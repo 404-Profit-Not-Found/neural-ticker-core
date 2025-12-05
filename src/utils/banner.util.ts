@@ -18,7 +18,7 @@ export async function showBanner(app: INestApplication) {
         console.log();
         console.log(
           chalk.blue(
-            await figlet.text('neuro tick', {
+            await figlet.text(`money = time`, {
               font: '',
               horizontalLayout: 'default',
               verticalLayout: 'default',
