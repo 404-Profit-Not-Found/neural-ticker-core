@@ -1,0 +1,16 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    container_name: neural_ticker_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-neural_ticker}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - neural_ticker_data:/var/lib/postgresql/data
+
+volumes:
+  neural_ticker_data:

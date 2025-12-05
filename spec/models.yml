@@ -1,0 +1,10 @@
+models:
+  openai:
+    low:    gpt-4.1-nano
+    medium: gpt-4.1-mini
+    high:   gpt-5-mini
+    deep:   gpt-5.1
+  gemini:
+    low:    gemini-2.5-flash-lite
+    medium: gemini-2.5-flash
+    high:   gemini-3-pro
