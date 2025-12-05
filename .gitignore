@@ -22,9 +22,9 @@ profile.cov
 # vendor/
 
 # env file
-.env
-firebase-config.json
-firebase-client-config.json
+# .env
+# firebase-config.json
+# firebase-client-config.json
 # Editor/IDE
 # .idea/
 # .vscode/
