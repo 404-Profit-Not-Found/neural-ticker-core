@@ -16,11 +16,12 @@
 
 The system is built as a modular NestJS application:
 
-- **SymbolsModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
+- **TickersModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
 - **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (TimescaleDB).
 - **ResearchModule**: Orchestrates LLM-based qualitative analysis.
 - **RiskRewardModule**: Generates quantitative scores (0-100) based on market data and AI insights.
 - **JobsModule**: Schedules background tasks (Daily Sync, Scanners).
+- **AuthModule**: Handles Google OAuth, Firebase Token Exchange, and JWT issuance.
 
 ## 🗄️ Database Architecture
 
@@ -30,7 +31,7 @@ The data layer utilizes **PostgreSQL** extended with **TimescaleDB** for efficie
 classDiagram
     direction TB
 
-    class symbols {
+    class tickers {
         +BIGINT id
         +TEXT symbol
         +TEXT name
@@ -42,7 +43,26 @@ classDiagram
         +NUMERIC share_outstanding
         +TEXT finnhub_industry
         +TEXT sector
+        +JSONB finnhub_raw
         +TIMESTAMPTZ updated_at
+    }
+
+    class users {
+        +UUID id
+        +TEXT email
+        +TEXT google_id
+        +TEXT full_name
+        +ENUM role
+        +TEXT avatar_url
+        +TIMESTAMPTZ last_login
+    }
+
+    class auth_logs {
+        +UUID id
+        +UUID user_id
+        +TEXT provider
+        +TIMESTAMPTZ login_at
+        +TEXT ip_address
     }
 
     class price_ohlcv {
@@ -85,14 +105,29 @@ classDiagram
         +INTEGER reward_score
         +ENUM confidence_level
         +TEXT provider
-        +bigint research_note_id
+        +JSONB numeric_context
+        +BIGINT research_note_id
     }
 
-    symbols "1" -- "*" price_ohlcv : has history
-    symbols "1" -- "1" fundamentals : has current stats
-    symbols "1" -- "*" risk_reward_scores : has scores
+    tickers "1" -- "*" price_ohlcv : has history
+    tickers "1" -- "1" fundamentals : has current stats
+    tickers "1" -- "*" risk_reward_scores : has scores
     research_notes "1" -- "*" risk_reward_scores : generated during
+    users "1" -- "*" auth_logs : logs login
 ```
+
+## 🔐 Authentication & API
+
+The API is secured via JWT. Common flow:
+
+1.  **Login via Google/Firebase**: Obtain a Firebase ID Token.
+2.  **Exchange Token**: `POST /auth/firebase` with `{ token: "..." }` to get an App Access Token.
+3.  **Use Token**: Add `Authorization: Bearer <access_token>` to requests.
+
+Key Endpoints:
+- `GET /api/v1/tickers`: List watched tickers.
+- `GET /api/v1/tickers/{symbol}/snapshot`: Get latest price/fundamentals (Lazy loads from Finnhub if missing).
+- `POST /api/v1/research/ask`: Submit a research query.
 
 ## 🧠 AI Model Configuration
 
@@ -131,6 +166,7 @@ $ npm install
    DATABASE_URL=postgres://user:pass@localhost:5432/neural_db
    FINNHUB_API_KEY=your_key
    OPENAI_API_KEY=your_key
+   FIREBASE_API_KEY=your_web_api_key
    ```
 
 ### Running the App

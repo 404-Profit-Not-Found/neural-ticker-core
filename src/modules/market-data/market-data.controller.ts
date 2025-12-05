@@ -5,11 +5,13 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
 
 @ApiTags('Market Data')
-@Controller('api/v1/symbols/:symbol')
+@ApiBearerAuth()
+@Controller('api/v1/tickers/:symbol')
 export class MarketDataController {
   constructor(private readonly service: MarketDataService) {}
 

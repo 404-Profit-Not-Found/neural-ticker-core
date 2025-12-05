@@ -5,11 +5,13 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { RiskRewardService } from './risk-reward.service';
 
 @ApiTags('Risk/Reward')
-@Controller('api/v1/symbols/:symbol/risk-reward')
+@ApiBearerAuth()
+@Controller('api/v1/tickers/:symbol/risk-reward')
 export class RiskRewardController {
   constructor(private readonly service: RiskRewardService) {}
 

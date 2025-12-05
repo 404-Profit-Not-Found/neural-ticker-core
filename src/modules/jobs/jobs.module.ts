@@ -8,7 +8,6 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
     FinnhubModule,
     TickersModule,
     MarketDataModule,
