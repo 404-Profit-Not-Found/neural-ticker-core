@@ -50,9 +50,9 @@ import configuration from './config/configuration';
           ssl:
             process.env.DB_SSL === 'false'
               ? false
-              : (dbConfig.url || process.env.DB_SSL === 'true')
-              ? { rejectUnauthorized: false }
-              : false,
+              : dbConfig.url || process.env.DB_SSL === 'true'
+                ? { rejectUnauthorized: false }
+                : false,
         };
       },
     }),
