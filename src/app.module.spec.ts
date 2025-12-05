@@ -12,6 +12,9 @@ describe('AppModule', () => {
     process.env.GEMINI_API_KEY = 'test-key';
     process.env.FINNHUB_API_KEY = 'test-key';
     
+    // Ensure DB_PASSWORD is a string to prevent "client password must be a string" error
+    process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'password';
+    
     // DB Configuration: rely on dotenv loading .env (whether local or Neon)
     // If running in CI (no .env), the CI env vars will handle it.
     
