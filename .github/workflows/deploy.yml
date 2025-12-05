@@ -1,0 +1,67 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: neuro-b7a51 # User's project ID
+  REGION: us-central1 # Common region, user can change if needed
+  REPO_NAME: neural-repo # Artifact Registry Repo Name (User needs to create this)
+  SERVICE_NAME: neural-ticket-core
+  IMAGE_NAME: neural-ticket-core
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Verify we have the secrets needed
+      # Note: We are using a Service Account Key JSON for simplicity as user has one.
+      # Ideally we use Workload Identity Federation (WIF) but that requires more setup on GCP side.
+      - name: 'Google Auth'
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: 'Configure Docker'
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: 'Build and Push Container'
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: 'Deploy to Cloud Run'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE_TAG }}
+          env_vars: |
+             NODE_ENV=production
+             APP_PORT=8080
+             DATABASE_URL=${{ secrets.DATABASE_URL }}
+             FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
+             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+             JWT_SECRET=${{ secrets.JWT_SECRET }}
+             FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+             FIREBASE_CREDENTIALS_JSON=${{ secrets.GCP_SA_KEY }}
+
+      - name: 'Show Output'
+        run: echo ${{ steps.deploy.outputs.url }}

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobsService } from './jobs.service';
 import { FinnhubModule } from '../finnhub/finnhub.module';
-import { SymbolsModule } from '../symbols/symbols.module';
+import { TickersModule } from '../tickers/tickers.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 
@@ -10,7 +10,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
   imports: [
     ScheduleModule.forRoot(),
     FinnhubModule,
-    SymbolsModule,
+    TickersModule,
     MarketDataModule,
     RiskRewardModule,
   ],

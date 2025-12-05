@@ -35,12 +35,13 @@ describe('FinnhubService', () => {
   });
 
   describe('getCompanyProfile', () => {
-    it('should return company profile data', async () => {
+    it('should verify connection on init', async () => {
       const mockData = { name: 'Apple Inc', ticker: 'AAPL' };
       mockHttpService.get.mockReturnValue(of({ data: mockData }));
 
       const result = await service.getCompanyProfile('AAPL');
       expect(result).toEqual(mockData);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(httpService.get).toHaveBeenCalledWith('/stock/profile2', {
         params: { symbol: 'AAPL' },
       });
@@ -54,6 +55,7 @@ describe('FinnhubService', () => {
 
       const result = await service.getQuote('AAPL');
       expect(result).toEqual(mockData);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(httpService.get).toHaveBeenCalledWith('/quote', {
         params: { symbol: 'AAPL' },
       });

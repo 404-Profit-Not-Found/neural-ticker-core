@@ -1,57 +1,77 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { showBanner } from './utils/banner.util';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Set global prefix if desired, e.g. api/v1
+  // app.setGlobalPrefix('api/v1');
+
   const config = new DocumentBuilder()
     .setTitle('Neural Ticket Core API')
-    .setDescription('API documentation for the Neural Ticket Core backend service.')
+    .setDescription(
+      'API documentation for the Neural Ticket Core backend service.',
+    )
     .setVersion('1.0')
     .addTag('Health')
-    .addTag('Symbols')
+    .addTag('Ticker')
     .addTag('Market Data')
     .addTag('Research')
     .addTag('Risk/Reward')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(process.env.APP_PORT ?? 8080);
-  
-  // Console Banner
-  try {
-    const { default: chalk } = await import('chalk');
-    const { DataSource } = await import('typeorm');
-    
-    const dataSource = app.get(DataSource);
-    const start = Date.now();
-    let dbStatus = chalk.yellow('Checking...');
+  // Retry logic for EADDRINUSE
+  const port = process.env.APP_PORT ?? 8080;
+
+  const listenWithRetry = async (attempts = 5) => {
     try {
-        if (dataSource.isInitialized) {
-             await dataSource.query('SELECT 1');
-             const latency = Date.now() - start;
-             dbStatus = chalk.green(`Online (${latency}ms)`);
+      await app.listen(port);
+    } catch (err: any) {
+      if (err.code === 'EADDRINUSE') {
+        if (attempts > 0) {
+          console.log(
+            `Port ${port} in use, retrying in 1s... (${attempts} attempts left)`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await listenWithRetry(attempts - 1);
         } else {
-            dbStatus = chalk.red('Not Initialized');
+          console.error(
+            `Unable to bind to port ${port} after multiple attempts.`,
+          );
+          process.exit(1);
         }
-    } catch (e) {
-        dbStatus = chalk.red('Error');
+      } else {
+        throw err;
+      }
     }
+  };
 
-    const port = process.env.APP_PORT ?? 8080;
-    const appName = 'neural-ticker-core';
+  await listenWithRetry();
 
-    console.log(chalk.bold.cyan(`\n${appName} started successfully!`));
-    console.log(chalk.gray('------------------------------------------------------------'));
-    console.log(chalk.green(`🚀 App running at:    `) + chalk.underline(`http://localhost:${port}`));
-    console.log(chalk.yellow(`sz Swagger Docs:      `) + chalk.underline(`http://localhost:${port}/api/docs`));
-    console.log(chalk.blue(`🗄️  Database:          `) + dbStatus);
-    console.log(chalk.gray('------------------------------------------------------------'));
-    
-  } catch (error) {
-    console.error('Failed to display banner:', error);
-  }
+  // Aggressive Shutdown for Hot Reload
+  // This ensures all keep-alive connections are killed instantly
+  const server = app.getHttpServer();
+
+  const cleanup = async () => {
+    // console.log(`Received signal, forcing shutdown...`);
+    if (server) {
+      server.closeAllConnections(); // Node 18+
+      server.close();
+    }
+    await app.close();
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => void cleanup());
+  process.on('SIGINT', () => void cleanup());
+
+  // Console Banner
+  await showBanner(app);
 }
-bootstrap();
+void bootstrap();

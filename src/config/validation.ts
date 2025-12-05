@@ -1,5 +1,15 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, IsUrl, ValidateIf, IsOptional, IsBooleanString, Min, Max, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsString,
+  IsUrl,
+  IsOptional,
+  IsBooleanString,
+  Min,
+  Max,
+  validateSync,
+} from 'class-validator';
 
 enum Environment {
   Local = 'local',
@@ -36,36 +46,6 @@ class EnvironmentVariables {
   @IsString()
   GEMINI_API_KEY: string;
 
-  // OpenAI Models
-  @IsString()
-  @IsOptional()
-  OPENAI_MODEL_LOW: string;
-
-  @IsString()
-  @IsOptional()
-  OPENAI_MODEL_MEDIUM: string;
-
-  @IsString()
-  @IsOptional()
-  OPENAI_MODEL_HIGH: string;
-
-  @IsString()
-  @IsOptional()
-  OPENAI_MODEL_DEEP: string;
-
-  // Gemini Models
-  @IsString()
-  @IsOptional()
-  GEMINI_MODEL_LOW: string;
-
-  @IsString()
-  @IsOptional()
-  GEMINI_MODEL_MEDIUM: string;
-
-  @IsString()
-  @IsOptional()
-  GEMINI_MODEL_HIGH: string;
-
   @IsBooleanString()
   @IsOptional()
   RRSCORE_ENABLED: string;
@@ -98,12 +78,12 @@ class EnvironmentVariables {
 }
 
 export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(
-    EnvironmentVariables,
-    config,
-    { enableImplicitConversion: true },
-  );
-  const errors = validateSync(validatedConfig, { skipMissingProperties: false });
+  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+    enableImplicitConversion: true,
+  });
+  const errors = validateSync(validatedConfig, {
+    skipMissingProperties: false,
+  });
 
   if (errors.length > 0) {
     throw new Error(errors.toString());

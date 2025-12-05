@@ -2,97 +2,172 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Neural-Ticket Core
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[![Build Status](https://github.com/branislavlang/neural-ticket-core/actions/workflows/ci.yml/badge.svg)](https://github.com/branislavlang/neural-ticket-core/actions)
+[![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)](https://github.com/branislavlang/neural-ticket-core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![NestJS](https://img.shields.io/badge/nestjs-%5E10.0.0-red)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
 
-## Description
+**Neural-Ticket Core** is the authoritative backend for the AI-assisted stock research tool. It orchestrates data ingestion from financial APIs (Finnhub), generates qualitative research notes via LLMs (OpenAI, Gemini), and calculates quantitative Risk/Reward scores.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📚 System Architecture
 
-## Project setup
+The system is built as a modular NestJS application:
+
+- **SymbolsModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
+- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (TimescaleDB).
+- **ResearchModule**: Orchestrates LLM-based qualitative analysis.
+- **RiskRewardModule**: Generates quantitative scores (0-100) based on market data and AI insights.
+- **JobsModule**: Schedules background tasks (Daily Sync, Scanners).
+
+## 🗄️ Database Architecture
+
+The data layer utilizes **PostgreSQL** extended with **TimescaleDB** for efficient time-series storage.
+
+```mermaid
+classDiagram
+    direction TB
+
+    class symbols {
+        +BIGINT id
+        +TEXT symbol
+        +TEXT name
+        +TEXT exchange
+        +TEXT currency
+        +TEXT country
+        +DATE ipo_date
+        +NUMERIC market_capitalization
+        +NUMERIC share_outstanding
+        +TEXT finnhub_industry
+        +TEXT sector
+        +TIMESTAMPTZ updated_at
+    }
+
+    class price_ohlcv {
+        +BIGINT symbol_id
+        +TIMESTAMPTZ ts
+        +TEXT timeframe
+        +NUMERIC open
+        +NUMERIC high
+        +NUMERIC low
+        +NUMERIC close
+        +NUMERIC volume
+        +TEXT source
+    }
+
+    class fundamentals {
+        +BIGINT symbol_id
+        +NUMERIC market_cap
+        +NUMERIC pe_ttm
+        +NUMERIC eps_ttm
+        +NUMERIC beta
+        +TIMESTAMPTZ updated_at
+    }
+
+    class research_notes {
+        +BIGINT id
+        +UUID request_id
+        +TEXT[] tickers
+        +TEXT question
+        +ENUM provider
+        +TEXT[] models_used
+        +TEXT answer_markdown
+    }
+
+    class risk_reward_scores {
+        +BIGINT id
+        +BIGINT symbol_id
+        +TIMESTAMPTZ as_of
+        +INTEGER risk_reward_score
+        +INTEGER risk_score
+        +INTEGER reward_score
+        +ENUM confidence_level
+        +TEXT provider
+        +bigint research_note_id
+    }
+
+    symbols "1" -- "*" price_ohlcv : has history
+    symbols "1" -- "1" fundamentals : has current stats
+    symbols "1" -- "*" risk_reward_scores : has scores
+    research_notes "1" -- "*" risk_reward_scores : generated during
+```
+
+## 🧠 AI Model Configuration
+
+Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `models.yml` or environment variables.
+
+| Tier | OpenAI | Gemini |
+| :--- | :--- | :--- |
+| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` |
+| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` |
+| **High** | `gpt-5-mini` | `gemini-3-pro` |
+| **Deep** | `gpt-5.1` | - |
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** (v18+)
+- **Docker** & **Docker Compose**
+- **Finnhub API Key**
+- **OpenAI / Gemini API Keys** (Optional for AI features)
+
+### Installation
 
 ```bash
 $ npm install
 ```
 
-## Compile and run the project
+### Environment Setup
 
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Configure your keys:
+   ```ini
+   DATABASE_URL=postgres://user:pass@localhost:5432/neural_db
+   FINNHUB_API_KEY=your_key
+   OPENAI_API_KEY=your_key
+   ```
+
+### Running the App
+
+Start the database services:
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+$ docker-compose up -d
 ```
 
-## Run tests
+Run the server:
+```bash
+# Data ingestion & API
+$ npm run start:dev
+```
+
+## 🧪 Testing
+
+The project maintains **>80% Code Coverage** for critical services.
 
 ```bash
-# unit tests
+# Unit Tests
 $ npm run test
 
-# e2e tests
+# Setup E2E Sandbox
 $ npm run test:e2e
 
-# test coverage
+# View Coverage Report
 $ npm run test:cov
 ```
 
-## Deployment
+## 📦 Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Powered by **Google Cloud Run** and **GitHub Actions**.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- **Push to Main**: Triggers Build & Test.
+- **Release**: TBD
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## 📄 License
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is [MIT licensed](LICENSE).

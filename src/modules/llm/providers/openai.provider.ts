@@ -17,9 +17,14 @@ export class OpenAiProvider implements ILlmProvider {
 
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
     const tieredModel = this.resolveModel(prompt.quality);
+    const contextStr =
+      typeof prompt.numericContext === 'string'
+        ? prompt.numericContext
+        : JSON.stringify(prompt.numericContext);
+
     const systemPrompt = `You are a financial analyst.
     Ground your answer in the provided numeric context ONLY.
-    Context: ${JSON.stringify(prompt.numericContext)}`;
+    Context: ${contextStr}`;
 
     try {
       const response = await this.client.chat.completions.create({
@@ -45,7 +50,9 @@ export class OpenAiProvider implements ILlmProvider {
     }
   }
 
-  private resolveModel(quality: 'low' | 'medium' | 'high' | 'deep' = 'medium'): string {
+  private resolveModel(
+    quality: 'low' | 'medium' | 'high' | 'deep' = 'medium',
+  ): string {
     const models = this.configService.get('openai.models');
     return models[quality] || 'gpt-4o';
   }

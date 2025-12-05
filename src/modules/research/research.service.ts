@@ -27,35 +27,35 @@ export class ResearchService {
     // 1. Gather context
     const context: Record<string, any> = {};
     for (const ticker of tickers) {
-        // In a real app, this would handle errors gracefully per ticker
-        const snapshot = await this.marketDataService.getSnapshot(ticker);
-        context[ticker] = snapshot;
+      // In a real app, this would handle errors gracefully per ticker
+      const snapshot = await this.marketDataService.getSnapshot(ticker);
+      context[ticker] = snapshot;
     }
 
     // 2. Call LLM
     const result = await this.llmService.generateResearch({
-        question,
-        tickers,
-        numericContext: context,
-        quality,
-        provider,
+      question,
+      tickers,
+      numericContext: context,
+      quality,
+      provider,
     });
 
     // 3. Persist
     const note = this.noteRepo.create({
-        request_id: uuidv4(),
-        tickers,
-        question,
-        provider: provider as LlmProvider,
-        models_used: result.models,
-        answer_markdown: result.answerMarkdown,
-        numeric_context: context,
+      request_id: uuidv4(),
+      tickers,
+      question,
+      provider: provider as LlmProvider,
+      models_used: result.models,
+      answer_markdown: result.answerMarkdown,
+      numeric_context: context,
     });
 
     return this.noteRepo.save(note);
   }
 
   async getResearchNote(id: string): Promise<ResearchNote | null> {
-      return this.noteRepo.findOne({ where: { id } });
+    return this.noteRepo.findOne({ where: { id } });
   }
 }
