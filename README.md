@@ -207,3 +207,4 @@ Powered by **Google Cloud Run** and **GitHub Actions**.
 ## 📄 License
 
 This project is [MIT licensed](LICENSE).
+
