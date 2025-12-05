@@ -20,11 +20,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    console.log('DEBUG: JwtStrategy validating payload:', payload);
     // payload.sub is the user UUID
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
+      console.error('DEBUG: JwtStrategy failed - user not found for sub:', payload.sub);
       throw new UnauthorizedException();
     }
+    console.log('DEBUG: JwtStrategy success for user:', user.email);
     return user;
   }
 }

@@ -1,9 +1,10 @@
 import { Controller, Get, Param, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 
 @ApiTags('Ticker')
+@ApiBearerAuth()
 @Controller('api/v1/tickers')
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}

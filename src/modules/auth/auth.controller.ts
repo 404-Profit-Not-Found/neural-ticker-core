@@ -10,7 +10,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import type { Request, Response } from 'express';
 
@@ -19,6 +19,7 @@ import { GoogleAuthExceptionFilter } from './filters/google-auth-exception.filte
 
 @Public()
 @ApiTags('Auth')
+@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
