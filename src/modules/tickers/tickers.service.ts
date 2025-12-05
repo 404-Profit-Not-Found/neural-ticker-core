@@ -15,13 +15,8 @@ export class TickersService {
   ) {}
 
   async getTicker(symbol: string): Promise<TickerEntity> {
-    const entity = await this.tickerRepo.findOne({
-      where: { symbol: symbol.toUpperCase() },
-    });
-    if (!entity) {
-      throw new NotFoundException(`Ticker ${symbol} not found`);
-    }
-    return entity;
+    // If not in DB, try to fetch from Finnhub via ensureTicker
+    return this.ensureTicker(symbol);
   }
 
   // Alias for backward compatibility if needed, or primarily used by other services
@@ -38,17 +33,33 @@ export class TickersService {
       return existing;
     }
 
-    this.logger.log(
-      `Ticker ${upperSymbol} not found, fetching from Finnhub...`,
-    );
-    const profile = await this.finnhubService.getCompanyProfile(upperSymbol);
+    let profile;
+    try {
+      this.logger.log(
+        `Ticker ${upperSymbol} not found, fetching from Finnhub...`,
+      );
+      profile = await this.finnhubService.getCompanyProfile(upperSymbol);
+    } catch (error) {
+      if (error.response?.status === 429) {
+        this.logger.warn(
+          `Finnhub Rate Limit Exceeded for ${upperSymbol}. Retrying later suggested.`,
+        );
+        throw new NotFoundException(
+          `Ticker ${upperSymbol} could not be verified due to rate limits. Please try again later.`,
+        );
+      }
+      this.logger.error(
+        `Finnhub fetch failed for ${upperSymbol}: ${error.message}`,
+      );
+      // Fallback: throw NotFound to be consistent with "lazy load failed"
+      throw new NotFoundException(
+        `Ticker ${upperSymbol} not found or external API unavailable`,
+      );
+    }
 
     // If Finnhub returns empty object or error logic needs handling
     if (!profile || Object.keys(profile).length === 0) {
       this.logger.warn(`Finnhub returned no profile for ${upperSymbol}`);
-      // Depending on business logic, might still create a placeholder or throw
-      // For now, assume if valid symbol Finnhub returns something.
-      // If empty, throw NotFound
       throw new NotFoundException(
         `Ticker ${upperSymbol} details not found in Finnhub`,
       );
