@@ -5,6 +5,10 @@ import { INestApplication } from '@nestjs/common';
 describe('AppModule', () => {
   let app: INestApplication;
 
+  beforeAll(() => {
+    process.env.OPENAI_API_KEY = 'test-key';
+  });
+
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
