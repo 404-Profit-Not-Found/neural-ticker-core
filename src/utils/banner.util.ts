@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import figlet from 'figlet';
 
 export async function showBanner(app: INestApplication) {
   try {
@@ -14,6 +15,19 @@ export async function showBanner(app: INestApplication) {
 
     try {
       if (dataSource.isInitialized) {
+        console.log();
+        console.log(
+          chalk.blue(
+            await figlet.text('neuro tick', {
+              font: '',
+              horizontalLayout: 'default',
+              verticalLayout: 'default',
+              width: 80,
+              whitespaceBreak: true,
+            }),
+          ),
+        );
+
         await dataSource.query('SELECT 1');
         const latency = Date.now() - start;
         dbStatus = chalk.green(`Online (${latency}ms)`);

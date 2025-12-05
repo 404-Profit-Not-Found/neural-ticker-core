@@ -47,7 +47,12 @@ import configuration from './config/configuration';
           database: process.env.DB_DATABASE,
           autoLoadEntities: true,
           synchronize: process.env.DB_SYNCHRONIZE === 'true',
-          ssl: dbConfig.url ? { rejectUnauthorized: false } : false,
+          ssl:
+            process.env.DB_SSL === 'false'
+              ? false
+              : (dbConfig.url || process.env.DB_SSL === 'true')
+              ? { rejectUnauthorized: false }
+              : false,
         };
       },
     }),

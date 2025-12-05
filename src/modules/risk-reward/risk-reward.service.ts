@@ -65,7 +65,7 @@ export class RiskRewardService {
   // Scanning logic would go here (evaluateSymbol)
   async evaluateSymbol(
     symbol: string,
-    provider: 'openai' | 'gemini' = 'openai',
+    provider: 'gemini' | 'openai' = 'openai',
     quality: QualityTier = 'low',
   ) {
     const snapshot = await this.marketDataService.getSnapshot(symbol);
