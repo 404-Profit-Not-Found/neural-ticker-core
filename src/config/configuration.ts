@@ -37,4 +37,9 @@ export default () => ({
     readTimeout: parseInt(process.env.HTTP_READ_TIMEOUT_SEC || '10', 10),
     writeTimeout: parseInt(process.env.HTTP_WRITE_TIMEOUT_SEC || '10', 10),
   },
+  firebase: {
+    serviceAccountJson:
+      process.env.GCP_SA_KEY || process.env.FIREBASE_CREDENTIALS_JSON,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+  },
 });

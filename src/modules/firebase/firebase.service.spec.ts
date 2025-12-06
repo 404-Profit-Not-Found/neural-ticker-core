@@ -50,7 +50,7 @@ describe('FirebaseService', () => {
     it('should load credentials from JSON env var', async () => {
       const mockCreds = { private_key: 'key', client_email: 'email' };
       (configService.get as jest.Mock).mockImplementation((key) => {
-        if (key === 'FIREBASE_CREDENTIALS_JSON')
+        if (key === 'firebase.serviceAccountJson')
           return JSON.stringify(mockCreds);
         return null;
       });
@@ -76,7 +76,7 @@ describe('FirebaseService', () => {
 
     it('should handle json parse error in credentials env var', async () => {
       (configService.get as jest.Mock).mockImplementation((key) => {
-        if (key === 'FIREBASE_CREDENTIALS_JSON') return '{ invalid json }';
+        if (key === 'firebase.serviceAccountJson') return '{ invalid json }';
         return null;
       });
 
@@ -90,7 +90,7 @@ describe('FirebaseService', () => {
     it('should fail gracefully if private_key missing in credentials', async () => {
       const mockCreds = { client_email: 'no-key' };
       (configService.get as jest.Mock).mockImplementation((key) => {
-        if (key === 'FIREBASE_CREDENTIALS_JSON')
+        if (key === 'firebase.serviceAccountJson')
           return JSON.stringify(mockCreds);
         return null;
       });
