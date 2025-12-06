@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import { HealthModule } from './modules/health/health.module';
+import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
 import configuration from './config/configuration';
 
 // ...
@@ -67,6 +68,7 @@ import configuration from './config/configuration';
     UsersModule,
     AuthModule,
     FirebaseModule,
+    StockTwitsModule,
   ],
   controllers: [AppController],
   providers: [
