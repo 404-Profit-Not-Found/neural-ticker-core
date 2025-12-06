@@ -3,6 +3,8 @@ import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { ResearchPrompt, ResearchResult } from './llm.types';
 
+import { jsonToToon } from 'toon-parser';
+
 @Injectable()
 export class LlmService {
   constructor(
@@ -13,49 +15,71 @@ export class LlmService {
   async generateResearch(prompt: ResearchPrompt): Promise<ResearchResult> {
     const provider = prompt.provider || 'openai';
 
+    // Optimize context tokens using Toon Parser
+    const optimizedPrompt = { ...prompt };
+    if (
+      optimizedPrompt.numericContext &&
+      typeof optimizedPrompt.numericContext === 'object'
+    ) {
+      try {
+        // Sanitize: Toon Parser crashes on Date objects/Functions.
+        // JSON.stringify converts Dates to strings, and strips functions.
+        const sanitized = JSON.parse(
+          JSON.stringify(optimizedPrompt.numericContext),
+        );
+        optimizedPrompt.numericContext = jsonToToon(sanitized);
+      } catch (e) {
+        // Fallback to original if parsing fails
+        console.warn('Toon parsing failed, using original context', e);
+      }
+    }
+
     switch (provider) {
       case 'openai':
-        return this.openAiProvider.generate(prompt);
+        return this.openAiProvider.generate(optimizedPrompt);
       case 'gemini':
-        return this.geminiProvider.generate(prompt);
-      case 'ensemble':
+        return this.geminiProvider.generate(optimizedPrompt);
+      case 'ensemble': {
         // Simple ensemble: run both, return combined.
-        // For now, let's just run OpenAI as primary and maybe append if we had logic.
-        // Or run both and combine.
         const [openaiRes, geminiRes] = await Promise.allSettled([
-          this.openAiProvider.generate(prompt),
-          this.geminiProvider.generate(prompt)
+          this.openAiProvider.generate(optimizedPrompt),
+          this.geminiProvider.generate(optimizedPrompt),
         ]);
-        
+
         const answerParts = [];
         const models = [];
         let tokensIn = 0;
         let tokensOut = 0;
 
         if (openaiRes.status === 'fulfilled') {
-            answerParts.push(`### OpenAI (${openaiRes.value.models.join(', ')})\n${openaiRes.value.answerMarkdown}`);
-            models.push(...openaiRes.value.models);
-            tokensIn += openaiRes.value.tokensIn || 0;
-            tokensOut += openaiRes.value.tokensOut || 0;
+          answerParts.push(
+            `### OpenAI (${openaiRes.value.models.join(', ')})\n${openaiRes.value.answerMarkdown}`,
+          );
+          models.push(...openaiRes.value.models);
+          tokensIn += openaiRes.value.tokensIn || 0;
+          tokensOut += openaiRes.value.tokensOut || 0;
         }
         if (geminiRes.status === 'fulfilled') {
-            answerParts.push(`### Gemini (${geminiRes.value.models.join(', ')})\n${geminiRes.value.answerMarkdown}`);
-            models.push(...geminiRes.value.models);
+          answerParts.push(
+            `### Gemini (${geminiRes.value.models.join(', ')})\n${geminiRes.value.answerMarkdown}`,
+          );
+          models.push(...geminiRes.value.models);
         }
 
         if (answerParts.length === 0) {
-            throw new Error("All ensemble providers failed");
+          throw new Error('All ensemble providers failed');
         }
 
         return {
-            provider: 'ensemble',
-            models,
-            answerMarkdown: answerParts.join('\n\n---\n\n'),
-            tokensIn,
-            tokensOut,
+          provider: 'ensemble',
+          models,
+          answerMarkdown: answerParts.join('\n\n---\n\n'),
+          tokensIn,
+          tokensOut,
         };
+      }
       default:
-        throw new BadRequestException(`Unknown provider: ${provider}`);
+        throw new BadRequestException(`Unknown provider: ${provider as any}`);
     }
   }
 }

@@ -51,24 +51,24 @@ describe('ResearchService', () => {
 
   describe('createResearchQuestion', () => {
     it('should create and save research note', async () => {
-        const tickers = ['AAPL'];
-        const question = 'Analyzie';
-        
-        mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
-        mockLlmService.generateResearch.mockResolvedValue({
-            provider: 'ensemble',
-            models: ['gpt'],
-            answerMarkdown: 'Answer',
-        });
-        repo.create.mockReturnValue({ id: '1', question });
-        repo.save.mockResolvedValue({ id: '1', question });
+      const tickers = ['AAPL'];
+      const question = 'Analyzie';
 
-        const result = await service.createResearchQuestion(tickers, question);
-        
-        expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
-        expect(llmService.generateResearch).toHaveBeenCalled();
-        expect(repo.save).toHaveBeenCalled();
-        expect(result).toEqual({ id: '1', question });
+      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
+      mockLlmService.generateResearch.mockResolvedValue({
+        provider: 'ensemble',
+        models: ['gpt'],
+        answerMarkdown: 'Answer',
+      });
+      repo.create.mockReturnValue({ id: '1', question });
+      repo.save.mockResolvedValue({ id: '1', question });
+
+      const result = await service.createResearchQuestion(tickers, question);
+
+      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(llmService.generateResearch).toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalled();
+      expect(result).toEqual({ id: '1', question });
     });
   });
 });

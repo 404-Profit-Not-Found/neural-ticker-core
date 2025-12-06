@@ -5,13 +5,13 @@ import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
-import { SymbolsModule } from '../symbols/symbols.module';
+import { TickersModule } from '../tickers/tickers.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PriceOhlcv, Fundamentals]),
     FinnhubModule,
-    SymbolsModule,
+    TickersModule,
   ],
   controllers: [MarketDataController],
   providers: [MarketDataService],

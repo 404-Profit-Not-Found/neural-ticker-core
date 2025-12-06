@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum RiskConfidenceLevel {
@@ -22,11 +28,18 @@ export class RiskRewardScore {
   @Column({ type: 'timestamptz' })
   as_of: Date;
 
-  @ApiProperty({ example: 75, description: 'Composite Risk/Reward Score (0-100)' })
+  @ApiProperty({
+    example: 75,
+    description: 'Composite Risk/Reward Score (0-100)',
+  })
   @Column({ type: 'integer' })
   risk_reward_score: number;
 
-  @ApiProperty({ example: 40, description: 'Risk Component Score (Lower is better usually, or context dependent)' })
+  @ApiProperty({
+    example: 40,
+    description:
+      'Risk Component Score (Lower is better usually, or context dependent)',
+  })
   @Column({ type: 'integer', nullable: true })
   risk_score: number;
 
@@ -35,7 +48,11 @@ export class RiskRewardScore {
   reward_score: number;
 
   @ApiProperty({ enum: RiskConfidenceLevel, example: RiskConfidenceLevel.HIGH })
-  @Column({ type: 'enum', enum: RiskConfidenceLevel, default: RiskConfidenceLevel.MEDIUM })
+  @Column({
+    type: 'enum',
+    enum: RiskConfidenceLevel,
+    default: RiskConfidenceLevel.MEDIUM,
+  })
   confidence_level: RiskConfidenceLevel;
 
   @ApiProperty({ example: 'openai' })

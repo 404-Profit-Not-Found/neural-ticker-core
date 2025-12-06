@@ -12,18 +12,18 @@ export default () => ({
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: process.env.OPENAI_BASE_URL,
     models: {
-      low: process.env.OPENAI_MODEL_LOW || 'gpt-4o-mini',
-      medium: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4o',
-      high: process.env.OPENAI_MODEL_HIGH || 'gpt-4o',
-      deep: process.env.OPENAI_MODEL_DEEP || 'gpt-4o',
+      low: 'gpt-4.1-nano',
+      medium: 'gpt-4.1-mini',
+      high: 'gpt-5-mini',
+      deep: 'gpt-5.1',
     },
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     models: {
-      low: process.env.GEMINI_MODEL_LOW || 'gemini-1.5-flash',
-      medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-1.5-pro',
-      high: process.env.GEMINI_MODEL_HIGH || 'gemini-1.5-pro',
+      low: 'gemini-2.5-flash-lite',
+      medium: 'gemini-2.5-flash',
+      high: 'gemini-3-pro',
     },
   },
   riskReward: {

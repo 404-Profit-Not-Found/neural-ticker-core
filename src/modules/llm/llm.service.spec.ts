@@ -43,11 +43,15 @@ describe('LlmService', () => {
     const prompt: ResearchPrompt = {
       question: 'Why?',
       tickers: ['A'],
-      numericContext: {},
+      numericContext: '',
     };
 
     it('should default to openai', async () => {
-      const expected: ResearchResult = { provider: 'openai', models: ['gpt'], answerMarkdown: 'Ok' };
+      const expected: ResearchResult = {
+        provider: 'openai',
+        models: ['gpt'],
+        answerMarkdown: 'Ok',
+      };
       mockOpenAiProvider.generate.mockResolvedValue(expected);
 
       const result = await service.generateResearch(prompt);
@@ -57,28 +61,46 @@ describe('LlmService', () => {
     });
 
     it('should call gemini when provider is gemini', async () => {
-        const expected: ResearchResult = { provider: 'gemini', models: ['gem'], answerMarkdown: 'Ok' };
-        mockGeminiProvider.generate.mockResolvedValue(expected);
-        
-        const result = await service.generateResearch({ ...prompt, provider: 'gemini' });
-        expect(result).toEqual(expected);
-        expect(gemini.generate).toHaveBeenCalled();
+      const expected: ResearchResult = {
+        provider: 'gemini',
+        models: ['gem'],
+        answerMarkdown: 'Ok',
+      };
+      mockGeminiProvider.generate.mockResolvedValue(expected);
+
+      const result = await service.generateResearch({
+        ...prompt,
+        provider: 'gemini',
+      });
+      expect(result).toEqual(expected);
+      expect(gemini.generate).toHaveBeenCalled();
     });
 
     it('should call both for ensemble', async () => {
-        const openaiRes: ResearchResult = { provider: 'openai', models: ['gpt'], answerMarkdown: 'AI answer' };
-        const geminiRes: ResearchResult = { provider: 'gemini', models: ['gem'], answerMarkdown: 'Gem answer' };
-        
-        mockOpenAiProvider.generate.mockResolvedValue(openaiRes);
-        mockGeminiProvider.generate.mockResolvedValue(geminiRes);
+      const openaiRes: ResearchResult = {
+        provider: 'openai',
+        models: ['gpt'],
+        answerMarkdown: 'AI answer',
+      };
+      const geminiRes: ResearchResult = {
+        provider: 'gemini',
+        models: ['gem'],
+        answerMarkdown: 'Gem answer',
+      };
 
-        const result = await service.generateResearch({ ...prompt, provider: 'ensemble' });
-        
-        expect(openai.generate).toHaveBeenCalled();
-        expect(gemini.generate).toHaveBeenCalled();
-        expect(result.provider).toBe('ensemble');
-        expect(result.answerMarkdown).toContain('### OpenAI');
-        expect(result.answerMarkdown).toContain('### Gemini');
+      mockOpenAiProvider.generate.mockResolvedValue(openaiRes);
+      mockGeminiProvider.generate.mockResolvedValue(geminiRes);
+
+      const result = await service.generateResearch({
+        ...prompt,
+        provider: 'ensemble',
+      });
+
+      expect(openai.generate).toHaveBeenCalled();
+      expect(gemini.generate).toHaveBeenCalled();
+      expect(result.provider).toBe('ensemble');
+      expect(result.answerMarkdown).toContain('### OpenAI');
+      expect(result.answerMarkdown).toContain('### Gemini');
     });
   });
 });

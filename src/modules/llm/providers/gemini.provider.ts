@@ -19,22 +19,29 @@ export class GeminiProvider implements ILlmProvider {
 
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
     if (!this.genAI) {
-        throw new Error("Gemini API Key not configured");
+      throw new Error('Gemini API Key not configured');
     }
 
     const modelName = this.resolveModel(prompt.quality);
-    const model: GenerativeModel = this.genAI.getGenerativeModel({ model: modelName });
+    const model: GenerativeModel = this.genAI.getGenerativeModel({
+      model: modelName,
+    });
+
+    const contextStr =
+      typeof prompt.numericContext === 'string'
+        ? prompt.numericContext
+        : JSON.stringify(prompt.numericContext);
 
     const systemPrompt = `You are a financial analyst.
     Ground your answer in the provided numeric context ONLY.
-    Context: ${JSON.stringify(prompt.numericContext)}`;
+    Context: ${contextStr}`;
 
     const fullPrompt = `${systemPrompt}\n\nQuestion: ${prompt.question}`;
 
     try {
       const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      
+      const response = result.response;
+
       return {
         provider: 'gemini',
         models: [modelName],
@@ -47,11 +54,13 @@ export class GeminiProvider implements ILlmProvider {
     }
   }
 
-  private resolveModel(quality: 'low' | 'medium' | 'high' | 'deep' = 'medium'): string {
+  private resolveModel(
+    quality: 'low' | 'medium' | 'high' | 'deep' = 'medium',
+  ): string {
     const models = this.configService.get('gemini.models');
     if (quality === 'deep') {
-        // Fallback to high for Gemini as per spec (only 3 tiers) or use high
-        return models['high'] || 'gemini-1.5-pro';
+      // Fallback to high for Gemini as per spec (only 3 tiers) or use high
+      return models['high'] || 'gemini-1.5-pro';
     }
     return models[quality] || 'gemini-1.5-flash';
   }

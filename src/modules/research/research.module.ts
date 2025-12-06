@@ -4,14 +4,14 @@ import { ResearchController } from './research.controller';
 import { ResearchService } from './research.service';
 import { ResearchNote } from './entities/research-note.entity';
 import { LlmModule } from '../llm/llm.module';
-import { SymbolsModule } from '../symbols/symbols.module';
+import { TickersModule } from '../tickers/tickers.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResearchNote]),
     LlmModule,
-    SymbolsModule,
+    TickersModule,
     MarketDataModule,
   ],
   controllers: [ResearchController],
