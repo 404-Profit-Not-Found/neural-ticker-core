@@ -60,9 +60,11 @@ export class FirebaseService implements OnModuleInit {
 
         if (serviceAccount) {
           // Safety Check: Users often confuse Client Config with Service Account
-          if (!serviceAccount.private_key) {
+          if (!serviceAccount.private_key || !serviceAccount.client_email) {
             this.logger.error(
-              `[FATAL] Invalid Firebase Credentials! Missing private_key.`,
+              `[FATAL] Invalid Firebase Credentials! Missing private_key or client_email. Found keys: ${Object.keys(
+                serviceAccount,
+              ).join(', ')}`,
             );
             return;
           }
@@ -87,6 +89,12 @@ export class FirebaseService implements OnModuleInit {
   }
 
   async verifyIdToken(token: string): Promise<admin.auth.DecodedIdToken> {
+    if (admin.apps.length === 0) {
+      this.logger.error('Firebase Admin not initialized. Cannot verify token.');
+      throw new Error(
+        'Firebase integration is disabled due to missing credentials.',
+      );
+    }
     return admin.auth().verifyIdToken(token);
   }
 }

@@ -109,9 +109,28 @@ classDiagram
         +BIGINT research_note_id
     }
 
+    class stocktwits_posts {
+        +BIGINT id
+        +TEXT symbol
+        +TEXT username
+        +TEXT body
+        +INTEGER likes_count
+        +INTEGER user_followers_count
+        +TIMESTAMPTZ created_at
+    }
+
+    class stocktwits_watchers {
+        +UUID id
+        +TEXT symbol
+        +INTEGER count
+        +TIMESTAMPTZ timestamp
+    }
+
     tickers "1" -- "*" price_ohlcv : has history
     tickers "1" -- "1" fundamentals : has current stats
     tickers "1" -- "*" risk_reward_scores : has scores
+    tickers "1" -- "*" stocktwits_posts : mentions
+    tickers "1" -- "*" stocktwits_watchers : tracked in
     research_notes "1" -- "*" risk_reward_scores : generated during
     users "1" -- "*" auth_logs : logs login
 ```
