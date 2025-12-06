@@ -5,7 +5,10 @@ import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
 
 async function bootstrap() {
+  console.log('--- BOOTSTRAP STARTING ---');
+  console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
+  console.log('--- NEST APP CREATED ---');
 
   // Set global prefix if desired, e.g. api/v1
   // app.setGlobalPrefix('api/v1');
@@ -31,7 +34,9 @@ async function bootstrap() {
 
   const listenWithRetry = async (attempts = 5) => {
     try {
+      console.log(`--- ATTEMPTING TO LISTEN ON PORT ${port} (0.0.0.0) ---`);
       await app.listen(port, '0.0.0.0');
+      console.log('--- APP LISTENING SUCCESSFULLY ---');
     } catch (err: any) {
       if (err.code === 'EADDRINUSE') {
         if (attempts > 0) {
