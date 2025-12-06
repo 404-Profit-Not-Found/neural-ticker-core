@@ -27,7 +27,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   // Retry logic for EADDRINUSE
-  const port = process.env.APP_PORT ?? 8080;
+  const port = process.env.PORT || process.env.APP_PORT || 8080;
 
   const listenWithRetry = async (attempts = 5) => {
     try {
