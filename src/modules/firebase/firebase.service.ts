@@ -12,13 +12,15 @@ export class FirebaseService implements OnModuleInit {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async onModuleInit() {
+    // Priority 1: JSON Content from Config (Env: GCP_SA_KEY or FIREBASE_CREDENTIALS_JSON)
+    const serviceAccountJson = this.configService.get<string>(
+      'firebase.serviceAccountJson',
+    );
+    // Priority 2: File Path (Legacy / Local Dev)
     const serviceAccountPath = this.configService.get<string>(
       'GOOGLE_APPLICATION_CREDENTIALS',
     );
-    const serviceAccountJson = this.configService.get<string>(
-      'FIREBASE_CREDENTIALS_JSON',
-    ); // New Support
-    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+    const projectId = this.configService.get<string>('firebase.projectId');
 
     // We try to initialize.
     try {
@@ -26,35 +28,34 @@ export class FirebaseService implements OnModuleInit {
         let serviceAccount: any;
 
         if (serviceAccountJson) {
-          // Support for Cloud Run where we pass JSON as Env Var
           try {
-            serviceAccount = JSON.parse(serviceAccountJson);
-            this.logger.log(
-              'Loaded Firebase Credentials from FIREBASE_CREDENTIALS_JSON',
-            );
+             // If it's a string starting with '{', parse it.
+             // If the user pasted the key into the env var, it will be a string.
+             if (serviceAccountJson.trim().startsWith('{')) {
+                serviceAccount = JSON.parse(serviceAccountJson);
+                this.logger.log('Loaded Firebase Credentials from Config (JSON Content)');
+             } else {
+                 this.logger.warn('firebase.serviceAccountJson does not look like JSON');
+             }
           } catch (e) {
-            this.logger.error('Failed to parse FIREBASE_CREDENTIALS_JSON', e);
+            this.logger.error('Failed to parse firebase.serviceAccountJson', e);
           }
         } else if (serviceAccountPath) {
-          // Check if it looks like a path or content (simple check)
-          if (serviceAccountPath.trim().startsWith('{')) {
-            // It's content disguised as path?
-            serviceAccount = JSON.parse(serviceAccountPath);
-          } else {
-            try {
-              // Fix: Resolve path absolute to CWD to handle ./firebase-config.json correctly
-              const absolutePath = path.isAbsolute(serviceAccountPath)
+          // Legacy path handling
+          try {
+             const absolutePath = path.isAbsolute(serviceAccountPath)
                 ? serviceAccountPath
                 : path.resolve(process.cwd(), serviceAccountPath);
-
-              // serviceAccount = require(absolutePath);
-              const fileContent = fs.readFileSync(absolutePath, 'utf8');
-              serviceAccount = JSON.parse(fileContent);
-            } catch (e) {
-              this.logger.warn(
-                `Could not require credential file: ${serviceAccountPath} (resolved: ${path.resolve(process.cwd(), serviceAccountPath)}) - Error: ${e}`,
-              );
-            }
+             
+             if (fs.existsSync(absolutePath)) {
+                const fileContent = fs.readFileSync(absolutePath, 'utf8');
+                serviceAccount = JSON.parse(fileContent);
+                this.logger.log(`Loaded Firebase Credentials from file: ${serviceAccountPath}`);
+             } else {
+                 this.logger.warn(`Credential file not found: ${absolutePath}`);
+             }
+          } catch (e) {
+             this.logger.warn(`Could not read credential file: ${e.message}`);
           }
         }
 

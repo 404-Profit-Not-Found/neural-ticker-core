@@ -22,6 +22,7 @@ describe('StockTwitsService', () => {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
+    findAndCount: jest.fn(),
   };
 
   const mockWatchersRepo = {
@@ -127,6 +128,30 @@ describe('StockTwitsService', () => {
           count: 5000,
         }),
       );
+    });
+  });
+
+  describe('getPosts', () => {
+    it('should return paginated posts', async () => {
+      const symbol = 'AAPL';
+      const mockPosts = [{ id: 1 }, { id: 2 }];
+      const total = 10;
+      mockPostsRepo.findAndCount = jest.fn().mockResolvedValue([mockPosts, total]);
+
+      const result = await service.getPosts(symbol, 1, 10);
+
+      expect(postsRepo.findAndCount).toHaveBeenCalledWith({
+        where: { symbol },
+        order: { created_at: 'DESC' },
+        take: 10,
+        skip: 0,
+      });
+      expect(result).toEqual({
+        data: mockPosts,
+        total,
+        page: 1,
+        limit: 10,
+      });
     });
   });
 });

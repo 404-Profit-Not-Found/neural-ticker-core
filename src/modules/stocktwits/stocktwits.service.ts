@@ -128,12 +128,23 @@ export class StockTwitsService {
     this.logger.log('Daily Watcher Sync Complete.');
   }
 
-  async getPosts(symbol: string) {
-    return this.postsRepository.find({
+  async getPosts(symbol: string, page = 1, limit = 50) {
+    const take = limit;
+    const skip = (page - 1) * take;
+
+    const [data, total] = await this.postsRepository.findAndCount({
       where: { symbol },
       order: { created_at: 'DESC' },
-      take: 50,
+      take,
+      skip,
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   async getWatchersHistory(symbol: string) {
