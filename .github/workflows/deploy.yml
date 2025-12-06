@@ -16,6 +16,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: prod
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -23,7 +24,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+      - name: Debug Secrets
+        run: |
+          echo "Is GCP_SA_KEY set? ${{ secrets.GCP_SA_KEY != '' }}"
+          echo "Is DATABASE_URL set? ${{ secrets.DATABASE_URL != '' }}"
       # Verify we have the secrets needed
       # Note: We are using a Service Account Key JSON for simplicity as user has one.
       # Ideally we use Workload Identity Federation (WIF) but that requires more setup on GCP side.
