@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
-import { Cron, CronExpression } from '@nestjs/schedule';
+
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 import { TickersService } from '../tickers/tickers.service';
@@ -100,7 +100,7 @@ export class StockTwitsService {
   /**
    * Hourly: Sync posts for all tickers
    */
-  @Cron(CronExpression.EVERY_HOUR)
+
   async handleHourlyPostsSync() {
     this.logger.log('Starting Hourly StockTwits Post Sync...');
     const tickers = await this.tickersService.getAllTickers();
@@ -116,7 +116,7 @@ export class StockTwitsService {
    * Daily: Sync watcher counts for all tickers
    * Runs at midnight.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+
   async handleDailyWatchersSync() {
     this.logger.log('Starting Daily StockTwits Watcher Sync...');
     const tickers = await this.tickersService.getAllTickers();

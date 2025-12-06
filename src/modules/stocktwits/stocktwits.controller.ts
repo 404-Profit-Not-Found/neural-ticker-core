@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Headers,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
 import {
   ApiTags,
@@ -7,6 +16,7 @@ import {
   ApiQuery,
   getSchemaPath,
   ApiExtraModels,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
@@ -15,7 +25,16 @@ import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 @ApiExtraModels(StockTwitsPost)
 @Controller('api/v1/stocktwits')
 export class StockTwitsController {
+  private readonly logger = new Logger(StockTwitsController.name);
+
   constructor(private readonly stockTwitsService: StockTwitsService) {}
+
+  private validateSecret(secret: string) {
+    if (secret !== process.env.CRON_SECRET) {
+      this.logger.warn('Unauthorized cron attempt');
+      throw new UnauthorizedException('Invalid Cron Secret');
+    }
+  }
 
   @Get(':symbol/posts')
   @ApiOperation({
@@ -80,5 +99,25 @@ export class StockTwitsController {
     await this.stockTwitsService.fetchAndStorePosts(symbol);
     await this.stockTwitsService.trackWatchers(symbol);
     return { message: 'Sync triggered successfully' };
+  }
+
+  @Post('jobs/sync-posts')
+  @ApiOperation({ summary: 'Trigger hourly posts sync (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Job started' })
+  async handleHourlyPostsSync(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    await this.stockTwitsService.handleHourlyPostsSync();
+    return { message: 'Hourly posts sync completed' };
+  }
+
+  @Post('jobs/sync-watchers')
+  @ApiOperation({ summary: 'Trigger daily watchers sync (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Job started' })
+  async handleDailyWatchersSync(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    await this.stockTwitsService.handleDailyWatchersSync();
+    return { message: 'Daily watchers sync completed' };
   }
 }
