@@ -1,0 +1,42 @@
+name: Cron Jobs
+
+on:
+  schedule:
+    # Daily at Midnight UTC (Sync Candles, Watchers)
+    - cron: '0 0 * * *'
+    # Hourly (Risk Scanner, Posts Sync)
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  daily-jobs:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Daily Candle Sync
+        run: |
+          curl -X POST ${{ secrets.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles \
+          -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"
+
+      - name: Trigger Daily Watchers Sync
+        run: |
+          curl -X POST ${{ secrets.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-watchers \
+          -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"
+
+  hourly-jobs:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Risk/Reward Scanner
+        run: |
+          curl -X POST ${{ secrets.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner \
+          -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"
+
+      - name: Trigger Hourly Posts Sync
+        run: |
+          curl -X POST ${{ secrets.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-posts \
+          -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"

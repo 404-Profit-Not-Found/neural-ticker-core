@@ -66,6 +66,7 @@ jobs:
              JWT_SECRET=${{ secrets.JWT_SECRET }}
              FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
              GCP_SA_KEY=${{ secrets.GCP_SA_KEY }}
+             CRON_SECRET=${{ secrets.CRON_SECRET }}
 
       - name: 'Show Output'
         run: echo ${{ steps.deploy.outputs.url }}

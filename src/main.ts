@@ -31,7 +31,7 @@ async function bootstrap() {
 
   const listenWithRetry = async (attempts = 5) => {
     try {
-      await app.listen(port);
+      await app.listen(port, '0.0.0.0');
     } catch (err: any) {
       if (err.code === 'EADDRINUSE') {
         if (attempts > 0) {

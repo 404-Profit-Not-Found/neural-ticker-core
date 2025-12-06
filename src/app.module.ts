@@ -1,7 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+
 import { APP_GUARD } from '@nestjs/core'; // Added
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard'; // Added
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
@@ -32,7 +32,7 @@ import configuration from './config/configuration';
       envFilePath: '.env',
       load: [configuration],
     }),
-    ScheduleModule.forRoot(),
+
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

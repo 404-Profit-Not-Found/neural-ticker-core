@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
@@ -14,7 +14,7 @@ export class JobsService {
     private readonly marketDataService: MarketDataService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+
   async syncDailyCandles() {
     this.logger.log('Starting daily candle sync...');
     try {
@@ -38,7 +38,7 @@ export class JobsService {
     }
   }
 
-  @Cron('0 * * * *') // Every hour
+
   async runRiskRewardScanner() {
     this.logger.log('Starting Risk/Reward Scanner...');
     try {
