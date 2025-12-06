@@ -16,6 +16,7 @@ import type { Request, Response } from 'express';
 
 import { Public } from './public.decorator';
 import { GoogleAuthExceptionFilter } from './filters/google-auth-exception.filter';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 
 @Public()
 @ApiTags('Auth')
@@ -29,7 +30,7 @@ export class AuthController {
     description: 'Redirects to Google OAuth2 consent screen.',
   })
   @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   async googleAuth() {
     // Passport redirects automatically
   }
@@ -39,7 +40,7 @@ export class AuthController {
     description: 'Handles Google Redirect, creates user, returns JWT.',
   })
   @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   @UseFilters(GoogleAuthExceptionFilter)
   async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     // req.user contains the user from GoogleStrategy.validate()
