@@ -14,7 +14,6 @@ export class JobsService {
     private readonly marketDataService: MarketDataService,
   ) {}
 
-
   async syncDailyCandles() {
     this.logger.log('Starting daily candle sync...');
     try {
@@ -37,7 +36,6 @@ export class JobsService {
       this.logger.error('Daily candle sync failed globally', e);
     }
   }
-
 
   async runRiskRewardScanner() {
     this.logger.log('Starting Risk/Reward Scanner...');
