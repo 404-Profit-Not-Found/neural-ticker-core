@@ -1,6 +1,13 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, getSchemaPath, ApiExtraModels } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  getSchemaPath,
+  ApiExtraModels,
+} from '@nestjs/swagger';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 

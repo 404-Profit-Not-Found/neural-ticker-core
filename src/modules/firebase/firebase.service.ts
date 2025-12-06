@@ -29,33 +29,39 @@ export class FirebaseService implements OnModuleInit {
 
         if (serviceAccountJson) {
           try {
-             // If it's a string starting with '{', parse it.
-             // If the user pasted the key into the env var, it will be a string.
-             if (serviceAccountJson.trim().startsWith('{')) {
-                serviceAccount = JSON.parse(serviceAccountJson);
-                this.logger.log('Loaded Firebase Credentials from Config (JSON Content)');
-             } else {
-                 this.logger.warn('firebase.serviceAccountJson does not look like JSON');
-             }
+            // If it's a string starting with '{', parse it.
+            // If the user pasted the key into the env var, it will be a string.
+            if (serviceAccountJson.trim().startsWith('{')) {
+              serviceAccount = JSON.parse(serviceAccountJson);
+              this.logger.log(
+                'Loaded Firebase Credentials from Config (JSON Content)',
+              );
+            } else {
+              this.logger.warn(
+                'firebase.serviceAccountJson does not look like JSON',
+              );
+            }
           } catch (e) {
             this.logger.error('Failed to parse firebase.serviceAccountJson', e);
           }
         } else if (serviceAccountPath) {
           // Legacy path handling
           try {
-             const absolutePath = path.isAbsolute(serviceAccountPath)
-                ? serviceAccountPath
-                : path.resolve(process.cwd(), serviceAccountPath);
-             
-             if (fs.existsSync(absolutePath)) {
-                const fileContent = fs.readFileSync(absolutePath, 'utf8');
-                serviceAccount = JSON.parse(fileContent);
-                this.logger.log(`Loaded Firebase Credentials from file: ${serviceAccountPath}`);
-             } else {
-                 this.logger.warn(`Credential file not found: ${absolutePath}`);
-             }
+            const absolutePath = path.isAbsolute(serviceAccountPath)
+              ? serviceAccountPath
+              : path.resolve(process.cwd(), serviceAccountPath);
+
+            if (fs.existsSync(absolutePath)) {
+              const fileContent = fs.readFileSync(absolutePath, 'utf8');
+              serviceAccount = JSON.parse(fileContent);
+              this.logger.log(
+                `Loaded Firebase Credentials from file: ${serviceAccountPath}`,
+              );
+            } else {
+              this.logger.warn(`Credential file not found: ${absolutePath}`);
+            }
           } catch (e) {
-             this.logger.warn(`Could not read credential file: ${e.message}`);
+            this.logger.warn(`Could not read credential file: ${e.message}`);
           }
         }
 

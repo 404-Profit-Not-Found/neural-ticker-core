@@ -136,7 +136,9 @@ describe('StockTwitsService', () => {
       const symbol = 'AAPL';
       const mockPosts = [{ id: 1 }, { id: 2 }];
       const total = 10;
-      mockPostsRepo.findAndCount = jest.fn().mockResolvedValue([mockPosts, total]);
+      mockPostsRepo.findAndCount = jest
+        .fn()
+        .mockResolvedValue([mockPosts, total]);
 
       const result = await service.getPosts(symbol, 1, 10);
 
