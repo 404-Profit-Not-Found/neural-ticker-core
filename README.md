@@ -4,7 +4,7 @@
 
 # Neural-Ticket Core
 
-[![Build Status](https://github.com/branislavlang/neural-ticket-core/actions/workflows/ci.yml/badge.svg)](https://github.com/branislavlang/neural-ticket-core/actions)
+[![Build Status](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/ci.yml/badge.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions)
 [![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)](https://github.com/branislavlang/neural-ticket-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![NestJS](https://img.shields.io/badge/nestjs-%5E10.0.0-red)](https://nestjs.com/)
