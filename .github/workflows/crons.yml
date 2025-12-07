@@ -30,3 +30,6 @@ jobs:
 
       - name: Trigger Hourly Posts Sync
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-posts -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
+      - name: Trigger Research Cleanup (Zombie Tickets)
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"

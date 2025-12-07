@@ -145,6 +145,20 @@ classDiagram
         +TIMESTAMPTZ timestamp
     }
 
+    class watchlists {
+        +BIGINT id
+        +UUID user_id
+        +TEXT name
+        +TIMESTAMPTZ created_at
+    }
+
+    class watchlist_items {
+        +BIGINT id
+        +BIGINT watchlist_id
+        +BIGINT ticker_id
+        +TIMESTAMPTZ added_at
+    }
+
     tickers "1" -- "*" price_ohlcv : has history
     tickers "1" -- "1" fundamentals : has current stats
     tickers "1" -- "*" risk_analyses : has risk profile
@@ -154,6 +168,9 @@ classDiagram
     research_notes "1" -- "*" risk_analyses : generates
     users "1" -- "*" auth_logs : logs login
     users "1" -- "*" research_notes : requests
+    users "1" -- "*" watchlists : owns
+    watchlists "1" -- "*" watchlist_items : contains
+    watchlist_items "*" -- "1" tickers : references
 ```
 
 ## 🔐 Authentication & API

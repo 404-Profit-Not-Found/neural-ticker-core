@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { ResearchService } from '../research/research.service'; // Added
 
 @Injectable()
 export class JobsService {
@@ -12,7 +13,20 @@ export class JobsService {
     private readonly riskRewardService: RiskRewardService,
     private readonly tickersService: TickersService,
     private readonly marketDataService: MarketDataService,
+    private readonly researchService: ResearchService,
   ) {}
+
+  async cleanupStuckResearch() {
+    this.logger.log('Running Zombie Ticket Cleanup...');
+    try {
+        const count = await this.researchService.failStuckTickets(20); // 20 mins
+        this.logger.log(`Cleanup complete. Fixed ${count} tickets.`);
+        return { count };
+    } catch (e) {
+        this.logger.error('Zombie Ticket Cleanup failed', e);
+        throw e;
+    }
+  }
 
   async syncDailyCandles() {
     this.logger.log('Starting daily candle sync...');

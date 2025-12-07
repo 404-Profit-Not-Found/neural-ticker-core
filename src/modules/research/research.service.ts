@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -160,5 +160,27 @@ export class ResearchService {
       page,
       limit,
     };
+  }
+
+  async failStuckTickets(staleMinutes: number = 20): Promise<number> {
+    const threshold = new Date(Date.now() - staleMinutes * 60 * 1000);
+
+    const stuckNotes = await this.noteRepo.find({
+      where: {
+        status: ResearchStatus.PROCESSING,
+        updated_at: LessThan(threshold),
+      },
+    });
+
+    if (stuckNotes.length === 0) return 0;
+
+    for (const note of stuckNotes) {
+      note.status = ResearchStatus.FAILED;
+      note.error = 'Timeout: Research stuck in processing state.';
+      await this.noteRepo.save(note);
+    }
+    
+    this.logger.warn(`Cleaned up ${stuckNotes.length} stuck research tickets.`);
+    return stuckNotes.length;
   }
 }

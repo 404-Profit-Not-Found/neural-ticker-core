@@ -45,4 +45,14 @@ export class JobsController {
     await this.jobsService.runRiskRewardScanner();
     return { message: 'Risk/Reward scanner completed' };
   }
+
+  @Post('cleanup-research')
+  @ApiOperation({ summary: 'Fail stuck Research Tickets (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Cleanup completed' })
+  async cleanupResearch(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    const result = await this.jobsService.cleanupStuckResearch();
+    return { message: 'Cleanup completed', stats: result };
+  }
 }

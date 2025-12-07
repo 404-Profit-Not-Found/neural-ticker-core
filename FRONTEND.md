@@ -44,6 +44,17 @@ Display watched tickers and their latest data.
 4.  **StockTwits**: `GET /api/v1/stocktwits/{symbol}/posts`
     -   Returns recent social sentiment posts.
 
+### A.2 Watchlists (User Specific)
+Allow users to group tickers.
+
+1.  **List Watchlists**: `GET /api/v1/watchlists`
+    -   Returns: `[{ id: "1", name: "Tech", items: [...] }]`
+2.  **Create Watchlist**: `POST /api/v1/watchlists`
+    -   Body: `{ "name": "My List" }`
+3.  **Add Ticker**: `POST /api/v1/watchlists/{id}/items`
+    -   Body: `{ "symbol": "AAPL" }`
+4.  **Remove Ticker**: `DELETE /api/v1/watchlists/{id}/items/{tickerId}`
+
 ### B. Deep Research (Async)
 The research module is **asynchronous** to support long-running "Deep Thinking" models (Gemini 3 Pro).
 

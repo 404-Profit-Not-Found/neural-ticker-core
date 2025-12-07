@@ -4,6 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany, // Added
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -42,8 +43,11 @@ export class User {
   updated_at: Date;
 
   @ApiProperty()
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   last_login: Date;
+
+  @OneToMany('Watchlist', 'user')
+  watchlists: any[]; // Using string/any to avoid circular dependency import issues for now, or use forwardRef
 
   @ApiProperty({ example: { gemini_api_key: '...' } })
   @Column({ type: 'jsonb', nullable: true })
