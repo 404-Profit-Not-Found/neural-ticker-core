@@ -12,7 +12,6 @@ COPY . .
 
 # Build
 RUN npm run build
-RUN ls -R dist
 
 # --- Production Stage ---
 FROM node:22-alpine
@@ -36,4 +35,4 @@ USER node
 EXPOSE 8080
 
 # Start command
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
