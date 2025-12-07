@@ -34,9 +34,10 @@ export class FirebaseService implements OnModuleInit {
               serviceAccount = JSON.parse(serviceAccountJson);
             } else {
               // Priority 2: Base64 Decoding
-              const decoded = Buffer.from(serviceAccountJson, 'base64').toString(
-                'utf8',
-              );
+              const decoded = Buffer.from(
+                serviceAccountJson,
+                'base64',
+              ).toString('utf8');
               if (decoded.trim().startsWith('{')) {
                 serviceAccount = JSON.parse(decoded);
                 this.logger.log(
@@ -44,7 +45,7 @@ export class FirebaseService implements OnModuleInit {
                 );
               }
             }
-          } catch (e) {
+          } catch {
             // Ignore initial parse errors if we are going to try file path next
             if (!serviceAccount) {
               this.logger.warn(
