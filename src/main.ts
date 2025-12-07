@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
@@ -8,6 +9,7 @@ async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
 
   // Set global prefix if desired, e.g. api/v1

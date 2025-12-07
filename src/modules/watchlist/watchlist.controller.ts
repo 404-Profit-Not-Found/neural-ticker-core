@@ -62,7 +62,11 @@ export class WatchlistController {
   })
   @Post()
   async createWatchlist(@Req() req: any, @Body('name') name: string) {
-    return this.watchlistService.createWatchlist(req.user.uid, name);
+    console.log('DEBUG: createWatchlist req.user:', req.user);
+    if (!req.user || !req.user.id) {
+       console.error('DEBUG: User ID missing in request', req.user);
+    }
+    return this.watchlistService.createWatchlist(req.user.id, name);
   }
 
   @ApiOperation({
@@ -91,7 +95,7 @@ export class WatchlistController {
     @Body('symbol') symbol: string,
   ) {
     return this.watchlistService.addTickerToWatchlist(
-      req.user.uid,
+      req.user.id,
       watchlistId,
       symbol,
     );
@@ -115,7 +119,7 @@ export class WatchlistController {
     @Param('tickerId') tickerId: string,
   ) {
     await this.watchlistService.removeItemFromWatchlist(
-      req.user.uid,
+      req.user.id,
       watchlistId,
       tickerId,
     );
