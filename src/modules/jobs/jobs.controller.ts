@@ -12,6 +12,7 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Jobs')
 @Controller('api/v1/jobs')
+@Public()
 export class JobsController {
   private readonly logger = new Logger(JobsController.name);
 
