@@ -44,4 +44,8 @@ export class User {
   @ApiProperty()
   @Column({ type: 'timestamptz', nullable: true })
   last_login: Date;
+
+  @ApiProperty({ example: { gemini_api_key: '...' } })
+  @Column({ type: 'jsonb', nullable: true })
+  preferences: Record<string, any>;
 }

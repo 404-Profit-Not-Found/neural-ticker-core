@@ -18,38 +18,66 @@ export class GeminiProvider implements ILlmProvider {
   }
 
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
-    if (!this.genAI) {
+    // 1. Resolve API Key (Prompt > Config)
+    const apiKey = prompt.apiKey || this.configService.get<string>('gemini.apiKey');
+    if (!apiKey) {
       throw new Error('Gemini API Key not configured');
     }
 
+    // 2. Initialize Gemini 3 Pro (or use cached if same key?)
+    // Creating new instance per request to support dynamic keys is safest.
+    const genAI = new GoogleGenerativeAI(apiKey);
+
     const modelName = this.resolveModel(prompt.quality);
-    const model: GenerativeModel = this.genAI.getGenerativeModel({
+    
+    // 3. Configure Model with Thinking for 'deep'
+    const isDeep = prompt.quality === 'deep' || prompt.quality === 'high';
+    const modelParams: any = {
       model: modelName,
-    });
+    };
+    
+    if (modelName.includes('gemini-3')) {
+       // Gemini 3 Thinking + Search
+       modelParams.tools = [{ googleSearch: {} }];
+    }
+
+    const model: GenerativeModel = genAI.getGenerativeModel(modelParams);
+
+    // 4. Thinking Config
+    const generationConfig: any = {};
+    if (modelName.includes('gemini-3')) {
+        generationConfig.thinkingLevel = isDeep ? 'high' : 'low';
+    }
 
     const contextStr =
       typeof prompt.numericContext === 'string'
         ? prompt.numericContext
         : JSON.stringify(prompt.numericContext);
 
-    const systemPrompt = `You are a financial analyst.
-    Ground your answer in the provided numeric context ONLY.
+    const systemPrompt = `You are a financial analyst performing deep research.
+    Ground your answer in the provided numeric context AND external Google Search results.
     Context: ${contextStr}`;
 
     const fullPrompt = `${systemPrompt}\n\nQuestion: ${prompt.question}`;
 
     try {
-      const result = await model.generateContent(fullPrompt);
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig,
+      });
       const response = result.response;
+      
+      // Log thoughts if available (debug)
+      // const candidates = response.candidates;
 
       return {
         provider: 'gemini',
         models: [modelName],
         answerMarkdown: response.text(),
-        // Usage metadata might differ in SDK versions
+        groundingMetadata: response.candidates?.[0]?.groundingMetadata,
       };
     } catch (err) {
-      this.logger.error(`Gemini call failed: ${err.message}`);
+      this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
       throw err;
     }
   }
@@ -58,10 +86,11 @@ export class GeminiProvider implements ILlmProvider {
     quality: 'low' | 'medium' | 'high' | 'deep' = 'medium',
   ): string {
     const models = this.configService.get('gemini.models');
+    // For 'deep', prioritize Gemini 3 Pro
     if (quality === 'deep') {
-      // Fallback to high for Gemini as per spec (only 3 tiers) or use high
-      return models['high'] || 'gemini-1.5-pro';
+      return 'gemini-3-pro-preview';
     }
-    return models[quality] || 'gemini-1.5-flash';
+    // Safe access for other keys
+    return models?.[quality] || 'gemini-1.5-flash';
   }
 }

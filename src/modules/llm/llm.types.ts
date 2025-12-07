@@ -8,6 +8,7 @@ export interface ResearchPrompt {
   maxTokens?: number;
   quality?: QualityTier;
   provider?: 'openai' | 'gemini' | 'ensemble';
+  apiKey?: string;
 }
 
 export interface ResearchResult {
@@ -17,6 +18,7 @@ export interface ResearchResult {
   citations?: string[];
   tokensIn?: number;
   tokensOut?: number;
+  groundingMetadata?: any;
 }
 
 export interface ILlmProvider {

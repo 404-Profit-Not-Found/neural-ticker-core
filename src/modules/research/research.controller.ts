@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   NotFoundException,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -12,6 +13,7 @@ import {
   ApiProperty,
   ApiResponse,
   ApiParam,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { ResearchService } from './research.service';
 import { QualityTier } from '../llm/llm.types';
@@ -23,6 +25,7 @@ import {
   IsNumber,
 } from 'class-validator';
 
+// ... DTO stays same ...
 class AskResearchDto {
   @ApiProperty({
     example: ['AAPL'],
@@ -58,43 +61,57 @@ class AskResearchDto {
   @IsNumber()
   @IsOptional()
   maxTokens?: number;
+  
+  @ApiProperty({ description: 'Optional: Provide your own Gemini API Key', required: false })
+  @IsString()
+  @IsOptional()
+  apiKey?: string;
 }
 
-import { Public } from '../auth/public.decorator';
-
 @ApiTags('Research')
+@ApiBearerAuth()
 @Controller('api/v1/research')
-@Public()
 export class ResearchController {
   constructor(private readonly researchService: ResearchService) {}
 
   @ApiOperation({
-    summary: 'Ask a research question to LLMs',
+    summary: 'Submit a research question (Async)',
     description:
-      'Submits a research question about specific tickers to the configured LLM provider. Returns a generic ID to poll for results or the immediate result if synchronous.',
+      'Creates a research ticket. Returns a Ticket ID immediately. Poll GET /:id for status.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Question submitted.',
-    schema: { example: { id: '123', status: 'pending', question: '...' } },
+    description: 'Ticket created.',
+    schema: { example: { id: '123', status: 'pending' } },
   })
   @Post('ask')
-  ask(@Body() dto: AskResearchDto) {
-    return this.researchService.createResearchQuestion(
+  async ask(@Request() req: any, @Body() dto: AskResearchDto) {
+    const userId = req.user.id;
+    // Handle dynamic API key from body if present
+    const overrideKey = dto.apiKey;
+    
+    const ticket = await this.researchService.createResearchTicket(
+      userId,
       dto.tickers,
       dto.question,
       dto.provider,
       dto.quality as QualityTier,
+      overrideKey
     );
+    
+    // Fire and forget background processing
+    this.researchService.processTicket(ticket.id).catch(err => console.error('Background processing failed', err));
+
+    return { id: ticket.id, status: ticket.status };
   }
 
   @ApiOperation({
-    summary: 'Retrieve a research note by ID',
-    description: 'Fetches a previously asked research note.',
+    summary: 'Retrieve a research ticket/note by ID',
+    description: 'Fetches status and result of a research request.',
   })
   @ApiParam({ name: 'id', example: '123' })
-  @ApiResponse({ status: 200, description: 'Research note found.' })
-  @ApiResponse({ status: 404, description: 'Research note not found.' })
+  @ApiResponse({ status: 200, description: 'Found.' })
+  @ApiResponse({ status: 404, description: 'Not found.' })
   @Get(':id')
   async getResearch(@Param('id') id: string) {
     const note = await this.researchService.getResearchNote(id);

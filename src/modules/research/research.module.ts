@@ -6,6 +6,7 @@ import { ResearchNote } from './entities/research-note.entity';
 import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { MarketDataModule } from '../market-data/market-data.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MarketDataModule } from '../market-data/market-data.module';
     LlmModule,
     TickersModule,
     MarketDataModule,
+    UsersModule,
   ],
   controllers: [ResearchController],
   providers: [ResearchService],

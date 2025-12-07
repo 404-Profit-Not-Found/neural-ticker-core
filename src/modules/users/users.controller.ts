@@ -7,6 +7,8 @@ import {
   Query,
   UseGuards,
   UnauthorizedException,
+  Request,
+  Post,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -49,5 +51,13 @@ export class UsersController {
       throw new UnauthorizedException('Invalid role. Must be user or admin.');
     }
     return this.usersService.updateRole(id, role);
+  }
+
+  @ApiOperation({ summary: 'Update User Preferences (API Keys)' })
+  @ApiBody({ schema: { example: { gemini_api_key: '...' } } })
+  @Post('me/preferences')
+  async updatePreferences(@Request() req: any, @Body() body: Record<string, any>) {
+    // req.user is populated by JwtAuthGuard
+    return this.usersService.updatePreferences(req.user.id, body);
   }
 }
