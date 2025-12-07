@@ -8,9 +8,6 @@ import { TickersService } from '../tickers/tickers.service';
 
 describe('WatchlistService', () => {
   let service: WatchlistService;
-  let watchlistRepo: any;
-  let itemRepo: any;
-  let tickersService: any;
 
   const mockWatchlistRepo = {
     create: jest.fn(),
@@ -42,9 +39,6 @@ describe('WatchlistService', () => {
     }).compile();
 
     service = module.get<WatchlistService>(WatchlistService);
-    watchlistRepo = module.get(getRepositoryToken(Watchlist));
-    itemRepo = module.get(getRepositoryToken(WatchlistItem));
-    tickersService = module.get(TickersService);
   });
 
   afterEach(() => {
@@ -66,7 +60,10 @@ describe('WatchlistService', () => {
 
       const result = await service.createWatchlist(userId, name);
 
-      expect(mockWatchlistRepo.create).toHaveBeenCalledWith({ user_id: userId, name });
+      expect(mockWatchlistRepo.create).toHaveBeenCalledWith({
+        user_id: userId,
+        name,
+      });
       expect(result).toEqual(mockList);
     });
   });
@@ -137,24 +134,26 @@ describe('WatchlistService', () => {
       });
     });
   });
-  
-  describe('removeHighLevelItem', () => {
-     it('should verify ownership and remove', async () => {
-         const userId = 'user-1';
-         const itemId = '10';
-         const mockItem = { id: itemId, watchlist: { user_id: userId } };
-         
-         mockItemRepo.findOne.mockResolvedValue(mockItem);
-         mockItemRepo.remove.mockResolvedValue(mockItem);
-         
-         await service.removeHighLevelItem(userId, itemId);
-         
-         expect(mockItemRepo.remove).toHaveBeenCalledWith(mockItem);
-     });
 
-     it('should throw if item not found or not owned', async () => {
-         mockItemRepo.findOne.mockResolvedValue(null);
-         await expect(service.removeHighLevelItem('u', 'i')).rejects.toThrow(NotFoundException);
-     });
+  describe('removeHighLevelItem', () => {
+    it('should verify ownership and remove', async () => {
+      const userId = 'user-1';
+      const itemId = '10';
+      const mockItem = { id: itemId, watchlist: { user_id: userId } };
+
+      mockItemRepo.findOne.mockResolvedValue(mockItem);
+      mockItemRepo.remove.mockResolvedValue(mockItem);
+
+      await service.removeHighLevelItem(userId, itemId);
+
+      expect(mockItemRepo.remove).toHaveBeenCalledWith(mockItem);
+    });
+
+    it('should throw if item not found or not owned', async () => {
+      mockItemRepo.findOne.mockResolvedValue(null);
+      await expect(service.removeHighLevelItem('u', 'i')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 });

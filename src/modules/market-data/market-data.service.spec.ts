@@ -38,9 +38,9 @@ describe('MarketDataService', () => {
 
   const mockConfigService = {
     get: jest.fn((key) => {
-        if (key === 'marketData.stalePriceMinutes') return 15;
-        if (key === 'marketData.staleFundamentalsHours') return 24;
-        return null;
+      if (key === 'marketData.stalePriceMinutes') return 15;
+      if (key === 'marketData.staleFundamentalsHours') return 24;
+      return null;
     }),
   };
 

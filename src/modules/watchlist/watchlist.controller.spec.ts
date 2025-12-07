@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { WatchlistController } from './watchlist.controller';
 import { WatchlistService } from './watchlist.service';
@@ -16,9 +17,7 @@ describe('WatchlistController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WatchlistController],
-      providers: [
-        { provide: WatchlistService, useValue: mockService },
-      ],
+      providers: [{ provide: WatchlistService, useValue: mockService }],
     }).compile();
 
     controller = module.get<WatchlistController>(WatchlistController);
@@ -53,7 +52,11 @@ describe('WatchlistController', () => {
     it('should call service', async () => {
       const req = { user: { uid: 'user-1' } };
       await controller.addItem(req, 'list-1', 'AAPL');
-      expect(service.addTickerToWatchlist).toHaveBeenCalledWith('user-1', 'list-1', 'AAPL');
+      expect(service.addTickerToWatchlist).toHaveBeenCalledWith(
+        'user-1',
+        'list-1',
+        'AAPL',
+      );
     });
   });
 
@@ -61,7 +64,11 @@ describe('WatchlistController', () => {
     it('should call service', async () => {
       const req = { user: { uid: 'user-1' } };
       await controller.removeItem(req, 'list-1', 'ticker-1');
-      expect(service.removeItemFromWatchlist).toHaveBeenCalledWith('user-1', 'list-1', 'ticker-1');
+      expect(service.removeItemFromWatchlist).toHaveBeenCalledWith(
+        'user-1',
+        'list-1',
+        'ticker-1',
+      );
     });
   });
 });
