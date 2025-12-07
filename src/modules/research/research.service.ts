@@ -12,6 +12,8 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 
+import { RiskRewardService } from '../risk-reward/risk-reward.service';
+
 @Injectable()
 export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
@@ -22,6 +24,7 @@ export class ResearchService {
     private readonly llmService: LlmService,
     private readonly marketDataService: MarketDataService,
     private readonly usersService: UsersService,
+    private readonly riskRewardService: RiskRewardService,
   ) {}
 
   async createResearchTicket(
@@ -60,9 +63,28 @@ export class ResearchService {
       const context: Record<string, any> = {};
       for (const ticker of note.tickers) {
         try {
-          context[ticker] = await this.marketDataService.getSnapshot(ticker);
+          const snapshot = await this.marketDataService.getSnapshot(ticker);
+          // Also fetch Risk/Reward Score
+          const riskScore = await this.riskRewardService.getLatestScore(ticker);
+
+          context[ticker] = {
+            ...snapshot,
+            risk_reward: riskScore
+              ? {
+                  overall_score: riskScore.overall_score,
+                  financial_risk: riskScore.financial_risk,
+                  execution_risk: riskScore.execution_risk,
+                  reward_target: riskScore.price_target_weighted,
+                  upside: riskScore.upside_percent,
+                  scenarios: riskScore.scenarios?.map((s) => ({
+                    type: s.scenario_type,
+                    target: s.price_mid,
+                  })),
+                }
+              : 'Not available',
+          };
         } catch (e) {
-          this.logger.warn(`Failed to fetch snapshot for ${ticker}`, e);
+          this.logger.warn(`Failed to fetch context for ${ticker}`, e);
         }
       }
 
@@ -96,6 +118,11 @@ export class ResearchService {
       note.numeric_context = context;
       note.models_used = result.models;
       await this.noteRepo.save(note);
+
+      // 5. Post-Process: Generate "Deep Tier" Risk Score from the analysis
+      // "Flip" logic: Research -> Score
+      this.logger.log(`Triggering Deep Verification Score for ticket ${id}`);
+      await this.riskRewardService.evaluateFromResearch(note);
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
@@ -106,5 +133,32 @@ export class ResearchService {
 
   async getResearchNote(id: string): Promise<ResearchNote | null> {
     return this.noteRepo.findOne({ where: { id } });
+  }
+
+  async findAll(
+    userId: string,
+    status: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ data: ResearchNote[]; total: number; page: number; limit: number }> {
+    const query = this.noteRepo.createQueryBuilder('note');
+    query.where('note.user_id = :userId', { userId });
+
+    if (status && status !== 'all') {
+      query.andWhere('note.status = :status', { status });
+    }
+
+    query.orderBy('note.created_at', 'DESC');
+    query.skip((page - 1) * limit);
+    query.take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 }

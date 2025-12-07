@@ -5,6 +5,7 @@ import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
+import { RiskRewardService } from '../risk-reward/risk-reward.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
@@ -12,6 +13,7 @@ describe('ResearchService', () => {
   let llmService: any;
   let marketDataService: any;
   let usersService: any;
+  let riskRewardService: any;
 
   const mockRepo = {
     create: jest.fn(),
@@ -31,6 +33,11 @@ describe('ResearchService', () => {
     findById: jest.fn(),
   };
 
+  const mockRiskRewardService = {
+    getLatestScore: jest.fn(),
+    evaluateFromResearch: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +46,7 @@ describe('ResearchService', () => {
         { provide: LlmService, useValue: mockLlmService },
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: RiskRewardService, useValue: mockRiskRewardService },
       ],
     }).compile();
 
@@ -47,6 +55,7 @@ describe('ResearchService', () => {
     llmService = module.get(LlmService);
     marketDataService = module.get(MarketDataService);
     usersService = module.get(UsersService);
+    riskRewardService = module.get(RiskRewardService);
   });
 
   afterEach(() => {
@@ -106,12 +115,19 @@ describe('ResearchService', () => {
         status: ResearchStatus.PENDING,
         user_id: 'u1',
         provider: 'gemini',
-        quality: 'deep'
+        quality: 'deep',
       };
       repo.findOne.mockResolvedValue(note);
       mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
       mockUsersService.findById.mockResolvedValue({
         preferences: { gemini_api_key: 'key' },
+      });
+      mockRiskRewardService.getLatestScore.mockResolvedValue({
+        risk_reward_score: 80,
+        risk_score: 20,
+        reward_score: 90,
+        confidence_level: 'high',
+        rationale_markdown: 'Good',
       });
       mockLlmService.generateResearch.mockResolvedValue({
         answerMarkdown: 'Answer',
@@ -122,6 +138,7 @@ describe('ResearchService', () => {
 
       expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
       expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(riskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
       expect(usersService.findById).toHaveBeenCalledWith('u1');
       expect(llmService.generateResearch).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -129,13 +146,16 @@ describe('ResearchService', () => {
           provider: 'gemini',
         }),
       );
-      // Status update expectations
-      // note object is mutated in place in the service, so we check calls to save
-      expect(repo.save).toHaveBeenCalledTimes(2); // Pending->Processing, then Processing->Completed
-      // Actually implementation calls save twice?
-      // 1. status = PROCESSING -> save
-      // 2. complete -> save
-      // So 2 calls. (Unless create called it first? No, create is separate).
+
+      expect(repo.save).toHaveBeenCalledTimes(2);
+
+      // Verify Deep Verification Score trigger
+      expect(riskRewardService.evaluateFromResearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '1',
+          answer_markdown: 'Answer',
+        }),
+      );
     });
   });
 });

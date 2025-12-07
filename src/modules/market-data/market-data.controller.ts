@@ -20,29 +20,42 @@ export class MarketDataController {
 
   @ApiOperation({
     summary: 'Get latest snapshot (price + fundamentals)',
-    description:
-      'Retrieves the latest price candle and fundamentals. If data is stale (>15m for price, >24h for fundamentals), it fetches fresh data from Finnhub, persists it to the database, and returns the updated state.',
+    description: `
+**Market Data Snapshot**:
+- **Price**: Latest real-time price candle (Open, High, Low, Close, Volume).
+- **Fundamentals**: Key metrics like Market Cap, PE Ratio, etc.
+- **Staleness Logic**: 
+    - Price: Refreshes from Finnhub if > 15 mins old.
+    - Fundamentals: Refreshes if > 24 hours old.
+    - Falls back to database cache if API fails.
+    `,
   })
   @ApiParam({
     name: 'symbol',
     example: 'AAPL',
-    description: 'Stock Ticker Symbol',
+    description: 'Stock Ticker Symbol (e.g. AAPL, MSFT)',
   })
   @ApiResponse({
     status: 200,
-    description: 'Snapshot retrieved.',
+    description: 'Snapshot retrieved successfully.',
     schema: {
       example: {
-        symbol: { id: '1', symbol: 'AAPL', name: 'Apple Inc' },
+        ticker: { id: '1', symbol: 'AAPL', name: 'Apple Inc' },
         latestPrice: {
           open: 150.0,
           close: 152.5,
           high: 153.0,
           low: 149.0,
-          ts: '2023-10-27T...',
+          volume: 5000000,
+          ts: '2023-10-27T10:00:00Z',
+          source: 'finnhub_quote'
         },
-        fundamentals: { market_cap: 2500000 },
-        source: 'finnhub',
+        fundamentals: { 
+            market_cap: 2500000,
+            pe_ratio: 28.5,
+            beta: 1.2
+        },
+        source: 'finnhub' 
       },
     },
   })

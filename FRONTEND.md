@@ -39,7 +39,8 @@ Display watched tickers and their latest data.
 2.  **Get Details**: `GET /api/v1/market-data/snapshot/{symbol}`
     -   Returns price, volume, and fundamental data.
 3.  **Risk/Reward**: `GET /api/v1/risk-reward/{symbol}`
-    -   Returns the latest calculated risk score (0-100).
+    -   Returns the latest **RiskAnalysis** (Overall Score, Scenarios, SWOT, Catalysts).
+    -   *Note*: This score is strictly derived from "Deep Research". If no deep research has been run, this may be null.
 4.  **StockTwits**: `GET /api/v1/stocktwits/{symbol}/posts`
     -   Returns recent social sentiment posts.
 
@@ -79,7 +80,23 @@ Poll every 3-5 seconds until status is `completed`.
     {
       "status": "completed",
       "answer_markdown": "## Analysis\n\nApple's AI strategy...",
-      "numeric_context": { ... }
+      "numeric_context": {
+         "AAPL": {
+           "price": 150.00,
+           "risk_reward": {
+             "overall_score": 8.0,
+             "financial_risk": 7.5,
+             "execution_risk": 5.0,
+             "upside": 150.00,
+             "reward_target": 185.00,
+             "scenarios": [
+                { "type": "bull", "target": 220.00 },
+                { "type": "base", "target": 185.00 },
+                { "type": "bear", "target": 110.00 }
+             ]
+           }
+         }
+      }
     }
     ```
 

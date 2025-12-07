@@ -1,0 +1,124 @@
+{
+  "ticker": "IOVA",
+  "company_name": "Iovance Biotherapeutics",
+  "sector": "Biotechnology",
+  "market_cap_current": 0.85,
+  "price_current": 2.20,
+  "risk_score": {
+    "overall": 8.0,
+    "financial_risk": 8.5,
+    "execution_risk": 8.0,
+    "dilution_risk": 8.0,
+    "competitive_risk": 7.0,
+    "regulatory_risk": 6.5
+  },
+  "time_horizon_years": 3,
+  "scenarios": {
+    "bull": {
+      "probability": 0.275,
+      "description": "Successful scale-up, strong demand for Amtagvi, manufacturing optimization, margins >55%, revenues ~800M.",
+      "price_target_low": 10,
+      "price_target_high": 18,
+      "price_target_mid": 14,
+      "expected_market_cap": 5.0,
+      "key_drivers": [
+        "TIL therapy adoption accelerates",
+        "Manufacturing scaling efficiencies",
+        "Earlier-line approvals",
+        "Expanding indications"
+      ]
+    },
+    "base": {
+      "probability": 0.40,
+      "description": "Moderate commercialization success, 400–500M revenues, dilution continues but manageable.",
+      "price_target_low": 3,
+      "price_target_high": 4.5,
+      "price_target_mid": 3.7,
+      "expected_market_cap": 1.6,
+      "key_drivers": [
+        "Slow but steady growth",
+        "Controlled dilution",
+        "Stabilizing margins",
+        "No major competitive shocks"
+      ]
+    },
+    "bear": {
+      "probability": 0.325,
+      "description": "Weak uptake, heavy dilution, revenue stalls, financing risk, possible distress.",
+      "price_target_low": 0.0,
+      "price_target_high": 0.8,
+      "price_target_mid": 0.4,
+      "expected_market_cap": 0.3,
+      "key_drivers": [
+        "Demand fails to scale",
+        "Financing becomes toxic",
+        "Operational bottlenecks",
+        "Regulatory or safety concerns"
+      ]
+    }
+  },
+  "expected_value": {
+    "price_target_weighted": 5.5,
+    "upside_vs_current_percent": 150.0
+  },
+  "fundamentals": {
+    "cash_on_hand": 0.307,
+    "runway_years": 1.8,
+    "revenue_ttm": 0.25,
+    "gross_margin": 0.43,
+    "debt": null,
+    "shares_outstanding": 362,
+    "dilution_forecast_3yr": 450
+  },
+  "qualitative": {
+    "strengths": [
+      "First-in-class TIL therapy",
+      "Strong clinical efficacy data",
+      "Growing revenue",
+      "Large total addressable market"
+    ],
+    "weaknesses": [
+      "High cash burn",
+      "Manufacturing complexity",
+      "Single-product dependence"
+    ],
+    "opportunities": [
+      "Expansion to new tumor types",
+      "Earlier-line therapy",
+      "Ex-US approvals",
+      "Manufacturing automation"
+    ],
+    "threats": [
+      "Competition from next-gen cell therapies",
+      "Financing risk",
+      "Commercial uptake uncertainty"
+    ]
+  },
+  "catalysts": {
+    "near_term": [
+      "Updated commercial sales numbers",
+      "Manufacturing scale updates",
+      "New clinical data readouts"
+    ],
+    "long_term": [
+      "Earlier-line trials",
+      "European approval",
+      "Pipeline TIL expansions"
+    ]
+  },
+  "red_flags": [
+    "High probability of dilution",
+    "Class-action lawsuit",
+    "High variance in analyst estimates"
+  ],
+  "analyst_summary": {
+    "analyst_target_avg": 8.25,
+    "analyst_target_range_low": 1.5,
+    "analyst_target_range_high": 17,
+    "sentiment": "mixed"
+  },
+  "metadata": {
+    "last_updated": "2025-12-05T00:00:00Z",
+    "model_version": "1.0.0"
+  }
+}

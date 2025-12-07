@@ -37,25 +37,10 @@ export class JobsService {
     }
   }
 
-  async runRiskRewardScanner() {
-    this.logger.log('Starting Risk/Reward Scanner...');
-    try {
-      const tickers = await this.tickersService.getAllTickers();
-      this.logger.log(`Found ${tickers.length} tickers to scan.`);
-
-      for (const ticker of tickers) {
-        if (!ticker.symbol) continue;
-        try {
-          // Generate new score using AI
-          await this.riskRewardService.evaluateSymbol(ticker.symbol);
-          this.logger.debug(`Scanned ${ticker.symbol}`);
-        } catch (err) {
-          this.logger.error(`Failed to scan ${ticker.symbol}: ${err.message}`);
-        }
-      }
-      this.logger.log('Risk/Reward Scanner completed.');
-    } catch (e) {
-      this.logger.error('Risk/Reward Scanner failed globally', e);
-    }
+  runRiskRewardScanner() {
+    this.logger.log(
+      'Risk/Reward Scanner is disabled per configuration (Deep Research only).',
+    );
+    // Logic removed to prevent low-tier score generation.
   }
 }

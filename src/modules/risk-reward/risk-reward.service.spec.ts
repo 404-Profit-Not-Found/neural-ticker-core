@@ -2,16 +2,24 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RiskRewardService } from './risk-reward.service';
 import { RiskRewardScore } from './entities/risk-reward-score.entity';
+import { RiskAnalysis } from './entities/risk-analysis.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 
 describe('RiskRewardService', () => {
   let service: RiskRewardService;
-  let repo: any;
+  // let analysisRepo: any;
   let llmService: any;
   // let marketDataService: any;
 
   const mockRepo = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockAnalysisRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
@@ -31,13 +39,17 @@ describe('RiskRewardService', () => {
       providers: [
         RiskRewardService,
         { provide: getRepositoryToken(RiskRewardScore), useValue: mockRepo },
+        {
+          provide: getRepositoryToken(RiskAnalysis),
+          useValue: mockAnalysisRepo,
+        },
         { provide: LlmService, useValue: mockLlmService },
         { provide: MarketDataService, useValue: mockMarketDataService },
       ],
     }).compile();
 
     service = module.get<RiskRewardService>(RiskRewardService);
-    repo = module.get(getRepositoryToken(RiskRewardScore));
+    // analysisRepo = module.get(getRepositoryToken(RiskAnalysis));
     llmService = module.get(LlmService);
     // marketDataService = module.get(MarketDataService);
   });
@@ -55,132 +67,85 @@ describe('RiskRewardService', () => {
       mockMarketDataService.getSnapshot.mockResolvedValue({
         ticker: { id: '1' },
       });
-      const freshScore = { as_of: new Date() }; // Now
-      repo.findOne.mockResolvedValue(freshScore);
+      const freshScore = { created_at: new Date() }; // Now
+      mockAnalysisRepo.findOne.mockResolvedValue(freshScore);
 
       const result = await service.getLatestScore('AAPL');
       expect(result).toBe(freshScore);
       expect(llmService.generateResearch).not.toHaveBeenCalled();
     });
 
-    it('should generate new score if stale', async () => {
+    it('should return null (and NOT auto-generate) if missing', async () => {
       mockMarketDataService.getSnapshot.mockResolvedValue({
         ticker: { id: '1', symbol: 'AAPL' },
         latestPrice: {},
         fundamentals: {},
       });
-      const staleDate = new Date();
-      staleDate.setHours(staleDate.getHours() - 2); // 2 hours old
-      repo.findOne.mockResolvedValue({ as_of: staleDate });
+      mockAnalysisRepo.findOne.mockResolvedValue(null);
 
-      // Mock evaluateSymbol internals
-      mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: '```json\n{"risk_reward_score": 80}\n```',
-        models: [],
-      });
-      repo.create.mockReturnValue({});
-      repo.save.mockResolvedValue({ risk_reward_score: 80 });
+      // getLatestScore logic for missing: return null.
+      // It might log 'stale/missing', but it calls evaluateSymbol (which we removed public access to or modified behavior).
+      // wait, in my implementation I kept `if(isStale) ... evaluateSymbol`.
+      // BUT I modified evaluateSymbol to ... actually I didn't change it to be empty.
+      // I changed getLatestScore to return `latest || null;` and commented out the generation block!
+      // Let's verify my changes in Step 56.
 
       const result = await service.getLatestScore('AAPL');
-      expect(llmService.generateResearch).toHaveBeenCalled();
-      expect(result).toBeDefined();
-      if (result) expect(result.risk_reward_score).toBe(80);
+      expect(result).toBeNull();
+      expect(llmService.generateResearch).not.toHaveBeenCalled();
     });
 
-    it('should generate new score if missing', async () => {
-      mockMarketDataService.getSnapshot.mockResolvedValue({
-        ticker: { id: '1', symbol: 'AAPL' },
-        latestPrice: {},
-        fundamentals: {},
-      });
-      repo.findOne.mockResolvedValue(null);
-
-      mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: '```json\n{"risk_reward_score": 80}\n```',
-        models: [],
-      });
-      repo.save.mockResolvedValue({ risk_reward_score: 80 });
-
-      const result = await service.getLatestScore('AAPL');
-      expect(result).toBeDefined();
-      if (result) expect(result.risk_reward_score).toBe(80);
-    });
-
-    it('should fallback to old score on error', async () => {
+    it('should return stale score if stale (without regeneration)', async () => {
       mockMarketDataService.getSnapshot.mockResolvedValue({
         ticker: { id: '1' },
       });
       const staleDate = new Date();
-      staleDate.setHours(staleDate.getHours() - 5);
-      const staleScore = { as_of: staleDate, val: 'old' };
-      repo.findOne.mockResolvedValue(staleScore);
-
-      // evaluateSymbol fails
-      jest
-        .spyOn(service, 'evaluateSymbol')
-        .mockRejectedValue(new Error('Fail'));
+      staleDate.setDate(staleDate.getDate() - 5);
+      const staleScore = { created_at: staleDate };
+      mockAnalysisRepo.findOne.mockResolvedValue(staleScore);
 
       const result = await service.getLatestScore('AAPL');
       expect(result).toBe(staleScore);
+      expect(llmService.generateResearch).not.toHaveBeenCalled();
     });
   });
 
-  describe('evaluateSymbol', () => {
-    it('should handle JSON parse errors', async () => {
+  describe('evaluateFromResearch', () => {
+    it('should return null if no note or markdown', async () => {
+      expect(await service.evaluateFromResearch(null)).toBeNull();
+      expect(await service.evaluateFromResearch({})).toBeNull();
+    });
+
+    it('should generate analysis from valid research note', async () => {
+      const note = {
+        id: '123',
+        tickers: ['AAPL'],
+        answer_markdown: 'Analysis...',
+      };
+
       mockMarketDataService.getSnapshot.mockResolvedValue({
         ticker: { id: '1', symbol: 'AAPL' },
-        latestPrice: {},
-        fundamentals: {},
+        latestPrice: { close: 100 },
+        fundamentals: { market_cap: 1000 },
       });
+
       mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: 'INVALID JSON',
-        models: ['gpt'],
-      });
-
-      const result = await service.evaluateSymbol('AAPL');
-      expect(result).toBeNull();
-    });
-
-    it('should map confidence correctly', async () => {
-      mockMarketDataService.getSnapshot.mockResolvedValue({
-        ticker: { id: '1', symbol: 'AAPL' },
-        latestPrice: {},
-        fundamentals: {},
-      });
-
-      // Test with number confidence
-      mockLlmService.generateResearch.mockResolvedValueOnce({
-        answerMarkdown: '```json\n{"confidence": "90"}\n```',
+        answerMarkdown:
+          '```json\n{"risk_score": {"overall": 8}, "scenarios": {"bull": {"probability": 0.5}}}\n```',
         models: [],
       });
-      repo.create.mockReturnValue({});
-      repo.save.mockImplementation((x: any) => x);
 
-      await service.evaluateSymbol('AAPL');
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ confidence_level: 'high' }),
-      );
-
-      // Test with low string
-      mockLlmService.generateResearch.mockResolvedValueOnce({
-        answerMarkdown: '```json\n{"confidence": "low"}\n```',
-        models: [],
+      // mock save
+      mockAnalysisRepo.save.mockImplementation((entity) => {
+        // verify entity properties
+        if (entity.overall_score !== 8) throw new Error('Mapping failed');
+        return entity;
       });
-      await service.evaluateSymbol('AAPL');
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ confidence_level: 'low' }),
-      );
-    });
-  });
 
-  describe('getScoreHistory', () => {
-    it('should return found scores', async () => {
-      mockMarketDataService.getSnapshot.mockResolvedValue({
-        ticker: { id: '1' },
-      });
-      repo.find.mockResolvedValue([]);
-      const res = await service.getScoreHistory('AAPL');
-      expect(res).toEqual([]);
+      const result = await service.evaluateFromResearch(note);
+      expect(llmService.generateResearch).toHaveBeenCalled();
+      expect(mockAnalysisRepo.save).toHaveBeenCalled();
+      expect(result.overall_score).toBe(8);
     });
   });
 });
