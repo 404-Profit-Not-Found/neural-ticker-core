@@ -10,9 +10,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![NestJS](https://img.shields.io/badge/nestjs-%5E10.0.0-red)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
-[![Docker Pulls](https://img.shields.io/docker/pulls/404-profit-not-found/neural-ticker-core.svg)](https://hub.docker.com/r/404-profit-not-found/neural-ticker-core)
-[![GitHub stars](https://img.shields.io/github/stars/404-Profit-Not-Found/neural-ticker-core.svg?style=flat)](https://github.com/404-Profit-Not-Found/neural-ticker-core/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/404-Profit-Not-Found/neural-ticker-core.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/issues)
 
 **Neural-Ticket Core** is the authoritative backend for the AI-assisted stock research tool. It orchestrates data ingestion from financial APIs (Finnhub), generates qualitative research notes via LLMs (OpenAI, Gemini), and calculates quantitative Risk/Reward scores.
 
