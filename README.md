@@ -1,6 +1,4 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+
 
 
 # Neural-Ticket Core
@@ -26,7 +24,9 @@ The system is built as a modular NestJS application:
 
 ## 🗄️ Database Architecture
 
-The data layer utilizes **Neon (Serverless PostgreSQL)** for scalable relational and time-series storage.
+The data layer utilizes **PostgreSQL** (Neon Serverless).
+
+
 
 ```mermaid
 classDiagram
@@ -53,6 +53,7 @@ classDiagram
         +TEXT google_id
         +TEXT full_name
         +ENUM role
+        +JSONB preferences
         +TEXT avatar_url
         +TIMESTAMPTZ last_login
     }
@@ -89,24 +90,43 @@ classDiagram
     class research_notes {
         +BIGINT id
         +UUID request_id
+        +UUID user_id
         +TEXT[] tickers
         +TEXT question
         +ENUM provider
+        +ENUM status
+        +TEXT quality
         +TEXT[] models_used
         +TEXT answer_markdown
+        +JSONB numeric_context
+        +TEXT error
     }
 
-    class risk_reward_scores {
+    class risk_analyses {
         +BIGINT id
-        +BIGINT symbol_id
-        +TIMESTAMPTZ as_of
-        +INTEGER risk_reward_score
-        +INTEGER risk_score
-        +INTEGER reward_score
-        +ENUM confidence_level
-        +TEXT provider
-        +JSONB numeric_context
-        +BIGINT research_note_id
+        +BIGINT ticker_id
+        +TIMESTAMPTZ created_at
+        +NUMERIC overall_score
+        +NUMERIC financial_risk
+        +NUMERIC execution_risk
+        +NUMERIC competitive_risk
+        +NUMERIC regulatory_risk
+        +NUMERIC upside_percent
+        +NUMERIC price_target_weighted
+        +JSONB red_flags
+        +TEXT research_note_id
+        +NUMERIC analyst_target_avg
+        +TEXT sentiment
+    }
+
+    class risk_scenarios {
+        +BIGINT id
+        +BIGINT analysis_id
+        +ENUM scenario_type
+        +NUMERIC probability
+        +NUMERIC price_mid
+        +TEXT description
+        +TEXT[] key_drivers
     }
 
     class stocktwits_posts {
@@ -126,13 +146,32 @@ classDiagram
         +TIMESTAMPTZ timestamp
     }
 
+    class watchlists {
+        +BIGINT id
+        +UUID user_id
+        +TEXT name
+        +TIMESTAMPTZ created_at
+    }
+
+    class watchlist_items {
+        +BIGINT id
+        +BIGINT watchlist_id
+        +BIGINT ticker_id
+        +TIMESTAMPTZ added_at
+    }
+
     tickers "1" -- "*" price_ohlcv : has history
     tickers "1" -- "1" fundamentals : has current stats
-    tickers "1" -- "*" risk_reward_scores : has scores
+    tickers "1" -- "*" risk_analyses : has risk profile
+    risk_analyses "1" -- "*" risk_scenarios : has scenarios
     tickers "1" -- "*" stocktwits_posts : mentions
     tickers "1" -- "*" stocktwits_watchers : tracked in
-    research_notes "1" -- "*" risk_reward_scores : generated during
+    research_notes "1" -- "*" risk_analyses : generates
     users "1" -- "*" auth_logs : logs login
+    users "1" -- "*" research_notes : requests
+    users "1" -- "*" watchlists : owns
+    watchlists "1" -- "*" watchlist_items : contains
+    watchlist_items "*" -- "1" tickers : references
 ```
 
 ## 🔐 Authentication & API
@@ -146,7 +185,13 @@ The API is secured via JWT. Common flow:
 Key Endpoints:
 - `GET /api/v1/tickers`: List watched tickers.
 - `GET /api/v1/tickers/{symbol}/snapshot`: Get latest price/fundamentals (Lazy loads from Finnhub if missing).
-- `POST /api/v1/research/ask`: Submit a research query.
+- `POST /api/v1/research/ask`: Submit a research query (Async, returns Ticket ID).
+- `GET /api/v1/research`: List my research tickets.
+- `GET /api/v1/research/{id}`: Poll for research results.
+- `POST /api/v1/users/me/preferences`: Securely store API keys (e.g. Gemini).
+
+**Swagger UI**:
+Detailed API documentation enabled in development at `/api` (or `/swagger`).
 
 ## 🧠 AI Model Configuration
 
@@ -154,10 +199,19 @@ Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `mod
 
 | Tier | OpenAI | Gemini |
 | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` |
-| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` |
-| **High** | `gpt-5-mini` | `gemini-3-pro` |
-| **Deep** | `gpt-5.1` | - |
+| **Low** | `gpt-4o-mini` | `gemini-1.5-flash` |
+| **Medium** | `gpt-4o` | `gemini-1.5-pro` |
+| **High** | `gpt-o1` | `gemini-1.5-pro` |
+| **Deep** | `gpt-o3-mini`| `gemini-2.0-flash-thinking-exp` (High Thinking) |
+
+## 💻 Frontend Integration
+
+For detailed instructions on connecting a frontend (Web/Mobile), please refer to **[FRONTEND.md](FRONTEND.md)**.
+
+### Quick Spec
+- **Auth**: Firebase Client SDK -> Exchange for JWT.
+- **Research**: Async flow (`POST /ask` -> `GET /:id`).
+- **Websockets**: Not currently implemented (use polling).
 
 ## 🚀 Getting Started
 
@@ -182,7 +236,7 @@ $ npm install
    ```
 2. Configure your keys:
    ```ini
-   DATABASE_URL=postgres://user:pass@ep-cool-project-123456.us-east-1.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=postgres://user:pass@host:5432/neondb?sslmode=require
    FINNHUB_API_KEY=your_key
    OPENAI_API_KEY=your_key
    FIREBASE_API_KEY=your_web_api_key
@@ -196,15 +250,18 @@ Run the server:
 $ npm run start:dev
 ```
 
-## 🧪 Testing
+## 🧪 Testing & Code Quality
 
 The project maintains **>80% Code Coverage** for critical services.
 
 ```bash
+# Linting (Run this before commit)
+$ npm run lint
+
 # Unit Tests
 $ npm run test
 
-# Setup E2E Sandbox
+# End-to-End Tests
 $ npm run test:e2e
 
 # View Coverage Report
@@ -215,8 +272,8 @@ $ npm run test:cov
 
 Powered by **Google Cloud Run** and **GitHub Actions**.
 
-- **Push to Main**: Triggers Build & Test.
-- **Release**: TBD
+- **Push to Main**: Triggers Build, Test, & Lint.
+- **Release**: Handled via GitHub Release workflow.
 
 ## 📄 License
 

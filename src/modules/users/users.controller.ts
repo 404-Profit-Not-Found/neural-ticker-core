@@ -7,6 +7,8 @@ import {
   Query,
   UseGuards,
   UnauthorizedException,
+  Request,
+  Post,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -49,5 +51,36 @@ export class UsersController {
       throw new UnauthorizedException('Invalid role. Must be user or admin.');
     }
     return this.usersService.updateRole(id, role);
+  }
+
+  @ApiOperation({
+    summary: 'Update User Preferences (API Keys)',
+    description: `
+**User Preferences**:
+- Store your personal API keys here to use them during Research and Scoring.
+- **Security Check**: Keys are stored in the database. Ensure this endpoint is called over HTTPS.
+- **Keys Supported**:
+    - \`gemini_api_key\`: Your Google Gemini API Key. Used for 'Deep' research if provided.
+      `,
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        gemini_api_key: {
+          type: 'string',
+          description: 'Your Google Gemini API Key',
+          example: 'AIzaSy...',
+        },
+      },
+    },
+  })
+  @Post('me/preferences')
+  async updatePreferences(
+    @Request() req: any,
+    @Body() body: Record<string, any>,
+  ) {
+    // req.user is populated by JwtAuthGuard
+    return this.usersService.updatePreferences(req.user.id, body);
   }
 }

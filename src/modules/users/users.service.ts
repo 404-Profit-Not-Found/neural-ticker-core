@@ -68,6 +68,18 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  async updatePreferences(
+    id: string,
+    preferences: Record<string, any>,
+  ): Promise<User> {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    user.preferences = { ...user.preferences, ...preferences };
+    return this.userRepo.save(user);
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { id } });
   }

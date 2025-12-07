@@ -1,9 +1,10 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
 
-import { APP_GUARD } from '@nestjs/core'; // Added
-import { JwtAuthGuard } from './modules/auth/jwt-auth.guard'; // Added
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 import { AppController } from './app.controller';
@@ -20,6 +21,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import { HealthModule } from './modules/health/health.module';
 import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
+import { WatchlistModule } from './modules/watchlist/watchlist.module'; // Added
 import configuration from './config/configuration';
 
 // ...
@@ -32,6 +34,14 @@ import configuration from './config/configuration';
       envFilePath: '.env',
       load: [configuration],
     }),
+
+    // Global Rate Limiting: 100 requests per minute per IP
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -70,13 +80,18 @@ import configuration from './config/configuration';
     AuthModule,
     FirebaseModule,
     StockTwitsModule,
+    WatchlistModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: ThrottlerGuard, // Rate Limiting First
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard, // Auth Second
     },
   ],
 })

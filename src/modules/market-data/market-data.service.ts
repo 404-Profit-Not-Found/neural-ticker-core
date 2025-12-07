@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
+import { ConfigService } from '@nestjs/config'; // Added
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { TickersService } from '../tickers/tickers.service';
@@ -17,14 +18,21 @@ export class MarketDataService {
     private readonly fundamentalsRepo: Repository<Fundamentals>,
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
+    private readonly configService: ConfigService, // Added
   ) {}
 
   async getSnapshot(symbol: string) {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
 
-    // Configurable stale thresholds (could be env vars)
-    const MARKET_DATA_STALE_MINUTES = 15;
-    const FUNDAMENTALS_STALE_HOURS = 24;
+    // Configurable stale thresholds
+    const MARKET_DATA_STALE_MINUTES = this.configService.get<number>(
+      'marketData.stalePriceMinutes',
+      15,
+    );
+    const FUNDAMENTALS_STALE_HOURS = this.configService.get<number>(
+      'marketData.staleFundamentalsHours',
+      24,
+    );
 
     // Fetch latest candle from DB
     let latestCandle = await this.ohlcvRepo.findOne({

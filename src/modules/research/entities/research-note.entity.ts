@@ -12,6 +12,13 @@ export enum LlmProvider {
   ENSEMBLE = 'ensemble',
 }
 
+export enum ResearchStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
 @Entity('research_notes')
 export class ResearchNote {
   @ApiProperty({ example: '1' })
@@ -34,6 +41,10 @@ export class ResearchNote {
   @Column({ type: 'enum', enum: LlmProvider })
   provider: LlmProvider;
 
+  @ApiProperty({ example: 'deep', required: false })
+  @Column({ type: 'text', default: 'medium' })
+  quality: string;
+
   @ApiProperty({ example: ['gpt-4'] })
   @Column({ type: 'text', array: true })
   models_used: string[];
@@ -46,7 +57,33 @@ export class ResearchNote {
   @Column({ type: 'jsonb' })
   numeric_context: Record<string, any>;
 
+  @ApiProperty({ enum: ResearchStatus, default: ResearchStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: ResearchStatus,
+    default: ResearchStatus.PENDING,
+  })
+  status: ResearchStatus;
+
+  @ApiProperty({ required: false })
+  @Column({ type: 'text', nullable: true })
+  error: string;
+
+  @ApiProperty({ description: 'ID of the user who requested this research' })
+  @Column({ type: 'uuid', nullable: true })
+  user_id: string;
+
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
+
+  @ApiProperty()
+  @CreateDateColumn({ type: 'timestamptz', onUpdate: 'CURRENT_TIMESTAMP' }) // Using CreateDateColumn logic or UpdateDateColumn
+  // TypeORM has @UpdateDateColumn
+  @Column({
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
+  updated_at: Date;
 }

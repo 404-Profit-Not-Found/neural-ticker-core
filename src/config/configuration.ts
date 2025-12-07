@@ -33,6 +33,16 @@ export default () => ({
     batchSize: parseInt(process.env.RRSCORE_BATCH_SIZE || '50', 10),
     provider: process.env.RRSCORE_PROVIDER || 'openai',
   },
+  marketData: {
+    stalePriceMinutes: parseInt(
+      process.env.MARKET_DATA_STALE_PRICE_MINUTES || '15',
+      10,
+    ),
+    staleFundamentalsHours: parseInt(
+      process.env.MARKET_DATA_STALE_FUNDAMENTALS_HOURS || '24',
+      10,
+    ),
+  },
   http: {
     readTimeout: parseInt(process.env.HTTP_READ_TIMEOUT_SEC || '10', 10),
     writeTimeout: parseInt(process.env.HTTP_WRITE_TIMEOUT_SEC || '10', 10),

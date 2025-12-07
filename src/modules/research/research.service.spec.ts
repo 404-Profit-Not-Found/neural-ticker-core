@@ -1,15 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResearchService } from './research.service';
-import { ResearchNote } from './entities/research-note.entity';
+import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { UsersService } from '../users/users.service';
+import { RiskRewardService } from '../risk-reward/risk-reward.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
   let repo: any;
   let llmService: any;
   let marketDataService: any;
+  let usersService: any;
+  let riskRewardService: any;
 
   const mockRepo = {
     create: jest.fn(),
@@ -25,6 +29,15 @@ describe('ResearchService', () => {
     getSnapshot: jest.fn(),
   };
 
+  const mockUsersService = {
+    findById: jest.fn(),
+  };
+
+  const mockRiskRewardService = {
+    getLatestScore: jest.fn(),
+    evaluateFromResearch: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -32,6 +45,8 @@ describe('ResearchService', () => {
         { provide: getRepositoryToken(ResearchNote), useValue: mockRepo },
         { provide: LlmService, useValue: mockLlmService },
         { provide: MarketDataService, useValue: mockMarketDataService },
+        { provide: UsersService, useValue: mockUsersService },
+        { provide: RiskRewardService, useValue: mockRiskRewardService },
       ],
     }).compile();
 
@@ -39,6 +54,8 @@ describe('ResearchService', () => {
     repo = module.get(getRepositoryToken(ResearchNote));
     llmService = module.get(LlmService);
     marketDataService = module.get(MarketDataService);
+    usersService = module.get(UsersService);
+    riskRewardService = module.get(RiskRewardService);
   });
 
   afterEach(() => {
@@ -49,26 +66,96 @@ describe('ResearchService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('createResearchQuestion', () => {
-    it('should create and save research note', async () => {
+  describe('createResearchTicket', () => {
+    it('should create and save a PENDING research note', async () => {
       const tickers = ['AAPL'];
-      const question = 'Analyzie';
+      const question = 'Analyze';
+      const userId = 'user-1';
 
-      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
-      mockLlmService.generateResearch.mockResolvedValue({
-        provider: 'ensemble',
-        models: ['gpt'],
-        answerMarkdown: 'Answer',
+      repo.create.mockReturnValue({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
       });
-      repo.create.mockReturnValue({ id: '1', question });
-      repo.save.mockResolvedValue({ id: '1', question });
+      repo.save.mockResolvedValue({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
+      });
 
-      const result = await service.createResearchQuestion(tickers, question);
+      const result = await service.createResearchTicket(
+        userId,
+        tickers,
+        question,
+      );
 
-      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
-      expect(llmService.generateResearch).toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ResearchStatus.PENDING,
+          user_id: userId,
+        }),
+      );
       expect(repo.save).toHaveBeenCalled();
-      expect(result).toEqual({ id: '1', question });
+      expect(marketDataService.getSnapshot).not.toHaveBeenCalled();
+      expect(llmService.generateResearch).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
+      });
+    });
+  });
+
+  describe('processTicket', () => {
+    it('should process a ticket, fetch data, call LLM, and update status', async () => {
+      const note = {
+        id: '1',
+        tickers: ['AAPL'],
+        question: 'Q',
+        status: ResearchStatus.PENDING,
+        user_id: 'u1',
+        provider: 'gemini',
+        quality: 'deep',
+      };
+      repo.findOne.mockResolvedValue(note);
+      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
+      mockUsersService.findById.mockResolvedValue({
+        preferences: { gemini_api_key: 'key' },
+      });
+      mockRiskRewardService.getLatestScore.mockResolvedValue({
+        risk_reward_score: 80,
+        risk_score: 20,
+        reward_score: 90,
+        confidence_level: 'high',
+        rationale_markdown: 'Good',
+      });
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: 'Answer',
+        models: ['gemini-3'],
+      });
+
+      await service.processTicket('1');
+
+      expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(riskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
+      expect(usersService.findById).toHaveBeenCalledWith('u1');
+      expect(llmService.generateResearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: 'key',
+          provider: 'gemini',
+        }),
+      );
+
+      expect(repo.save).toHaveBeenCalledTimes(2);
+
+      // Verify Deep Verification Score trigger
+      expect(riskRewardService.evaluateFromResearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '1',
+          answer_markdown: 'Answer',
+        }),
+      );
     });
   });
 });

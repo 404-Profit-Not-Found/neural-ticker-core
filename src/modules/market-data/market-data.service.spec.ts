@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config'; // Added
 import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -35,6 +36,14 @@ describe('MarketDataService', () => {
     getCompanyProfile: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn((key) => {
+      if (key === 'marketData.stalePriceMinutes') return 15;
+      if (key === 'marketData.staleFundamentalsHours') return 24;
+      return null;
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +55,7 @@ describe('MarketDataService', () => {
         },
         { provide: TickersService, useValue: mockTickersService },
         { provide: FinnhubService, useValue: mockFinnhubService },
+        { provide: ConfigService, useValue: mockConfigService }, // Added
       ],
     }).compile();
 
