@@ -16,7 +16,7 @@
 The system is built as a modular NestJS application:
 
 - **TickersModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
-- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (TimescaleDB).
+- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (PostgreSQL/Neon).
 - **ResearchModule**: Orchestrates LLM-based qualitative analysis.
 - **RiskRewardModule**: Generates quantitative scores (0-100) based on market data and AI insights.
 - **JobsModule**: Schedules background tasks (Daily Sync, Scanners).
@@ -26,10 +26,11 @@ The system is built as a modular NestJS application:
 
 The data layer utilizes **PostgreSQL** (Neon Serverless).
 
+
+
 ```mermaid
 classDiagram
     direction TB
-
     class tickers {
         +BIGINT id
         +TEXT symbol
