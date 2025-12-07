@@ -18,7 +18,7 @@
 The system is built as a modular NestJS application:
 
 - **TickersModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
-- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (TimescaleDB).
+- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (PostgreSQL/Neon).
 - **ResearchModule**: Orchestrates LLM-based qualitative analysis.
 - **RiskRewardModule**: Generates quantitative scores (0-100) based on market data and AI insights.
 - **JobsModule**: Schedules background tasks (Daily Sync, Scanners).
@@ -26,12 +26,11 @@ The system is built as a modular NestJS application:
 
 ## 🗄️ Database Architecture
 
-The data layer utilizes **PostgreSQL** extended with **TimescaleDB** for efficient time-series storage.
+The data layer utilizes **Neon (Serverless PostgreSQL)** for scalable relational and time-series storage.
 
 ```mermaid
 classDiagram
     direction TB
-
     class tickers {
         +BIGINT id
         +TEXT symbol
@@ -183,18 +182,13 @@ $ npm install
    ```
 2. Configure your keys:
    ```ini
-   DATABASE_URL=postgres://user:pass@localhost:5432/neural_db
+   DATABASE_URL=postgres://user:pass@ep-cool-project-123456.us-east-1.aws.neon.tech/neondb?sslmode=require
    FINNHUB_API_KEY=your_key
    OPENAI_API_KEY=your_key
    FIREBASE_API_KEY=your_web_api_key
    ```
 
 ### Running the App
-
-Start the database services:
-```bash
-$ docker-compose up -d
-```
 
 Run the server:
 ```bash
