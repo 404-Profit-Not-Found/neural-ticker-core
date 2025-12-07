@@ -12,6 +12,7 @@ COPY . .
 
 # Build
 RUN npm run build
+RUN ls -R dist
 
 # --- Production Stage ---
 FROM node:22-alpine
