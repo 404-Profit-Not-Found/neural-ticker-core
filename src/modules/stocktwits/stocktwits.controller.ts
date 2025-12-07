@@ -21,9 +21,12 @@ import {
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 
+import { Public } from '../auth/public.decorator';
+
 @ApiTags('StockTwits')
 @ApiExtraModels(StockTwitsPost)
 @Controller('api/v1/stocktwits')
+@Public()
 export class StockTwitsController {
   private readonly logger = new Logger(StockTwitsController.name);
 
