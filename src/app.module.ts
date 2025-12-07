@@ -48,6 +48,7 @@ import configuration from './config/configuration';
           database: process.env.DB_DATABASE,
           autoLoadEntities: true,
           synchronize: process.env.DB_SYNCHRONIZE === 'true',
+          connectTimeoutMS: 10000, // 10s timeout to prevent hanging
           ssl:
             process.env.DB_SSL === 'false'
               ? false
