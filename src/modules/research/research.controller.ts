@@ -61,8 +61,11 @@ class AskResearchDto {
   @IsNumber()
   @IsOptional()
   maxTokens?: number;
-  
-  @ApiProperty({ description: 'Optional: Provide your own Gemini API Key', required: false })
+
+  @ApiProperty({
+    description: 'Optional: Provide your own Gemini API Key',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   apiKey?: string;
@@ -88,19 +91,19 @@ export class ResearchController {
   async ask(@Request() req: any, @Body() dto: AskResearchDto) {
     const userId = req.user.id;
     // Handle dynamic API key from body if present
-    const overrideKey = dto.apiKey;
-    
+
     const ticket = await this.researchService.createResearchTicket(
       userId,
       dto.tickers,
       dto.question,
       dto.provider,
       dto.quality as QualityTier,
-      overrideKey
     );
-    
+
     // Fire and forget background processing
-    this.researchService.processTicket(ticket.id).catch(err => console.error('Background processing failed', err));
+    this.researchService
+      .processTicket(ticket.id)
+      .catch((err) => console.error('Background processing failed', err));
 
     return { id: ticket.id, status: ticket.status };
   }

@@ -41,6 +41,10 @@ export class ResearchNote {
   @Column({ type: 'enum', enum: LlmProvider })
   provider: LlmProvider;
 
+  @ApiProperty({ example: 'deep', required: false })
+  @Column({ type: 'text', default: 'medium' })
+  quality: string;
+
   @ApiProperty({ example: ['gpt-4'] })
   @Column({ type: 'text', array: true })
   models_used: string[];

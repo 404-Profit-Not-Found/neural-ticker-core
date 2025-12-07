@@ -147,7 +147,8 @@ The API is secured via JWT. Common flow:
 Key Endpoints:
 - `GET /api/v1/tickers`: List watched tickers.
 - `GET /api/v1/tickers/{symbol}/snapshot`: Get latest price/fundamentals (Lazy loads from Finnhub if missing).
-- `POST /api/v1/research/ask`: Submit a research query.
+- `POST /api/v1/research/ask`: Submit a research query (Async, returns Ticket ID).
+- `GET /api/v1/research/{id}`: Poll for research results.
 
 ## 🧠 AI Model Configuration
 
@@ -158,7 +159,18 @@ Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `mod
 | **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` |
 | **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` |
 | **High** | `gpt-5-mini` | `gemini-3-pro` |
-| **Deep** | `gpt-5.1` | - |
+| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` |
+| **High** | `gpt-5-mini` | `gemini-3-pro` |
+| **Deep** | `gpt-5.1` | `gemini-3-pro` (High Thinking) |
+
+## 💻 Frontend Integration
+
+For detailed instructions on connecting a frontend (Web/Mobile), please refer to **[FRONTEND.md](FRONTEND.md)**.
+
+### Quick Spec
+- **Auth**: Firebase Client SDK -> Exchange for JWT.
+- **Research**: Async flow (`POST /ask` -> `GET /:id`).
+- **Websockets**: Not currently implemented (use polling).
 
 ## 🚀 Getting Started
 

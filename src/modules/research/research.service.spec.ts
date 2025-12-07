@@ -1,15 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResearchService } from './research.service';
-import { ResearchNote } from './entities/research-note.entity';
+import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { UsersService } from '../users/users.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
   let repo: any;
   let llmService: any;
   let marketDataService: any;
+  let usersService: any;
 
   const mockRepo = {
     create: jest.fn(),
@@ -25,6 +27,10 @@ describe('ResearchService', () => {
     getSnapshot: jest.fn(),
   };
 
+  const mockUsersService = {
+    findById: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -32,6 +38,7 @@ describe('ResearchService', () => {
         { provide: getRepositoryToken(ResearchNote), useValue: mockRepo },
         { provide: LlmService, useValue: mockLlmService },
         { provide: MarketDataService, useValue: mockMarketDataService },
+        { provide: UsersService, useValue: mockUsersService },
       ],
     }).compile();
 
@@ -39,6 +46,7 @@ describe('ResearchService', () => {
     repo = module.get(getRepositoryToken(ResearchNote));
     llmService = module.get(LlmService);
     marketDataService = module.get(MarketDataService);
+    usersService = module.get(UsersService);
   });
 
   afterEach(() => {
@@ -49,26 +57,85 @@ describe('ResearchService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('createResearchQuestion', () => {
-    it('should create and save research note', async () => {
+  describe('createResearchTicket', () => {
+    it('should create and save a PENDING research note', async () => {
       const tickers = ['AAPL'];
-      const question = 'Analyzie';
+      const question = 'Analyze';
+      const userId = 'user-1';
 
-      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
-      mockLlmService.generateResearch.mockResolvedValue({
-        provider: 'ensemble',
-        models: ['gpt'],
-        answerMarkdown: 'Answer',
+      repo.create.mockReturnValue({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
       });
-      repo.create.mockReturnValue({ id: '1', question });
-      repo.save.mockResolvedValue({ id: '1', question });
+      repo.save.mockResolvedValue({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
+      });
 
-      const result = await service.createResearchQuestion(tickers, question);
+      const result = await service.createResearchTicket(
+        userId,
+        tickers,
+        question,
+      );
 
-      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
-      expect(llmService.generateResearch).toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ResearchStatus.PENDING,
+          user_id: userId,
+        }),
+      );
       expect(repo.save).toHaveBeenCalled();
-      expect(result).toEqual({ id: '1', question });
+      expect(marketDataService.getSnapshot).not.toHaveBeenCalled();
+      expect(llmService.generateResearch).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        id: '1',
+        question,
+        status: ResearchStatus.PENDING,
+      });
+    });
+  });
+
+  describe('processTicket', () => {
+    it('should process a ticket, fetch data, call LLM, and update status', async () => {
+      const note = {
+        id: '1',
+        tickers: ['AAPL'],
+        question: 'Q',
+        status: ResearchStatus.PENDING,
+        user_id: 'u1',
+        provider: 'gemini',
+        quality: 'deep'
+      };
+      repo.findOne.mockResolvedValue(note);
+      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
+      mockUsersService.findById.mockResolvedValue({
+        preferences: { gemini_api_key: 'key' },
+      });
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: 'Answer',
+        models: ['gemini-3'],
+      });
+
+      await service.processTicket('1');
+
+      expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(usersService.findById).toHaveBeenCalledWith('u1');
+      expect(llmService.generateResearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKey: 'key',
+          provider: 'gemini',
+        }),
+      );
+      // Status update expectations
+      // note object is mutated in place in the service, so we check calls to save
+      expect(repo.save).toHaveBeenCalledTimes(2); // Pending->Processing, then Processing->Completed
+      // Actually implementation calls save twice?
+      // 1. status = PROCESSING -> save
+      // 2. complete -> save
+      // So 2 calls. (Unless create called it first? No, create is separate).
     });
   });
 });

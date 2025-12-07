@@ -56,7 +56,10 @@ export class UsersController {
   @ApiOperation({ summary: 'Update User Preferences (API Keys)' })
   @ApiBody({ schema: { example: { gemini_api_key: '...' } } })
   @Post('me/preferences')
-  async updatePreferences(@Request() req: any, @Body() body: Record<string, any>) {
+  async updatePreferences(
+    @Request() req: any,
+    @Body() body: Record<string, any>,
+  ) {
     // req.user is populated by JwtAuthGuard
     return this.usersService.updatePreferences(req.user.id, body);
   }

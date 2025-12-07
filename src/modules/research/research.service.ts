@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { ResearchNote, LlmProvider, ResearchStatus } from './entities/research-note.entity';
+import {
+  ResearchNote,
+  LlmProvider,
+  ResearchStatus,
+} from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
@@ -26,13 +30,13 @@ export class ResearchService {
     question: string,
     provider: 'openai' | 'gemini' | 'ensemble' = 'ensemble',
     quality: QualityTier = 'medium',
-    overrideKey?: string,
   ): Promise<ResearchNote> {
     const note = this.noteRepo.create({
       request_id: uuidv4(),
       tickers,
       question,
       provider: provider as LlmProvider,
+      quality,
       numeric_context: {}, // Filled during processing
       status: ResearchStatus.PENDING,
       user_id: userId,
@@ -43,7 +47,7 @@ export class ResearchService {
   // Legacy method kept for compatibility if needed, but forwarded to new flow?
   // Or just removed. I will remove it to force usage of new async flow.
   // The controller was the only user.
-  
+
   async processTicket(id: string): Promise<void> {
     const note = await this.noteRepo.findOne({ where: { id } });
     if (!note) return;
@@ -56,17 +60,17 @@ export class ResearchService {
       const context: Record<string, any> = {};
       for (const ticker of note.tickers) {
         try {
-           context[ticker] = await this.marketDataService.getSnapshot(ticker);
+          context[ticker] = await this.marketDataService.getSnapshot(ticker);
         } catch (e) {
-           this.logger.warn(`Failed to fetch snapshot for ${ticker}`, e);
+          this.logger.warn(`Failed to fetch snapshot for ${ticker}`, e);
         }
       }
 
       // 2. Resolve API Key
       let apiKey: string | undefined;
       if (note.user_id) {
-         const user = await this.usersService.findById(note.user_id);
-         apiKey = user?.preferences?.gemini_api_key;
+        const user = await this.usersService.findById(note.user_id);
+        apiKey = user?.preferences?.gemini_api_key;
       }
       // Fallback to System Default if User Key missing
       if (!apiKey) {
@@ -81,8 +85,8 @@ export class ResearchService {
         question: note.question,
         tickers: note.tickers,
         numericContext: context,
-        quality: 'high', // Force High for deep research as requested, or map from QualityTier
-        provider: 'gemini', // Enforce Gemini 3 for async deep research
+        quality: note.quality as QualityTier,
+        provider: note.provider as any,
         apiKey,
       });
 
@@ -92,7 +96,6 @@ export class ResearchService {
       note.numeric_context = context;
       note.models_used = result.models;
       await this.noteRepo.save(note);
-      
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;

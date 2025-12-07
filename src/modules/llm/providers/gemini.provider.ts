@@ -19,7 +19,8 @@ export class GeminiProvider implements ILlmProvider {
 
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
     // 1. Resolve API Key (Prompt > Config)
-    const apiKey = prompt.apiKey || this.configService.get<string>('gemini.apiKey');
+    const apiKey =
+      prompt.apiKey || this.configService.get<string>('gemini.apiKey');
     if (!apiKey) {
       throw new Error('Gemini API Key not configured');
     }
@@ -29,16 +30,16 @@ export class GeminiProvider implements ILlmProvider {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const modelName = this.resolveModel(prompt.quality);
-    
+
     // 3. Configure Model with Thinking for 'deep'
     const isDeep = prompt.quality === 'deep' || prompt.quality === 'high';
     const modelParams: any = {
       model: modelName,
     };
-    
+
     if (modelName.includes('gemini-3')) {
-       // Gemini 3 Thinking + Search
-       modelParams.tools = [{ googleSearch: {} }];
+      // Gemini 3 Thinking + Search
+      modelParams.tools = [{ googleSearch: {} }];
     }
 
     const model: GenerativeModel = genAI.getGenerativeModel(modelParams);
@@ -46,7 +47,7 @@ export class GeminiProvider implements ILlmProvider {
     // 4. Thinking Config
     const generationConfig: any = {};
     if (modelName.includes('gemini-3')) {
-        generationConfig.thinkingLevel = isDeep ? 'high' : 'low';
+      generationConfig.thinkingLevel = isDeep ? 'high' : 'low';
     }
 
     const contextStr =
@@ -66,7 +67,7 @@ export class GeminiProvider implements ILlmProvider {
         generationConfig,
       });
       const response = result.response;
-      
+
       // Log thoughts if available (debug)
       // const candidates = response.candidates;
 
