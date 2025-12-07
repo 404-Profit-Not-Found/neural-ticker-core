@@ -67,7 +67,6 @@ jobs:
              FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
              GCP_SA_KEY=${{ secrets.GCP_SA_KEY }}
              CRON_SECRET=${{ secrets.CRON_SECRET }}
-             DB_SSL_REJECT_UNAUTHORIZED=false
 
       - name: 'Show Output'
         run: echo ${{ steps.deploy.outputs.url }}
