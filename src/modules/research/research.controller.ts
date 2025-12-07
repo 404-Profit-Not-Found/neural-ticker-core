@@ -60,8 +60,11 @@ class AskResearchDto {
   maxTokens?: number;
 }
 
+import { Public } from '../auth/public.decorator';
+
 @ApiTags('Research')
 @Controller('api/v1/research')
+@Public()
 export class ResearchController {
   constructor(private readonly researchService: ResearchService) {}
 

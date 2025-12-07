@@ -36,7 +36,7 @@ async function bootstrap() {
     try {
       console.log(`--- ATTEMPTING TO LISTEN ON PORT ${port} (0.0.0.0) ---`);
       await app.listen(port, '0.0.0.0');
-      console.log('--- APP LISTENING SUCCESSFULLY ---');
+    
     } catch (err: any) {
       if (err.code === 'EADDRINUSE') {
         if (attempts > 0) {

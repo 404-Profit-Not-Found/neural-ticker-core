@@ -9,9 +9,12 @@ import {
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 
+import { Public } from '../auth/public.decorator';
+
 @ApiTags('Ticker')
 @ApiBearerAuth()
 @Controller('api/v1/tickers')
+@Public()
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}
 

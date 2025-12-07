@@ -8,6 +8,8 @@ import {
 import { JobsService } from './jobs.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 
+import { Public } from '../auth/public.decorator';
+
 @ApiTags('Jobs')
 @Controller('api/v1/jobs')
 export class JobsController {
