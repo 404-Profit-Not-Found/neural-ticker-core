@@ -38,7 +38,8 @@ class AskResearchDto {
   tickers: string[];
 
   @ApiProperty({
-    example: 'What are the main risks for Apple in 2024 considering AI competition?',
+    example:
+      'What are the main risks for Apple in 2024 considering AI competition?',
     description: 'The specific question or topic you want the AI to research.',
   })
   @IsString()
@@ -48,7 +49,8 @@ class AskResearchDto {
     enum: ['openai', 'gemini', 'ensemble'],
     required: false,
     default: 'ensemble',
-    description: 'Select the LLM Provider. "ensemble" combines models for best results (if implemented), otherwise defaults to system preference.',
+    description:
+      'Select the LLM Provider. "ensemble" combines models for best results (if implemented), otherwise defaults to system preference.',
   })
   @IsEnum(['openai', 'gemini', 'ensemble'])
   @IsOptional()
@@ -70,18 +72,26 @@ class AskResearchDto {
   @IsOptional()
   quality?: string;
 
-  @ApiProperty({ required: false, description: 'Optional: Tone/Style of the report (e.g. "Skeptical", "Optimistic", "Technical").' })
+  @ApiProperty({
+    required: false,
+    description:
+      'Optional: Tone/Style of the report (e.g. "Skeptical", "Optimistic", "Technical").',
+  })
   @IsString()
   @IsOptional()
   style?: string;
 
-  @ApiProperty({ required: false, description: 'Max output tokens. Leave empty for model default.' })
+  @ApiProperty({
+    required: false,
+    description: 'Max output tokens. Leave empty for model default.',
+  })
   @IsNumber()
   @IsOptional()
   maxTokens?: number;
 
   @ApiProperty({
-    description: 'Optional: Provide your own Gemini API Key for this single request (overrides user/system defaults).',
+    description:
+      'Optional: Provide your own Gemini API Key for this single request (overrides user/system defaults).',
     required: false,
   })
   @IsString()
@@ -102,17 +112,32 @@ export class ResearchController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Ticket successfully created. Processing started in background.',
+    description:
+      'Ticket successfully created. Processing started in background.',
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000', description: 'Unique Ticket ID used for polling.' },
-        status: { type: 'string', example: 'pending', enum: ['pending', 'processing', 'completed', 'failed'] },
+        id: {
+          type: 'string',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+          description: 'Unique Ticket ID used for polling.',
+        },
+        status: {
+          type: 'string',
+          example: 'pending',
+          enum: ['pending', 'processing', 'completed', 'failed'],
+        },
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid input (e.g. missing question or empty tickers).' })
-  @ApiResponse({ status: 401, description: 'Unauthorized. Bearer token missing or invalid.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input (e.g. missing question or empty tickers).',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized. Bearer token missing or invalid.',
+  })
   @Post('ask')
   async ask(@Request() req: any, @Body() dto: AskResearchDto) {
     const userId = req.user.id;
@@ -136,11 +161,27 @@ export class ResearchController {
 
   @ApiOperation({
     summary: 'List my research tickets',
-    description: 'Returns a paginated list of research requests filtered by status.',
+    description:
+      'Returns a paginated list of research requests filtered by status.',
   })
-  @ApiQuery({ name: 'status', required: false, enum: ['all', 'pending', 'processing', 'completed', 'failed'], description: 'Filter by status (default: all)' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10)' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['all', 'pending', 'processing', 'completed', 'failed'],
+    description: 'Filter by status (default: all)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of tickets.',
@@ -149,9 +190,9 @@ export class ResearchController {
         data: [{ id: '1', tickers: ['AAPL'], status: 'completed' }],
         total: 10,
         page: 1,
-        limit: 10
-      }
-    }
+        limit: 10,
+      },
+    },
   })
   @Get()
   async list(
@@ -161,7 +202,12 @@ export class ResearchController {
     @Query('limit') limit: number = 10,
   ) {
     const userId = req.user.id;
-    return this.researchService.findAll(userId, status, Number(page), Number(limit));
+    return this.researchService.findAll(
+      userId,
+      status,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @ApiOperation({
@@ -169,17 +215,21 @@ export class ResearchController {
     description:
       'Fetches status and result of a research request. Status Flow: pending -> processing -> completed. Result includes answer_markdown, numeric_context, and models_used.',
   })
-  @ApiParam({ name: 'id', example: '550e8400-e29b-41d4-a716-446655440000', description: 'The Ticket ID returned by /ask' })
+  @ApiParam({
+    name: 'id',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'The Ticket ID returned by /ask',
+  })
   @ApiResponse({
     status: 202,
     description: 'Processing. The research is still in progress.',
     schema: {
       example: {
-         id: '123',
-         status: 'processing',
-         created_at: '2023-01-01T12:00:00Z'
-      }
-    }
+        id: '123',
+        status: 'processing',
+        created_at: '2023-01-01T12:00:00Z',
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -191,10 +241,12 @@ export class ResearchController {
         tickers: ['AAPL'],
         question: 'Should I buy?',
         answer_markdown: '# Analysis\n\nApple is a strong buy...',
-        numeric_context: { AAPL: { price: 150, risk_reward: { overall_score: 8.5 } } },
-        created_at: '2023-01-01T12:00:00Z'
-      }
-    }
+        numeric_context: {
+          AAPL: { price: 150, risk_reward: { overall_score: 8.5 } },
+        },
+        created_at: '2023-01-01T12:00:00Z',
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Ticket not found. Invalid ID.' })
   @Get(':id')

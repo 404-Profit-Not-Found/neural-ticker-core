@@ -3,6 +3,7 @@ import { JobsService } from './jobs.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { ResearchService } from '../research/research.service';
 
 describe('JobsService', () => {
   let service: JobsService;
@@ -19,6 +20,10 @@ describe('JobsService', () => {
     getSnapshot: jest.fn(),
   };
 
+  const mockResearchService = {
+    failStuckTickets: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +31,7 @@ describe('JobsService', () => {
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: TickersService, useValue: mockTickersService },
         { provide: MarketDataService, useValue: mockMarketDataService },
+        { provide: ResearchService, useValue: mockResearchService },
       ],
     }).compile();
 
@@ -85,40 +91,9 @@ describe('JobsService', () => {
   });
 
   describe('runRiskRewardScanner', () => {
-    it('should iterate tickers and evaluate symbols', async () => {
-      const tickers = [{ symbol: 'AAPL' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
-      mockRiskRewardService.evaluateSymbol.mockResolvedValue({});
-
-      await service.runRiskRewardScanner();
-
-      expect(mockRiskRewardService.evaluateSymbol).toHaveBeenCalledWith('AAPL');
-    });
-
-    it('should handle errors gracefully', async () => {
-      const tickers = [{ symbol: 'ERR' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
-      mockRiskRewardService.evaluateSymbol.mockRejectedValue(
-        new Error('Eval Error'),
-      );
-
-      await service.runRiskRewardScanner();
-
-      expect(mockRiskRewardService.evaluateSymbol).toHaveBeenCalledWith('ERR');
-    });
-
-    it('should handle global scanner errors', async () => {
-      mockTickersService.getAllTickers.mockRejectedValue(
-        new Error('Global fail'),
-      );
-      await service.runRiskRewardScanner();
-      // Should catch and log
-    });
-
-    it('should skip tickers without symbol', async () => {
-      const tickers = [{ no_symbol: '?' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
-      await service.runRiskRewardScanner();
+    it('should be disabled and do nothing (sync)', () => {
+      service.runRiskRewardScanner();
+      expect(mockTickersService.getAllTickers).not.toHaveBeenCalled();
       expect(mockRiskRewardService.evaluateSymbol).not.toHaveBeenCalled();
     });
   });

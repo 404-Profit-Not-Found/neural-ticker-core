@@ -213,25 +213,29 @@ export class RiskRewardService {
           .trim();
         const firstBrace = jsonStr.indexOf('{');
         const lastBrace = jsonStr.lastIndexOf('}');
-        
+
         if (firstBrace === -1 || lastBrace === -1) {
-             throw new Error('No JSON braces found');
+          throw new Error('No JSON braces found');
         }
 
         const cleanJson = jsonStr.substring(firstBrace, lastBrace + 1);
         parsed = JSON.parse(cleanJson);
-        
+
         // Basic validation: Check if key fields exist
         if (!parsed.risk_score || !parsed.scenarios) {
-            throw new Error('Missing key sections (risk_score, scenarios)');
+          throw new Error('Missing key sections (risk_score, scenarios)');
         }
 
         break; // Success
       } catch (e) {
-        this.logger.warn(`Attempt ${attempts}/${maxRetries} failed to parse JSON for ${symbol}: ${e.message}`);
+        this.logger.warn(
+          `Attempt ${attempts}/${maxRetries} failed to parse JSON for ${symbol}: ${e.message}`,
+        );
         if (attempts === maxRetries) {
-             this.logger.error(`Final attempt failed for ${symbol}.`);
-             throw new Error('LLM output could not be parsed as JSON after retries.');
+          this.logger.error(`Final attempt failed for ${symbol}.`);
+          throw new Error(
+            'LLM output could not be parsed as JSON after retries.',
+          );
         }
         // Optional: Wait a bit? Or just retry immediately.
       }

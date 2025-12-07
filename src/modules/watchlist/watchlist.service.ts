@@ -60,13 +60,13 @@ export class WatchlistService {
   async removeItemFromWatchlist(
     userId: string,
     watchlistId: string,
-    tickerId: string, // Pass item ID or Ticker ID? Let's assume Ticker ID for ease, or Item ID. 
-    // Usually easier to delete by Item ID if the UI has it. 
+    tickerId: string, // Pass item ID or Ticker ID? Let's assume Ticker ID for ease, or Item ID.
+    // Usually easier to delete by Item ID if the UI has it.
     // But UI might just say "Delete AAPL".
     // Let's implement delete by TickerID within Watchlist context.
   ): Promise<void> {
-     // 1. Verify owner
-     const watchlist = await this.watchlistRepo.findOne({
+    // 1. Verify owner
+    const watchlist = await this.watchlistRepo.findOne({
       where: { id: watchlistId, user_id: userId },
     });
     if (!watchlist) {
@@ -89,9 +89,9 @@ export class WatchlistService {
     });
 
     if (!item || item.watchlist.user_id !== userId) {
-        throw new NotFoundException('Item not found or access denied');
+      throw new NotFoundException('Item not found or access denied');
     }
-    
+
     await this.itemRepo.remove(item);
   }
 }

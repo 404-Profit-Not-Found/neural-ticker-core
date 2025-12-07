@@ -48,14 +48,14 @@ export class MarketDataController {
           low: 149.0,
           volume: 5000000,
           ts: '2023-10-27T10:00:00Z',
-          source: 'finnhub_quote'
+          source: 'finnhub_quote',
         },
-        fundamentals: { 
-            market_cap: 2500000,
-            pe_ratio: 28.5,
-            beta: 1.2
+        fundamentals: {
+          market_cap: 2500000,
+          pe_ratio: 28.5,
+          beta: 1.2,
         },
-        source: 'finnhub' 
+        source: 'finnhub',
       },
     },
   })

@@ -29,7 +29,8 @@ export class WatchlistController {
 
   @ApiOperation({
     summary: 'List user watchlists',
-    description: 'Returns all watchlists created by the authenticated user, including their items (tickers).',
+    description:
+      'Returns all watchlists created by the authenticated user, including their items (tickers).',
   })
   @ApiResponse({
     status: 200,
@@ -66,7 +67,8 @@ export class WatchlistController {
 
   @ApiOperation({
     summary: 'Add Ticker to Watchlist',
-    description: 'Adds a stock symbol to a specific watchlist. Auto-creates ticker if missing.',
+    description:
+      'Adds a stock symbol to a specific watchlist. Auto-creates ticker if missing.',
   })
   @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
   @ApiBody({
@@ -88,7 +90,11 @@ export class WatchlistController {
     @Param('id') watchlistId: string,
     @Body('symbol') symbol: string,
   ) {
-    return this.watchlistService.addTickerToWatchlist(req.user.uid, watchlistId, symbol);
+    return this.watchlistService.addTickerToWatchlist(
+      req.user.uid,
+      watchlistId,
+      symbol,
+    );
   }
 
   @ApiOperation({
@@ -96,7 +102,11 @@ export class WatchlistController {
     description: 'Removes a specific ticker association from a watchlist.',
   })
   @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
-  @ApiParam({ name: 'tickerId', example: '42', description: 'Ticker ID (BigInt)' })
+  @ApiParam({
+    name: 'tickerId',
+    example: '42',
+    description: 'Ticker ID (BigInt)',
+  })
   @ApiResponse({ status: 200, description: 'Ticker removed.' })
   @Delete(':id/items/:tickerId')
   async removeItem(
@@ -104,7 +114,11 @@ export class WatchlistController {
     @Param('id') watchlistId: string,
     @Param('tickerId') tickerId: string,
   ) {
-    await this.watchlistService.removeItemFromWatchlist(req.user.uid, watchlistId, tickerId);
+    await this.watchlistService.removeItemFromWatchlist(
+      req.user.uid,
+      watchlistId,
+      tickerId,
+    );
     return { success: true };
   }
 }

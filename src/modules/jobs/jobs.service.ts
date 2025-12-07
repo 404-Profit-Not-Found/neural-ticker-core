@@ -19,12 +19,12 @@ export class JobsService {
   async cleanupStuckResearch() {
     this.logger.log('Running Zombie Ticket Cleanup...');
     try {
-        const count = await this.researchService.failStuckTickets(20); // 20 mins
-        this.logger.log(`Cleanup complete. Fixed ${count} tickets.`);
-        return { count };
+      const count = await this.researchService.failStuckTickets(20); // 20 mins
+      this.logger.log(`Cleanup complete. Fixed ${count} tickets.`);
+      return { count };
     } catch (e) {
-        this.logger.error('Zombie Ticket Cleanup failed', e);
-        throw e;
+      this.logger.error('Zombie Ticket Cleanup failed', e);
+      throw e;
     }
   }
 

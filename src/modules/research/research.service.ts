@@ -140,7 +140,12 @@ export class ResearchService {
     status: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<{ data: ResearchNote[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    data: ResearchNote[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const query = this.noteRepo.createQueryBuilder('note');
     query.where('note.user_id = :userId', { userId });
 
@@ -179,7 +184,7 @@ export class ResearchService {
       note.error = 'Timeout: Research stuck in processing state.';
       await this.noteRepo.save(note);
     }
-    
+
     this.logger.warn(`Cleaned up ${stuckNotes.length} stuck research tickets.`);
     return stuckNotes.length;
   }

@@ -34,8 +34,14 @@ export default () => ({
     provider: process.env.RRSCORE_PROVIDER || 'openai',
   },
   marketData: {
-    stalePriceMinutes: parseInt(process.env.MARKET_DATA_STALE_PRICE_MINUTES || '15', 10),
-    staleFundamentalsHours: parseInt(process.env.MARKET_DATA_STALE_FUNDAMENTALS_HOURS || '24', 10),
+    stalePriceMinutes: parseInt(
+      process.env.MARKET_DATA_STALE_PRICE_MINUTES || '15',
+      10,
+    ),
+    staleFundamentalsHours: parseInt(
+      process.env.MARKET_DATA_STALE_FUNDAMENTALS_HOURS || '24',
+      10,
+    ),
   },
   http: {
     readTimeout: parseInt(process.env.HTTP_READ_TIMEOUT_SEC || '10', 10),
