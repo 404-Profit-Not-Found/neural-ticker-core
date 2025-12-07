@@ -21,6 +21,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import { HealthModule } from './modules/health/health.module';
 import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
+import { WatchlistModule } from './modules/watchlist/watchlist.module'; // Added
 import configuration from './config/configuration';
 
 // ...
@@ -77,6 +78,7 @@ import configuration from './config/configuration';
     AuthModule,
     FirebaseModule,
     StockTwitsModule,
+    WatchlistModule,
   ],
   controllers: [AppController],
   providers: [
