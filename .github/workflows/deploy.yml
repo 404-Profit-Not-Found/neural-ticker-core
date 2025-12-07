@@ -70,6 +70,8 @@ jobs:
              GCP_SA_KEY=${{ secrets.GCP_SA_KEY }}
              CRON_SECRET=${{ secrets.CRON_SECRET }}
              GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
+             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
 
       - name: 'Show Output'
         run: echo ${{ steps.deploy.outputs.url }}
