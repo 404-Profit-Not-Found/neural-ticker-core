@@ -29,20 +29,28 @@ export class FirebaseService implements OnModuleInit {
 
         if (serviceAccountJson) {
           try {
-            // If it's a string starting with '{', parse it.
-            // If the user pasted the key into the env var, it will be a string.
+            // Priority 1: Direct JSON parsing
             if (serviceAccountJson.trim().startsWith('{')) {
               serviceAccount = JSON.parse(serviceAccountJson);
-              this.logger.log(
-                'Loaded Firebase Credentials from Config (JSON Content)',
-              );
             } else {
-              this.logger.warn(
-                'firebase.serviceAccountJson does not look like JSON',
+              // Priority 2: Base64 Decoding
+              const decoded = Buffer.from(serviceAccountJson, 'base64').toString(
+                'utf8',
               );
+              if (decoded.trim().startsWith('{')) {
+                serviceAccount = JSON.parse(decoded);
+                this.logger.log(
+                  'Loaded Firebase Credentials from Config (Base64 Encoded)',
+                );
+              }
             }
           } catch (e) {
-            this.logger.error('Failed to parse firebase.serviceAccountJson', e);
+            // Ignore initial parse errors if we are going to try file path next
+            if (!serviceAccount) {
+              this.logger.warn(
+                'firebase.serviceAccountJson is not valid JSON or Base64',
+              );
+            }
           }
         } else if (serviceAccountPath) {
           // Legacy path handling
