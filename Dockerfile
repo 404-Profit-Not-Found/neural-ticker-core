@@ -37,7 +37,7 @@ RUN npm ci --only=production
 COPY --from=backend-builder /app/dist ./dist
 
 # Copy built frontend assets to the "client" folder expected by ServeStaticModule
-COPY --from=frontend-builder /app/frontend/dist ./client
+COPY --from=frontend-builder /app/client ./client
 
 # Create a non-root user for security (optional but recommended for Cloud Run)
 # Alpine images usually have 'node' user
