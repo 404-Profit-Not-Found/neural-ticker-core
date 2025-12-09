@@ -131,12 +131,37 @@ export function WatchlistTable() {
             if (!current) return;
 
             const items = current.items || [];
-            const symbols = items.map((item: any) => item.ticker.symbol);
-            let results: any[] = [];
+            // Watchlist item type is nested
+            interface WatchlistItem {
+                ticker: { id: string; symbol: string };
+            }
+
+            // Snapshot response shape
+            interface SnapshotResponse {
+                ticker: {
+                    symbol: string;
+                    name: string;
+                    logo_url?: string;
+                };
+                latestPrice?: {
+                    close: number;
+                    prevClose?: number;
+                };
+                fundamentals?: {
+                    sector?: string;
+                    pe_ttm?: number;
+                    market_cap?: number;
+                    dividend_yield?: number;
+                    beta?: number;
+                };
+            }
+
+            const symbols = items.map((item: WatchlistItem) => item.ticker.symbol);
+            let results: SnapshotResponse[] = [];
             
             if (symbols.length > 0) {
                 try {
-                    const { data } = await api.post('/market-data/snapshots', { symbols });
+                    const { data } = await api.post<SnapshotResponse[]>('/market-data/snapshots', { symbols });
                     results = data || [];
                 } catch (e) {
                     console.error("Bulk snapshot fetch failed", e);
@@ -144,13 +169,13 @@ export function WatchlistTable() {
             }
 
             const mappedData = results
-                .filter((s: any) => s && s.ticker) // Filter out errors or nulls
-                .map((s: any) => {
+                .filter((s) => s && s.ticker) // Filter out errors or nulls
+                .map((s) => {
                     const price = Number(s.latestPrice?.close || 0);
                     const prevClose = Number(s.latestPrice?.prevClose || price);
                     const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
                     const fundamentals = s.fundamentals || {};
-
+                    
                     return {
                         symbol: s.ticker.symbol,
                         logo: s.ticker.logo_url,
@@ -159,7 +184,7 @@ export function WatchlistTable() {
                         price: price,
                         change: change,
                         pe: fundamentals.pe_ttm ?? null,
-                        marketCap: formatMarketCap(fundamentals.market_cap),
+                        marketCap: formatMarketCap(fundamentals.market_cap || 0),
                         divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
                         beta: fundamentals.beta ?? null,
                         rating: 'Hold',
