@@ -50,27 +50,43 @@ const columnHelper = createColumnHelper<StockData>();
 
 
 // Helper component for Logo with caching
+// Helper component for Logo with caching
 export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
-    // Reactive source computation - ensures changes to url prop are reflected immediately
-    // and prioritizes proxy for Finnhub URLs.
+    const [useCache, setUseCache] = useState(true);
+    const [loaded, setLoaded] = useState(false);
+    const [error, setError] = useState(false);
+
     const imgSrc = useMemo(() => {
+        if (useCache) {
+            // Try fetching from our DB cache first
+            return `/api/v1/tickers/${symbol}/logo`;
+        }
+        // Fallback to proxy or direct URL
         if (!url) return null;
         if (url.includes('finnhub.io')) {
             return `/api/proxy/image?url=${encodeURIComponent(url)}`;
         }
         return url;
-    }, [url]);
+    }, [useCache, url, symbol]);
     
-    const [loaded, setLoaded] = useState(false);
-    const [error, setError] = useState(false);
-
-    // Reset state when url changes
+    // Reset state when symbol changes
     useEffect(() => {
+        setUseCache(true);
         setLoaded(false);
         setError(false);
-    }, [url]);
+    }, [symbol, url]);
 
-    if (!url || !imgSrc || error) {
+    const handleError = () => {
+        if (useCache) {
+            // If DB cache fails (404), switch to fallback
+            setUseCache(false);
+        } else {
+            // If fallback fails, show placeholder
+            setError(true);
+        }
+    };
+
+    if (error || !imgSrc) {
         return (
             <div className={cn("rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0", className || "w-8 h-8")}>
                 {symbol.substring(0, 1)}
@@ -88,7 +104,7 @@ export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: s
                 alt="" // Decorative
                 className={cn(`w-full h-full rounded-full object-contain transition-opacity duration-300`, loaded ? 'opacity-100' : 'opacity-0')}
                 onLoad={() => setLoaded(true)}
-                onError={() => setError(true)}
+                onError={handleError}
             />
         </div>
     );
