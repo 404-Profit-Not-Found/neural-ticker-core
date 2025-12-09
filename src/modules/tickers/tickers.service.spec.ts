@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
+import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { NotFoundException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 
 describe('TickersService', () => {
   let service: TickersService;
@@ -14,10 +16,29 @@ describe('TickersService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    })),
+    find: jest.fn(),
+  };
+
+  const mockLogoRepo = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockFinnhubService = {
     getCompanyProfile: jest.fn(),
+  };
+
+  const mockHttpService = {
+    get: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -29,8 +50,16 @@ describe('TickersService', () => {
           useValue: mockTickerRepo,
         },
         {
+          provide: getRepositoryToken(TickerLogoEntity),
+          useValue: mockLogoRepo,
+        },
+        {
           provide: FinnhubService,
           useValue: mockFinnhubService,
+        },
+        {
+          provide: HttpService,
+          useValue: mockHttpService,
         },
       ],
     }).compile();

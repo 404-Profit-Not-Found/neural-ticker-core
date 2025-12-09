@@ -15,5 +15,9 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    outDir: '../client',
+    emptyOutDir: true,
   }
 })

@@ -60,7 +60,6 @@ jobs:
           flags: '--allow-unauthenticated'
           env_vars: |
              NODE_ENV=production
-             APP_ENV=production
              APP_PORT=8080
              DATABASE_URL=${{ secrets.DATABASE_URL }}
              FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
@@ -72,6 +71,9 @@ jobs:
              GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
              GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
              GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+             APP_ENV=${{ secrets.APP_ENV }}
+             APP_PORT=${{ secrets.APP_PORT }}
 
       - name: 'Show Output'
         run: echo ${{ steps.deploy.outputs.url }}

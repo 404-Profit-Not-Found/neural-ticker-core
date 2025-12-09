@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -61,6 +62,29 @@ export class TickersController {
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
     return this.tickersService.ensureTicker(symbol);
+  }
+
+  @ApiOperation({
+    summary: 'Get ticker logo',
+    description: 'Serves the cached logo for a ticker from the database.',
+  })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiResponse({ status: 200, description: 'Logo image.' })
+  @ApiResponse({ status: 404, description: 'Logo not found.' })
+  @Public()
+  @Get(':symbol/logo')
+  async getLogo(@Param('symbol') symbol: string, @Res() res: Response) {
+    const logo = await this.tickersService.getLogo(symbol);
+    if (!logo) {
+      // Fallback or 404. Since we have ensureTicker running, it should be there.
+      // Or we can redirect to the finnhub url via proxy if we have the ticker?
+      // For now, strict 404 and let frontend handle default.
+      return res.status(404).send('Logo not found');
+    }
+
+    res.set('Content-Type', logo.mime_type);
+    res.set('Cache-Control', 'public, max-age=604800'); // 7 days
+    res.send(logo.image_data);
   }
 
   @ApiOperation({

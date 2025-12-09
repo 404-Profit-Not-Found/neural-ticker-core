@@ -2,7 +2,10 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
+import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class TickersService {
@@ -11,7 +14,10 @@ export class TickersService {
   constructor(
     @InjectRepository(TickerEntity)
     private readonly tickerRepo: Repository<TickerEntity>,
+    @InjectRepository(TickerLogoEntity)
+    private readonly logoRepo: Repository<TickerLogoEntity>,
     private readonly finnhubService: FinnhubService,
+    private readonly httpService: HttpService,
   ) {}
 
   async getTicker(symbol: string): Promise<TickerEntity> {
@@ -30,6 +36,14 @@ export class TickersService {
       where: { symbol: upperSymbol },
     });
     if (existing) {
+      // Trigger background logo download if missing, just in case
+      if (existing.logo_url && !existing.logo_url.startsWith('http')) {
+        // Assume if it's not http, it might be already processed or invalid?
+        // Actually we want to check if we have it in logoRepo
+        void this.checkAndDownloadLogo(existing);
+      } else if (existing.logo_url) {
+        void this.checkAndDownloadLogo(existing);
+      }
       return existing;
     }
 
@@ -81,7 +95,72 @@ export class TickersService {
       finnhub_raw: profile,
     });
 
-    return this.tickerRepo.save(newTicker);
+    const savedTicker = await this.tickerRepo.save(newTicker);
+
+    // Download logo in background
+    if (savedTicker.logo_url) {
+      this.downloadAndSaveLogo(savedTicker.id, savedTicker.logo_url).catch(
+        (err) =>
+          this.logger.error(
+            `Failed to download logo for ${savedTicker.symbol}: ${err.message}`,
+          ),
+      );
+    }
+
+    return savedTicker;
+  }
+
+  private async checkAndDownloadLogo(ticker: TickerEntity) {
+    // Non-blocking check
+    try {
+      const exists = await this.logoRepo.findOne({
+        where: { symbol_id: ticker.id },
+      });
+      if (!exists && ticker.logo_url) {
+        void this.downloadAndSaveLogo(ticker.id, ticker.logo_url);
+      }
+    } catch (e) {
+      this.logger.error(
+        `Error checking logo for ${ticker.symbol}: ${e.message}`,
+      );
+    }
+  }
+
+  async downloadAndSaveLogo(symbolId: string, url: string) {
+    if (!url) return;
+    try {
+      this.logger.debug(
+        `Downloading logo for ticker ID ${symbolId} from ${url}`,
+      );
+      const response = await firstValueFrom(
+        this.httpService.get(url, { responseType: 'arraybuffer' }),
+      );
+
+      const buffer = Buffer.from(response.data);
+      const mimeType = response.headers['content-type'] || 'image/png';
+
+      const logo = this.logoRepo.create({
+        symbol_id: symbolId,
+        image_data: buffer,
+        mime_type: mimeType,
+      });
+
+      await this.logoRepo.save(logo);
+      this.logger.log(`Saved logo for ticker ID ${symbolId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to download logo from ${url}: ${error.message}`,
+      );
+    }
+  }
+
+  async getLogo(symbol: string): Promise<TickerLogoEntity | null> {
+    const ticker = await this.tickerRepo.findOne({
+      where: { symbol: symbol.toUpperCase() },
+    });
+    if (!ticker) return null;
+
+    return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }
 
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
@@ -99,7 +178,12 @@ export class TickersService {
     const searchPattern = `${search.toUpperCase()}%`;
     return this.tickerRepo
       .createQueryBuilder('ticker')
-      .select(['ticker.symbol', 'ticker.name', 'ticker.exchange', 'ticker.logo_url'])
+      .select([
+        'ticker.symbol',
+        'ticker.name',
+        'ticker.exchange',
+        'ticker.logo_url',
+      ])
       .where('UPPER(ticker.symbol) LIKE :pattern', { pattern: searchPattern })
       .orWhere('UPPER(ticker.name) LIKE :pattern', { pattern: searchPattern })
       .orderBy('ticker.symbol', 'ASC')

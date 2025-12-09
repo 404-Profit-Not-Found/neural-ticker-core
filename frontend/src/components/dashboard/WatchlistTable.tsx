@@ -7,7 +7,7 @@ import {
     type SortingState,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
     ArrowUpDown,
     MoreVertical,
@@ -29,6 +29,8 @@ import { useToast } from '../ui/toast';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/api';
 
+import { TickerLogo } from './TickerLogo';
+
 // Define the shape of our table data
 interface StockData {
     symbol: string;
@@ -46,53 +48,6 @@ interface StockData {
 }
 
 const columnHelper = createColumnHelper<StockData>();
-
-
-
-// Helper component for Logo with caching
-export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
-    // Reactive source computation - ensures changes to url prop are reflected immediately
-    // and prioritizes proxy for Finnhub URLs.
-    const imgSrc = useMemo(() => {
-        if (!url) return null;
-        if (url.includes('finnhub.io')) {
-            return `/api/proxy/image?url=${encodeURIComponent(url)}`;
-        }
-        return url;
-    }, [url]);
-    
-    const [loaded, setLoaded] = useState(false);
-    const [error, setError] = useState(false);
-
-    // Reset state when url changes
-    useEffect(() => {
-        setLoaded(false);
-        setError(false);
-    }, [url]);
-
-    if (!url || !imgSrc || error) {
-        return (
-            <div className={cn("rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0", className || "w-8 h-8")}>
-                {symbol.substring(0, 1)}
-            </div>
-        );
-    }
-
-    return (
-        <div className={cn("relative shrink-0", className || "w-8 h-8")}>
-            {!loaded && (
-                <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
-            )}
-            <img
-                src={imgSrc}
-                alt="" // Decorative
-                className={cn(`w-full h-full rounded-full object-contain transition-opacity duration-300`, loaded ? 'opacity-100' : 'opacity-0')}
-                onLoad={() => setLoaded(true)}
-                onError={() => setError(true)}
-            />
-        </div>
-    );
-};
 
 export function WatchlistTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
@@ -126,8 +81,15 @@ export function WatchlistTable() {
     const [watchlists, setWatchlists] = useState<WatchlistData[]>([]);
     const navigate = useNavigate();
 
+    // Move formatMarketCap here to be hoisted before usage
+    const formatMarketCap = useCallback((val: number) => {
+        if (!val) return '-';
+        if (val > 1000) return `$${(val / 1000).toFixed(2)}B`;
+        return `$${val.toFixed(2)}M`;
+    }, []);
+
     // 1. Initial Load of Watchlists
-    const fetchWatchlists = async () => {
+    const fetchWatchlists = useCallback(async () => {
         try {
             const { data: lists } = await api.get('/watchlists');
             if (lists && lists.length > 0) {
@@ -149,10 +111,10 @@ export function WatchlistTable() {
         } catch {
             console.error("Failed to fetch watchlists");
         }
-    };
+    }, [activeWatchlistId]);
 
     // 2. Fetch Items when Active ID changes
-    const fetchItems = async () => {
+    const fetchItems = useCallback(async () => {
         if (!activeWatchlistId) return;
         setLoading(true);
         try {
@@ -169,7 +131,8 @@ export function WatchlistTable() {
             if (!current) return;
 
             const items = current.items || [];
-            const promises = items.map((item: { ticker: { symbol: string } }) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const promises = items.map((item: any) =>
                 api.get(`/tickers/${item.ticker.symbol}/snapshot`).catch(() => null)
             );
 
@@ -208,19 +171,19 @@ export function WatchlistTable() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [activeWatchlistId, formatMarketCap]);
 
      
     useEffect(() => {
         fetchWatchlists();
-    }, []);
+    }, [fetchWatchlists]);
 
      
     useEffect(() => {
         fetchItems();
-    }, [activeWatchlistId]);
+    }, [fetchItems]);
 
-    const handleRemoveTicker = async (symbol: string) => {
+    const handleRemoveTicker = useCallback(async (symbol: string) => {
         if (!activeWatchlistId) return;
         
         // Find the ticker ID from the current watchlist items
@@ -240,7 +203,7 @@ export function WatchlistTable() {
             console.error("Failed to remove ticker", err);
             showToast("Failed to remove ticker", 'error');
         }
-    };
+    }, [activeWatchlistId, watchlists, showToast, fetchItems]); // Added dependencies
 
     // Debounced search for autocomplete
     useEffect(() => {
@@ -339,11 +302,11 @@ export function WatchlistTable() {
         }
     };
 
-    const formatMarketCap = (val: number) => {
+    const formatMarketCap = useCallback((val: number) => {
         if (!val) return '-';
         if (val > 1000) return `$${(val / 1000).toFixed(2)}B`;
         return `$${val.toFixed(2)}M`;
-    };
+    }, []);
 
     const columns = useMemo(() => [
         columnHelper.accessor('symbol', {
@@ -361,8 +324,8 @@ export function WatchlistTable() {
             },
             cell: (info) => {
                 return (
-                    <div className="flex items-center gap-3" onClick={() => navigate(`/dashboard/ticker/${info.getValue()}`)}>
-                        <TickerLogo url={info.row.original.logo} symbol={info.getValue()} />
+                        <div className="flex items-center gap-3" onClick={() => navigate(`/dashboard/ticker/${info.getValue()}`)}>
+                        <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
                         <span className="text-blue-500 font-semibold cursor-pointer hover:underline">{info.getValue()}</span>
                     </div>
                 );
