@@ -47,69 +47,46 @@ interface StockData {
 
 const columnHelper = createColumnHelper<StockData>();
 
-// Logo cache utilities - stores URL to avoid re-fetching on re-renders
-const LOGO_CACHE_PREFIX = 'logo_cache_v2_';
-const LOGO_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-const getCachedLogo = (symbol: string): string | null => {
-    try {
-        const cached = localStorage.getItem(LOGO_CACHE_PREFIX + symbol);
-        if (cached) {
-            const { url, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < LOGO_CACHE_EXPIRY) {
-                return url;
-            }
-            localStorage.removeItem(LOGO_CACHE_PREFIX + symbol); // Expired
-        }
-    } catch { /* ignore parse errors */ }
-    return null;
-};
-
-const setCachedLogo = (symbol: string, url: string) => {
-    try {
-        localStorage.setItem(LOGO_CACHE_PREFIX + symbol, JSON.stringify({
-            url,
-            timestamp: Date.now()
-        }));
-    } catch { /* localStorage full or unavailable */ }
-};
 
 // Helper component for Logo with caching
-export const TickerLogo = ({ url, symbol }: { url?: string, symbol: string }) => {
-    // Use lazy initializer to check cache synchronously on first render
-    const [imgSrc] = useState(() => {
+export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
+    // Reactive source computation - ensures changes to url prop are reflected immediately
+    // and prioritizes proxy for Finnhub URLs.
+    const imgSrc = useMemo(() => {
         if (!url) return null;
-        const cached = getCachedLogo(symbol);
-        if (cached) return cached;
         if (url.includes('finnhub.io')) {
-            // Use backend proxy to avoid CORS issues
             return `/api/proxy/image?url=${encodeURIComponent(url)}`;
         }
-        // Cache the URL for future use (original check)
-        setCachedLogo(symbol, url);
         return url;
-    });
+    }, [url]);
     
     const [loaded, setLoaded] = useState(false);
     const [error, setError] = useState(false);
 
+    // Reset state when url changes
+    useEffect(() => {
+        setLoaded(false);
+        setError(false);
+    }, [url]);
+
     if (!url || !imgSrc || error) {
         return (
-            <div className="w-8 h-8 rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0">
+            <div className={cn("rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0", className || "w-8 h-8")}>
                 {symbol.substring(0, 1)}
             </div>
         );
     }
 
     return (
-        <div className="relative w-8 h-8 shrink-0">
+        <div className={cn("relative shrink-0", className || "w-8 h-8")}>
             {!loaded && (
                 <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
             )}
             <img
                 src={imgSrc}
                 alt="" // Decorative
-                className={`w-full h-full rounded-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                className={cn(`w-full h-full rounded-full object-contain transition-opacity duration-300`, loaded ? 'opacity-100' : 'opacity-0')}
                 onLoad={() => setLoaded(true)}
                 onError={() => setError(true)}
             />
@@ -218,7 +195,7 @@ export function WatchlistTable() {
                         change: change,
                         pe: fundamentals.pe_ttm ?? null,
                         marketCap: formatMarketCap(fundamentals.market_cap),
-                        divYield: fundamentals.dividend_yield ? (fundamentals.dividend_yield).toFixed(2) + '%' : '-',
+                        divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
                         beta: fundamentals.beta ?? null,
                         rating: 'Hold',
                         growthRank: 5
@@ -614,13 +591,11 @@ export function WatchlistTable() {
                                             selectedIndex === idx && "bg-[#27272a]"
                                         )}
                                     >
-                                        {s.logo_url ? (
-                                            <img src={s.logo_url} alt="" className="w-6 h-6 rounded-full object-contain" />
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa]">
-                                                {s.symbol[0]}
-                                            </div>
-                                        )}
+                                        <TickerLogo 
+                                            url={s.logo_url} 
+                                            symbol={s.symbol} 
+                                            className="w-6 h-6" 
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-semibold text-blue-400">{s.symbol}</span>
