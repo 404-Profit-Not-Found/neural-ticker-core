@@ -60,7 +60,6 @@ jobs:
           flags: '--allow-unauthenticated'
           env_vars: |
              NODE_ENV=production
-             APP_PORT=8080
              DATABASE_URL=${{ secrets.DATABASE_URL }}
              FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
