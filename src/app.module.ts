@@ -60,20 +60,20 @@ import configuration from './config/configuration';
         return {
           type: 'postgres',
           url: dbConfig.url,
-          host: process.env.DB_HOST,
-          port: parseInt(process.env.DB_PORT || '5432'),
-          username: process.env.DB_USERNAME,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_DATABASE,
+          host: dbConfig.host || 'localhost',
+          port: dbConfig.port || 5432,
+          username: dbConfig.username || 'postgres',
+          password: dbConfig.password, // Let undefined be undefined if not set, pg handles it if url is present
+          database: dbConfig.database || 'postgres',
           autoLoadEntities: true,
-          synchronize: process.env.DB_SYNCHRONIZE === 'true',
-          connectTimeoutMS: 10000, // 10s timeout to prevent hanging
+          synchronize: dbConfig.synchronize,
+          connectTimeoutMS: 10000,
           ssl:
             process.env.DB_SSL === 'false'
               ? false
-              : dbConfig.url || process.env.DB_SSL === 'true'
+              : dbConfig.url && dbConfig.url.includes('sslmode=require') || process.env.DB_SSL === 'true'
                 ? { rejectUnauthorized: false }
-                : false,
+                : false, // Default to false if not explicitly required
         };
       },
     }),

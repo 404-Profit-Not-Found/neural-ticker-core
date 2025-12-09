@@ -23,7 +23,9 @@ describe('Public Access (e2e)', () => {
   }, 30000); // Increase timeout for app init
 
   afterEach(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   it('/api/v1/tickers/NVDA/logo (GET) should be public (200 or 404, not 401)', () => {
