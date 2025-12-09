@@ -24,14 +24,14 @@ export default () => ({
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackUrl: process.env.GOOGLE_CALLBACK_URL,
   },
-  gemini: {
-    apiKey: process.env.GEMINI_API_KEY,
-    models: {
-      low: 'gemini-2.5-flash-lite',
-      medium: 'gemini-2.5-flash',
-      high: 'gemini-3-pro',
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY,
+      models: {
+        low: 'gemini-2.5-flash-lite',
+        medium: 'gemini-2.5-flash',
+        high: 'gemini-3-pro',
+      },
     },
-  },
   riskReward: {
     enabled: process.env.RRSCORE_ENABLED !== 'false',
     cron: process.env.RRSCORE_CRON_EXPRESSION || '0 * * * *',
