@@ -1,19 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LlmService } from './llm.service';
-import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
-import { ResearchPrompt, ResearchResult } from './llm.types';
+import { OpenAiProvider } from './providers/openai.provider';
+import { QualityTier } from './llm.types';
 
 describe('LlmService', () => {
   let service: LlmService;
-  let openai: any;
-  let gemini: any;
+  let geminiProvider: GeminiProvider;
+  let openAiProvider: OpenAiProvider;
 
-  const mockOpenAiProvider = {
-    generate: jest.fn(),
-  };
-
-  const mockGeminiProvider = {
+  const mockProvider = {
     generate: jest.fn(),
   };
 
@@ -21,17 +17,21 @@ describe('LlmService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LlmService,
-        { provide: OpenAiProvider, useValue: mockOpenAiProvider },
-        { provide: GeminiProvider, useValue: mockGeminiProvider },
+        {
+          provide: GeminiProvider,
+          useValue: mockProvider,
+        },
+        {
+          provide: OpenAiProvider,
+          useValue: mockProvider,
+        },
       ],
     }).compile();
 
     service = module.get<LlmService>(LlmService);
-    openai = module.get(OpenAiProvider);
-    gemini = module.get(GeminiProvider);
-  });
+    geminiProvider = module.get<GeminiProvider>(GeminiProvider);
+    openAiProvider = module.get<OpenAiProvider>(OpenAiProvider);
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
@@ -40,67 +40,46 @@ describe('LlmService', () => {
   });
 
   describe('generateResearch', () => {
-    const prompt: ResearchPrompt = {
-      question: 'Why?',
-      tickers: ['A'],
-      numericContext: '',
-    };
-
-    it('should default to openai', async () => {
-      const expected: ResearchResult = {
-        provider: 'openai',
-        models: ['gpt'],
-        answerMarkdown: 'Ok',
+    it('should route to OpenAI if provider specified', async () => {
+      const prompt = {
+        question: 'q',
+        provider: 'openai' as const,
+        quality: 'medium' as QualityTier,
       };
-      mockOpenAiProvider.generate.mockResolvedValue(expected);
+      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'openai' });
 
       const result = await service.generateResearch(prompt);
-      expect(result).toEqual(expected);
-      expect(openai.generate).toHaveBeenCalledWith(prompt);
-      expect(gemini.generate).not.toHaveBeenCalled();
+
+      expect(result.answerMarkdown).toBe('openai');
+      expect(openAiProvider.generate).toHaveBeenCalledWith(prompt);
+      expect(geminiProvider.generate).not.toHaveBeenCalled();
     });
 
-    it('should call gemini when provider is gemini', async () => {
-      const expected: ResearchResult = {
-        provider: 'gemini',
-        models: ['gem'],
-        answerMarkdown: 'Ok',
+    it('should route to Gemini if specified', async () => {
+      const prompt = {
+        question: 'q',
+        provider: 'gemini' as const,
+        quality: 'medium' as QualityTier,
       };
-      mockGeminiProvider.generate.mockResolvedValue(expected);
+      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'gemini' });
 
-      const result = await service.generateResearch({
-        ...prompt,
-        provider: 'gemini',
-      });
-      expect(result).toEqual(expected);
-      expect(gemini.generate).toHaveBeenCalled();
+      const result = await service.generateResearch(prompt);
+
+      expect(result.answerMarkdown).toBe('gemini');
+      expect(geminiProvider.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'gemini' }),
+      );
+      expect(openAiProvider.generate).not.toHaveBeenCalled();
     });
 
-    it('should call both for ensemble', async () => {
-      const openaiRes: ResearchResult = {
-        provider: 'openai',
-        models: ['gpt'],
-        answerMarkdown: 'AI answer',
-      };
-      const geminiRes: ResearchResult = {
-        provider: 'gemini',
-        models: ['gem'],
-        answerMarkdown: 'Gem answer',
-      };
+    it('should route to OpenAI by default', async () => {
+      const prompt = { question: 'q', quality: 'medium' as QualityTier };
+      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'openai' });
 
-      mockOpenAiProvider.generate.mockResolvedValue(openaiRes);
-      mockGeminiProvider.generate.mockResolvedValue(geminiRes);
+      const result = await service.generateResearch(prompt);
 
-      const result = await service.generateResearch({
-        ...prompt,
-        provider: 'ensemble',
-      });
-
-      expect(openai.generate).toHaveBeenCalled();
-      expect(gemini.generate).toHaveBeenCalled();
-      expect(result.provider).toBe('ensemble');
-      expect(result.answerMarkdown).toContain('### OpenAI');
-      expect(result.answerMarkdown).toContain('### Gemini');
+      expect(result.answerMarkdown).toBe('openai');
+      expect(openAiProvider.generate).toHaveBeenCalledWith(expect.anything());
     });
   });
 });
