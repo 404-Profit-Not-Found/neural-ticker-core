@@ -21,6 +21,9 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm run lint
+    - name: Install Frontend Dependencies
+      run: npm ci
+      working-directory: ./frontend
     - name: Lint Frontend
       run: npm run lint
       working-directory: ./frontend
