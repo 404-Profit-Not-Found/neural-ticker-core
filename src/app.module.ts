@@ -22,6 +22,7 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
 import { HealthModule } from './modules/health/health.module';
 import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
 import { WatchlistModule } from './modules/watchlist/watchlist.module'; // Added
+import { SocialModule } from './modules/social/social.module';
 import configuration from './config/configuration';
 
 // ...
@@ -81,6 +82,7 @@ import configuration from './config/configuration';
     FirebaseModule,
     StockTwitsModule,
     WatchlistModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [

@@ -31,16 +31,16 @@ import {
 class AskResearchDto {
   @ApiProperty({
     example: ['AAPL', 'MSFT'],
-    description: 'Array of stock tickers (symbols) to focus the research on.',
+    description: 'List of ticker symbols to research. Currently supports US Equities.',
+    isArray: true,
   })
   @IsArray()
   @IsString({ each: true })
   tickers: string[];
 
   @ApiProperty({
-    example:
-      'What are the main risks for Apple in 2024 considering AI competition?',
-    description: 'The specific question or topic you want the AI to research.',
+    example: 'Analyze the impact of the latest earnings report on the stock price.',
+    description: 'The specific research question or hypothesis you want the AI to investigate.',
   })
   @IsString()
   question: string;
@@ -49,8 +49,7 @@ class AskResearchDto {
     enum: ['openai', 'gemini', 'ensemble'],
     required: false,
     default: 'ensemble',
-    description:
-      'Select the LLM Provider. "ensemble" combines models for best results (if implemented), otherwise defaults to system preference.',
+    description: 'The LLM provider to use. "ensemble" is recommended for best accuracy.',
   })
   @IsEnum(['openai', 'gemini', 'ensemble'])
   @IsOptional()
@@ -60,13 +59,7 @@ class AskResearchDto {
     enum: ['low', 'medium', 'high', 'deep'],
     required: false,
     default: 'medium',
-    description: `
-**Quality Tiers**:
-- **low**: Fast, shallow scan (GPT-4o-mini). Good for quick sentiment.
-- **medium**: Standard analysis (GPT-4o). Balanced.
-- **high**: Detailed reasoning (Opus/Sonnet level).
-- **deep**: **Gemini Thinking Model**. Extremely detailed chain-of-thought analysis. Takes longer, uses "Search" tools. triggers Post-Research Verification.
-    `,
+    description: 'Depth of analysis. "deep" triggers the slow-thinking Gemini model with web search capabilities.',
   })
   @IsEnum(['low', 'medium', 'high', 'deep'])
   @IsOptional()
@@ -74,8 +67,8 @@ class AskResearchDto {
 
   @ApiProperty({
     required: false,
-    description:
-      'Optional: Tone/Style of the report (e.g. "Skeptical", "Optimistic", "Technical").',
+    example: 'Professional',
+    description: 'The tone of the generated report (e.g., "Professional", "Skeptical", "ELI5").',
   })
   @IsString()
   @IsOptional()
@@ -83,16 +76,16 @@ class AskResearchDto {
 
   @ApiProperty({
     required: false,
-    description: 'Max output tokens. Leave empty for model default.',
+    example: 4000,
+    description: 'Maximum number of tokens for the output response.',
   })
   @IsNumber()
   @IsOptional()
   maxTokens?: number;
 
   @ApiProperty({
-    description:
-      'Optional: Provide your own Gemini API Key for this single request (overrides user/system defaults).',
     required: false,
+    description: 'Optional API key override for this specific request.',
   })
   @IsString()
   @IsOptional()

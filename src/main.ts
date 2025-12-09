@@ -11,6 +11,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
+  
+  // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
+  (app.getHttpAdapter().getInstance() as any).set('etag', false);
 
   // Set global prefix if desired, e.g. api/v1
   // app.setGlobalPrefix('api/v1');
@@ -60,22 +63,15 @@ async function bootstrap() {
 
   await listenWithRetry();
 
-  // Aggressive Shutdown for Hot Reload
-  // This ensures all keep-alive connections are killed instantly
+  // Enable standard NestJS shutdown hooks
+  app.enableShutdownHooks();
+
+  // Aggressive connection cleanup for hot reload environments
   const server = app.getHttpServer();
-
-  const cleanup = async () => {
-    // console.log(`Received signal, forcing shutdown...`);
-    if (server) {
-      server.closeAllConnections(); // Node 18+
-      server.close();
-    }
-    await app.close();
-    process.exit(0);
-  };
-
-  process.on('SIGTERM', () => void cleanup());
-  process.on('SIGINT', () => void cleanup());
+  if (server) {
+      server.keepAliveTimeout = 5000; // Reduce keep-alive timeout
+      server.on('close', () => console.log('--- SERVER CLOSED ---'));
+  }
 
   // Console Banner
   await showBanner(app);

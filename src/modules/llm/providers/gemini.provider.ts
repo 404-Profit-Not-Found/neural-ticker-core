@@ -45,10 +45,9 @@ export class GeminiProvider implements ILlmProvider {
     const model: GenerativeModel = genAI.getGenerativeModel(modelParams);
 
     // 4. Thinking Config
+    // Note: The specific 'thinkingLevel' param caused 400 Bad Request.
+    // Removing strict config for now to let model default behavior take over.
     const generationConfig: any = {};
-    if (modelName.includes('gemini-3')) {
-      generationConfig.thinkingLevel = isDeep ? 'high' : 'low';
-    }
 
     const contextStr =
       typeof prompt.numericContext === 'string'

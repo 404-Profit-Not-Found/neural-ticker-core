@@ -31,6 +31,10 @@ export class Fundamentals {
   @Column({ type: 'numeric', precision: 10, scale: 4, nullable: true })
   debt_to_equity: number;
 
+  @ApiProperty({ example: 'Technology', required: false })
+  @Column({ type: 'text', nullable: true })
+  sector: string;
+
   @ApiProperty()
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;

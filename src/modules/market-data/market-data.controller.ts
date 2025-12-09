@@ -90,4 +90,11 @@ export class MarketDataController {
 
     return this.service.getHistory(symbol, interval, from, to);
   }
+  @ApiOperation({ summary: 'Get Company News' })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiResponse({ status: 200, description: 'List of company news.' })
+  @Get('news')
+  getNews(@Param('symbol') symbol: string) {
+    return this.service.getCompanyNews(symbol);
+  }
 }

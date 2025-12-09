@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -67,6 +68,22 @@ export class WatchlistController {
        console.error('DEBUG: User ID missing in request', req.user);
     }
     return this.watchlistService.createWatchlist(req.user.id, name);
+  }
+
+  @ApiOperation({
+    summary: 'Rename Watchlist',
+    description: 'Updates the name of an existing watchlist.',
+  })
+  @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
+  @ApiBody({ schema: { type: 'object', properties: { name: { type: 'string', example: 'New Name' } } } })
+  @ApiResponse({ status: 200, description: 'Watchlist updated.' })
+  @Patch(':id') // Nestjs Patch import needed? Checked logic below.
+  async updateWatchlist(
+      @Req() req: any,
+      @Param('id') watchlistId: string,
+      @Body('name') name: string,
+  ) {
+      return this.watchlistService.updateWatchlist(req.user.id, watchlistId, name);
   }
 
   @ApiOperation({

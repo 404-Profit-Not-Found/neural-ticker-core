@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import TickerDetails from './pages/TickerDetails'; // Added
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -29,6 +30,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/ticker/:symbol"
+            element={
+              <ProtectedRoute>
+                <TickerDetails />
               </ProtectedRoute>
             }
           />
