@@ -25,6 +25,7 @@ import { HealthModule } from './modules/health/health.module';
 import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
 import { WatchlistModule } from './modules/watchlist/watchlist.module'; // Added
 import { SocialModule } from './modules/social/social.module';
+import { ProxyModule } from './modules/proxy/proxy.module';
 import configuration from './config/configuration';
 
 // ...
@@ -90,6 +91,7 @@ import configuration from './config/configuration';
     StockTwitsModule,
     WatchlistModule,
     SocialModule,
+    ProxyModule,
   ],
   controllers: [AppController],
   providers: [
