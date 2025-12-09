@@ -1,6 +1,6 @@
-# Frontend Integration Specification - Neural-Ticket Core
+# Frontend Integration Specification - neural-ticker Core
 
-This document outlines the integration points for a frontend application to connect with the Neural-Ticket Core backend.
+This document outlines the integration points for a frontend application to connect with the neural-ticker Core backend.
 
 ## 0. Local Development Setup
 

@@ -20,7 +20,10 @@ export class Comment {
   @Column({ type: 'text' })
   ticker_symbol: string;
 
-  @ApiProperty({ example: 'This stock looks promising!', description: 'Comment Content' })
+  @ApiProperty({
+    example: 'This stock looks promising!',
+    description: 'Comment Content',
+  })
   @Column({ type: 'text' })
   content: string;
 

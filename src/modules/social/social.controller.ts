@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Request,
-  UseGuards,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Request } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -36,7 +27,9 @@ export class SocialController {
 
   @ApiOperation({ summary: 'Post a Comment' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
-  @ApiBody({ schema: { type: 'object', properties: { content: { type: 'string' } } } })
+  @ApiBody({
+    schema: { type: 'object', properties: { content: { type: 'string' } } },
+  })
   @ApiResponse({ status: 201, description: 'Comment created' })
   @Post('comments/:symbol')
   async postComment(
@@ -49,11 +42,14 @@ export class SocialController {
 
   @ApiOperation({ summary: 'Get Watcher Count' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
-  @ApiResponse({ status: 200, description: 'Number of users watching this ticker' })
+  @ApiResponse({
+    status: 200,
+    description: 'Number of users watching this ticker',
+  })
   @Public()
   @Get('stats/:symbol/watchers')
   async getWatcherCount(@Param('symbol') symbol: string) {
-      const count = await this.socialService.getWatcherCount(symbol);
-      return { symbol, watchers: count };
+    const count = await this.socialService.getWatcherCount(symbol);
+    return { symbol, watchers: count };
   }
 }

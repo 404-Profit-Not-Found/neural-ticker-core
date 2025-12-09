@@ -159,14 +159,13 @@ export class MarketDataService {
     });
   }
 
-
   async getCompanyNews(symbol: string) {
-      // Default to last 7 days
-      const to = new Date().toISOString().split('T')[0];
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - 7);
-      const from = fromDate.toISOString().split('T')[0];
+    // Default to last 7 days
+    const to = new Date().toISOString().split('T')[0];
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 7);
+    const from = fromDate.toISOString().split('T')[0];
 
-      return this.finnhubService.getCompanyNews(symbol, from, to);
+    return this.finnhubService.getCompanyNews(symbol, from, to);
   }
 }

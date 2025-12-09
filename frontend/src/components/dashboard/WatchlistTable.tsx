@@ -83,7 +83,13 @@ export function WatchlistTable() {
     const [loading, setLoading] = useState(true);
     const initializationRef = useRef(false); // Ref to track if creation is in progress
 
-    const [watchlists, setWatchlists] = useState<any[]>([]);
+    // Type for watchlist object from API
+    interface WatchlistData {
+        id: string;
+        name: string;
+        items: { ticker: { symbol: string } }[];
+    }
+    const [watchlists, setWatchlists] = useState<WatchlistData[]>([]);
     const navigate = useNavigate();
 
     // 1. Initial Load of Watchlists
@@ -104,9 +110,9 @@ export function WatchlistTable() {
                     const createRes = await api.post('/watchlists', { name: 'My First Watchlist' });
                     setWatchlists([createRes.data]);
                     setActiveWatchlistId(createRes.data.id);
-                } catch (e) { setData([]); }
+                } catch { setData([]); }
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to fetch watchlists");
         }
     };
@@ -125,20 +131,22 @@ export function WatchlistTable() {
             const { data: lists } = await api.get('/watchlists');
             setWatchlists(lists);
 
-            const current = lists.find((w: any) => w.id === activeWatchlistId);
+            const current = lists.find((w: WatchlistData) => w.id === activeWatchlistId);
             if (!current) return;
 
             const items = current.items || [];
-            const promises = items.map((item: any) =>
+            const promises = items.map((item: { ticker: { symbol: string } }) =>
                 api.get(`/tickers/${item.ticker.symbol}/snapshot`).catch(() => null)
             );
 
             const results = await Promise.all(promises);
             // ... Mapping Logic ...
+             
             const mappedData = results
-                .filter((r: any) => r && r.data)
-                .map((r: any) => {
-                    const s = r.data;
+                .filter((r): r is { data: Record<string, unknown> } => r !== null && typeof r === 'object' && 'data' in r)
+                .map((r) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const s = r.data as any;
                     const price = Number(s.latestPrice?.close || 0);
                     const prevClose = Number(s.latestPrice?.prevClose || price);
                     const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -168,10 +176,12 @@ export function WatchlistTable() {
         }
     }
 
+     
     useEffect(() => {
         fetchWatchlists();
     }, []);
 
+     
     useEffect(() => {
         fetchItems();
     }, [activeWatchlistId]);
@@ -301,7 +311,7 @@ export function WatchlistTable() {
                 </Button>
             ),
         }),
-    ], []);
+    ], [navigate]);
 
     const table = useReactTable({
         data,

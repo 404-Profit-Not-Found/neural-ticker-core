@@ -65,7 +65,7 @@ export class WatchlistController {
   async createWatchlist(@Req() req: any, @Body('name') name: string) {
     console.log('DEBUG: createWatchlist req.user:', req.user);
     if (!req.user || !req.user.id) {
-       console.error('DEBUG: User ID missing in request', req.user);
+      console.error('DEBUG: User ID missing in request', req.user);
     }
     return this.watchlistService.createWatchlist(req.user.id, name);
   }
@@ -75,15 +75,24 @@ export class WatchlistController {
     description: 'Updates the name of an existing watchlist.',
   })
   @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
-  @ApiBody({ schema: { type: 'object', properties: { name: { type: 'string', example: 'New Name' } } } })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { name: { type: 'string', example: 'New Name' } },
+    },
+  })
   @ApiResponse({ status: 200, description: 'Watchlist updated.' })
   @Patch(':id') // Nestjs Patch import needed? Checked logic below.
   async updateWatchlist(
-      @Req() req: any,
-      @Param('id') watchlistId: string,
-      @Body('name') name: string,
+    @Req() req: any,
+    @Param('id') watchlistId: string,
+    @Body('name') name: string,
   ) {
-      return this.watchlistService.updateWatchlist(req.user.id, watchlistId, name);
+    return this.watchlistService.updateWatchlist(
+      req.user.id,
+      watchlistId,
+      name,
+    );
   }
 
   @ApiOperation({

@@ -31,7 +31,8 @@ import {
 class AskResearchDto {
   @ApiProperty({
     example: ['AAPL', 'MSFT'],
-    description: 'List of ticker symbols to research. Currently supports US Equities.',
+    description:
+      'List of ticker symbols to research. Currently supports US Equities.',
     isArray: true,
   })
   @IsArray()
@@ -39,8 +40,10 @@ class AskResearchDto {
   tickers: string[];
 
   @ApiProperty({
-    example: 'Analyze the impact of the latest earnings report on the stock price.',
-    description: 'The specific research question or hypothesis you want the AI to investigate.',
+    example:
+      'Analyze the impact of the latest earnings report on the stock price.',
+    description:
+      'The specific research question or hypothesis you want the AI to investigate.',
   })
   @IsString()
   question: string;
@@ -49,7 +52,8 @@ class AskResearchDto {
     enum: ['openai', 'gemini', 'ensemble'],
     required: false,
     default: 'ensemble',
-    description: 'The LLM provider to use. "ensemble" is recommended for best accuracy.',
+    description:
+      'The LLM provider to use. "ensemble" is recommended for best accuracy.',
   })
   @IsEnum(['openai', 'gemini', 'ensemble'])
   @IsOptional()
@@ -59,7 +63,8 @@ class AskResearchDto {
     enum: ['low', 'medium', 'high', 'deep'],
     required: false,
     default: 'medium',
-    description: 'Depth of analysis. "deep" triggers the slow-thinking Gemini model with web search capabilities.',
+    description:
+      'Depth of analysis. "deep" triggers the slow-thinking Gemini model with web search capabilities.',
   })
   @IsEnum(['low', 'medium', 'high', 'deep'])
   @IsOptional()
@@ -68,7 +73,8 @@ class AskResearchDto {
   @ApiProperty({
     required: false,
     example: 'Professional',
-    description: 'The tone of the generated report (e.g., "Professional", "Skeptical", "ELI5").',
+    description:
+      'The tone of the generated report (e.g., "Professional", "Skeptical", "ELI5").',
   })
   @IsString()
   @IsOptional()

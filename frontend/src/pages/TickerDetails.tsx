@@ -21,14 +21,19 @@ export default function TickerDetails() {
     const { symbol } = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [tickerData, setTickerData] = useState<any>(null);
     const [activeTab, setActiveTab] = useState("overview");
 
     // State for tabs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [researchNote, setResearchNote] = useState<any>(null);
     const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [riskAnalysis, setRiskAnalysis] = useState<any>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [news, setNews] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [comments, setComments] = useState<any[]>([]);
     const [newComment, setNewComment] = useState("");
     const [researchLoading, setResearchLoading] = useState(false);
@@ -71,6 +76,7 @@ export default function TickerDetails() {
                     // Simple heuristic: Find latest completed ticket for this ticker
                     // Ideally backend supports filtering by ticker.
                     // Client side filtering for now:
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const relevant = res.data?.data?.find((t: any) => t.tickers.includes(symbol) && t.status === 'completed');
                     if (relevant) {
                         setResearchNote(relevant);

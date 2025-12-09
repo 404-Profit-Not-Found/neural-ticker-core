@@ -80,7 +80,7 @@ describe('WatchlistService', () => {
       expect(mockWatchlistRepo.find).toHaveBeenCalledWith({
         where: { user_id: userId },
         relations: ['items', 'items.ticker'],
-        order: { created_at: 'DESC' },
+        order: { created_at: 'ASC' },
       });
       expect(result).toEqual(mockLists);
     });

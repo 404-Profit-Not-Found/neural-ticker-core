@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Watchlist } from './entities/watchlist.entity';
@@ -16,13 +16,13 @@ export class WatchlistService {
   ) {}
 
   async createWatchlist(userId: string, name: string): Promise<Watchlist> {
-    // Check if exists (Idempotency) - allow same name? Or strict unique names per user? 
+    // Check if exists (Idempotency) - allow same name? Or strict unique names per user?
     // Let's bring back idempotency for same name, but allow multiple if name differs.
     const existing = await this.watchlistRepo.findOne({
       where: { user_id: userId, name },
     });
     if (existing) {
-      // If name matches, return it to prevent duplicates of same name. 
+      // If name matches, return it to prevent duplicates of same name.
       // User can create new lists with DIFFERENT names.
       return existing;
     }
@@ -42,15 +42,19 @@ export class WatchlistService {
     });
   }
 
-  async updateWatchlist(userId: string, watchlistId: string, name: string): Promise<Watchlist> {
-      const watchlist = await this.watchlistRepo.findOne({
-          where: { id: watchlistId, user_id: userId },
-      });
-      if (!watchlist) {
-          throw new NotFoundException('Watchlist not found or access denied');
-      }
-      watchlist.name = name;
-      return this.watchlistRepo.save(watchlist);
+  async updateWatchlist(
+    userId: string,
+    watchlistId: string,
+    name: string,
+  ): Promise<Watchlist> {
+    const watchlist = await this.watchlistRepo.findOne({
+      where: { id: watchlistId, user_id: userId },
+    });
+    if (!watchlist) {
+      throw new NotFoundException('Watchlist not found or access denied');
+    }
+    watchlist.name = name;
+    return this.watchlistRepo.save(watchlist);
   }
 
   async addTickerToWatchlist(

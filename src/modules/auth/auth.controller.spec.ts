@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
@@ -22,6 +23,10 @@ describe('AuthController', () => {
     loginWithFirebase: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue('http://localhost:3000'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -29,6 +34,10 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
@@ -56,15 +65,23 @@ describe('AuthController', () => {
       mockAuthService.login.mockResolvedValue(mockResult);
 
       const req = { user: mockUser };
-      const res = { json: jest.fn() };
+      const res = {
+        cookie: jest.fn().mockReturnThis(),
+        redirect: jest.fn(),
+      };
 
       await controller.googleAuthRedirect(req as any, res as any);
 
       expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
-      expect(res.json).toHaveBeenCalledWith({
-        message: 'Login successful',
-        ...mockResult,
-      });
+      expect(res.cookie).toHaveBeenCalledWith(
+        'authentication',
+        'jwt-token',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'lax',
+        }),
+      );
+      expect(res.redirect).toHaveBeenCalled();
     });
   });
 

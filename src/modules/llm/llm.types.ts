@@ -19,6 +19,7 @@ export interface ResearchResult {
   tokensIn?: number;
   tokensOut?: number;
   groundingMetadata?: any;
+  thoughts?: string;
 }
 
 export interface ILlmProvider {

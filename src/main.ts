@@ -11,9 +11,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
-  
+
   // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
-  (app.getHttpAdapter().getInstance() as any).set('etag', false);
+  app.getHttpAdapter().getInstance().set('etag', false);
 
   // Set global prefix if desired, e.g. api/v1
   // app.setGlobalPrefix('api/v1');
@@ -69,8 +69,8 @@ async function bootstrap() {
   // Aggressive connection cleanup for hot reload environments
   const server = app.getHttpServer();
   if (server) {
-      server.keepAliveTimeout = 5000; // Reduce keep-alive timeout
-      server.on('close', () => console.log('--- SERVER CLOSED ---'));
+    server.keepAliveTimeout = 5000; // Reduce keep-alive timeout
+    server.on('close', () => console.log('--- SERVER CLOSED ---'));
   }
 
   // Console Banner
