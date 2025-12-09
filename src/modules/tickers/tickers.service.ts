@@ -90,4 +90,20 @@ export class TickersService {
       order: { symbol: 'ASC' },
     });
   }
+
+  async searchTickers(search?: string): Promise<Partial<TickerEntity>[]> {
+    if (!search || search.trim() === '') {
+      return this.getAllTickers();
+    }
+
+    const searchPattern = `${search.toUpperCase()}%`;
+    return this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select(['ticker.symbol', 'ticker.name', 'ticker.exchange', 'ticker.logo_url'])
+      .where('UPPER(ticker.symbol) LIKE :pattern', { pattern: searchPattern })
+      .orWhere('UPPER(ticker.name) LIKE :pattern', { pattern: searchPattern })
+      .orderBy('ticker.symbol', 'ASC')
+      .limit(20)
+      .getMany();
+  }
 }

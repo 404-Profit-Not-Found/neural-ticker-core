@@ -85,6 +85,19 @@ export function WatchlistTable() {
     const [loading, setLoading] = useState(true);
     const initializationRef = useRef(false); // Ref to track if creation is in progress
     const { showToast } = useToast();
+    
+    // Autocomplete state
+    interface TickerSuggestion {
+        symbol: string;
+        name: string;
+        exchange?: string;
+        logo_url?: string;
+    }
+    const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
     // Type for watchlist object from API
     interface WatchlistData {
@@ -189,38 +202,6 @@ export function WatchlistTable() {
         fetchItems();
     }, [activeWatchlistId]);
 
-    const handleAddTicker = async (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && searchTerm.trim()) {
-            if (!activeWatchlistId) {
-                showToast("No active watchlist found. Please create one first.", 'error');
-                return;
-            }
-
-            setAdding(true);
-            try {
-                await api.post(`/watchlists/${activeWatchlistId}/items`, { symbol: searchTerm.toUpperCase() });
-                showToast(`${searchTerm.toUpperCase()} added to watchlist`, 'success');
-                setSearchTerm('');
-                await fetchItems();
-            } catch (err: unknown) {
-                console.error("Failed to add ticker", err);
-                // Check if it's a 409 Conflict (duplicate)
-                if (err && typeof err === 'object' && 'response' in err) {
-                    const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
-                    if (axiosErr.response?.status === 409) {
-                        showToast(`${searchTerm.toUpperCase()} is already in this watchlist`, 'error');
-                    } else {
-                        showToast(axiosErr.response?.data?.message || "Failed to add ticker", 'error');
-                    }
-                } else {
-                    showToast("Failed to add ticker. It might not exist.", 'error');
-                }
-            } finally {
-                setAdding(false);
-            }
-        }
-    };
-
     const handleRemoveTicker = async (symbol: string) => {
         if (!activeWatchlistId) return;
         
@@ -243,6 +224,102 @@ export function WatchlistTable() {
         }
     };
 
+    // Debounced search for autocomplete
+    useEffect(() => {
+        if (searchTerm.trim().length < 1) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                const { data: results } = await api.get(`/tickers?search=${searchTerm}`);
+                setSuggestions(results || []);
+                setShowSuggestions(results && results.length > 0);
+                setSelectedIndex(-1);
+            } catch (err) {
+                console.error("Failed to fetch suggestions", err);
+            }
+        }, 200); // 200ms debounce
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                suggestionsRef.current && 
+                !suggestionsRef.current.contains(event.target as Node) &&
+                searchInputRef.current &&
+                !searchInputRef.current.contains(event.target as Node)
+            ) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const selectSuggestion = async (symbol: string) => {
+        setSearchTerm(symbol);
+        setShowSuggestions(false);
+        
+        if (!activeWatchlistId) {
+            showToast("No active watchlist found. Please create one first.", 'error');
+            return;
+        }
+
+        setAdding(true);
+        try {
+            await api.post(`/watchlists/${activeWatchlistId}/items`, { symbol });
+            showToast(`${symbol} added to watchlist`, 'success');
+            setSearchTerm('');
+            await fetchItems();
+        } catch (err: unknown) {
+            console.error("Failed to add ticker", err);
+            if (err && typeof err === 'object' && 'response' in err) {
+                const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+                if (axiosErr.response?.status === 409) {
+                    showToast(`${symbol} is already in this watchlist`, 'error');
+                } else {
+                    showToast(axiosErr.response?.data?.message || "Failed to add ticker", 'error');
+                }
+            } else {
+                showToast("Failed to add ticker. It might not exist.", 'error');
+            }
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!showSuggestions || suggestions.length === 0) {
+            // Original enter handler
+            if (e.key === 'Enter' && searchTerm.trim()) {
+                selectSuggestion(searchTerm.toUpperCase());
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => Math.max(prev - 1, -1));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+                selectSuggestion(suggestions[selectedIndex].symbol);
+            } else if (searchTerm.trim()) {
+                selectSuggestion(searchTerm.toUpperCase());
+            }
+        } else if (e.key === 'Escape') {
+            setShowSuggestions(false);
+        }
+    };
 
     const formatMarketCap = (val: number) => {
         if (!val) return '-';
@@ -470,14 +547,50 @@ export function WatchlistTable() {
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#a1a1aa] w-4 h-4" />
                         )}
                         <input
+                            ref={searchInputRef}
                             type="text"
                             placeholder="Add stock..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={handleAddTicker}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
                             disabled={adding}
                             className="h-9 w-64 bg-[#18181b] border border-[#27272a] rounded-md pl-9 pr-4 text-sm text-[#fafafa] focus:outline-none focus:border-blue-500 transition-colors placeholder:text-[#52525b] disabled:opacity-50"
                         />
+                        
+                        {/* Autocomplete Dropdown */}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <div 
+                                ref={suggestionsRef}
+                                className="absolute top-full left-0 mt-1 w-80 bg-[#18181b] border border-[#27272a] rounded-md shadow-lg z-50 py-1 max-h-64 overflow-y-auto"
+                            >
+                                {suggestions.map((s, idx) => (
+                                    <button
+                                        key={s.symbol}
+                                        onClick={() => selectSuggestion(s.symbol)}
+                                        className={cn(
+                                            "w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-[#27272a] transition-colors",
+                                            selectedIndex === idx && "bg-[#27272a]"
+                                        )}
+                                    >
+                                        {s.logo_url ? (
+                                            <img src={s.logo_url} alt="" className="w-6 h-6 rounded-full object-contain" />
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa]">
+                                                {s.symbol[0]}
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-blue-400">{s.symbol}</span>
+                                                <span className="text-xs text-[#52525b]">{s.exchange}</span>
+                                            </div>
+                                            <span className="text-xs text-[#a1a1aa] truncate block">{s.name}</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <Button
                         variant="outline"
