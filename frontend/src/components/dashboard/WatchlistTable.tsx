@@ -131,19 +131,21 @@ export function WatchlistTable() {
             if (!current) return;
 
             const items = current.items || [];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const promises = items.map((item: any) =>
-                api.get(`/tickers/${item.ticker.symbol}/snapshot`).catch(() => null)
-            );
+            const symbols = items.map((item: any) => item.ticker.symbol);
+            let results: any[] = [];
+            
+            if (symbols.length > 0) {
+                try {
+                    const { data } = await api.post('/market-data/snapshots', { symbols });
+                    results = data || [];
+                } catch (e) {
+                    console.error("Bulk snapshot fetch failed", e);
+                }
+            }
 
-            const results = await Promise.all(promises);
-            // ... Mapping Logic ...
-             
             const mappedData = results
-                .filter((r): r is { data: Record<string, unknown> } => r !== null && typeof r === 'object' && 'data' in r)
-                .map((r) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const s = r.data as any;
+                .filter((s: any) => s && s.ticker) // Filter out errors or nulls
+                .map((s: any) => {
                     const price = Number(s.latestPrice?.close || 0);
                     const prevClose = Number(s.latestPrice?.prevClose || price);
                     const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketDataController } from './market-data.controller';
+import { MarketDataBulkController } from './market-data-bulk.controller';
 import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -13,7 +14,7 @@ import { TickersModule } from '../tickers/tickers.module';
     FinnhubModule,
     TickersModule,
   ],
-  controllers: [MarketDataController],
+  controllers: [MarketDataController, MarketDataBulkController],
   providers: [MarketDataService],
   exports: [MarketDataService],
 })
