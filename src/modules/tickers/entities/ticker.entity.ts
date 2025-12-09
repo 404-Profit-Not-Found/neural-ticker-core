@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { ColumnNumericTransformer } from '../../../common/transformers/column-numeric.transformer';
 
 @Entity('tickers')
 export class TickerEntity {
@@ -46,7 +47,13 @@ export class TickerEntity {
     description: 'Market Capitalization',
     required: false,
   })
-  @Column({ type: 'numeric', precision: 24, scale: 4, nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
   market_capitalization: number;
 
   @ApiProperty({
@@ -54,7 +61,13 @@ export class TickerEntity {
     description: 'Shares Outstanding',
     required: false,
   })
-  @Column({ type: 'numeric', precision: 24, scale: 8, nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 8,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
   share_outstanding: number;
 
   @ApiProperty({
