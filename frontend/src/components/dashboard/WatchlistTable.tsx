@@ -47,12 +47,53 @@ interface StockData {
 
 const columnHelper = createColumnHelper<StockData>();
 
-// Helper component for Logo with Skeleton
+// Logo cache utilities - stores URL to avoid re-fetching on re-renders
+const LOGO_CACHE_PREFIX = 'logo_cache_v2_';
+const LOGO_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const getCachedLogo = (symbol: string): string | null => {
+    try {
+        const cached = localStorage.getItem(LOGO_CACHE_PREFIX + symbol);
+        if (cached) {
+            const { url, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < LOGO_CACHE_EXPIRY) {
+                return url;
+            }
+            localStorage.removeItem(LOGO_CACHE_PREFIX + symbol); // Expired
+        }
+    } catch { /* ignore parse errors */ }
+    return null;
+};
+
+const setCachedLogo = (symbol: string, url: string) => {
+    try {
+        localStorage.setItem(LOGO_CACHE_PREFIX + symbol, JSON.stringify({
+            url,
+            timestamp: Date.now()
+        }));
+    } catch { /* localStorage full or unavailable */ }
+};
+
+// Helper component for Logo with caching
 export const TickerLogo = ({ url, symbol }: { url?: string, symbol: string }) => {
+    // Use lazy initializer to check cache synchronously on first render
+    const [imgSrc] = useState(() => {
+        if (!url) return null;
+        const cached = getCachedLogo(symbol);
+        if (cached) return cached;
+        if (url.includes('finnhub.io')) {
+            // Use backend proxy to avoid CORS issues
+            return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+        }
+        // Cache the URL for future use (original check)
+        setCachedLogo(symbol, url);
+        return url;
+    });
+    
     const [loaded, setLoaded] = useState(false);
     const [error, setError] = useState(false);
 
-    if (!url || error) {
+    if (!url || !imgSrc || error) {
         return (
             <div className="w-8 h-8 rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0">
                 {symbol.substring(0, 1)}
@@ -66,7 +107,7 @@ export const TickerLogo = ({ url, symbol }: { url?: string, symbol: string }) =>
                 <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
             )}
             <img
-                src={url}
+                src={imgSrc}
                 alt="" // Decorative
                 className={`w-full h-full rounded-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setLoaded(true)}

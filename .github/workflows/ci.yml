@@ -64,6 +64,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          APP_ENV: ${{ secrets.APP_ENV }}
+          APP_PORT: ${{ secrets.APP_PORT }}
+          
     - name: Run E2E Tests
       run: npm run test:e2e
       env:
