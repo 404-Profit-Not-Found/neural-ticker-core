@@ -63,6 +63,8 @@ export class GeminiProvider implements ILlmProvider {
       tools: tools,
       thinkingConfig: thinkingConfig,
       systemInstruction: `You are a financial analyst performing deep research. 
+      CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge.
+      
       Context: ${JSON.stringify(prompt.numericContext)}`,
     };
 

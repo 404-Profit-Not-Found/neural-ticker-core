@@ -15,7 +15,8 @@ process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
  * Skip in CI where no database is available.
  */
 const isCI = process.env.CI === 'true';
-const describeOrSkip = isCI ? describe.skip : describe;
+// const describeOrSkip = isCI ? describe.skip : describe;
+const describeOrSkip = describe;
 
 describeOrSkip('AppController (e2e)', () => {
   let app: INestApplication<App>;
