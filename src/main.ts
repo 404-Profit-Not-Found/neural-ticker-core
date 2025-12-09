@@ -16,7 +16,7 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('etag', false);
 
   // Set global prefix if desired, e.g. api/v1
-  // app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
     .setTitle('Neural Ticket Core API')

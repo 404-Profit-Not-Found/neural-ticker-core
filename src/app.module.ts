@@ -1,6 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ServeStaticModule } from '@nestjs/serve-static'; // Added
+import { join } from 'path'; // Added
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
 
 import { APP_GUARD } from '@nestjs/core';
@@ -34,6 +36,11 @@ import configuration from './config/configuration';
       isGlobal: true,
       envFilePath: '.env',
       load: [configuration],
+    }),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', '..', 'client'),
+      exclude: ['/api/{*splat}'],
     }),
 
     // Global Rate Limiting: 100 requests per minute per IP

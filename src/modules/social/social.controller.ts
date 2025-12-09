@@ -12,7 +12,7 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Social')
 @ApiBearerAuth()
-@Controller('api/v1/social')
+@Controller('v1/social')
 export class SocialController {
   constructor(private readonly socialService: SocialService) {}
 

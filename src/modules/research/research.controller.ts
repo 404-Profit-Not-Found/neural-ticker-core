@@ -100,7 +100,7 @@ class AskResearchDto {
 
 @ApiTags('Research')
 @ApiBearerAuth()
-@Controller('api/v1/research')
+@Controller('v1/research')
 export class ResearchController {
   constructor(private readonly researchService: ResearchService) {}
 

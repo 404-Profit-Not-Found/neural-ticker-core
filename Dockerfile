@@ -1,31 +1,43 @@
-# Base image
-FROM node:22-alpine AS builder
-
-WORKDIR /app
-
-# Install dependencies (only dev needed for build, but we prune later)
-COPY package*.json ./
+# --- Stage 1: Build Frontend ---
+FROM node:22-alpine AS frontend-builder
+WORKDIR /app/frontend
+# Copy frontend package files
+COPY frontend/package*.json ./
+# Install frontend deps
 RUN npm ci
-
-# Copy source
-COPY . .
-
-# Build
+# Copy frontend source
+COPY frontend/ .
+# Build frontend
 RUN npm run build
 
-# --- Production Stage ---
+# --- Stage 2: Build Backend ---
+FROM node:22-alpine AS backend-builder
+WORKDIR /app
+# Copy backend package files
+COPY package*.json ./
+# Install backend deps
+RUN npm ci
+# Copy backend source
+COPY . .
+# Build backend
+RUN npm run build
+
+# --- Stage 3: Production ---
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy backend package files
 COPY package*.json ./
 
 # Install only production dependencies
 RUN npm ci --only=production
 
-# Copy built assets
-COPY --from=builder /app/dist ./dist
+# Copy built backend assets
+COPY --from=backend-builder /app/dist ./dist
+
+# Copy built frontend assets to the "client" folder expected by ServeStaticModule
+COPY --from=frontend-builder /app/frontend/dist ./client
 
 # Create a non-root user for security (optional but recommended for Cloud Run)
 # Alpine images usually have 'node' user

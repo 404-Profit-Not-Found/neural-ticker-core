@@ -13,7 +13,7 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Ticker')
 @ApiBearerAuth()
-@Controller('api/v1/tickers')
+@Controller('v1/tickers')
 @Public()
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}

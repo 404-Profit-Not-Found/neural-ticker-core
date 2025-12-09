@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import TickerDetails from './pages/TickerDetails'; // Added
@@ -13,7 +14,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading Neural Terminal...</div>;
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Redirect to Google SSO immediately if not logged in
+    window.location.href = '/api/auth/google';
+    return null;
   }
 
   return <>{children}</>;
@@ -23,31 +26,33 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/ticker/:symbol"
-            element={
-              <ProtectedRoute>
-                <TickerDetails />
-              </ProtectedRoute>
-            }
-          />
-          {/* Add more routes here */}
-          <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/ticker/:symbol"
+              element={
+                <ProtectedRoute>
+                  <TickerDetails />
+                </ProtectedRoute>
+              }
+            />
+            {/* Add more routes here */}
+            <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-          <Route path="/oauth-callback" element={<OAuthCallback />} />
-        </Routes>
+            <Route path="/oauth-callback" element={<OAuthCallback />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

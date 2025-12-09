@@ -44,6 +44,9 @@ class EnvironmentVariables {
   OPENAI_BASE_URL: string;
 
   @IsString()
+  GOOGLE_CALLBACK_URL: string;
+
+  @IsString()
   GEMINI_API_KEY: string;
 
   @IsBooleanString()

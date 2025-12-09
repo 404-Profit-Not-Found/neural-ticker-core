@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Watchlist } from './entities/watchlist.entity';
@@ -73,8 +73,15 @@ export class WatchlistService {
     // 2. Ensure Ticker exists
     const ticker = await this.tickersService.awaitEnsureTicker(symbol);
 
-    // 3. Create Item (Check duplicate?)
-    // Allowing duplicates for now, or could use upsert logic
+    // 3. Check if ticker already in watchlist
+    const existing = await this.itemRepo.findOne({
+      where: { watchlist_id: watchlistId, ticker_id: ticker.id },
+    });
+    if (existing) {
+      throw new ConflictException(`${symbol} is already in this watchlist`);
+    }
+
+    // 4. Create Item
     const item = this.itemRepo.create({
       watchlist_id: watchlistId,
       ticker_id: ticker.id,

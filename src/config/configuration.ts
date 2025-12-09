@@ -19,6 +19,11 @@ export default () => ({
       deep: 'gpt-5.1',
     },
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+  },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     models: {

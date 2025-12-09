@@ -24,7 +24,7 @@ import { Watchlist } from './entities/watchlist.entity';
 @ApiTags('Watchlists')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/watchlists')
+@Controller('v1/watchlists')
 export class WatchlistController {
   constructor(private readonly watchlistService: WatchlistService) {}
 
@@ -40,7 +40,7 @@ export class WatchlistController {
   })
   @Get()
   async getMyWatchlists(@Req() req: any) {
-    return this.watchlistService.getUserWatchlists(req.user.uid);
+    return this.watchlistService.getUserWatchlists(req.user.id);
   }
 
   @ApiOperation({

@@ -13,7 +13,7 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
-@Controller('api/v1/tickers/:symbol')
+@Controller('v1/tickers/:symbol')
 @Public()
 export class MarketDataController {
   constructor(private readonly service: MarketDataService) {}

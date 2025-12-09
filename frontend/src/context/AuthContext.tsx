@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const checkSession = async () => {
         try {
             // Attempt to fetch profile using cookie - use httpClient (root) not api (v1)
-            const { data } = await httpClient.get('/auth/profile');
+            const { data } = await httpClient.get('/api/auth/profile');
             setUser(data);
         } catch (err) {
             console.warn('Session check failed:', err); // Log error for debug
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const refreshSession = checkSession;
 
     const loginWithGoogle = () => {
-        window.location.href = '/auth/google'; // Full redirect
+        window.location.href = '/api/auth/google'; // Full redirect
     };
 
     const loginWithDevToken = async (email: string) => {

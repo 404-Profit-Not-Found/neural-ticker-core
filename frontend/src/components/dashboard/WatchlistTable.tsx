@@ -21,9 +21,11 @@ import {
     Pencil,
     ChevronDown,
     Check,
+    Trash2,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { useToast } from '../ui/toast';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/api';
 
@@ -82,12 +84,13 @@ export function WatchlistTable() {
     const [adding, setAdding] = useState(false);
     const [loading, setLoading] = useState(true);
     const initializationRef = useRef(false); // Ref to track if creation is in progress
+    const { showToast } = useToast();
 
     // Type for watchlist object from API
     interface WatchlistData {
         id: string;
         name: string;
-        items: { ticker: { symbol: string } }[];
+        items: { ticker: { id: string; symbol: string } }[];
     }
     const [watchlists, setWatchlists] = useState<WatchlistData[]>([]);
     const navigate = useNavigate();
@@ -189,28 +192,56 @@ export function WatchlistTable() {
     const handleAddTicker = async (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && searchTerm.trim()) {
             if (!activeWatchlistId) {
-                alert("No active watchlist found. Please create one first (feature coming soon).");
+                showToast("No active watchlist found. Please create one first.", 'error');
                 return;
             }
 
             setAdding(true);
             try {
-                // 1. Ensure ticker exists (Backend handles this? Controller says addItem calls service.addTickerToWatchlist)
-                // The backend controller usually handles finding/creating the ticker.
                 await api.post(`/watchlists/${activeWatchlistId}/items`, { symbol: searchTerm.toUpperCase() });
-
-                // 2. Clear and Refresh
+                showToast(`${searchTerm.toUpperCase()} added to watchlist`, 'success');
                 setSearchTerm('');
                 await fetchItems();
-            } catch (err) {
+            } catch (err: unknown) {
                 console.error("Failed to add ticker", err);
-                alert("Failed to add ticker. It might not exist in our reliable sources.");
+                // Check if it's a 409 Conflict (duplicate)
+                if (err && typeof err === 'object' && 'response' in err) {
+                    const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+                    if (axiosErr.response?.status === 409) {
+                        showToast(`${searchTerm.toUpperCase()} is already in this watchlist`, 'error');
+                    } else {
+                        showToast(axiosErr.response?.data?.message || "Failed to add ticker", 'error');
+                    }
+                } else {
+                    showToast("Failed to add ticker. It might not exist.", 'error');
+                }
             } finally {
                 setAdding(false);
             }
         }
     };
 
+    const handleRemoveTicker = async (symbol: string) => {
+        if (!activeWatchlistId) return;
+        
+        // Find the ticker ID from the current watchlist items
+        const currentList = watchlists.find(w => w.id === activeWatchlistId);
+        const item = currentList?.items.find(i => i.ticker.symbol === symbol);
+        
+        if (!item) {
+            showToast("Could not find ticker to remove", 'error');
+            return;
+        }
+
+        try {
+            await api.delete(`/watchlists/${activeWatchlistId}/items/${item.ticker.id}`);
+            showToast(`${symbol} removed from watchlist`, 'success');
+            await fetchItems();
+        } catch (err) {
+            console.error("Failed to remove ticker", err);
+            showToast("Failed to remove ticker", 'error');
+        }
+    };
 
 
     const formatMarketCap = (val: number) => {
@@ -305,13 +336,24 @@ export function WatchlistTable() {
         }),
         columnHelper.display({
             id: 'actions',
-            cell: () => (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#a1a1aa] hover:text-white">
-                    <MoreVertical className="h-4 w-4" />
-                </Button>
+            cell: (info) => (
+                <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[#a1a1aa] hover:text-white">
+                        <MoreVertical className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-[#a1a1aa] hover:text-red-500"
+                        onClick={() => handleRemoveTicker(info.row.original.symbol)}
+                        title="Remove from watchlist"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             ),
         }),
-    ], [navigate]);
+    ], [navigate, handleRemoveTicker]);
 
     const table = useReactTable({
         data,
