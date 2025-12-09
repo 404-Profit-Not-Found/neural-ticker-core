@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -23,7 +24,7 @@ import { Watchlist } from './entities/watchlist.entity';
 @ApiTags('Watchlists')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/watchlists')
+@Controller('v1/watchlists')
 export class WatchlistController {
   constructor(private readonly watchlistService: WatchlistService) {}
 
@@ -39,7 +40,7 @@ export class WatchlistController {
   })
   @Get()
   async getMyWatchlists(@Req() req: any) {
-    return this.watchlistService.getUserWatchlists(req.user.uid);
+    return this.watchlistService.getUserWatchlists(req.user.id);
   }
 
   @ApiOperation({
@@ -62,7 +63,36 @@ export class WatchlistController {
   })
   @Post()
   async createWatchlist(@Req() req: any, @Body('name') name: string) {
-    return this.watchlistService.createWatchlist(req.user.uid, name);
+    console.log('DEBUG: createWatchlist req.user:', req.user);
+    if (!req.user || !req.user.id) {
+      console.error('DEBUG: User ID missing in request', req.user);
+    }
+    return this.watchlistService.createWatchlist(req.user.id, name);
+  }
+
+  @ApiOperation({
+    summary: 'Rename Watchlist',
+    description: 'Updates the name of an existing watchlist.',
+  })
+  @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { name: { type: 'string', example: 'New Name' } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Watchlist updated.' })
+  @Patch(':id') // Nestjs Patch import needed? Checked logic below.
+  async updateWatchlist(
+    @Req() req: any,
+    @Param('id') watchlistId: string,
+    @Body('name') name: string,
+  ) {
+    return this.watchlistService.updateWatchlist(
+      req.user.id,
+      watchlistId,
+      name,
+    );
   }
 
   @ApiOperation({
@@ -91,7 +121,7 @@ export class WatchlistController {
     @Body('symbol') symbol: string,
   ) {
     return this.watchlistService.addTickerToWatchlist(
-      req.user.uid,
+      req.user.id,
       watchlistId,
       symbol,
     );
@@ -115,7 +145,7 @@ export class WatchlistController {
     @Param('tickerId') tickerId: string,
   ) {
     await this.watchlistService.removeItemFromWatchlist(
-      req.user.uid,
+      req.user.id,
       watchlistId,
       tickerId,
     );

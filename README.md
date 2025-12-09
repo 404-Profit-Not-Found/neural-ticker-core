@@ -1,15 +1,15 @@
 
 
 
-# Neural-Ticket Core
+# neural-ticker Core
 [![Deploy to Cloud Run](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/deploy.yml/badge.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/deploy.yml)
 [![Build Status](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/ci.yml/badge.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions)
-[![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)](https://github.com/branislavlang/neural-ticket-core)
+[![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)](https://github.com/branislavlang/neural-ticker-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![NestJS](https://img.shields.io/badge/nestjs-%5E10.0.0-red)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
 
-**Neural-Ticket Core** is the authoritative backend for the AI-assisted stock research tool. It orchestrates data ingestion from financial APIs (Finnhub), generates qualitative research notes via LLMs (OpenAI, Gemini), and calculates quantitative Risk/Reward scores.
+**neural-ticker Core** is the authoritative backend for the AI-assisted stock research tool. It orchestrates data ingestion from financial APIs (Finnhub), generates qualitative research notes via LLMs (OpenAI, Gemini), and calculates quantitative Risk/Reward scores.
 
 ## 📚 System Architecture
 
@@ -199,10 +199,10 @@ Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `mod
 
 | Tier | OpenAI | Gemini |
 | :--- | :--- | :--- |
-| **Low** | `gpt-4o-mini` | `gemini-1.5-flash` |
-| **Medium** | `gpt-4o` | `gemini-1.5-pro` |
-| **High** | `gpt-o1` | `gemini-1.5-pro` |
-| **Deep** | `gpt-o3-mini`| `gemini-2.0-flash-thinking-exp` (High Thinking) |
+| **Low** | `gpt-4.1-nano` | `gemini-2.0-flash` |
+| **Medium** | `gpt-4.1-mini` | `gemini-2.0-flash` |
+| **High** | `gpt-5-mini` | `gemini-2.0-flash-thinking-exp` |
+| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` |
 
 ## 💻 Frontend Integration
 

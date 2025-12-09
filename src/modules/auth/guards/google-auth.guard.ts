@@ -12,7 +12,7 @@ export class GoogleAuthGuard extends AuthGuard('google') {
       ? performProtocol[0]
       : performProtocol || req.protocol;
     const host = req.get('host');
-    const callbackURL = `${protocol}://${host}/auth/google/callback`;
+    const callbackURL = `${protocol}://${host}/api/auth/google/callback`;
 
     return {
       callbackURL,

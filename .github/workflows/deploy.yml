@@ -10,8 +10,8 @@ env:
   PROJECT_ID: neuro-b7a51 # User's project ID
   REGION: us-central1 # Common region, user can change if needed
   REPO_NAME: neural-repo # Artifact Registry Repo Name (User needs to create this)
-  SERVICE_NAME: neural-ticket-core
-  IMAGE_NAME: neural-ticket-core
+  SERVICE_NAME: neural-ticker-core
+  IMAGE_NAME: neural-ticker-core
 
 jobs:
   deploy:

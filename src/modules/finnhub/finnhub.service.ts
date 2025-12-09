@@ -35,6 +35,19 @@ export class FinnhubService {
     }
   }
 
+  async getCompanyNews(symbol: string, from: string, to: string): Promise<any> {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.get('/company-news', {
+          params: { symbol, from, to },
+        }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error, symbol);
+    }
+  }
+
   private handleError(error: any, context?: string) {
     if (error instanceof AxiosError) {
       this.logger.error(

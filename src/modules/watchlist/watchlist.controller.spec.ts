@@ -34,7 +34,7 @@ describe('WatchlistController', () => {
 
   describe('getMyWatchlists', () => {
     it('should call service with user id', async () => {
-      const req = { user: { uid: 'user-1' } };
+      const req = { user: { id: 'user-1', uid: 'user-1' } };
       await controller.getMyWatchlists(req);
       expect(service.getUserWatchlists).toHaveBeenCalledWith('user-1');
     });
@@ -42,7 +42,7 @@ describe('WatchlistController', () => {
 
   describe('createWatchlist', () => {
     it('should call service', async () => {
-      const req = { user: { uid: 'user-1' } };
+      const req = { user: { id: 'user-1', uid: 'user-1' } };
       await controller.createWatchlist(req, 'My List');
       expect(service.createWatchlist).toHaveBeenCalledWith('user-1', 'My List');
     });
@@ -50,7 +50,7 @@ describe('WatchlistController', () => {
 
   describe('addItem', () => {
     it('should call service', async () => {
-      const req = { user: { uid: 'user-1' } };
+      const req = { user: { id: 'user-1', uid: 'user-1' } };
       await controller.addItem(req, 'list-1', 'AAPL');
       expect(service.addTickerToWatchlist).toHaveBeenCalledWith(
         'user-1',
@@ -62,7 +62,7 @@ describe('WatchlistController', () => {
 
   describe('removeItem', () => {
     it('should call service', async () => {
-      const req = { user: { uid: 'user-1' } };
+      const req = { user: { id: 'user-1', uid: 'user-1' } };
       await controller.removeItem(req, 'list-1', 'ticker-1');
       expect(service.removeItemFromWatchlist).toHaveBeenCalledWith(
         'user-1',

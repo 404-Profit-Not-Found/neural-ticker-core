@@ -1,6 +1,6 @@
 # Owners
 
-This file lists the owners of the Neural-Ticket Core project.
+This file lists the owners of the neural-ticker Core project.
 
 ## Maintainers
 

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
@@ -8,10 +9,14 @@ async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
 
+  // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
+  app.getHttpAdapter().getInstance().set('etag', false);
+
   // Set global prefix if desired, e.g. api/v1
-  // app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
     .setTitle('Neural Ticket Core API')
@@ -58,22 +63,15 @@ async function bootstrap() {
 
   await listenWithRetry();
 
-  // Aggressive Shutdown for Hot Reload
-  // This ensures all keep-alive connections are killed instantly
+  // Enable standard NestJS shutdown hooks
+  app.enableShutdownHooks();
+
+  // Aggressive connection cleanup for hot reload environments
   const server = app.getHttpServer();
-
-  const cleanup = async () => {
-    // console.log(`Received signal, forcing shutdown...`);
-    if (server) {
-      server.closeAllConnections(); // Node 18+
-      server.close();
-    }
-    await app.close();
-    process.exit(0);
-  };
-
-  process.on('SIGTERM', () => void cleanup());
-  process.on('SIGINT', () => void cleanup());
+  if (server) {
+    server.keepAliveTimeout = 5000; // Reduce keep-alive timeout
+    server.on('close', () => console.log('--- SERVER CLOSED ---'));
+  }
 
   // Console Banner
   await showBanner(app);

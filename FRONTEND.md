@@ -1,30 +1,37 @@
-# Frontend Integration Specification - Neural-Ticket Core
+# Frontend Integration Specification - neural-ticker Core
 
-This document outlines the integration points for a frontend application to connect with the Neural-Ticket Core backend.
+This document outlines the integration points for a frontend application to connect with the neural-ticker Core backend.
+
+## 0. Local Development Setup
+
+To run locally against `localhost:3000`:
+- **Auth Redirect**: The backend redirects Google Login to `FRONTEND_URL` (default: `http://localhost:4200`) + `/oauth-callback`.
+- **Cookies**: An `HttpOnly` cookie named `authentication` is set automatically.
+- **Dev Token**: For testing without OAuth, use `POST /auth/dev/token`.
 
 ## 1. Authentication Flow
 
-The backend uses **Firebase Authentication** for identity management and **JWT** for session handling.
+The backend uses **Firebase Authentication** (optional) and **Google OAuth** (primary) with **JWT** session cookies.
 
-### Step 1: Client-Side Login
-Use the Firebase JS SDK to authenticate the user on the client.
-```javascript
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+### A. Google OAuth (Recommend for Web)
+1.  **Redirect User**: Open `http://localhost:3000/auth/google`.
+2.  **Callback**: User is redirected to `http://localhost:4200/oauth-callback?token=XYZ`.
+3.  **Session**: An `authentication` cookie is also set (HttpOnly).
+4.  **Usage**:
+    -   Extract `token` from URL for API calls (`Authorization: Bearer <token>`).
+    -   OR rely on the cookie for subsequent requests (ensure `withCredentials: true`).
 
-const auth = getAuth();
-const provider = new GoogleAuthProvider();
-const result = await signInWithPopup(auth, provider);
-const firebaseToken = await result.user.getIdToken();
-```
+### B. Firebase Auth (Legacy/Mobile)
+Use the Firebase JS SDK to authenticate.
 
-### Step 2: Exchange Token
-Exchange the Firebase ID Token for a Backend Access Token.
-- **Endpoint**: `POST /auth/firebase`
-- **Body**: `{ "token": "FIREBASE_ID_TOKEN" }`
-- **Response**: `{ "accessToken": "JWT_TOKEN" }`
+### C. Developer Auth (Testing)
+Quickly get a token for testing.
+- **Endpoint**: `POST /auth/dev/token`
+- **Body**: `{ "email": "dev@test.com" }`
+- **Response**: `{ "access_token": "..." }`
 
-### Step 3: Authenticated Requests
-Include the token in the `Authorization` header for all subsequent requests.
+### Authenticated Requests
+Include the token in the header if not using cookies:
 - **Header**: `Authorization: Bearer <JWT_TOKEN>`
 
 ---
@@ -117,17 +124,158 @@ Poll every 3-5 seconds until status is `completed`.
 
 | Scope | Method | Endpoint | Description |
 | :--- | :--- | :--- | :--- |
+| **Auth** | GET | `/auth/google` | Google OAuth Login |
+| **Auth** | POST | `/auth/dev/token` | Get Dev Token (No OAuth) |
+| **Auth** | GET | `/auth/profile` | Get My Profile |
 | **Auth** | POST | `/auth/firebase` | Exchange Firebase Token |
-| **User** | GET | `/users/me` | Get Profile |
+| **User** | GET | `/users` | List All Users (Admin) |
+| **User** | GET | `/users/logins` | Audit Logs (Admin) |
 | **User** | POST | `/users/me/preferences` | Update API Keys |
 | **Tickers** | GET | `/api/v1/tickers` | List all tickers |
-| **Market** | GET | `/api/v1/market-data/snapshot/:sym` | Get OHLCV + Fund. |
+| **Tickers** | POST | `/api/v1/tickers/:symbol` | Ensure/Create Ticker |
+| **Tickers** | GET | `/api/v1/tickers/:symbol` | Get Profile |
+| **Market** | GET | `/api/v1/tickers/:sym/snapshot` | Get Price + Fundamentals |
+| **Market** | GET | `/api/v1/tickers/:sym/history` | Get Candles `?days=30` |
 | **Research** | POST | `/api/v1/research/ask` | Start Async Research |
-| **Research** | GET | `/api/v1/research/:id` | Get Research Status/Result |
-| **StockTwits**| GET | `/api/v1/stocktwits/:sym/posts` | Social Stream |
+| **Research** | GET | `/api/v1/research` | List Tickets `?status=` |
+| **Research** | GET | `/api/v1/research/:id` | Get Research Details |
+| **Risk** | GET | `/api/v1/tickers/:sym/risk-reward` | Get Score `?history=false` |
+| **StockTwits**| GET | `/api/v1/stocktwits/:sym/posts` | Social Stream `?page=1` |
+| **StockTwits**| GET | `/api/v1/stocktwits/:sym/watchers`| Watcher Count History |
+| **StockTwits**| POST | `/api/v1/stocktwits/:sym/sync` | Trigger Manual Sync |
+| **Watchlist** | GET | `/api/v1/watchlists` | List My Watchlists |
+| **Watchlist** | POST | `/api/v1/watchlists` | Create New List |
+| **Watchlist** | POST | `/api/v1/watchlists/:id/items` | Add Ticker to List |
+| **Watchlist** | DEL | `/api/v1/watchlists/:id/items/:tid`| Remove Ticker |
 
 ## 4. Error Handling
 
 -   **401 Unauthorized**: Token expired or missing. Refresh Firebase token and re-exchange.
 -   **404 Not Found**: Ticker or Research ID does not exist.
 -   **500 Internal Error**: Generic failure. check `error` field in JSON.
+
+## 5. Data Models (DTOs)
+
+Use these TypeScript interfaces for frontend integration.
+
+### Research
+```typescript
+export interface ResearchNote {
+  id: string; // BigInt -> String
+  request_id: string; // UUID
+  tickers: string[];
+  question: string;
+  provider: 'openai' | 'gemini' | 'ensemble';
+  quality: 'low' | 'medium' | 'high' | 'deep';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  answer_markdown: string;
+  numeric_context: {
+    [symbol: string]: {
+      price: number;
+      risk_reward: {
+        overall_score: number;
+        scenarios: RiskScenario[]
+      };
+    };
+  };
+  created_at: string; // ISO Date
+}
+
+export interface AskResearchDto {
+  tickers: string[];
+  question: string;
+  provider?: 'openai' | 'gemini' | 'ensemble'; // default: ensemble
+  quality?: 'low' | 'medium' | 'high' | 'deep'; // default: medium
+  style?: string; // Optional tone
+  maxTokens?: number;
+  apiKey?: string; // Optional Gemini API Key
+}
+```
+
+### Risk & Market
+```typescript
+export interface RiskAnalysis {
+  id: string;
+  ticker_id: string;
+  overall_score: number;
+  financial_risk: number;
+  execution_risk: number;
+  dilution_risk: number;
+  price_target_weighted: number;
+  upside_percent: number;
+  scenarios: RiskScenario[];
+  qualitative_factors: RiskQualitativeFactor[];
+  catalysts: RiskCatalyst[];
+  fundamentals: {
+    cash_on_hand: number;
+    runway_years: number;
+    revenue_ttm: number;
+    gross_margin: number;
+    debt: number;
+  };
+  red_flags: string[];
+}
+
+export interface RiskScenario {
+  scenario_type: 'bull' | 'bear' | 'base';
+  price_target: number;
+  probability_percentage: number; // 0-100
+  rating: string; // "Buy", "Hold"
+  description: string;
+  time_horizon_months: number;
+}
+
+export interface TickerEntity {
+  id: string;
+  symbol: string;
+  name: string;
+  exchange: string;
+  market_capitalization?: number;
+  sector?: string;
+  industry?: string;
+  logo_url?: string;
+  web_url?: string;
+}
+
+export interface MarketSnapshot {
+  ticker: TickerEntity;
+  latestPrice: {
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    ts: string; // ISO
+  };
+  fundamentals: {
+    market_cap: number;
+    pe_ratio: number;
+    beta: number;
+  };
+}
+```
+
+### Watchlist & Social
+```typescript
+export interface Watchlist {
+  id: string;
+  name: string;
+  user_id: string;
+  items: WatchlistItem[];
+}
+
+export interface WatchlistItem {
+  id: string;
+  ticker: TickerEntity;
+  added_at: string;
+}
+
+export interface StockTwitsPost {
+  id: number;
+  symbol: string;
+  username: string;
+  body: string;
+  likes_count: number;
+  created_at: string;
+}
+```

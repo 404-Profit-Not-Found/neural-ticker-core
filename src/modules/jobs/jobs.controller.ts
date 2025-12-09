@@ -11,7 +11,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Jobs')
-@Controller('api/v1/jobs')
+@Controller('v1/jobs')
 @Public()
 export class JobsController {
   private readonly logger = new Logger(JobsController.name);

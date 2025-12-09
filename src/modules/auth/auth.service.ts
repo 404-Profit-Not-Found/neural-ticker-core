@@ -76,6 +76,18 @@ export class AuthService {
     }
   }
 
+  async localDevLogin(email: string) {
+    // Only for dev/test environments primarily, but widely useful for quick testing
+    this.logger.warn(`Dev Login used for ${email}`);
+    const user = await this.usersService.createOrUpdateGoogleUser({
+      email,
+      googleId: `dev-${email}`,
+      fullName: 'Dev User',
+      avatarUrl: '',
+    });
+    return this.login(user);
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async login(user: User) {
     const payload = {

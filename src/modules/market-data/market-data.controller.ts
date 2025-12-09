@@ -13,7 +13,7 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
-@Controller('api/v1/tickers/:symbol')
+@Controller('v1/tickers/:symbol')
 @Public()
 export class MarketDataController {
   constructor(private readonly service: MarketDataService) {}
@@ -89,5 +89,12 @@ export class MarketDataController {
     const interval = 'D';
 
     return this.service.getHistory(symbol, interval, from, to);
+  }
+  @ApiOperation({ summary: 'Get Company News' })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiResponse({ status: 200, description: 'List of company news.' })
+  @Get('news')
+  getNews(@Param('symbol') symbol: string) {
+    return this.service.getCompanyNews(symbol);
   }
 }

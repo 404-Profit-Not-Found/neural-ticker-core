@@ -1,6 +1,7 @@
 export default () => ({
   env: process.env.APP_ENV || 'local',
   port: parseInt(process.env.APP_PORT || '3000', 10),
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4200',
   database: {
     url: process.env.DATABASE_URL,
   },
@@ -17,6 +18,11 @@ export default () => ({
       high: 'gpt-5-mini',
       deep: 'gpt-5.1',
     },
+  },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL,
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,

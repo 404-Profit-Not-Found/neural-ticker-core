@@ -38,6 +38,10 @@ export class PriceOhlcv {
   @Column({ type: 'numeric', precision: 18, scale: 6 })
   close: number;
 
+  @ApiProperty({ example: 148.0 })
+  @Column({ type: 'numeric', precision: 18, scale: 6, nullable: true })
+  prevClose: number;
+
   @ApiProperty({ example: 50000000, required: false })
   @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
   volume: number;

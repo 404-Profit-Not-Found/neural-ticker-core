@@ -1,10 +1,11 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
@@ -13,14 +14,21 @@ import { Public } from '../auth/public.decorator';
 
 @ApiTags('Ticker')
 @ApiBearerAuth()
-@Controller('api/v1/tickers')
+@Controller('v1/tickers')
 @Public()
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}
 
   @ApiOperation({
-    summary: 'List all tickers',
-    description: 'Returns a list of all tracked tickers with basic info.',
+    summary: 'List/search tickers',
+    description:
+      'Returns a list of tracked tickers. Use ?search= to filter by symbol or name.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Filter by symbol or name prefix (case-insensitive)',
+    example: 'AAP',
   })
   @ApiResponse({
     status: 200,
@@ -30,8 +38,8 @@ export class TickersController {
     },
   })
   @Get()
-  getAll() {
-    return this.tickersService.getAllTickers();
+  getAll(@Query('search') search?: string) {
+    return this.tickersService.searchTickers(search);
   }
 
   @ApiOperation({

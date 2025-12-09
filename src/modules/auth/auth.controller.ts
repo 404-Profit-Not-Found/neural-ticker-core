@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   UseFilters,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -23,7 +24,10 @@ import { GoogleAuthGuard } from './guards/google-auth.guard';
 @ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @ApiOperation({
     summary: 'Login with Google',
@@ -44,17 +48,21 @@ export class AuthController {
   @UseFilters(GoogleAuthExceptionFilter)
   async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     // req.user contains the user from GoogleStrategy.validate()
-    const result = await this.authService.login(req.user as any); // Cast to expected user type if needed
+    const result = await this.authService.login(req.user as any);
 
-    // In a real app, you might redirect to frontend with token in query params,
-    // or return JSON if this was a popup flow.
-    // For now, let's return JSON to the browser/client.
-    // Ideally: res.redirect(`http://localhost:3000?token=${result.access_token}`);
-
-    return res.json({
-      message: 'Login successful',
-      ...result,
+    // Set HttpOnly cookie for session persistence
+    res.cookie('authentication', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // true in prod
+      sameSite: 'lax', // basic CSRF protection
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
+
+    const frontendUrl = this.configService.get<string>('frontendUrl');
+    // Redirect to frontend with the token
+    return res.redirect(
+      `${frontendUrl}/oauth-callback?token=${result.access_token}`,
+    );
   }
 
   @Get('profile')
@@ -73,5 +81,16 @@ export class AuthController {
     if (!body.token) throw new UnauthorizedException('Token required');
     const user = await this.authService.loginWithFirebase(body.token);
     return this.authService.login(user);
+  }
+
+  @ApiOperation({
+    summary: 'Dev Login (Test Token)',
+    description: 'Get a JWT token for a dev user without OAuth flow.',
+  })
+  @ApiBody({ schema: { example: { email: 'dev@test.com' } } })
+  @Post('dev/token')
+  async devLogin(@Body() body: { email: string }) {
+    if (!body.email) throw new UnauthorizedException('Email required');
+    return this.authService.localDevLogin(body.email);
   }
 }

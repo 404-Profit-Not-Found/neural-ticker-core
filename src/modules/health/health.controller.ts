@@ -7,7 +7,7 @@ import { Public } from '../auth/public.decorator';
 
 @Public()
 @ApiTags('Health')
-@Controller('api/v1/health')
+@Controller('v1/health')
 export class HealthController {
   constructor(
     private readonly dataSource: DataSource,

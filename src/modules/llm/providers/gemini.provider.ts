@@ -1,81 +1,95 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import {
+  GoogleGenAI,
+  Tool,
+  ThinkingConfig,
+  GenerateContentConfig,
+  ThinkingLevel,
+} from '@google/genai'; // NEW SDK
 import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
 
 @Injectable()
 export class GeminiProvider implements ILlmProvider {
   private readonly logger = new Logger(GeminiProvider.name);
-  private genAI: GoogleGenerativeAI;
+  private client: GoogleGenAI;
 
   constructor(private readonly configService: ConfigService) {
-    // Note: The @google/genai SDK usage here assumes standard initialization.
-    // Spec said @google/genai.
     const apiKey = this.configService.get<string>('gemini.apiKey');
     if (apiKey) {
-      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.client = new GoogleGenAI({ apiKey });
     }
   }
 
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
-    // 1. Resolve API Key (Prompt > Config)
     const apiKey =
       prompt.apiKey || this.configService.get<string>('gemini.apiKey');
-    if (!apiKey) {
-      throw new Error('Gemini API Key not configured');
+    if (!apiKey) throw new Error('Gemini API Key not configured');
+
+    // Re-initialize client if a custom key is provided (or rely on singleton)
+    const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
+
+    // Resolve model and determine if it supports "Thinking"
+    const modelName = this.resolveModel(prompt.quality);
+    const isThinkingModel =
+      modelName.includes('thinking') || modelName.includes('gemini-3');
+
+    // 1. Configure Tools (Google Search)
+    // In the new SDK, tools are simplified.
+    const tools: Tool[] = [
+      { googleSearch: {} }, // Native Grounding
+    ];
+
+    // 2. Configure Thinking (The tricky part)
+    let thinkingConfig: ThinkingConfig | undefined;
+
+    if (isThinkingModel) {
+      if (modelName.includes('gemini-3')) {
+        // Gemini 3 uses "Level" (Low/High)
+        thinkingConfig = {
+          includeThoughts: true,
+          thinkingLevel: ThinkingLevel.HIGH,
+        };
+      } else {
+        // Gemini 2.5 uses "Budget" (Token Count)
+        thinkingConfig = {
+          includeThoughts: true,
+          thinkingBudget: 1024, // Adjust based on complexity
+        };
+      }
     }
 
-    // 2. Initialize Gemini 3 Pro (or use cached if same key?)
-    // Creating new instance per request to support dynamic keys is safest.
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    const modelName = this.resolveModel(prompt.quality);
-
-    // 3. Configure Model with Thinking for 'deep'
-    const isDeep = prompt.quality === 'deep' || prompt.quality === 'high';
-    const modelParams: any = {
-      model: modelName,
+    const config: GenerateContentConfig = {
+      tools: tools,
+      thinkingConfig: thinkingConfig,
+      systemInstruction: `You are a financial analyst performing deep research. 
+      Context: ${JSON.stringify(prompt.numericContext)}`,
     };
 
-    if (modelName.includes('gemini-3')) {
-      // Gemini 3 Thinking + Search
-      modelParams.tools = [{ googleSearch: {} }];
-    }
-
-    const model: GenerativeModel = genAI.getGenerativeModel(modelParams);
-
-    // 4. Thinking Config
-    const generationConfig: any = {};
-    if (modelName.includes('gemini-3')) {
-      generationConfig.thinkingLevel = isDeep ? 'high' : 'low';
-    }
-
-    const contextStr =
-      typeof prompt.numericContext === 'string'
-        ? prompt.numericContext
-        : JSON.stringify(prompt.numericContext);
-
-    const systemPrompt = `You are a financial analyst performing deep research.
-    Ground your answer in the provided numeric context AND external Google Search results.
-    Context: ${contextStr}`;
-
-    const fullPrompt = `${systemPrompt}\n\nQuestion: ${prompt.question}`;
-
     try {
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-        generationConfig,
+      const result = await client.models.generateContent({
+        model: modelName,
+        contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
+        config: config,
       });
-      const response = result.response;
 
-      // Log thoughts if available (debug)
-      // const candidates = response.candidates;
+      // 3. Extract Grounding Metadata (New SDK format)
+      // The new SDK returns cleaner metadata objects
+      const groundingMeta = result.candidates?.[0]?.groundingMetadata;
+
+      // 4. Extract Thoughts (if available)
+      // Thoughts are often in the first candidate part if includeThoughts is true
+      const thoughts = result.candidates?.[0]?.content?.parts?.filter(
+        (p) => p.thought,
+      );
 
       return {
         provider: 'gemini',
         models: [modelName],
-        answerMarkdown: response.text(),
-        groundingMetadata: response.candidates?.[0]?.groundingMetadata,
+        answerMarkdown: result.text || '', // Getter, not method
+        groundingMetadata: groundingMeta,
+        // You might want to return thoughts separately for debugging
+        thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
       };
     } catch (err) {
       this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
@@ -83,15 +97,10 @@ export class GeminiProvider implements ILlmProvider {
     }
   }
 
-  private resolveModel(
-    quality: 'low' | 'medium' | 'high' | 'deep' = 'medium',
-  ): string {
-    const models = this.configService.get('gemini.models');
-    // For 'deep', prioritize Gemini 3 Pro
-    if (quality === 'deep') {
-      return 'gemini-3-pro-preview';
-    }
-    // Safe access for other keys
-    return models?.[quality] || 'gemini-1.5-flash';
+  private resolveModel(quality?: string): string {
+    // Official Model IDs as of Late 2025:
+    if (quality === 'deep') return 'gemini-3-pro-preview';
+    if (quality === 'high') return 'gemini-2.0-flash-thinking-exp';
+    return 'gemini-2.0-flash';
   }
 }

@@ -80,6 +80,7 @@ export class MarketDataService {
             high: quote.h,
             low: quote.l,
             close: quote.c,
+            prevClose: quote.pc,
             volume: 0, // Quote doesn't return volume usually, only candles do.
             source: 'finnhub_quote',
           });
@@ -111,6 +112,7 @@ export class MarketDataService {
           const newFundamentals = this.fundamentalsRepo.create({
             symbol_id: tickerEntity.id,
             market_cap: profile.marketCapitalization,
+            sector: profile.finnhubIndustry,
             // pe_ttm: ??? (Need separate API call)
             // eps_ttm: ???
             // beta: ???
@@ -155,5 +157,15 @@ export class MarketDataService {
       },
       order: { ts: 'ASC' },
     });
+  }
+
+  async getCompanyNews(symbol: string) {
+    // Default to last 7 days
+    const to = new Date().toISOString().split('T')[0];
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 7);
+    const from = fromDate.toISOString().split('T')[0];
+
+    return this.finnhubService.getCompanyNews(symbol, from, to);
   }
 }

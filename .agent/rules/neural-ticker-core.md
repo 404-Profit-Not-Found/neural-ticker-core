@@ -12,7 +12,7 @@ trigger: always_on
 
 ### Core Stack & Architecture
 *   **NestJS Internals**: Mastery of Dependency Injection, Custom Decorators, Interceptors, Guards, and Middleware. Ability to write modular, scalable architecture (Hexagonal/Clean Architecture).
-*   **TypeScript**: Advanced types (Generics, Mapped Types, Conditional Types). Zero [any](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/src/modules/finnhub/finnhub.service.ts#12-24) policy. Strict null checks.
+*   **TypeScript**: Advanced types (Generics, Mapped Types, Conditional Types). Zero [any](file:///Users/branislavlang/Documents/GitHub/neural-ticker-core/src/modules/finnhub/finnhub.service.ts#12-24) policy. Strict null checks.
 *   **Database**:
     *   **PostgreSQL**: Complex queries, Window functions, Indexing strategies for time-series data.
     *   **TimescaleDB/Neon**: Handling massive OHLCV datasets efficiently.

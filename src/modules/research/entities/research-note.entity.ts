@@ -46,15 +46,15 @@ export class ResearchNote {
   quality: string;
 
   @ApiProperty({ example: ['gpt-4'] })
-  @Column({ type: 'text', array: true })
+  @Column({ type: 'text', array: true, default: '{}' })
   models_used: string[];
 
   @ApiProperty({ example: 'Based on recent earnings...' })
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   answer_markdown: string;
 
   @ApiProperty()
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'jsonb', default: {} })
   numeric_context: Record<string, any>;
 
   @ApiProperty({ enum: ResearchStatus, default: ResearchStatus.PENDING })

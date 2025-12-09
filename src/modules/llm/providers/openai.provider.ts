@@ -33,7 +33,7 @@ export class OpenAiProvider implements ILlmProvider {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt.question },
         ],
-        max_tokens: prompt.maxTokens || 1000,
+        max_completion_tokens: prompt.maxTokens || 1000,
       });
 
       const choice = response.choices[0];

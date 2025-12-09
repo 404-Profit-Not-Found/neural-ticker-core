@@ -23,6 +23,7 @@ profile.cov
 
 # env file
 .env
+.env.yaml
 # firebase-config.json
 # firebase-client-config.json
 # Editor/IDE

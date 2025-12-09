@@ -1,6 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ServeStaticModule } from '@nestjs/serve-static'; // Added
+import { join } from 'path'; // Added
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
 
 import { APP_GUARD } from '@nestjs/core';
@@ -22,6 +24,7 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
 import { HealthModule } from './modules/health/health.module';
 import { StockTwitsModule } from './modules/stocktwits/stocktwits.module';
 import { WatchlistModule } from './modules/watchlist/watchlist.module'; // Added
+import { SocialModule } from './modules/social/social.module';
 import configuration from './config/configuration';
 
 // ...
@@ -33,6 +36,11 @@ import configuration from './config/configuration';
       isGlobal: true,
       envFilePath: '.env',
       load: [configuration],
+    }),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', '..', 'client'),
+      exclude: ['/api/{*splat}'],
     }),
 
     // Global Rate Limiting: 100 requests per minute per IP
@@ -81,6 +89,7 @@ import configuration from './config/configuration';
     FirebaseModule,
     StockTwitsModule,
     WatchlistModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [
