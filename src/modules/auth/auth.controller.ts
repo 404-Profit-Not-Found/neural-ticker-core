@@ -58,7 +58,7 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
-    const frontendUrl = this.configService.get<string>('frontendUrl');
+    const frontendUrl = this.configService.get<string>('frontendUrl') || '';
     // Redirect to frontend with the token
     return res.redirect(
       `${frontendUrl}/oauth-callback?token=${result.access_token}`,
