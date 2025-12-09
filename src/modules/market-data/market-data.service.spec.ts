@@ -111,9 +111,8 @@ describe('MarketDataService', () => {
       } as unknown as Fundamentals;
 
       mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
-      // Mock findLatestPrice logic (it uses createQueryBuilder)
-      const mockBuilder = mockOhlcvRepo.createQueryBuilder();
-      mockBuilder.getOne.mockResolvedValue(mockPrice);
+      // Mock findLatestPrice logic (uses findOne, not queryBuilder as previously thought)
+      mockOhlcvRepo.findOne.mockResolvedValue(mockPrice);
       
       mockFundamentalsRepo.findOne.mockResolvedValue(mockFundamentals);
 
@@ -140,8 +139,7 @@ describe('MarketDataService', () => {
       
       mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
       
-      const mockBuilder = mockOhlcvRepo.createQueryBuilder();
-      mockBuilder.getOne.mockResolvedValue(mockPrice); // Stale
+      mockOhlcvRepo.findOne.mockResolvedValue(mockPrice); // Stale
 
       mockFinnhubService.getQuote.mockResolvedValue(newQuote);
       mockFundamentalsRepo.findOne.mockResolvedValue({ updated_at: new Date() }); 
