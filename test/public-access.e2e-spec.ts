@@ -3,6 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
+// Mock DB Credentials for E2E (same as app.e2e-spec.ts)
+process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'password';
+process.env.DB_USERNAME = process.env.DB_USERNAME || 'neural';
+process.env.DB_DATABASE = process.env.DB_DATABASE || 'neural_db';
+process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
+
 describe('Public Access (e2e)', () => {
   let app: INestApplication;
 
