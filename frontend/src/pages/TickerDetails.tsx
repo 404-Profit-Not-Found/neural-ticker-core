@@ -15,7 +15,7 @@ import {
     ShieldAlert,
     Loader2
 } from 'lucide-react';
-import { TickerLogo } from '../components/dashboard/WatchlistTable'; // Reuse logo
+import { TickerLogo } from '../components/dashboard/TickerLogo'; // Reuse logo
 
 export default function TickerDetails() {
     const { symbol } = useParams();

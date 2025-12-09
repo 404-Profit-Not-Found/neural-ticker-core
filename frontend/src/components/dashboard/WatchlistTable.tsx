@@ -302,11 +302,7 @@ export function WatchlistTable() {
         }
     };
 
-    const formatMarketCap = useCallback((val: number) => {
-        if (!val) return '-';
-        if (val > 1000) return `$${(val / 1000).toFixed(2)}B`;
-        return `$${val.toFixed(2)}M`;
-    }, []);
+
 
     const columns = useMemo(() => [
         columnHelper.accessor('symbol', {
