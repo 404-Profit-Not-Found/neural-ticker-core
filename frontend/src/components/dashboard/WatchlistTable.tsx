@@ -195,7 +195,7 @@ export function WatchlistTable() {
                         change: change,
                         pe: fundamentals.pe_ttm ?? null,
                         marketCap: formatMarketCap(fundamentals.market_cap),
-                        divYield: fundamentals.dividend_yield ? (fundamentals.dividend_yield).toFixed(2) + '%' : '-',
+                        divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
                         beta: fundamentals.beta ?? null,
                         rating: 'Hold',
                         growthRank: 5
