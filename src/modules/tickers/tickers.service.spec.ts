@@ -10,9 +10,7 @@ import { HttpService } from '@nestjs/axios';
 describe('TickersService', () => {
   let service: TickersService;
   let repo: any;
-  let logoRepo: any;
   let finnhub: any;
-  let httpService: any;
 
   const mockTickerRepo = {
     findOne: jest.fn(),
@@ -68,9 +66,7 @@ describe('TickersService', () => {
 
     service = module.get<TickersService>(TickersService);
     repo = module.get(getRepositoryToken(TickerEntity));
-    logoRepo = module.get(getRepositoryToken(TickerLogoEntity));
     finnhub = module.get(FinnhubService);
-    httpService = module.get(HttpService);
   });
 
   afterEach(() => {

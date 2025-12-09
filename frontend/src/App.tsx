@@ -11,13 +11,15 @@ import { api, httpClient } from './lib/api';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.href = '/api/auth/google';
+    }
+  }, [loading, user]);
+
   if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading Neural Terminal...</div>;
 
-  if (!user) {
-    // Redirect to Google SSO immediately if not logged in
-    window.location.href = '/api/auth/google';
-    return null;
-  }
+  if (!user) return null;
 
   return <>{children}</>;
 }
