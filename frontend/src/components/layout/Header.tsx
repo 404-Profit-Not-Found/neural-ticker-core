@@ -1,13 +1,25 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Settings, User as UserIcon } from 'lucide-react';
+import { Bell, Settings, User as UserIcon, Shield } from 'lucide-react';
 
 export function Header() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  const isActive = (path: string) => {
+    if (path === '/dashboard' && (location.pathname === '/' || location.pathname === '/dashboard')) return true;
+    return location.pathname === path;
+  };
+
+  const linkClass = (path: string) =>
+    `text-sm font-medium h-14 flex items-center px-1 transition-colors ${isActive(path)
+      ? 'text-white border-b-2 border-blue-500'
+      : 'text-[#a1a1aa] hover:text-white border-b-2 border-transparent'
+    }`;
 
   return (
     <header className="h-14 border-b border-[#27272a] bg-[#09090b] sticky top-0 z-50">
-            <div className="max-w-[100rem] mx-auto h-full flex items-center justify-between px-6">
+      <div className="max-w-[100rem] mx-auto h-full flex items-center justify-between px-6">
         {/* Left: Logo + Nav */}
         <div className="flex items-center gap-8">
           <span className="text-lg font-bold text-white tracking-tight">
@@ -16,26 +28,26 @@ export function Header() {
 
           <nav className="flex items-center gap-6">
             <Link
-              to="/"
-              className="text-sm font-medium text-white border-b-2 border-blue-500 h-14 flex items-center px-1"
+              to="/dashboard"
+              className={linkClass('/dashboard')}
             >
               Dashboard
             </Link>
             <Link
               to="/portfolio"
-              className="text-sm font-medium text-[#a1a1aa] hover:text-white transition-colors"
+              className={linkClass('/portfolio')}
             >
               My Portfolio
             </Link>
             <Link
               to="/watchlist"
-              className="text-sm font-medium text-[#a1a1aa] hover:text-white transition-colors"
+              className={linkClass('/watchlist')}
             >
               My Watchlist
             </Link>
             <Link
               to="/analyzer"
-              className="text-sm font-medium text-[#a1a1aa] hover:text-white transition-colors"
+              className={linkClass('/analyzer')}
             >
               Stock Analyzer
             </Link>
@@ -80,6 +92,15 @@ export function Header() {
                   <UserIcon size={16} />
                   Your Profile
                 </Link>
+                {user?.role === 'admin' && (
+                  <Link
+                    to="/admin"
+                    className="flex items-center gap-3 px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-[#27272a] rounded-md transition-colors"
+                  >
+                    <Shield size={16} />
+                    Admin Console
+                  </Link>
+                )}
                 <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors">
                   <Settings size={16} />
                   Settings

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WatchlistTable } from './WatchlistTable';
@@ -16,11 +17,21 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
 const renderWithProviders = () =>
   render(
-    <ToastProvider>
-      <WatchlistTable />
-    </ToastProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <WatchlistTable />
+      </ToastProvider>
+    </QueryClientProvider>,
   );
 
 type WatchlistPayload = { id: string; name: string; items: unknown[] }[];

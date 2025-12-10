@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { AllowedUser } from './entities/allowed-user.entity';
 import { NicknameGeneratorService } from './nickname-generator.service';
 
 @Injectable()
@@ -10,7 +11,34 @@ export class UsersService {
     private readonly nicknameGenerator: NicknameGeneratorService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(AllowedUser)
+    private readonly allowedUserRepo: Repository<AllowedUser>,
   ) {}
+
+  async isEmailAllowed(email: string): Promise<boolean> {
+    if (email === 'branislavlang@gmail.com') return true; // Super Admin always allowed
+    const count = await this.allowedUserRepo.count({ where: { email } });
+    return count > 0;
+  }
+
+  async allowEmail(email: string, addedBy: string): Promise<AllowedUser> {
+    const existing = await this.allowedUserRepo.findOne({ where: { email } });
+    if (existing) return existing;
+
+    const allowed = this.allowedUserRepo.create({
+      email,
+      added_by: addedBy,
+    });
+    return this.allowedUserRepo.save(allowed);
+  }
+
+  async revokeEmail(email: string): Promise<void> {
+    await this.allowedUserRepo.delete({ email });
+  }
+
+  async getAllowedUsers(): Promise<AllowedUser[]> {
+    return this.allowedUserRepo.find({ order: { created_at: 'DESC' } });
+  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { email } });

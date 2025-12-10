@@ -33,6 +33,17 @@ export class AuthService {
     const email = emails[0].value;
     const avatarUrl = photos ? photos[0]?.value : '';
 
+    // Access Control: Check Whitelist
+    const isAllowed = await this.usersService.isEmailAllowed(email);
+    if (!isAllowed) {
+      this.logger.warn(
+        `Login attempt blocked for non-whitelisted email: ${email}`,
+      );
+      throw new UnauthorizedException(
+        'Access Denied: You are not on the invite list.',
+      );
+    }
+
     const user = await this.usersService.createOrUpdateGoogleUser({
       googleId: id,
       email: email,
