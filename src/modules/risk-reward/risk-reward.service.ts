@@ -185,6 +185,11 @@ export class RiskRewardService {
 
       If exact numbers are missing in the text, infer reasonable estimates based on the text's sentiment and context provided.
       Probabilities must sum to approx 1.0.
+
+      IMPORTANT: Risk Scores (overall, financial, execution, etc.) are on a scale of 0 to 10.
+      - 0 = NO RISK / EXTREMELY SAFE
+      - 10 = EXTREME RISK / BANKRUPTCY IMMINENT
+      - 5 = MARKET AVERAGE RISK
       `,
       tickers: [symbol],
       numericContext: context,

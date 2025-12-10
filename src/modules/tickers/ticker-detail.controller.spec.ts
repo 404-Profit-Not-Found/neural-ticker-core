@@ -19,6 +19,7 @@ describe('TickerDetailController', () => {
 
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
+    getHistory: jest.fn(),
   };
 
   const mockRiskRewardService = {
@@ -66,17 +67,18 @@ describe('TickerDetailController', () => {
       };
       const mockRisk = { overall_score: 8.5 };
       const mockResearch = { id: 'note1', answer_markdown: 'Analysis' };
+      const mockHistory = [{ time: '2023-01-01', close: 100 }];
 
       mockMarketDataService.getSnapshot.mockResolvedValue(mockSnapshot);
+      mockMarketDataService.getHistory.mockResolvedValue(mockHistory);
       mockRiskRewardService.getLatestAnalysis.mockResolvedValue(mockRisk);
-      mockResearchService.getLatestNoteForTicker.mockResolvedValue(
-        mockResearch,
-      );
+      mockResearchService.getLatestNoteForTicker.mockResolvedValue(mockResearch);
 
       const result = await controller.getCompositeData('AAPL');
 
       expect(result.profile.symbol).toBe('AAPL');
       expect(result.market_data.price).toBe(150);
+      expect(result.market_data.history).toEqual(mockHistory);
       expect(result.risk_analysis?.overall_score).toBe(8.5);
       expect(result.research?.content).toBe('Analysis');
     });
@@ -100,6 +102,7 @@ describe('TickerDetailController', () => {
       };
 
       mockMarketDataService.getSnapshot.mockResolvedValue(mockSnapshot);
+      mockMarketDataService.getHistory.mockResolvedValue([]);
       mockRiskRewardService.getLatestAnalysis.mockResolvedValue(null);
       mockResearchService.getLatestNoteForTicker.mockResolvedValue(null);
 

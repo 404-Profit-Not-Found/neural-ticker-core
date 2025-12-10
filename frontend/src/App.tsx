@@ -1,9 +1,9 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import TickerDetails from './pages/TickerDetails'; // Added
+// import TickerDetails from './pages/TickerDetails'; // Legacy replaced by TickerDetail
 import { ProfilePage } from './pages/ProfilePage';
 import { AccessDenied } from './pages/AccessDenied';
 import { AdminConsole } from './pages/AdminConsole';
@@ -61,14 +61,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/dashboard/ticker/:symbol"
-              element={
-                <ProtectedRoute>
-                  <TickerDetails />
-                </ProtectedRoute>
-              }
-            />
+            {/* Redirect Legacy Route */}
+            <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
+
             {/* Add more routes here */}
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

@@ -29,7 +29,7 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {sortedScenarios.map((scenario) => {
-                const upside = ((scenario.price_mid - currentPrice) / currentPrice) * 100;
+                const upside = ((Number(scenario.price_mid) - currentPrice) / currentPrice) * 100;
                 const isPositive = upside > 0;
 
                 return (
@@ -44,7 +44,7 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                     >
                         {/* Probability Badge */}
                         <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border">
-                            {(scenario.probability * 100).toFixed(0)}% Prob
+                            {(Number(scenario.probability) * 100).toFixed(0)}% Prob
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -59,7 +59,7 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                                     {scenario.scenario_type} CASE
                                 </h3>
                                 <div className="text-2xl font-bold flex items-center gap-2">
-                                    ${scenario.price_mid.toFixed(2)}
+                                    ${Number(scenario.price_mid).toFixed(2)}
                                     <span className={cn(
                                         "text-sm font-medium flex items-center",
                                         isPositive ? "text-green-500" : "text-red-500"
@@ -78,11 +78,11 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                         <div className="mt-auto space-y-2">
                             <div className="flex justify-between text-xs text-muted-foreground border-t border-dashed border-border pt-2">
                                 <span>Range</span>
-                                <span>${scenario.price_low} - ${scenario.price_high}</span>
+                                <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>
                             </div>
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>Exp. Cap</span>
-                                <span>${(scenario.expected_market_cap / 1e9).toFixed(1)}B</span>
+                                <span>${(Number(scenario.expected_market_cap || 0) / 1e9).toFixed(1)}B</span>
                             </div>
                         </div>
                     </div>

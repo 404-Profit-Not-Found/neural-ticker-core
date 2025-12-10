@@ -319,7 +319,7 @@ export function WatchlistTable() {
         columnHelper.accessor('symbol', {
             header: ({ column }) => <SortableHeader column={column} title="Symbol" />,
             cell: (info) => (
-                <div className="flex items-center gap-3" onClick={() => navigate(`/dashboard/ticker/${info.getValue()}`)}>
+                <div className="flex items-center gap-3" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
                     <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
                     <span className="text-primary font-semibold cursor-pointer hover:underline">{info.getValue()}</span>
                 </div>

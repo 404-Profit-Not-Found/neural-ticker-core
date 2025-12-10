@@ -13,7 +13,7 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ResearchService } from '../research/research.service';
 
 @ApiTags('tickers')
-@Controller('tickers')
+@Controller('v1/tickers')
 export class TickerDetailController {
   constructor(
     private readonly tickersService: TickersService,
@@ -35,16 +35,21 @@ export class TickerDetailController {
     let snapshot;
     try {
       snapshot = await this.marketDataService.getSnapshot(symbol);
-    } catch {
+    } catch (e) {
+      console.error(`Error getting snapshot for ${symbol}:`, e);
       throw new NotFoundException(`Ticker ${symbol} not found`);
     }
 
     const { ticker, latestPrice, fundamentals } = snapshot;
 
-    // 2. Parallel Fetching for Risk & Research
-    const [riskAnalysis, researchNote] = await Promise.all([
+    // 2. Parallel Fetching for Risk, Research, and History
+    const [riskAnalysis, researchNote, priceHistory] = await Promise.all([
       this.riskRewardService.getLatestAnalysis(ticker.id).catch(() => null),
       this.researchService.getLatestNoteForTicker(symbol).catch(() => null),
+      this.marketDataService.getHistory(symbol, '1d', 
+          new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(), 
+          new Date().toISOString()
+      ).catch(() => []),
     ]);
 
     // 3. Construct Composite Response
@@ -68,6 +73,7 @@ export class TickerDetailController {
           : 0,
         volume: latestPrice?.volume || 0,
         updated_at: latestPrice?.ts || new Date(),
+        history: priceHistory || [],
       },
       fundamentals: {
         market_cap: fundamentals?.market_cap || ticker.market_capitalization,

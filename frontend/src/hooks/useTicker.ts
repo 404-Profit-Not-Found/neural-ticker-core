@@ -61,13 +61,13 @@ export function useTickerDetails(symbol?: string) {
         queryKey: tickerKeys.details(symbol || ''),
         queryFn: async () => {
             if (!symbol) return null;
-            // Parallel fetch: Snapshot, Watcher Count
-            const [snapshotRes, watchersRes] = await Promise.all([
-                api.get(`/tickers/${symbol}/snapshot`),
+            // Parallel fetch: Composite Data, Watcher Count
+            const [compositeRes, watchersRes] = await Promise.all([
+                api.get(`/tickers/${symbol}/composite`),
                 api.get(`/social/stats/${symbol}/watchers`).catch(() => ({ data: { watchers: 0 } }))
             ]);
             return {
-                ...snapshotRes.data,
+                ...compositeRes.data,
                 watchers: watchersRes.data.watchers
             };
         },
@@ -133,12 +133,12 @@ export function useTickerResearch(symbol?: string) {
     return useQuery({
         queryKey: tickerKeys.research(symbol || ''),
         queryFn: async () => {
-            if (!symbol) return null;
+            if (!symbol) return [];
             const res = await api.get('/research');
-            // Client side filtering for latest completed
+            // Client side filtering for this ticker
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const relevant = res.data?.data?.find((t: any) => t.tickers.includes(symbol) && t.status === 'completed');
-            return relevant || null;
+            const relevant = res.data?.data?.filter((t: any) => t.tickers.includes(symbol)).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            return relevant || [];
         },
         enabled: !!symbol,
         staleTime: 1000 * 60 * 10, // 10 min
