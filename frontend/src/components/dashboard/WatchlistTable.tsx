@@ -407,6 +407,7 @@ export function WatchlistTable() {
         }),
     ], [navigate, handleRemoveTicker, columnHelper]);
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data: tableData,
         columns,

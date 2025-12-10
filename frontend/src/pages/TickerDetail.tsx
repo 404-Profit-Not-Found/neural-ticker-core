@@ -16,21 +16,21 @@ export function TickerDetail() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (symbol) loadData();
+        const loadData = async () => {
+            if (!symbol) return;
+            setLoading(true);
+            try {
+                const res = await api.get(`/tickers/${symbol}/composite`);
+                setData(res.data);
+            } catch (err) {
+                console.error(err);
+                setError('Failed to load ticker data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
     }, [symbol]);
-
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get(`/tickers/${symbol}/composite`);
-            setData(res.data);
-        } catch (err) {
-            console.error(err);
-            setError('Failed to load ticker data');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (loading) return (
         <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -160,7 +160,7 @@ export function TickerDetail() {
                                         <TrendingUp size={18} /> Bullish Catalysts
                                     </h3>
                                     <ul className="space-y-2">
-                                        {risk_analysis.catalysts?.map((c: any, i: number) => (
+                                        {risk_analysis.catalysts?.map((c: { description: string }, i: number) => (
                                             <li key={i} className="text-sm text-foreground/90 flex items-start gap-2">
                                                 <span className="text-green-500 mt-1">•</span>
                                                 {c.description}

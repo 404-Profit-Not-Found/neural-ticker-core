@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import '@testing-library/jest-dom'; // Ensure types are available
 import { WatchlistTable } from './WatchlistTable';
 import { ToastProvider } from '../ui/toast';
 import { api } from '../../lib/api';
@@ -46,12 +47,10 @@ type SnapshotPayload = {
     };
 }[];
 
-let mockGet: vi.SpyInstance<Promise<AxiosResponse<unknown>>, Parameters<typeof api.get>>;
-
 describe('WatchlistTable Sorting', () => {
     beforeEach(() => {
         // Mock API calls
-        mockGet = vi.spyOn(api, 'get').mockImplementation((url) => {
+        vi.spyOn(api, 'get').mockImplementation((url) => {
             if (url === '/watchlists') {
                 return Promise.resolve({
                     data: [{
@@ -119,7 +118,6 @@ describe('WatchlistTable Sorting', () => {
 
         // Sorting usually toggles ASC/DESC. Default behavior depends on react-table implementation.
         // Let's check the order of rows.
-        const rows = screen.getAllByRole('row');
         // Row 0 is header. Rows 1, 2, 3 are data.
 
         // We'll extract text from the rows to verify order

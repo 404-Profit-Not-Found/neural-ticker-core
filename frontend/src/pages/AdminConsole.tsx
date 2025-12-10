@@ -57,7 +57,7 @@ export function AdminConsole() {
         }
     };
 
-    const handleRevoke = async (item: any) => {
+    const handleRevoke = async (item: { email: string; status: string }) => {
         const isWaitlist = item.status === 'WAITLIST';
         const message = isWaitlist
             ? `Are you sure you want to REJECT ${item.email}? They will be removed from the database.`

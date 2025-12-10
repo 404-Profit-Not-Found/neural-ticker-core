@@ -77,8 +77,8 @@ describe('TickerDetailController', () => {
 
       expect(result.profile.symbol).toBe('AAPL');
       expect(result.market_data.price).toBe(150);
-      expect(result.risk_analysis.overall_score).toBe(8.5);
-      expect(result.research.content).toBe('Analysis');
+      expect(result.risk_analysis?.overall_score).toBe(8.5);
+      expect(result.research?.content).toBe('Analysis');
     });
 
     it('should throw NotFoundException if marketDataService throws (Ticker not found)', async () => {
