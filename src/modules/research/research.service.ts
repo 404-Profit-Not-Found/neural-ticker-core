@@ -135,6 +135,15 @@ export class ResearchService {
     return this.noteRepo.findOne({ where: { id } });
   }
 
+  async getLatestNoteForTicker(symbol: string): Promise<ResearchNote | null> {
+    return this.noteRepo
+      .createQueryBuilder('note')
+      .where(':symbol = ANY(note.tickers)', { symbol })
+      .andWhere('note.status = :status', { status: ResearchStatus.COMPLETED })
+      .orderBy('note.created_at', 'DESC')
+      .getOne();
+  }
+
   async findAll(
     userId: string,
     status: string,

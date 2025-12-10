@@ -1,12 +1,14 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import TickerDetails from './pages/TickerDetails'; // Added
+// import TickerDetails from './pages/TickerDetails'; // Legacy replaced by TickerDetail
 import { ProfilePage } from './pages/ProfilePage';
+import { AccessDenied } from './pages/AccessDenied';
 import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
+import { TickerDetail } from './pages/TickerDetail';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -52,13 +54,16 @@ function App() {
               }
             />
             <Route
-              path="/dashboard/ticker/:symbol"
+              path="/ticker/:symbol"
               element={
                 <ProtectedRoute>
-                  <TickerDetails />
+                  <TickerDetail />
                 </ProtectedRoute>
               }
             />
+            {/* Redirect Legacy Route */}
+            <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
+
             {/* Add more routes here */}
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -66,6 +71,7 @@ function App() {
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
             <Route path="/admin" element={<AdminRoute><AdminConsole /></AdminRoute>} />
+            <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
           </Routes>
         </ToastProvider>

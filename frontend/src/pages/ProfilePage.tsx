@@ -59,16 +59,16 @@ export function ProfilePage() {
 
             <main className="max-w-4xl mx-auto p-6 space-y-8 animate-in fade-in duration-500">
                 <div className="flex items-center gap-4 mb-8">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border border-border overflow-hidden rgb-border">
-                        {user?.avatar ? (
-                            <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border border-border overflow-hidden">
+                        {user?.avatar_url ? (
+                            <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover rounded-full" />
                         ) : (
                             <User size={32} className="text-muted-foreground" />
                         )}
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground rgb-text">
-                           {nickname || user?.name || 'Trader'}
+                            {nickname || user?.name || 'Trader'}
                         </h1>
                         <p className="text-muted-foreground">{user?.email}</p>
                     </div>
@@ -81,7 +81,7 @@ export function ProfilePage() {
                             <User className="text-primary" size={20} />
                             <h2 className="text-lg font-semibold">Identity</h2>
                         </div>
-                        
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground">Nickname</label>
                             <input
@@ -108,22 +108,20 @@ export function ProfilePage() {
                                 <div className="grid grid-cols-2 gap-2 bg-background p-1 rounded-md border border-border">
                                     <button
                                         onClick={() => setViewMode('KISS')}
-                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${
-                                            viewMode === 'KISS' 
-                                                ? 'bg-muted text-foreground shadow-sm' 
-                                                : 'text-muted-foreground hover:text-foreground'
-                                        }`}
+                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${viewMode === 'KISS'
+                                            ? 'bg-muted text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
                                     >
                                         <Shield size={14} />
                                         KISS
                                     </button>
                                     <button
                                         onClick={() => setViewMode('PRO')}
-                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${
-                                            viewMode === 'PRO' 
-                                                ? 'bg-muted text-foreground shadow-sm' 
-                                                : 'text-muted-foreground hover:text-foreground'
-                                        }`}
+                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${viewMode === 'PRO'
+                                            ? 'bg-muted text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
                                     >
                                         <Eye size={14} />
                                         PRO
@@ -140,23 +138,21 @@ export function ProfilePage() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <button
                                             onClick={() => setTheme('light')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-                                                theme === 'light' 
-                                                    ? 'bg-background text-foreground border-primary ring-2 ring-primary/50' 
-                                                    : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                            }`}
+                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${theme === 'light'
+                                                ? 'bg-background text-foreground border-primary ring-2 ring-primary/50'
+                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
+                                                }`}
                                         >
                                             <div className="w-8 h-8 rounded-full bg-gray-200 border border-gray-300"></div>
                                             <span className="text-sm font-medium">Light</span>
                                         </button>
-                                        
+
                                         <button
                                             onClick={() => setTheme('dark')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${
-                                                (theme === 'dark' || theme.startsWith('g'))
-                                                    ? 'bg-background text-foreground border-primary ring-2 ring-primary/50' 
-                                                    : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                            }`}
+                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${(theme === 'dark' || theme.startsWith('g'))
+                                                ? 'bg-background text-foreground border-primary ring-2 ring-primary/50'
+                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
+                                                }`}
                                         >
                                             <div className="w-8 h-8 rounded-full bg-[#09090b] border border-[#27272a]"></div>
                                             <span className="text-sm font-medium">Dark</span>
@@ -164,11 +160,10 @@ export function ProfilePage() {
 
                                         <button
                                             onClick={() => setTheme('rgb')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all relative overflow-hidden group ${
-                                                theme === 'rgb' 
-                                                    ? 'bg-black text-white border-transparent ring-2 ring-purple-500/50' 
-                                                    : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                            }`}
+                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all relative overflow-hidden group ${theme === 'rgb'
+                                                ? 'bg-black text-white border-transparent ring-2 ring-purple-500/50'
+                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
+                                                }`}
                                         >
                                             {/* RGB Gradient Background for active state */}
                                             {theme === 'rgb' && (
@@ -191,7 +186,7 @@ export function ProfilePage() {
                         className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {saving ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/>
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
                             <Save size={18} />
                         )}

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketDataController } from './market-data.controller';
 import { MarketDataBulkController } from './market-data-bulk.controller';
@@ -12,7 +12,7 @@ import { TickersModule } from '../tickers/tickers.module';
   imports: [
     TypeOrmModule.forFeature([PriceOhlcv, Fundamentals]),
     FinnhubModule,
-    TickersModule,
+    forwardRef(() => TickersModule),
   ],
   controllers: [MarketDataController, MarketDataBulkController],
   providers: [MarketDataService],

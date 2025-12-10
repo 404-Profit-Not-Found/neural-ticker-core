@@ -13,7 +13,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
   imports: [
     TypeOrmModule.forFeature([ResearchNote]),
     LlmModule,
-    TickersModule,
+    forwardRef(() => TickersModule),
     MarketDataModule,
     UsersModule,
     forwardRef(() => RiskRewardModule),

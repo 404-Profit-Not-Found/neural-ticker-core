@@ -48,7 +48,23 @@ export class AuthController {
   @UseFilters(GoogleAuthExceptionFilter)
   async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     // req.user contains the user from GoogleStrategy.validate()
-    const result = await this.authService.login(req.user as any);
+    const user = req.user as any;
+
+    const frontendUrl = this.configService.get<string>('frontendUrl') || '';
+
+    // Handle "Just Joined" Waitlist
+    if (user.isNewWaitlist) {
+      return res.redirect(`${frontendUrl}/access-denied?error=waitlist_joined`);
+    }
+
+    // Handle "Already Pending" Waitlist
+    if (user.role === 'waitlist') {
+      return res.redirect(
+        `${frontendUrl}/access-denied?error=waitlist_pending`,
+      );
+    }
+
+    const result = await this.authService.login(user);
 
     // Set HttpOnly cookie for session persistence
     res.cookie('authentication', result.access_token, {
@@ -59,7 +75,6 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
-    const frontendUrl = this.configService.get<string>('frontendUrl') || '';
     // Redirect to frontend with the token
     return res.redirect(
       `${frontendUrl}/oauth-callback?token=${result.access_token}`,
@@ -93,5 +108,19 @@ export class AuthController {
   async devLogin(@Body() body: { email: string }) {
     if (!body.email) throw new UnauthorizedException('Email required');
     return this.authService.localDevLogin(body.email);
+  }
+  @ApiOperation({
+    summary: 'Logout',
+    description: 'Clears authentication cookie.',
+  })
+  @Post('logout')
+  logout(@Res() res: Response) {
+    res.clearCookie('authentication', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+    return res.status(200).send({ success: true });
   }
 }

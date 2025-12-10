@@ -27,12 +27,27 @@ export const AdminService = {
     return data;
   },
 
+  getIdentities: async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await api.get<any[]>('/admin/identities');
+    return data;
+  },
+
   addToUserlist: async (email: string) => {
     const { data } = await api.post<AllowedUser>('/admin/userlist', { email });
     return data;
   },
 
   revokeAccess: async (email: string) => {
-    await api.delete('/admin/userlist/' + encodeURIComponent(email));
+    return api.delete(`/admin/userlist/${encodeURIComponent(email)}`);
+  },
+
+  rejectWaitlistUser: async (email: string) => {
+    return api.delete(`/admin/waitlist/${encodeURIComponent(email)}`);
+  },
+
+  approveUser: async (userId: string) => {
+    const { data } = await api.post<User>(`/users/${userId}/approve`);
+    return data;
   },
 };

@@ -26,7 +26,7 @@ export class User {
   @Column({ nullable: true })
   full_name: string;
 
-  @ApiProperty({ enum: ['user', 'admin'], default: 'user' })
+  @ApiProperty({ enum: ['user', 'admin', 'waitlist'], default: 'user' })
   @Column({ default: 'user' })
   role: string;
 
