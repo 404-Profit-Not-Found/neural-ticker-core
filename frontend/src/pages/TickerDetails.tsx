@@ -187,7 +187,7 @@ export default function TickerDetails() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Header />
-            <main className="p-6 space-y-6">
+            <main className="max-w-[100rem] mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">

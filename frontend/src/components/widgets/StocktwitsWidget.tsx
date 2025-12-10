@@ -35,7 +35,7 @@ function StocktwitsWidget({ colorTheme }: StocktwitsWidgetProps) {
     container.current.appendChild(script);
   }, [theme]);
 
-  return <div className="stocktwits-widget w-full" ref={container} />;
+  return <div className="stocktwits-widget w-full min-h-[2.5rem]" ref={container} />;
 }
 
 export default memo(StocktwitsWidget);
