@@ -37,7 +37,7 @@ export function RiskLight({ score, reasoning }: RiskLightProps) {
 
             <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger>
                         <div className="cursor-help flex items-center gap-1 bg-background border border-border px-2 py-1 rounded text-xs hover:bg-muted transition-colors">
                             <span className="font-semibold">{getLabel(score)}</span>
                             <Info size={10} className="text-muted-foreground" />
