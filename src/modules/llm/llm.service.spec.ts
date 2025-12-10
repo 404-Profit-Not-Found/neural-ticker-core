@@ -8,22 +8,23 @@ describe('LlmService', () => {
   let service: LlmService;
   let geminiProvider: GeminiProvider;
   let openAiProvider: OpenAiProvider;
-
-  const mockProvider = {
-    generate: jest.fn(),
-  };
+  let geminiGenerate: jest.Mock;
+  let openAiGenerate: jest.Mock;
 
   beforeEach(async () => {
+    geminiGenerate = jest.fn();
+    openAiGenerate = jest.fn();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LlmService,
         {
           provide: GeminiProvider,
-          useValue: mockProvider,
+          useValue: { generate: geminiGenerate },
         },
         {
           provide: OpenAiProvider,
-          useValue: mockProvider,
+          useValue: { generate: openAiGenerate },
         },
       ],
     }).compile();
@@ -46,7 +47,7 @@ describe('LlmService', () => {
         provider: 'openai' as const,
         quality: 'medium' as QualityTier,
       };
-      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'openai' });
+      openAiGenerate.mockResolvedValue({ answerMarkdown: 'openai' });
 
       const result = await service.generateResearch(prompt);
 
@@ -61,7 +62,7 @@ describe('LlmService', () => {
         provider: 'gemini' as const,
         quality: 'medium' as QualityTier,
       };
-      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'gemini' });
+      geminiGenerate.mockResolvedValue({ answerMarkdown: 'gemini' });
 
       const result = await service.generateResearch(prompt);
 
@@ -74,7 +75,7 @@ describe('LlmService', () => {
 
     it('should route to OpenAI by default', async () => {
       const prompt = { question: 'q', quality: 'medium' as QualityTier };
-      mockProvider.generate.mockResolvedValue({ answerMarkdown: 'openai' });
+      openAiGenerate.mockResolvedValue({ answerMarkdown: 'openai' });
 
       const result = await service.generateResearch(prompt);
 

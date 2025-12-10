@@ -21,11 +21,11 @@ describe('MarketDataService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn().mockResolvedValue({}), // Return Promise
-    create: jest.fn().mockImplementation((dto) => dto), 
+    create: jest.fn().mockImplementation((dto) => dto),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(), 
+      limit: jest.fn().mockReturnThis(),
       getOne: jest.fn(),
     })),
   };
@@ -80,7 +80,9 @@ describe('MarketDataService', () => {
     }).compile();
 
     service = module.get<MarketDataService>(MarketDataService);
-    ohlcvRepo = module.get<Repository<PriceOhlcv>>(getRepositoryToken(PriceOhlcv));
+    ohlcvRepo = module.get<Repository<PriceOhlcv>>(
+      getRepositoryToken(PriceOhlcv),
+    );
     fundamentalsRepo = module.get<Repository<Fundamentals>>(
       getRepositoryToken(Fundamentals),
     );
@@ -98,22 +100,22 @@ describe('MarketDataService', () => {
   describe('getSnapshot', () => {
     it('should return cached data if fresh', async () => {
       const mockTicker = { id: 1, symbol: 'AAPL' };
-      const mockPrice = { 
-        symbol: 'AAPL', 
-        close: 150, 
+      const mockPrice = {
+        symbol: 'AAPL',
+        close: 150,
         ts: new Date(),
-        updated_at: new Date() // Fresh
+        updated_at: new Date(), // Fresh
       } as unknown as PriceOhlcv;
-      const mockFundamentals = { 
-        symbol: 'AAPL', 
-        market_cap: 100, 
-        updated_at: new Date() // Fresh
+      const mockFundamentals = {
+        symbol: 'AAPL',
+        market_cap: 100,
+        updated_at: new Date(), // Fresh
       } as unknown as Fundamentals;
 
       mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
       // Mock findLatestPrice logic (uses findOne, not queryBuilder as previously thought)
       mockOhlcvRepo.findOne.mockResolvedValue(mockPrice);
-      
+
       mockFundamentalsRepo.findOne.mockResolvedValue(mockFundamentals);
 
       const result = await service.getSnapshot('AAPL');
@@ -128,21 +130,30 @@ describe('MarketDataService', () => {
       const staleDate = new Date();
       staleDate.setMinutes(staleDate.getMinutes() - 20); // 20 mins old
 
-      const mockPrice = { 
-        symbol: 'AAPL', 
-        close: 100, 
+      const mockPrice = {
+        symbol: 'AAPL',
+        close: 100,
         ts: staleDate,
-        updated_at: staleDate 
+        updated_at: staleDate,
       } as unknown as PriceOhlcv;
 
-      const newQuote = { c: 155, o: 154, h: 156, l: 153, v: 1000, t: Date.now() / 1000 };
-      
+      const newQuote = {
+        c: 155,
+        o: 154,
+        h: 156,
+        l: 153,
+        v: 1000,
+        t: Date.now() / 1000,
+      };
+
       mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
-      
+
       mockOhlcvRepo.findOne.mockResolvedValue(mockPrice); // Stale
 
       mockFinnhubService.getQuote.mockResolvedValue(newQuote);
-      mockFundamentalsRepo.findOne.mockResolvedValue({ updated_at: new Date() }); 
+      mockFundamentalsRepo.findOne.mockResolvedValue({
+        updated_at: new Date(),
+      });
 
       const result = await service.getSnapshot('AAPL');
 
@@ -163,7 +174,7 @@ describe('MarketDataService', () => {
       expect(finnhubService.getCompanyNews).toHaveBeenCalledWith(
         'AAPL',
         expect.any(String),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });

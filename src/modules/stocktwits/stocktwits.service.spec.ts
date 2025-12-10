@@ -84,7 +84,6 @@ describe('StockTwitsService', () => {
 
       await service.fetchAndStorePosts(symbol);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(httpService.get).toHaveBeenCalledWith(
         `https://api.stocktwits.com/api/2/streams/symbol/${symbol}.json`,
       );

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { WatchlistController } from './watchlist.controller';
 import { WatchlistService } from './watchlist.service';

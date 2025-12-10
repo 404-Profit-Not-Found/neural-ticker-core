@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { MarketDataController } from './market-data.controller';
 import { MarketDataService } from './market-data.service';
@@ -52,7 +51,7 @@ describe('MarketDataController', () => {
   describe('getHistory', () => {
     it('should call service.getHistory with defaults (30 days)', async () => {
       mockMarketDataService.getHistory.mockResolvedValue([]);
-      
+
       await controller.getHistory('AAPL');
 
       // Check if dates are passed correctly (approximate check since Date is dynamic)
@@ -66,7 +65,7 @@ describe('MarketDataController', () => {
 
     it('should call service.getHistory with custom days', async () => {
       mockMarketDataService.getHistory.mockResolvedValue([]);
-      
+
       await controller.getHistory('AAPL', 60);
 
       expect(service.getHistory).toHaveBeenCalledWith(

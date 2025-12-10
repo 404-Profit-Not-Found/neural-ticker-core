@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -54,14 +53,17 @@ describe('UsersController', () => {
 
       await controller.updatePreferences(mockReq, mockBody);
 
-      expect(service.updatePreferences).toHaveBeenCalledWith('user-id', mockBody);
+      expect(service.updatePreferences).toHaveBeenCalledWith(
+        'user-id',
+        mockBody,
+      );
     });
   });
 
   describe('getAllUsers', () => {
     it('should call service.findAll', async () => {
       const mockUsers = [{ id: 'user-id', email: 'test@example.com' }];
-      
+
       mockUsersService.findAll.mockResolvedValue(mockUsers);
 
       const result = await controller.getAllUsers();

@@ -2,11 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { FirebaseService } from '../firebase/firebase.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { AuthLog } from './entities/auth-log.entity';
 
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: UsersService;
   let jwtService: JwtService;
+  const mockAuthLogRepo = {
+    save: jest.fn(),
+  };
 
   const mockUsersService = {
     findByEmail: jest.fn(),
@@ -15,6 +21,10 @@ describe('AuthService', () => {
 
   const mockJwtService = {
     sign: jest.fn(),
+  };
+
+  const mockFirebaseService = {
+    verifyIdToken: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -29,6 +39,14 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: mockJwtService,
         },
+        {
+          provide: FirebaseService,
+          useValue: mockFirebaseService,
+        },
+        {
+          provide: getRepositoryToken(AuthLog),
+          useValue: mockAuthLogRepo,
+        },
       ],
     }).compile();
 
@@ -37,6 +55,7 @@ describe('AuthService', () => {
     jwtService = module.get<JwtService>(JwtService);
 
     jest.clearAllMocks();
+    mockAuthLogRepo.save.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -51,7 +70,13 @@ describe('AuthService', () => {
         photos: [{ value: 'url' }],
         displayName: 'Test',
       };
-      const user = { id: 1, email: 'test@example.com' };
+      const user = {
+        id: '1',
+        email: 'test@example.com',
+        full_name: 'Test',
+        avatar_url: 'url',
+        role: 'user',
+      };
       mockUsersService.createOrUpdateGoogleUser.mockResolvedValue(user);
 
       const result = await service.validateOAuthLogin(profile as any);
@@ -68,16 +93,31 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should returning access token', async () => {
-      const user = { id: 1, email: 'test@example.com', role: 'user' };
+      const user = {
+        id: '1',
+        email: 'test@example.com',
+        full_name: 'Test User',
+        avatar_url: 'http://avatar',
+        role: 'user',
+      };
       mockJwtService.sign.mockReturnValue('token');
 
       const result = await service.login(user as any);
 
-      expect(result).toEqual({ access_token: 'token', user });
-      expect(jwtService.sign).toHaveBeenCalledWith(
-        { email: user.email, sub: user.id, role: user.role },
-        expect.anything(), // options (expiresIn vs default)
-      );
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        email: user.email,
+        sub: user.id,
+      });
+      expect(result).toEqual({
+        access_token: 'token',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.full_name,
+          avatar: user.avatar_url,
+          role: user.role,
+        },
+      });
     });
   });
 });

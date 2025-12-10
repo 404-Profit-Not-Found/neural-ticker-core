@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { MarketDataBulkController } from './market-data-bulk.controller';
 import { MarketDataService } from './market-data.service';

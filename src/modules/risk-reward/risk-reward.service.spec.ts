@@ -58,7 +58,9 @@ describe('RiskRewardService', () => {
     }).compile();
 
     service = module.get<RiskRewardService>(RiskRewardService);
-    analysisRepo = module.get<Repository<RiskAnalysis>>(getRepositoryToken(RiskAnalysis));
+    analysisRepo = module.get<Repository<RiskAnalysis>>(
+      getRepositoryToken(RiskAnalysis),
+    );
     marketDataService = module.get<MarketDataService>(MarketDataService);
     llmService = module.get<LlmService>(LlmService);
 
@@ -71,7 +73,9 @@ describe('RiskRewardService', () => {
 
   describe('getLatestScore', () => {
     it('should return null if no score found', async () => {
-      mockMarketDataService.getSnapshot.mockResolvedValue({ ticker: { id: 1 } });
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 1 },
+      });
       mockAnalysisRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getLatestScore('AAPL');
@@ -81,7 +85,9 @@ describe('RiskRewardService', () => {
 
     it('should return found score', async () => {
       const mockScore = { symbol: 'AAPL', overall_score: 90 };
-      mockMarketDataService.getSnapshot.mockResolvedValue({ ticker: { id: 1 } });
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 1 },
+      });
       mockAnalysisRepo.findOne.mockResolvedValue(mockScore);
 
       const result = await service.getLatestScore('AAPL');
@@ -93,26 +99,28 @@ describe('RiskRewardService', () => {
   describe('evaluateFromResearch', () => {
     it('should generate analysis from research note', async () => {
       // Mock Data
-      const mockNote = { 
-        id: 'note-1', 
-        tickers: ['AAPL'], 
-        answer_markdown: '```json\n{"risk_score": {"overall": 8}, "scenarios": {"bull": {"probability": 0.2}}}\n```' 
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown:
+          '```json\n{"risk_score": {"overall": 8}, "scenarios": {"bull": {"probability": 0.2}}}\n```',
       };
-      
-      const mockSnapshot = { 
-        ticker: { id: 1, symbol: 'AAPL' }, 
-        latestPrice: { close: 150 }, 
-        fundamentals: { market_cap: 1000 } 
+
+      const mockSnapshot = {
+        ticker: { id: 1, symbol: 'AAPL' },
+        latestPrice: { close: 150 },
+        fundamentals: { market_cap: 1000 },
       };
 
       const mockLlmResponse = {
-        answerMarkdown: '```json\n{"risk_score": {"overall": 8}, "scenarios": {"bull": {"probability": 0.2}}}\n```'
+        answerMarkdown:
+          '```json\n{"risk_score": {"overall": 8}, "scenarios": {"bull": {"probability": 0.2}}}\n```',
       };
 
       mockMarketDataService.getSnapshot.mockResolvedValue(mockSnapshot);
       mockLlmService.generateResearch.mockResolvedValue(mockLlmResponse);
 
-      const mockSaved = new RiskAnalysis(); 
+      const mockSaved = new RiskAnalysis();
       mockAnalysisRepo.save.mockResolvedValue(mockSaved);
 
       // Mocks for successful parse
@@ -125,10 +133,10 @@ describe('RiskRewardService', () => {
         fundamentals: {},
         qualitative: {},
         catalysts: {},
-        red_flags: []
+        red_flags: [],
       });
       mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: '```json\n' + detailedJson + '\n```'
+        answerMarkdown: '```json\n' + detailedJson + '\n```',
       });
 
       const result = await service.evaluateFromResearch(mockNote);

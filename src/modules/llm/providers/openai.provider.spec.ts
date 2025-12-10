@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { OpenAiProvider } from './openai.provider';
@@ -83,13 +82,13 @@ describe('OpenAiProvider', () => {
       // If we want to test "generate checks config" - wait, provider *constructor* reads key.
       // If key is missing, constructor might not throw?
       // Let's check provider code:
-      // this.client = new OpenAI({...}) - OpenAI SDK throws if no key? 
+      // this.client = new OpenAI({...}) - OpenAI SDK throws if no key?
       // Actually configService.get returns undefined -> OpenAI might throw or wait.
       // But checking lines 11-16 of provider: it just does new OpenAI.
       // The generate method doesn't check key explicitly unlike Gemini.
       // So this test might not be applicable or needs to check if OpenAI throws.
-    }); 
-    
+    });
+
     // Changing strategy: Test success path first.
 
     it('should call OpenAI API with correct parameters', async () => {

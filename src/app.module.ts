@@ -71,7 +71,8 @@ import configuration from './config/configuration';
           ssl:
             process.env.DB_SSL === 'false'
               ? false
-              : dbConfig.url && dbConfig.url.includes('sslmode=require') || process.env.DB_SSL === 'true'
+              : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
+                  process.env.DB_SSL === 'true'
                 ? { rejectUnauthorized: false }
                 : false, // Default to false if not explicitly required
         };
