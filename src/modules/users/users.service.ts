@@ -2,10 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { NicknameGeneratorService } from './nickname-generator.service';
 
 @Injectable()
 export class UsersService {
   constructor(
+    private readonly nicknameGenerator: NicknameGeneratorService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
@@ -42,6 +44,10 @@ export class UsersService {
       user.full_name = profile.fullName;
       user.avatar_url = profile.avatarUrl;
       user.last_login = new Date();
+      // Ensure existing users get a nickname if they don't have one
+      if (!user.nickname) {
+        user.nickname = this.nicknameGenerator.generate();
+      }
       if (role) user.role = role; // Enforce admin if email matches
       return this.userRepo.save(user);
     }
@@ -54,9 +60,28 @@ export class UsersService {
       avatar_url: profile.avatarUrl,
       last_login: new Date(),
       role: role || 'user',
+      nickname: this.nicknameGenerator.generate(),
+      view_mode: 'PRO', // Default
+      theme: 'g100', // Default
     });
 
     return this.userRepo.save(newUser);
+  }
+
+  async updateProfile(
+    id: string,
+    updates: { nickname?: string; view_mode?: string; theme?: string },
+  ): Promise<User> {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (updates.nickname) user.nickname = updates.nickname;
+    if (updates.view_mode) user.view_mode = updates.view_mode;
+    if (updates.theme) user.theme = updates.theme;
+
+    return this.userRepo.save(user);
   }
 
   async updateRole(id: string, role: string): Promise<User> {

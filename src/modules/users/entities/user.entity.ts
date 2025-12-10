@@ -52,4 +52,16 @@ export class User {
   @ApiProperty({ example: { gemini_api_key: '...' } })
   @Column({ type: 'jsonb', nullable: true })
   preferences: Record<string, any>;
+
+  @ApiProperty({ example: 'FunnyPanda123' })
+  @Column({ nullable: true })
+  nickname: string;
+
+  @ApiProperty({ enum: ['KISS', 'PRO'], default: 'PRO' })
+  @Column({ default: 'PRO' })
+  view_mode: string;
+
+  @ApiProperty({ example: 'g100' })
+  @Column({ default: 'g100' })
+  theme: string;
 }

@@ -5,6 +5,9 @@ interface User {
     id: string;
     email: string;
     name: string;
+    nickname?: string;
+    view_mode?: string;
+    theme?: string;
     role: string;
     avatar: string;
 }

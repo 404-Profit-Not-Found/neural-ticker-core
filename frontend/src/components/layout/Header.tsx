@@ -47,15 +47,15 @@ export function Header() {
                 </nav>
             </div>
 
-            {/* Right: Actions */}
-            <div className="flex items-center gap-4">
-                <button className="text-[#a1a1aa] hover:text-white transition-colors">
-                    <Bell size={20} />
-                </button>
-                <button className="text-[#a1a1aa] hover:text-white transition-colors">
-                    <Settings size={20} />
-                </button>
-                <button className="text-[#a1a1aa] hover:text-white transition-colors">
+        <div className="flex items-center gap-4">
+            <button className="text-[#a1a1aa] hover:text-white transition-colors relative">
+                <Bell size={20} />
+                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+
+            {/* Profile Dropdown */}
+            <div className="relative group">
+                <button className="flex items-center gap-2 text-[#a1a1aa] hover:text-white transition-colors">
                     {user?.avatar ? (
                         <img src={user.avatar} alt="Profile" className="w-8 h-8 rounded-full border border-[#27272a]" />
                     ) : (
@@ -64,7 +64,33 @@ export function Header() {
                         </div>
                     )}
                 </button>
+
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 top-full mt-2 w-64 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="p-4 border-b border-[#27272a]">
+                        <p className="font-semibold text-white">{user?.nickname || 'Trader'}</p>
+                        <p className="text-xs text-[#a1a1aa]">{user?.email}</p>
+                    </div>
+
+                    <div className="p-2">
+                        <Link to="/profile" className="flex items-center gap-3 px-3 py-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors">
+                            <UserIcon size={16} />
+                            Your Profile
+                        </Link>
+                        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors">
+                            <Settings size={16} />
+                            Settings
+                        </button>
+                    </div>
+
+                    <div className="p-2 border-t border-[#27272a]">
+                        <button className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[#27272a] rounded-md transition-colors">
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
             </div>
-        </header>
+        </div>
+    </header>
     );
 }

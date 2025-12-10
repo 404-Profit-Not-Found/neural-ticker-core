@@ -4,6 +4,7 @@ import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import TickerDetails from './pages/TickerDetails'; // Added
+import { ProfilePage } from './pages/ProfilePage';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -48,6 +49,7 @@ function App() {
               }
             />
             {/* Add more routes here */}
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

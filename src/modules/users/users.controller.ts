@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   Request,
   Post,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -82,5 +83,22 @@ export class UsersController {
   ) {
     // req.user is populated by JwtAuthGuard
     return this.usersService.updatePreferences(req.user.id, body);
+  }
+  @ApiOperation({ summary: 'Update Profile (Nickname, Theme, View Mode)' })
+  @ApiBody({
+    schema: {
+      example: {
+        nickname: 'SuperTrader',
+        view_mode: 'KISS',
+        theme: 'g10',
+      },
+    },
+  })
+  @Patch('me')
+  async updateProfile(
+    @Request() req: any,
+    @Body() body: { nickname?: string; view_mode?: string; theme?: string },
+  ) {
+    return this.usersService.updateProfile(req.user.id, body);
   }
 }
