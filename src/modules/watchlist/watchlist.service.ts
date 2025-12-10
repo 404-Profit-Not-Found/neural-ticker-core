@@ -131,4 +131,18 @@ export class WatchlistService {
 
     await this.itemRepo.remove(item);
   }
+
+  async deleteWatchlist(userId: string, watchlistId: string): Promise<void> {
+    const watchlist = await this.watchlistRepo.findOne({
+      where: { id: watchlistId, user_id: userId },
+    });
+
+    if (!watchlist) {
+      throw new NotFoundException('Watchlist not found or access denied');
+    }
+
+    // Remove associated items first to avoid orphans in soft-delete scenarios
+    await this.itemRepo.delete({ watchlist_id: watchlistId });
+    await this.watchlistRepo.softRemove(watchlist);
+  }
 }

@@ -476,6 +476,35 @@ export function WatchlistTable() {
         }
     };
 
+    const handleDeleteList = async (watchlistId: string) => {
+        const list = watchlists.find((w) => w.id === watchlistId);
+        if (!list) return;
+
+        const confirmed = window.confirm(
+            `Delete watchlist "${list.name}"? All tickers in it will be removed.`,
+        );
+        if (!confirmed) return;
+
+        try {
+            await api.delete(`/watchlists/${watchlistId}`);
+            showToast('Watchlist deleted', 'success');
+
+            const remaining = watchlists.filter((w) => w.id !== watchlistId);
+            setWatchlists(remaining);
+
+            if (activeWatchlistId === watchlistId) {
+                const nextActive = remaining[0]?.id || null;
+                setActiveWatchlistId(nextActive);
+                if (!nextActive) {
+                    setData([]);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to delete watchlist', e);
+            showToast('Failed to delete watchlist', 'error');
+        }
+    };
+
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -534,9 +563,20 @@ export function WatchlistTable() {
                             <Plus className="w-4 h-4" />
                         </Button>
                         {activeWatchlistId && (
-                            <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-[#a1a1aa] hover:text-white" title="Rename List">
-                                <Pencil className="w-4 h-4" />
-                            </Button>
+                            <>
+                                <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-[#a1a1aa] hover:text-white" title="Rename List">
+                                    <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteList(activeWatchlistId)}
+                                    className="h-8 w-8 text-[#a1a1aa] hover:text-red-500"
+                                    title="Delete Watchlist"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>

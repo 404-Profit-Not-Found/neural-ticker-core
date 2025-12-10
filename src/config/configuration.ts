@@ -1,16 +1,20 @@
-export default () => ({
-  env: process.env.APP_ENV || 'local',
-  port: parseInt(process.env.APP_PORT || '3000', 10),
-  frontendUrl: process.env.FRONTEND_URL,
-  database: {
-    url: process.env.DATABASE_URL,
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-    synchronize: process.env.DB_SYNCHRONIZE === 'true',
-  },
+export default () => {
+  console.log('[DEBUG Config] DB_PASSWORD env:', process.env.DB_PASSWORD);
+  console.log('[DEBUG Config] DB_PASSWORD type:', typeof process.env.DB_PASSWORD);
+
+  return {
+    env: process.env.APP_ENV || 'local',
+    port: parseInt(process.env.APP_PORT || '3000', 10),
+    frontendUrl: process.env.FRONTEND_URL,
+    database: {
+      url: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE,
+      synchronize: process.env.DB_SYNCHRONIZE === 'true',
+    },
   finnhub: {
     apiKey: process.env.FINNHUB_API_KEY,
     baseUrl: process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1',
@@ -64,4 +68,5 @@ export default () => ({
       process.env.GCP_SA_KEY || process.env.FIREBASE_CREDENTIALS_JSON,
     projectId: process.env.FIREBASE_PROJECT_ID,
   },
-});
+};
+};

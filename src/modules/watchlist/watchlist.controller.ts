@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Req,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -149,6 +150,19 @@ export class WatchlistController {
       watchlistId,
       tickerId,
     );
+    return { success: true };
+  }
+
+  @ApiOperation({
+    summary: 'Delete Watchlist',
+    description: 'Deletes a watchlist and all its items for the authenticated user.',
+  })
+  @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
+  @ApiResponse({ status: 200, description: 'Watchlist deleted.' })
+  @Delete(':id')
+  @HttpCode(200)
+  async deleteWatchlist(@Req() req: any, @Param('id') watchlistId: string) {
+    await this.watchlistService.deleteWatchlist(req.user.id, watchlistId);
     return { success: true };
   }
 }
