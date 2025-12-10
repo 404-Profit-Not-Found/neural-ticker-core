@@ -6,51 +6,32 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 
 @Catch()
 export class GoogleAuthExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GoogleAuthExceptionFilter.name);
 
+  constructor(private readonly configService: ConfigService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    
+    // Log the error
+    const errorMessage = exception instanceof Error ? exception.message : String(exception);
+    this.logger.error(`Google Auth Failed: ${errorMessage}`);
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.UNAUTHORIZED;
-
-    this.logger.error(
-      `Google Auth Failed: ${exception instanceof Error ? exception.message : String(exception)}`,
-    );
-
-    // If it's the specific "TokenError" from passport-oauth2
-    if (
-      exception instanceof Error &&
-      (exception.message === 'TokenError' ||
-        exception.message === 'Bad Request' ||
-        (exception as any).code === 'invalid_grant')
-    ) {
-      return response.status(HttpStatus.UNAUTHORIZED).json({
-        statusCode: HttpStatus.UNAUTHORIZED,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        message:
-          'Google Login Failed. Session may have expired. Please try again.',
-        error: exception.message,
-      });
+    const frontendUrl = this.configService.get<string>('frontendUrl') || 'http://localhost:5173';
+    
+    // Check for "Invite Only" specific error
+    if (errorMessage.includes('not on the invite list')) {
+         return response.redirect(`${frontendUrl}/access-denied?error=invite_only`);
     }
 
-    // Fallback for other errors (re-throw if strictly needed, or handle generically)
-    // For now, fail safely with 401 for any auth callback error to prevent 500 crashes
-    response.status(status).json({
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      message: 'Authentication Failed',
-      error: exception instanceof Error ? exception.message : 'Unknown Error',
-    });
+    // Generic fallback for other auth errors
+    return response.redirect(`${frontendUrl}/access-denied?error=auth_failed`);
   }
 }

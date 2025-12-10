@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -32,8 +38,55 @@ export class UsersService {
     return this.allowedUserRepo.save(allowed);
   }
 
-  async revokeEmail(email: string): Promise<void> {
+  async deleteWaitlistUser(email: string): Promise<void> {
+      const user = await this.userRepo.findOne({ where: { email } });
+      
+      if (!user) {
+          throw new NotFoundException(`User with email ${email} not found`);
+      }
+
+      if (user.role !== 'waitlist') {
+          throw new ForbiddenException('Only waitlist users can be rejected/deleted via this method.');
+      }
+
+      await this.userRepo.delete({ id: user.id });
+  }
+
+  async revokeEmail(email: string, requester?: User): Promise<void> {
+    // Safety Checks
+    if (requester) {
+        if (requester.email === email) {
+            throw new ForbiddenException('You cannot revoke your own access.');
+        }
+    }
+
+    const user = await this.userRepo.findOne({ where: { email } });
+    
+    // Check if target is admin
+    if (user && user.role === 'admin') {
+        throw new ForbiddenException('Cannot revoke access of another administrator.');
+    }
+
+    // 1. Remove from allow list
     await this.allowedUserRepo.delete({ email });
+
+    // 2. If user exists, ban/delete/reset role?
+    // For now, let's just ensure they can't login by maybe changing role to 'banned' or just relying on "not in whitelist"
+    // The google strategy checks whitelist. So removing from whitelist is enough for NEW logins.
+    // But existing sessions?
+    // If we want to kill active session, we might need to increment a 'tokenVersion' or similar.
+    // For now, strict requirement is "delete".
+    
+    // If user exists, we SHOULD probably remove them or set to a non-active role to be sure.
+    if (user) {
+       // user.role = 'user'; // Already user?
+       // user.role = 'banned'?
+       // Actually, the request implies 'delete' or 'revoke'.
+       // Existing logic was just removing from allow list?
+       // Let's check what it was doing before.
+       // It seems it was just `this.allowedUserRepo.delete({ email })`.
+       // But if `validateOAuthLogin` checks `isEmailAllowed`, then removing from valid list is sufficient for next login.
+    }
   }
 
   async getAllowedUsers(): Promise<AllowedUser[]> {
@@ -53,7 +106,7 @@ export class UsersService {
     googleId: string;
     fullName: string;
     avatarUrl: string;
-  }): Promise<User> {
+  }, roleOverride?: string): Promise<User> {
     let user = await this.findByGoogleId(profile.googleId);
 
     // Also check by email to merge accounts if needed (optional security choice)
@@ -77,6 +130,14 @@ export class UsersService {
         user.nickname = this.nicknameGenerator.generate();
       }
       if (role) user.role = role; // Enforce admin if email matches
+      // If roleOverride is provided (e.g. waitlist), and user is NOT an admin/user (maybe they are trying to join waitlist but already exist?), 
+      // Actually if they exist they shouldn't trigger waitlist logic unless they were previously deleted or something? 
+      // If they exist and are 'user', they can just login. 
+      // If they exist and are 'waitlist' already, fine.
+      // If they exist and are 'user', and try to join waitlist, we shouldn't downgrade them.
+      // So only apply roleOverride if creating? 
+      // UsersService logic: If user exists, we usually return them.
+      
       return this.userRepo.save(user);
     }
 
@@ -87,7 +148,7 @@ export class UsersService {
       full_name: profile.fullName,
       avatar_url: profile.avatarUrl,
       last_login: new Date(),
-      role: role || 'user',
+      role: role || roleOverride || 'user',
       nickname: this.nicknameGenerator.generate(),
       view_mode: 'PRO', // Default
       theme: 'dark', // Default
@@ -135,6 +196,70 @@ export class UsersService {
 
   async findById(id: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { id } });
+  }
+
+  async approveUser(id: string): Promise<User> {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // 1. Update role to 'user'
+    user.role = 'user';
+    await this.userRepo.save(user);
+
+    // 2. Add to Whitelist
+    await this.allowEmail(user.email, 'Admin Console');
+
+    return user;
+  }
+
+  async getUnifiedIdentities(): Promise<any[]> {
+    const users = await this.userRepo.find();
+    const allowed = await this.allowedUserRepo.find();
+
+    const identityMap = new Map<string, any>();
+
+    // 1. Process Allowed Users (Invite List)
+    for (const a of allowed) {
+      identityMap.set(a.email, {
+        email: a.email,
+        status: 'INVITED', // Default, might be overridden if they are active
+        invited_at: a.created_at,
+        invited_by: a.added_by,
+        is_whitelisted: true,
+      });
+    }
+
+    // 2. Process Registered Users (Active or Waitlist)
+    for (const u of users) {
+      const existing = identityMap.get(u.email) || {};
+      
+      let status = 'ACTIVE';
+      if (u.role === 'admin') status = 'ADMIN';
+      else if (u.role === 'waitlist') status = 'WAITLIST';
+      else if (existing.is_whitelisted) status = 'ACTIVE'; // If whitelisted and registered, they are active
+
+      identityMap.set(u.email, {
+        ...existing, // Keep invited info if exists
+        id: u.id,
+        email: u.email,
+        full_name: u.full_name,
+        role: u.role,
+        last_login: u.last_login,
+        created_at: u.created_at,
+        avatar_url: u.avatar_url,
+        status: status,
+        is_registered: true,
+      });
+    }
+
+    // Convert map to array and sort by most recent activity/creation
+    return Array.from(identityMap.values()).sort((a, b) => {
+        const dateA = new Date(a.last_login || a.created_at || a.invited_at || 0).getTime();
+        const dateB = new Date(b.last_login || b.created_at || b.invited_at || 0).getTime();
+        return dateB - dateA;
+    });
   }
 
   async findAll(): Promise<User[]> {

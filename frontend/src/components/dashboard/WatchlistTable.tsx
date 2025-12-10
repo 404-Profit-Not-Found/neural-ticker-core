@@ -56,7 +56,7 @@ interface TickerData {
     price: number;
     change: number;
     pe: number | null;
-    marketCap: string | null;
+    marketCap: number | null;
     divYield: string | null;
     beta: number | null;
     rating: string;
@@ -174,7 +174,7 @@ export function WatchlistTable() {
                     price: price,
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
-                    marketCap: formatMarketCap(fundamentals.market_cap || 0),
+                    marketCap: fundamentals.market_cap ?? null,
                     divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
                     beta: fundamentals.beta ?? null,
                     rating: 'Hold',
@@ -356,7 +356,7 @@ export function WatchlistTable() {
         }),
         columnHelper.accessor('marketCap', {
             header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
-            cell: (info) => <span className="text-foreground">{info.getValue() || '-'}</span>,
+            cell: (info) => <span className="text-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
         }),
         columnHelper.accessor('divYield', {
             header: ({ column }) => <SortableHeader column={column} title="Div Yield %" />,

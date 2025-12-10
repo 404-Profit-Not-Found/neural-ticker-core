@@ -23,17 +23,34 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         configService.get<string>('GOOGLE_CLIENT_SECRET') || 'MISSING_SECRET',
       callbackURL,
       scope: ['email', 'profile'],
+      passReqToCallback: true,
     });
   }
 
   async validate(
+    req: any,
     accessToken: string,
     refreshToken: string,
     profile: any,
     done: VerifyCallback,
   ): Promise<any> {
     try {
-      const user = await this.authService.validateOAuthLogin(profile);
+      console.log('[GoogleStrategy] Validate called:', {
+          query: req.query,
+          profileId: profile.id
+      });
+
+      let intent = null;
+      if (req.query.state) {
+          try {
+              const state = JSON.parse(req.query.state);
+              intent = state.intent;
+          } catch (e) {
+              // ignore invalid state
+          }
+      }
+
+      const user = await this.authService.validateOAuthLogin(profile, intent);
       done(null, user);
     } catch (err) {
       done(err, false);

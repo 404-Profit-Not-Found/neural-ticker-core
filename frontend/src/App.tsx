@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import TickerDetails from './pages/TickerDetails'; // Added
 import { ProfilePage } from './pages/ProfilePage';
+import { AccessDenied } from './pages/AccessDenied';
 import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { useEffect } from 'react';
@@ -66,6 +67,7 @@ function App() {
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
             <Route path="/admin" element={<AdminRoute><AdminConsole /></AdminRoute>} />
+            <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
           </Routes>
         </ToastProvider>

@@ -63,9 +63,9 @@ export function Header() {
 
           <div className="relative group">
             <button className="flex items-center gap-2 text-[#a1a1aa] hover:text-white transition-colors">
-              {user?.avatar ? (
+              {user?.avatar_url ? (
                 <img
-                  src={user.avatar}
+                  src={user.avatar_url}
                   alt="Profile"
                   className="w-8 h-8 rounded-full border border-[#27272a]"
                 />

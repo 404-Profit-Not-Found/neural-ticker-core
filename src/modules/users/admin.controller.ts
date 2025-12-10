@@ -6,7 +6,10 @@ import {
   Body,
   Param,
   UseGuards,
+  Res,
+  Req,
   UnauthorizedException,
+  UseFilters,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -36,6 +39,12 @@ export class AdminController {
     return this.usersService.getAllowedUsers();
   }
 
+  @Get('identities')
+  @ApiOperation({ summary: 'List unified identities (active, waitlist, invited)' })
+  async getIdentities() {
+      return this.usersService.getUnifiedIdentities();
+  }
+
   @Post('userlist')
   @ApiOperation({ summary: 'Add email to userlist' })
   async addToUserlist(@Body() body: { email: string; addedBy?: string }) {
@@ -45,10 +54,14 @@ export class AdminController {
 
   @Delete('userlist/:email')
   @ApiOperation({ summary: 'Revoke access for an email' })
-  async revokeAccess(@Param('email') email: string) {
-    if (email === 'branislavlang@gmail.com') {
-      throw new UnauthorizedException('Cannot revoke super admin access');
-    }
-    return this.usersService.revokeEmail(email);
+  async revokeAccess(@Param('email') email: string, @Req() req: any) {
+    // req.user is populated by JwtAuthGuard
+    return this.usersService.revokeEmail(email, req.user);
+  }
+
+  @Delete('waitlist/:email')
+  @ApiOperation({ summary: 'Reject/Delete a waitlist user' })
+  async rejectWaitlistUser(@Param('email') email: string) {
+      return this.usersService.deleteWaitlistUser(email);
   }
 }

@@ -9,7 +9,7 @@ interface User {
     view_mode?: string;
     theme?: string;
     role: string;
-    avatar: string;
+    avatar_url: string;
 }
 
 interface AuthContextType {
