@@ -5,6 +5,8 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import TickerDetails from './pages/TickerDetails'; // Added
 import { ProfilePage } from './pages/ProfilePage';
+import { AdminConsole } from './pages/AdminConsole';
+import { AdminRoute } from './components/routes/AdminRoute';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -42,6 +44,14 @@ function App() {
               }
             />
             <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard/ticker/:symbol"
               element={
                 <ProtectedRoute>
@@ -55,6 +65,7 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
+            <Route path="/admin" element={<AdminRoute><AdminConsole /></AdminRoute>} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
           </Routes>
         </ToastProvider>
@@ -66,7 +77,7 @@ function App() {
 // Separate component to consume AuthContext inside AuthProvider
 function ThemeController() {
   const { user } = useAuth();
-  
+
   useEffect(() => {
     // Map legacy 'g100' or default to 'dark'
     let theme = user?.theme || 'dark';
@@ -76,14 +87,14 @@ function ThemeController() {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
     document.documentElement.classList.add(`theme-${theme}`);
-    
+
     // For RGB mode, we might want to ensure dark mode base styles are applied
     if (theme === 'rgb') {
-       document.documentElement.classList.add('dark');
+      document.documentElement.classList.add('dark');
     } else if (theme === 'dark') {
-       document.documentElement.classList.add('dark');
+      document.documentElement.classList.add('dark');
     } else {
-       document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('dark');
     }
 
   }, [user?.theme]);

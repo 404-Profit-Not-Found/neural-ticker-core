@@ -29,6 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check session on mount
     useEffect(() => {
+        // Skip check if handling callback (OAuthCallback component will handle it)
+        if (window.location.pathname.startsWith('/oauth-callback')) {
+            return;
+        }
         checkSession();
     }, []);
 

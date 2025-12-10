@@ -1,56 +1,36 @@
-import { useState, useMemo } from 'react';
 import { cn } from '../../lib/api';
+import { useTickerLogo } from '../../hooks/useTicker';
 
 export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
-    const [useCache, setUseCache] = useState(true);
-    const [error, setError] = useState(false);
-    const [loaded, setLoaded] = useState(false);
+    const { data: logoSrc, isLoading, isError } = useTickerLogo(symbol, url);
 
-    const imgSrc = useMemo(() => {
-        if (useCache) {
-            // Try fetching from our DB cache first
-            return `/api/v1/tickers/${symbol}/logo`;
-        }
-        // Fallback to proxy or direct URL
-        if (!url) return null;
-        if (url.includes('finnhub.io')) {
-            return `/api/proxy/image?url=${encodeURIComponent(url)}`;
-        }
-        return url;
-    }, [useCache, url, symbol]);
-    
-    // State reset is handled by generic 'key' prop on parent usage where this component is mounted
+    // Fallback logic
+    const showPlaceholder = isError || (!isLoading && !logoSrc && !url);
 
-    const handleError = () => {
-        if (useCache) {
-            // If DB cache fails (404), switch to fallback
-            setUseCache(false);
-        } else {
-            // If fallback fails, show placeholder
-            setError(true);
-        }
-    };
-
-    if (error || !imgSrc) {
+    if (showPlaceholder) {
         return (
             <div className={cn("rounded-full bg-[#27272a] flex items-center justify-center text-xs font-bold text-[#a1a1aa] shrink-0", className || "w-8 h-8")}>
-                {symbol.substring(0, 1)}
+                {symbol ? symbol.substring(0, 1) : '?'}
             </div>
         );
     }
 
+    if (logoSrc) {
+        return (
+            <div className={cn("relative shrink-0", className || "w-8 h-8")}>
+                <img
+                    src={logoSrc}
+                    alt=""
+                    className={cn(`w-full h-full rounded-full object-contain`)}
+                />
+            </div>
+        );
+    }
+
+    // Loading
     return (
         <div className={cn("relative shrink-0", className || "w-8 h-8")}>
-            {!loaded && (
-                <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
-            )}
-            <img
-                src={imgSrc}
-                alt="" // Decorative
-                className={cn(`w-full h-full rounded-full object-contain transition-opacity duration-300`, loaded ? 'opacity-100' : 'opacity-0')}
-                onLoad={() => setLoaded(true)}
-                onError={handleError}
-            />
+            <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
         </div>
     );
 };

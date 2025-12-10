@@ -12,8 +12,16 @@ async function bootstrap() {
   app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
 
+
+
   // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
   app.getHttpAdapter().getInstance().set('etag', false);
+
+  // Enable CORS
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+  });
 
   // Set global prefix if desired, e.g. api/v1
   app.setGlobalPrefix('api');
