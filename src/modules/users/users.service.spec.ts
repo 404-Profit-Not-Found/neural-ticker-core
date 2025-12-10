@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
+import { NicknameGeneratorService } from './nickname-generator.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -16,10 +17,18 @@ describe('UsersService', () => {
     update: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 
+  const mockNicknameGenerator = {
+    generate: jest.fn().mockReturnValue('nick'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        {
+          provide: NicknameGeneratorService,
+          useValue: mockNicknameGenerator,
+        },
         {
           provide: getRepositoryToken(User),
           useValue: mockRepo,

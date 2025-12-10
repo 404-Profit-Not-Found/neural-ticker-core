@@ -178,9 +178,9 @@ describe('WatchlistService', () => {
 
     it('should throw if watchlist not found', async () => {
       mockWatchlistRepo.findOne.mockResolvedValue(null);
-      await expect(service.deleteWatchlist('user-1', 'missing')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.deleteWatchlist('user-1', 'missing'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

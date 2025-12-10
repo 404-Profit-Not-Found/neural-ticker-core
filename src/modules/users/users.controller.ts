@@ -22,7 +22,7 @@ import { AuthLogFilterDto } from '../auth/dto/auth-log-filter.dto';
 @ApiTags('Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Controller('users')
+@Controller('v1/users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

@@ -61,7 +61,7 @@ export class User {
   @Column({ default: 'PRO' })
   view_mode: string;
 
-  @ApiProperty({ example: 'g100' })
-  @Column({ default: 'g100' })
+  @ApiProperty({ example: 'dark' })
+  @Column({ default: 'dark' })
   theme: string;
 }

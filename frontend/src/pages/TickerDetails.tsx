@@ -16,6 +16,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { TickerLogo } from '../components/dashboard/TickerLogo'; // Reuse logo
+import { Header } from '../components/layout/Header';
 
 export default function TickerDetails() {
     const { symbol } = useParams();
@@ -167,14 +168,14 @@ export default function TickerDetails() {
 
     if (loading) {
         return (
-            <div className="h-screen flex items-center justify-center bg-[#09090b] text-white">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="h-screen flex items-center justify-center bg-background text-foreground">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (!tickerData) {
-        return <div className="p-8 text-white">Ticker not found.</div>;
+        return <div className="p-8 text-foreground">Ticker not found.</div>;
     }
 
     const { ticker, latestPrice, fundamentals, watchers } = tickerData;
@@ -184,18 +185,19 @@ export default function TickerDetails() {
         : 0;
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-[#fafafa] p-6 space-y-6">
-            {/* Header */}
+        <div className="min-h-screen bg-background text-foreground">
+            <Header />
+            <main className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-[#a1a1aa] hover:text-white">
+                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <div className="flex items-center gap-3">
                         <TickerLogo url={ticker.logo_url} symbol={ticker.symbol} />
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">{ticker.symbol}</h1>
-                            <p className="text-sm text-[#a1a1aa]">{ticker.name}</p>
+                            <h1 className="text-2xl font-bold tracking-tight rgb-text">{ticker.symbol}</h1>
+                            <p className="text-sm text-muted-foreground">{ticker.name}</p>
                         </div>
                     </div>
                 </div>
@@ -206,7 +208,7 @@ export default function TickerDetails() {
                             {Number(change || 0) >= 0 ? '+' : ''}{Number(change || 0).toFixed(2)}%
                         </div>
                     </div>
-                    <Badge variant="secondary" className="gap-1 px-3 py-1 text-sm bg-[#27272a] text-[#a1a1aa]">
+                    <Badge variant="secondary" className="gap-1 px-3 py-1 text-sm bg-muted text-muted-foreground border border-border">
                         <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                         {watchers} Watchers
                     </Badge>
@@ -214,7 +216,7 @@ export default function TickerDetails() {
             </div>
 
             {/* Tabs Navigation (Placeholder for now, using buttons if Tabs component missing) */}
-            <div className="border-b border-[#27272a]">
+            <div className="border-b border-border">
                 <nav className="flex gap-6">
                     {[
                         { id: 'overview', label: 'Overview', icon: TrendingUp },
@@ -227,8 +229,8 @@ export default function TickerDetails() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
-                                ? 'border-blue-500 text-blue-500'
-                                : 'border-transparent text-[#a1a1aa] hover:text-[#fafafa]'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
                         >
                             <tab.icon className="w-4 h-4" />
@@ -242,19 +244,19 @@ export default function TickerDetails() {
             <div className="min-h-[400px]">
                 {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="p-4 rounded-lg bg-[#18181b] border border-[#27272a]">
-                            <h3 className="text-sm font-medium text-[#a1a1aa] mb-4">Key Stats</h3>
+                        <div className="p-4 rounded-lg bg-card border border-border rgb-border">
+                            <h3 className="text-sm font-medium text-muted-foreground mb-4">Key Stats</h3>
                             <div className="space-y-3">
                                 <div className="flex justify-between">
-                                    <span className="text-[#a1a1aa]">Market Cap</span>
+                                    <span className="text-muted-foreground">Market Cap</span>
                                     <span>{fundamentals?.market_cap ? `$${(fundamentals.market_cap / 1000).toFixed(2)}B` : '-'}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-[#a1a1aa]">P/E Ratio</span>
+                                    <span className="text-muted-foreground">P/E Ratio</span>
                                     <span>{fundamentals?.pe_ratio || '-'}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-[#a1a1aa]">Beta</span>
+                                    <span className="text-muted-foreground">Beta</span>
                                     <span>{fundamentals?.beta || '-'}</span>
                                 </div>
                             </div>
@@ -264,10 +266,10 @@ export default function TickerDetails() {
 
                 {activeTab === 'research' && (
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center bg-[#18181b] p-4 rounded-lg border border-[#27272a]">
+                        <div className="flex justify-between items-center bg-card p-4 rounded-lg border border-border rgb-border">
                             <div>
-                                <h3 className="font-semibold text-[#fafafa]">AI Deep Research</h3>
-                                <p className="text-sm text-[#a1a1aa]">Generate a fresh, multi-agent analysis report.</p>
+                                <h3 className="font-semibold text-foreground">AI Deep Research</h3>
+                                <p className="text-sm text-muted-foreground">Generate a fresh, multi-agent analysis report.</p>
                             </div>
                             <Button onClick={handleTriggerResearch} disabled={researchLoading}>
                                 {researchLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Brain className="w-4 h-4 mr-2" />}
@@ -276,14 +278,14 @@ export default function TickerDetails() {
                         </div>
 
                         {researchNote ? (
-                            <div className="p-6 rounded-lg bg-[#18181b] border border-[#27272a] prose prose-invert max-w-none">
+                            <div className="p-6 rounded-lg bg-card border border-border prose prose-invert max-w-none rgb-border">
                                 <ReactMarkdown>{researchNote.answer_markdown}</ReactMarkdown>
-                                <div className="mt-4 text-xs text-[#a1a1aa] border-t border-[#27272a] pt-4">
+                                <div className="mt-4 text-xs text-muted-foreground border-t border-border pt-4">
                                     Research ID: {researchNote.id} • Model: {Array.isArray(researchNote.models_used) ? researchNote.models_used.join(', ') : 'Ensemble'} • {new Date(researchNote.created_at).toLocaleString()}
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-[#a1a1aa] py-12">
+                            <div className="text-center text-muted-foreground py-12">
                                 {researchLoading ? "Deep research in progress. This may take a minute..." : "No research generated yet. Click 'Trigger Research' to start."}
                             </div>
                         )}
@@ -292,15 +294,15 @@ export default function TickerDetails() {
 
                 {activeTab === 'risk' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-6 rounded-lg bg-[#18181b] border border-[#27272a]">
-                            <h3 className="text-lg font-semibold mb-4 text-[#fafafa]">Risk Score</h3>
+                        <div className="p-6 rounded-lg bg-card border border-border rgb-border">
+                            <h3 className="text-lg font-semibold mb-4 text-foreground">Risk Score</h3>
                             {riskAnalysis ? (
-                                <div className="text-4xl font-bold font-mono text-blue-500">
+                                <div className="text-4xl font-bold font-mono text-primary">
                                     {riskAnalysis.overall_score || "N/A"}
-                                    <span className="text-sm text-[#a1a1aa] ml-2">/ 10</span>
+                                    <span className="text-sm text-muted-foreground ml-2">/ 10</span>
                                 </div>
                             ) : (
-                                <div className="text-[#a1a1aa]">No risk analysis found. Trigger research to generate.</div>
+                                <div className="text-muted-foreground">No risk analysis found. Trigger research to generate.</div>
                             )}
                         </div>
                     </div>
@@ -309,18 +311,18 @@ export default function TickerDetails() {
                 {activeTab === 'news' && (
                     <div className="space-y-4">
                         {news.length > 0 ? news.map((item, idx) => (
-                            <div key={idx} className="p-4 rounded-lg bg-[#18181b] border border-[#27272a] hover:bg-[#27272a] transition-colors">
+                            <div key={idx} className="p-4 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors rgb-border">
                                 <a href={item.url} target="_blank" rel="noreferrer" className="block">
-                                    <h4 className="font-medium text-blue-400 hover:underline mb-1">{item.headline}</h4>
-                                    <div className="flex justify-between text-xs text-[#a1a1aa]">
+                                    <h4 className="font-medium text-primary hover:underline mb-1">{item.headline}</h4>
+                                    <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>{item.source}</span>
                                         <span>{new Date(item.datetime * 1000).toLocaleDateString()}</span>
                                     </div>
-                                    <p className="text-sm text-[#d4d4d8] mt-2 line-clamp-2">{item.summary}</p>
+                                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{item.summary}</p>
                                 </a>
                             </div>
                         )) : (
-                            <div className="text-center text-[#a1a1aa] py-12">No recent news found.</div>
+                            <div className="text-center text-muted-foreground py-12">No recent news found.</div>
                         )}
                     </div>
                 )}
@@ -330,7 +332,7 @@ export default function TickerDetails() {
                         {/* Comment Input */}
                         <div className="flex gap-2">
                             <input
-                                className="flex-1 bg-[#18181b] border border-[#27272a] rounded-md px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                                className="flex-1 bg-card border border-border rounded-md px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 placeholder="Add a comment..."
                                 value={newComment}
                                 onChange={(e) => setNewComment(e.target.value)}
@@ -342,19 +344,20 @@ export default function TickerDetails() {
                         {/* Comments List */}
                         <div className="space-y-4">
                             {comments.map((comment) => (
-                                <div key={comment.id} className="p-4 rounded-lg bg-[#18181b] border border-[#27272a]">
+                                <div key={comment.id} className="p-4 rounded-lg bg-card border border-border rgb-border">
                                     <div className="flex justify-between items-start mb-2">
-                                        <div className="font-semibold text-sm text-blue-400">{comment.user?.email || "User"}</div>
-                                        <div className="text-xs text-[#a1a1aa]">{new Date(comment.created_at).toLocaleString()}</div>
+                                        <div className="font-semibold text-sm text-primary">{comment.user?.email || "User"}</div>
+                                        <div className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleString()}</div>
                                     </div>
-                                    <p className="text-sm text-[#eeeeee]">{comment.content}</p>
+                                    <p className="text-sm text-foreground">{comment.content}</p>
                                 </div>
                             ))}
-                            {comments.length === 0 && <div className="text-center text-[#a1a1aa] py-8">No comments yet. Be the first!</div>}
+                            {comments.length === 0 && <div className="text-center text-muted-foreground py-8">No comments yet. Be the first!</div>}
                         </div>
                     </div>
                 )}
             </div>
+            </main>
         </div>
     );
 }

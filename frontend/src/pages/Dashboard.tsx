@@ -4,7 +4,7 @@ import { WatchlistTable } from '../components/dashboard/WatchlistTable';
 
 export function Dashboard() {
     return (
-        <div className="min-h-screen bg-[#09090b] text-[#fafafa] font-sans selection:bg-blue-500/30">
+        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
             <Header />
 
             <main className="max-w-[1600px] mx-auto p-6 space-y-8 animate-in fade-in duration-500">

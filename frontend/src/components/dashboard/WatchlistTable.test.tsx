@@ -1,10 +1,10 @@
-/// <reference types="vitest" />
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WatchlistTable } from './WatchlistTable';
 import { ToastProvider } from '../ui/toast';
 import { api } from '../../lib/api';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { AxiosResponse } from 'axios';
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>(
@@ -23,32 +23,23 @@ const renderWithProviders = () =>
     </ToastProvider>,
   );
 
-const originalGet = api.get;
-const originalDelete = api.delete;
-const originalPost = api.post;
-
-let mockGet: ReturnType<typeof vi.fn>;
-let mockDelete: ReturnType<typeof vi.fn>;
-let mockPost: ReturnType<typeof vi.fn>;
+type WatchlistPayload = { id: string; name: string; items: unknown[] }[];
+let mockGet: vi.SpyInstance<Promise<AxiosResponse<WatchlistPayload>>, Parameters<typeof api.get>>;
+let mockDelete: vi.SpyInstance<Promise<AxiosResponse<{ success: boolean }>>, Parameters<typeof api.delete>>;
 
 describe('WatchlistTable', () => {
   beforeEach(() => {
-    mockGet = vi.fn().mockResolvedValue({
-      data: [{ id: 'list-1', name: 'My List', items: [] }],
-    } as any);
-    mockDelete = vi.fn().mockResolvedValue({ data: { success: true } } as any);
-    mockPost = vi.fn().mockResolvedValue({ data: [] } as any);
-
-    (api as any).get = mockGet;
-    (api as any).delete = mockDelete;
-    (api as any).post = mockPost;
+    mockGet = vi
+      .spyOn(api, 'get')
+      .mockResolvedValue({ data: [{ id: 'list-1', name: 'My List', items: [] }] } as AxiosResponse<WatchlistPayload>);
+    mockDelete = vi
+      .spyOn(api, 'delete')
+      .mockResolvedValue({ data: { success: true } } as AxiosResponse<{ success: boolean }>);
+    vi.spyOn(api, 'post').mockResolvedValue({ data: [] } as AxiosResponse<unknown>);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   afterEach(() => {
-    (api as any).get = originalGet;
-    (api as any).delete = originalDelete;
-    (api as any).post = originalPost;
     vi.restoreAllMocks();
     cleanup();
   });
@@ -59,6 +50,7 @@ describe('WatchlistTable', () => {
     expect(
       await screen.findByRole('button', { name: /delete watchlist/i }),
     ).toBeInTheDocument();
+    expect(mockGet).toHaveBeenCalled();
   });
 
   it('deletes the active watchlist when trash icon is clicked and confirmed', async () => {

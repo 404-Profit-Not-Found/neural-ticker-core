@@ -155,7 +155,8 @@ export class WatchlistController {
 
   @ApiOperation({
     summary: 'Delete Watchlist',
-    description: 'Deletes a watchlist and all its items for the authenticated user.',
+    description:
+      'Deletes a watchlist and all its items for the authenticated user.',
   })
   @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
   @ApiResponse({ status: 200, description: 'Watchlist deleted.' })

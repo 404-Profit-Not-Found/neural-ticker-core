@@ -62,7 +62,7 @@ export class UsersService {
       role: role || 'user',
       nickname: this.nicknameGenerator.generate(),
       view_mode: 'PRO', // Default
-      theme: 'g100', // Default
+      theme: 'dark', // Default
     });
 
     return this.userRepo.save(newUser);
