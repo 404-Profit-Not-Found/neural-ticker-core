@@ -143,17 +143,17 @@ export function WatchlistTable() {
         } catch {
             console.error("Failed to fetch watchlists");
         }
-    }, [activeWatchlistId]);
+    }, []);
 
     // 2. Fetch Items when Active ID changes
-    const fetchItems = useCallback(async () => {
-        if (!activeWatchlistId) return;
+    const fetchItems = useCallback(async (watchlistId: string | null) => {
+        if (!watchlistId) return;
         setLoading(true);
         try {
             const { data: lists } = await api.get('/watchlists');
             setWatchlists(lists);
 
-            const current = lists.find((w: WatchlistData) => w.id === activeWatchlistId);
+            const current = lists.find((w: WatchlistData) => w.id === watchlistId);
             if (!current) return;
 
             const items = current.items || [];
@@ -224,7 +224,7 @@ export function WatchlistTable() {
         } finally {
             setLoading(false);
         }
-    }, [activeWatchlistId, formatMarketCap]);
+    }, [formatMarketCap]);
 
      
     useEffect(() => {
@@ -233,8 +233,8 @@ export function WatchlistTable() {
 
      
     useEffect(() => {
-        fetchItems();
-    }, [fetchItems]);
+        fetchItems(activeWatchlistId);
+    }, [fetchItems, activeWatchlistId]);
 
     const handleRemoveTicker = useCallback(async (symbol: string) => {
         if (!activeWatchlistId) return;
@@ -251,7 +251,7 @@ export function WatchlistTable() {
         try {
             await api.delete(`/watchlists/${activeWatchlistId}/items/${item.ticker.id}`);
             showToast(`${symbol} removed from watchlist`, 'success');
-            await fetchItems();
+            await fetchItems(activeWatchlistId);
         } catch (err) {
             console.error("Failed to remove ticker", err);
             showToast("Failed to remove ticker", 'error');
@@ -310,7 +310,7 @@ export function WatchlistTable() {
             await api.post(`/watchlists/${activeWatchlistId}/items`, { symbol });
             showToast(`${symbol} added to watchlist`, 'success');
             setSearchTerm('');
-            await fetchItems();
+            await fetchItems(activeWatchlistId);
         } catch (err: unknown) {
             console.error("Failed to add ticker", err);
             if (err && typeof err === 'object' && 'response' in err) {
@@ -460,7 +460,7 @@ export function WatchlistTable() {
                 </div>
             ),
         }),
-    ], [navigate, handleRemoveTicker]);
+    ], [navigate, handleRemoveTicker, columnHelper]);
 
     const table = useReactTable({
         data,
@@ -664,7 +664,7 @@ export function WatchlistTable() {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={fetchItems}
+                        onClick={() => fetchItems(activeWatchlistId)}
                         disabled={loading}
                         className="h-9 gap-2 bg-card border-border text-foreground hover:bg-muted hover:text-foreground"
                     >

@@ -1,7 +1,16 @@
 import { useEffect, useRef, memo } from "react";
+import { useAuth } from "../../context/AuthContext";
 
-function StocktwitsWidget() {
+interface StocktwitsWidgetProps {
+  colorTheme?: 'light' | 'dark';
+}
+
+function StocktwitsWidget({ colorTheme }: StocktwitsWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  
+  // Determine theme from user preference or prop
+  const theme = colorTheme || (user?.theme === 'light' ? 'light' : 'dark');
 
   useEffect(() => {
     if (!container.current) return;
@@ -12,19 +21,19 @@ function StocktwitsWidget() {
     script.async = true;
     script.innerHTML = `
 {
-  "animated": false,
+  "animated": true,
   "assetClass": "equity",
-  "colorTheme": "dark",
+  "colorTheme": "${theme}",
   "location": "US",
   "logos": true,
-  "quantity": 10,
+  "quantity": 5,
   "sparklines": true,
   "transparent": true,
   "widget": "bar"
 }
     `;
     container.current.appendChild(script);
-  }, []);
+  }, [theme]);
 
   return <div className="stocktwits-widget w-full" ref={container} />;
 }
