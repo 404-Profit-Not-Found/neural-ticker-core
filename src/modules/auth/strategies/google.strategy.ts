@@ -36,18 +36,18 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ): Promise<any> {
     try {
       console.log('[GoogleStrategy] Validate called:', {
-          query: req.query,
-          profileId: profile.id
+        query: req.query,
+        profileId: profile.id,
       });
 
       let intent = null;
       if (req.query.state) {
-          try {
-              const state = JSON.parse(req.query.state);
-              intent = state.intent;
-          } catch (e) {
-              // ignore invalid state
-          }
+        try {
+          const state = JSON.parse(req.query.state);
+          intent = state.intent;
+        } catch {
+          // ignore invalid state
+        }
       }
 
       const user = await this.authService.validateOAuthLogin(profile, intent);

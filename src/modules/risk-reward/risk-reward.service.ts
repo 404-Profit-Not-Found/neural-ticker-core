@@ -31,18 +31,15 @@ export class RiskRewardService {
 
   async getLatestScore(symbol: string) {
     const snapshot = await this.marketDataService.getSnapshot(symbol);
+    return this.getLatestAnalysis(snapshot.ticker.id);
+  }
 
-    const latest = await this.analysisRepo.findOne({
-      where: { ticker_id: snapshot.ticker.id },
+  async getLatestAnalysis(tickerId: string): Promise<RiskAnalysis | null> {
+    return this.analysisRepo.findOne({
+      where: { ticker_id: tickerId },
       order: { created_at: 'DESC' },
       relations: ['scenarios', 'qualitative_factors', 'catalysts'],
     });
-
-    // Per user request: Do NOT auto-generate "low tier" scores.
-    // If it's stale or missing, return what we have or null.
-    // We only rely on "Deep Research" to trigger score generation now.
-
-    return latest || null;
   }
 
   async getScoreHistory(symbol: string) {

@@ -49,17 +49,19 @@ export class AuthController {
   async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     // req.user contains the user from GoogleStrategy.validate()
     const user = req.user as any;
-    
+
     const frontendUrl = this.configService.get<string>('frontendUrl') || '';
 
     // Handle "Just Joined" Waitlist
     if (user.isNewWaitlist) {
-        return res.redirect(`${frontendUrl}/access-denied?error=waitlist_joined`);
+      return res.redirect(`${frontendUrl}/access-denied?error=waitlist_joined`);
     }
 
     // Handle "Already Pending" Waitlist
     if (user.role === 'waitlist') {
-        return res.redirect(`${frontendUrl}/access-denied?error=waitlist_pending`);
+      return res.redirect(
+        `${frontendUrl}/access-denied?error=waitlist_pending`,
+      );
     }
 
     const result = await this.authService.login(user);

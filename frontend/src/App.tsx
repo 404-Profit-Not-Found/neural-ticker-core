@@ -8,6 +8,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { AccessDenied } from './pages/AccessDenied';
 import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
+import { TickerDetail } from './pages/TickerDetail';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -49,6 +50,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ticker/:symbol"
+              element={
+                <ProtectedRoute>
+                  <TickerDetail />
                 </ProtectedRoute>
               }
             />

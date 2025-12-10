@@ -1,11 +1,4 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 
@@ -18,17 +11,20 @@ export class GoogleAuthExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    
+
     // Log the error
-    const errorMessage = exception instanceof Error ? exception.message : String(exception);
+    const errorMessage =
+      exception instanceof Error ? exception.message : String(exception);
     this.logger.error(`Google Auth Failed: ${errorMessage}`);
 
-    const frontendUrl = this.configService.get<string>('frontendUrl') || 'http://localhost:5173';
-    
+    const frontendUrl =
+      this.configService.get<string>('frontendUrl') || 'http://localhost:5173';
+
     // Check for "Invite Only" specific error
     if (errorMessage.includes('not on the invite list')) {
-         return response.redirect(`${frontendUrl}/access-denied?error=invite_only`);
+      return response.redirect(
+        `${frontendUrl}/access-denied?error=invite_only`,
+      );
     }
 
     // Generic fallback for other auth errors

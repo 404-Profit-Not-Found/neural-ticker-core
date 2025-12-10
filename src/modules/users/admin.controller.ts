@@ -6,10 +6,8 @@ import {
   Body,
   Param,
   UseGuards,
-  Res,
   Req,
   UnauthorizedException,
-  UseFilters,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -40,9 +38,11 @@ export class AdminController {
   }
 
   @Get('identities')
-  @ApiOperation({ summary: 'List unified identities (active, waitlist, invited)' })
+  @ApiOperation({
+    summary: 'List unified identities (active, waitlist, invited)',
+  })
   async getIdentities() {
-      return this.usersService.getUnifiedIdentities();
+    return this.usersService.getUnifiedIdentities();
   }
 
   @Post('userlist')
@@ -62,6 +62,6 @@ export class AdminController {
   @Delete('waitlist/:email')
   @ApiOperation({ summary: 'Reject/Delete a waitlist user' })
   async rejectWaitlistUser(@Param('email') email: string) {
-      return this.usersService.deleteWaitlistUser(email);
+    return this.usersService.deleteWaitlistUser(email);
   }
 }

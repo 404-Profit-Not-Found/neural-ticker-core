@@ -1,9 +1,7 @@
 import {
   Injectable,
   NotFoundException,
-  UnauthorizedException,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -39,32 +37,36 @@ export class UsersService {
   }
 
   async deleteWaitlistUser(email: string): Promise<void> {
-      const user = await this.userRepo.findOne({ where: { email } });
-      
-      if (!user) {
-          throw new NotFoundException(`User with email ${email} not found`);
-      }
+    const user = await this.userRepo.findOne({ where: { email } });
 
-      if (user.role !== 'waitlist') {
-          throw new ForbiddenException('Only waitlist users can be rejected/deleted via this method.');
-      }
+    if (!user) {
+      throw new NotFoundException(`User with email ${email} not found`);
+    }
 
-      await this.userRepo.delete({ id: user.id });
+    if (user.role !== 'waitlist') {
+      throw new ForbiddenException(
+        'Only waitlist users can be rejected/deleted via this method.',
+      );
+    }
+
+    await this.userRepo.delete({ id: user.id });
   }
 
   async revokeEmail(email: string, requester?: User): Promise<void> {
     // Safety Checks
     if (requester) {
-        if (requester.email === email) {
-            throw new ForbiddenException('You cannot revoke your own access.');
-        }
+      if (requester.email === email) {
+        throw new ForbiddenException('You cannot revoke your own access.');
+      }
     }
 
     const user = await this.userRepo.findOne({ where: { email } });
-    
+
     // Check if target is admin
     if (user && user.role === 'admin') {
-        throw new ForbiddenException('Cannot revoke access of another administrator.');
+      throw new ForbiddenException(
+        'Cannot revoke access of another administrator.',
+      );
     }
 
     // 1. Remove from allow list
@@ -76,16 +78,16 @@ export class UsersService {
     // But existing sessions?
     // If we want to kill active session, we might need to increment a 'tokenVersion' or similar.
     // For now, strict requirement is "delete".
-    
+
     // If user exists, we SHOULD probably remove them or set to a non-active role to be sure.
     if (user) {
-       // user.role = 'user'; // Already user?
-       // user.role = 'banned'?
-       // Actually, the request implies 'delete' or 'revoke'.
-       // Existing logic was just removing from allow list?
-       // Let's check what it was doing before.
-       // It seems it was just `this.allowedUserRepo.delete({ email })`.
-       // But if `validateOAuthLogin` checks `isEmailAllowed`, then removing from valid list is sufficient for next login.
+      // user.role = 'user'; // Already user?
+      // user.role = 'banned'?
+      // Actually, the request implies 'delete' or 'revoke'.
+      // Existing logic was just removing from allow list?
+      // Let's check what it was doing before.
+      // It seems it was just `this.allowedUserRepo.delete({ email })`.
+      // But if `validateOAuthLogin` checks `isEmailAllowed`, then removing from valid list is sufficient for next login.
     }
   }
 
@@ -101,12 +103,15 @@ export class UsersService {
     return this.userRepo.findOne({ where: { google_id: googleId } });
   }
 
-  async createOrUpdateGoogleUser(profile: {
-    email: string;
-    googleId: string;
-    fullName: string;
-    avatarUrl: string;
-  }, roleOverride?: string): Promise<User> {
+  async createOrUpdateGoogleUser(
+    profile: {
+      email: string;
+      googleId: string;
+      fullName: string;
+      avatarUrl: string;
+    },
+    roleOverride?: string,
+  ): Promise<User> {
     let user = await this.findByGoogleId(profile.googleId);
 
     // Also check by email to merge accounts if needed (optional security choice)
@@ -130,14 +135,14 @@ export class UsersService {
         user.nickname = this.nicknameGenerator.generate();
       }
       if (role) user.role = role; // Enforce admin if email matches
-      // If roleOverride is provided (e.g. waitlist), and user is NOT an admin/user (maybe they are trying to join waitlist but already exist?), 
-      // Actually if they exist they shouldn't trigger waitlist logic unless they were previously deleted or something? 
-      // If they exist and are 'user', they can just login. 
+      // If roleOverride is provided (e.g. waitlist), and user is NOT an admin/user (maybe they are trying to join waitlist but already exist?),
+      // Actually if they exist they shouldn't trigger waitlist logic unless they were previously deleted or something?
+      // If they exist and are 'user', they can just login.
       // If they exist and are 'waitlist' already, fine.
       // If they exist and are 'user', and try to join waitlist, we shouldn't downgrade them.
-      // So only apply roleOverride if creating? 
+      // So only apply roleOverride if creating?
       // UsersService logic: If user exists, we usually return them.
-      
+
       return this.userRepo.save(user);
     }
 
@@ -234,7 +239,7 @@ export class UsersService {
     // 2. Process Registered Users (Active or Waitlist)
     for (const u of users) {
       const existing = identityMap.get(u.email) || {};
-      
+
       let status = 'ACTIVE';
       if (u.role === 'admin') status = 'ADMIN';
       else if (u.role === 'waitlist') status = 'WAITLIST';
@@ -256,9 +261,13 @@ export class UsersService {
 
     // Convert map to array and sort by most recent activity/creation
     return Array.from(identityMap.values()).sort((a, b) => {
-        const dateA = new Date(a.last_login || a.created_at || a.invited_at || 0).getTime();
-        const dateB = new Date(b.last_login || b.created_at || b.invited_at || 0).getTime();
-        return dateB - dateA;
+      const dateA = new Date(
+        a.last_login || a.created_at || a.invited_at || 0,
+      ).getTime();
+      const dateB = new Date(
+        b.last_login || b.created_at || b.invited_at || 0,
+      ).getTime();
+      return dateB - dateA;
     });
   }
 

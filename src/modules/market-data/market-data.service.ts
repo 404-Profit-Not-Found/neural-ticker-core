@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
@@ -16,6 +16,7 @@ export class MarketDataService {
     private readonly ohlcvRepo: Repository<PriceOhlcv>,
     @InjectRepository(Fundamentals)
     private readonly fundamentalsRepo: Repository<Fundamentals>,
+    @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
     private readonly configService: ConfigService, // Added

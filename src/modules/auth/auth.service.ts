@@ -35,40 +35,43 @@ export class AuthService {
 
     // Access Control: Check Whitelist
     const isAllowed = await this.usersService.isEmailAllowed(email);
-    
+
     // Logic: If not allowed...
     // Logic: If not allowed...
     if (!isAllowed) {
-        // Check if user is requesting to join the waitlist
-        if (intent === 'waitlist') {
-            this.logger.log(`User joining waitlist: ${email}`);
-            // Proceed to create/update but force ROLE = 'waitlist' if new or update status
-            const user = await this.usersService.createOrUpdateGoogleUser({
-                googleId: id,
-                email: email,
-                fullName: displayName,
-                avatarUrl: avatarUrl,
-            }, 'waitlist'); // specific role override
+      // Check if user is requesting to join the waitlist
+      if (intent === 'waitlist') {
+        this.logger.log(`User joining waitlist: ${email}`);
+        // Proceed to create/update but force ROLE = 'waitlist' if new or update status
+        const user = await this.usersService.createOrUpdateGoogleUser(
+          {
+            googleId: id,
+            email: email,
+            fullName: displayName,
+            avatarUrl: avatarUrl,
+          },
+          'waitlist',
+        ); // specific role override
 
-            // Attach a transient property to the user object for the controller to read.
-            (user as any).isNewWaitlist = true;
+        // Attach a transient property to the user object for the controller to read.
+        (user as any).isNewWaitlist = true;
 
-            return user;
-        }
+        return user;
+      }
 
-        // Check if user is already on the waitlist (returning user)
-        const existingUser = await this.usersService.findByEmail(email);
-        if (existingUser && existingUser.role === 'waitlist') {
-            this.logger.log(`Returning waitlist user login: ${email}`);
-            return existingUser;
-        }
+      // Check if user is already on the waitlist (returning user)
+      const existingUser = await this.usersService.findByEmail(email);
+      if (existingUser && existingUser.role === 'waitlist') {
+        this.logger.log(`Returning waitlist user login: ${email}`);
+        return existingUser;
+      }
 
-        this.logger.warn(
-            `Login attempt blocked for non-whitelisted email: ${email}`,
-        );
-        throw new UnauthorizedException(
-            'Access Denied: You are not on the invite list.',
-        );
+      this.logger.warn(
+        `Login attempt blocked for non-whitelisted email: ${email}`,
+      );
+      throw new UnauthorizedException(
+        'Access Denied: You are not on the invite list.',
+      );
     }
 
     const user = await this.usersService.createOrUpdateGoogleUser({
