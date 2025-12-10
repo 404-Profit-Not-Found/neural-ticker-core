@@ -42,8 +42,18 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                             scenario.scenario_type === 'base' && "bg-blue-500/5 border-blue-500/20 ring-1 ring-blue-500/30"
                         )}
                     >
+                        {/* Grid Pattern Overlay */}
+                        <div
+                            className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                            style={{
+                                backgroundImage: 'linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)',
+                                backgroundSize: '20px 20px',
+                                color: 'var(--foreground)'
+                            }}
+                        />
+
                         {/* Probability Badge */}
-                        <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border">
+                        <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border z-10">
                             {(Number(scenario.probability) * 100).toFixed(0)}% Prob
                         </div>
 

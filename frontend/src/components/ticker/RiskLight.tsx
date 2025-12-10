@@ -13,6 +13,7 @@ interface RiskLightProps {
 }
 
 export function RiskLight({ score, reasoning }: RiskLightProps) {
+    // Force cache invalidation
     const getColor = (s: number) => {
         if (s >= 7) return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
         if (s >= 4) return 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]';
