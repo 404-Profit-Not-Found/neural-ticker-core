@@ -131,7 +131,7 @@ describe('WatchlistTable Sorting', () => {
         // Helper to get text from specific column in row
         const getMarketCapFromRow = (row: HTMLElement) => {
             const cells = row.querySelectorAll('td');
-            return cells[6]?.textContent; // 7th column
+            return cells[4]?.textContent; // 5th column after merge
         };
 
         // Wait a bit for sorting to apply if needed (usually sync with fireEvent but safe to wait)
