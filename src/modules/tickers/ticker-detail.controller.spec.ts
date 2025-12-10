@@ -72,7 +72,9 @@ describe('TickerDetailController', () => {
       mockMarketDataService.getSnapshot.mockResolvedValue(mockSnapshot);
       mockMarketDataService.getHistory.mockResolvedValue(mockHistory);
       mockRiskRewardService.getLatestAnalysis.mockResolvedValue(mockRisk);
-      mockResearchService.getLatestNoteForTicker.mockResolvedValue(mockResearch);
+      mockResearchService.getLatestNoteForTicker.mockResolvedValue(
+        mockResearch,
+      );
 
       const result = await controller.getCompositeData('AAPL');
 

@@ -7,7 +7,7 @@ export function Dashboard() {
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
             <Header />
 
-            <main className="max-w-[100rem] mx-auto p-6 space-y-8 animate-in fade-in duration-500">
+            <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
                 {/* KPI Cards Row */}
                 <KPIGrid />
 

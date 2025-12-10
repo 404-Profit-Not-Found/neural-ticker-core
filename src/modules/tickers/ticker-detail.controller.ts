@@ -46,10 +46,14 @@ export class TickerDetailController {
     const [riskAnalysis, researchNote, priceHistory] = await Promise.all([
       this.riskRewardService.getLatestAnalysis(ticker.id).catch(() => null),
       this.researchService.getLatestNoteForTicker(symbol).catch(() => null),
-      this.marketDataService.getHistory(symbol, '1d', 
-          new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(), 
-          new Date().toISOString()
-      ).catch(() => []),
+      this.marketDataService
+        .getHistory(
+          symbol,
+          '1d',
+          new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+          new Date().toISOString(),
+        )
+        .catch(() => []),
     ]);
 
     // 3. Construct Composite Response

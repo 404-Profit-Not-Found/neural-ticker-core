@@ -3,6 +3,7 @@ import {
     useReactTable,
     getCoreRowModel,
     getSortedRowModel,
+    getFilteredRowModel,
     flexRender,
     createColumnHelper,
     type Column
@@ -21,7 +22,8 @@ import {
     TrendingUp,
     Pencil,
     ChevronDown,
-    Check
+    Check,
+    Filter
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -101,6 +103,7 @@ export function WatchlistTable() {
     // Local State
     const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(null);
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [globalFilter, setGlobalFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -317,21 +320,21 @@ export function WatchlistTable() {
 
     const columns = useMemo(() => [
         columnHelper.accessor('symbol', {
-            header: ({ column }) => <SortableHeader column={column} title="Symbol" />,
+            header: ({ column }) => <SortableHeader column={column} title="Ticker" />,
             cell: (info) => (
                 <div className="flex items-center gap-3" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
                     <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
-                    <span className="text-primary font-semibold cursor-pointer hover:underline">{info.getValue()}</span>
+                    <div className="flex flex-col cursor-pointer">
+                        <span className="text-primary font-bold hover:underline">{info.getValue()}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.company}>
+                            {info.row.original.company}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/70 truncate max-w-[150px]">
+                            {info.row.original.sector}
+                        </span>
+                    </div>
                 </div>
             ),
-        }),
-        columnHelper.accessor('company', {
-            header: ({ column }) => <SortableHeader column={column} title="Company" />,
-            cell: (info) => <span className="text-foreground font-medium truncate max-w-[200px] block" title={info.getValue()}>{info.getValue()}</span>,
-        }),
-        columnHelper.accessor('sector', {
-            header: ({ column }) => <SortableHeader column={column} title="Sector" />,
-            cell: (info) => <span className="text-muted-foreground">{info.getValue()}</span>,
         }),
         columnHelper.accessor('price', {
             header: ({ column }) => <SortableHeader column={column} title="Price" />,
@@ -413,8 +416,10 @@ export function WatchlistTable() {
         columns,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
         onSortingChange: setSorting,
-        state: { sorting },
+        onGlobalFilterChange: setGlobalFilter,
+        state: { sorting, globalFilter },
     });
 
     const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && tableData.length === 0);
@@ -479,8 +484,10 @@ export function WatchlistTable() {
                 </div>
             </div>
 
+            {/* Filter & Add Actions */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
+                    {/* Add Ticker */}
                     <div className="relative">
                         {addTickerMutation.isPending ? (
                             <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary w-4 h-4 animate-spin" />
@@ -540,6 +547,18 @@ export function WatchlistTable() {
                         <RefreshCw size={14} className={isRefetching ? "animate-spin" : ""} />
                         Refresh Data
                     </Button>
+                </div>
+
+                {/* Table Filter */}
+                <div className="relative">
+                    <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <input
+                        type="text"
+                        placeholder="Filter list..."
+                        value={globalFilter ?? ''}
+                        onChange={(e) => setGlobalFilter(e.target.value)}
+                        className="h-9 w-48 bg-card border border-border rounded-md pl-9 pr-4 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
+                    />
                 </div>
             </div>
 

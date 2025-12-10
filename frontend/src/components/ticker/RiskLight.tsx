@@ -13,6 +13,7 @@ interface RiskLightProps {
 }
 
 export function RiskLight({ score, reasoning }: RiskLightProps) {
+    // Force cache invalidation
     const getColor = (s: number) => {
         if (s >= 7) return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
         if (s >= 4) return 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]';
@@ -37,7 +38,7 @@ export function RiskLight({ score, reasoning }: RiskLightProps) {
 
             <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger>
                         <div className="cursor-help flex items-center gap-1 bg-background border border-border px-2 py-1 rounded text-xs hover:bg-muted transition-colors">
                             <span className="font-semibold">{getLabel(score)}</span>
                             <Info size={10} className="text-muted-foreground" />

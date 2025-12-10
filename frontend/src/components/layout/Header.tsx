@@ -19,40 +19,41 @@ export function Header() {
 
   return (
     <header className="h-14 border-b border-[#27272a] bg-[#09090b] sticky top-0 z-50">
-      <div className="max-w-[100rem] mx-auto h-full flex items-center justify-between px-6">
-        {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-8">
-          <span className="text-lg font-bold text-white tracking-tight">
+      <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
+        {/* Left: Logo */}
+        <div className="flex items-center">
+          <Link to="/dashboard" className="text-lg font-bold text-white tracking-tight hover:opacity-80 transition-opacity">
             NeuralTicker.com
-          </span>
-
-          <nav className="flex items-center gap-6">
-            <Link
-              to="/dashboard"
-              className={linkClass('/dashboard')}
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/portfolio"
-              className={linkClass('/portfolio')}
-            >
-              My Portfolio
-            </Link>
-            <Link
-              to="/watchlist"
-              className={linkClass('/watchlist')}
-            >
-              My Watchlist
-            </Link>
-            <Link
-              to="/analyzer"
-              className={linkClass('/analyzer')}
-            >
-              Stock Analyzer
-            </Link>
-          </nav>
+          </Link>
         </div>
+
+        {/* Center: Nav */}
+        <nav className="flex items-center gap-8">
+          <Link
+            to="/dashboard"
+            className={linkClass('/dashboard')}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/portfolio"
+            className={linkClass('/portfolio')}
+          >
+            My Portfolio
+          </Link>
+          <Link
+            to="/watchlist"
+            className={linkClass('/watchlist')}
+          >
+            My Watchlist
+          </Link>
+          <Link
+            to="/analyzer"
+            className={linkClass('/analyzer')}
+          >
+            Stock Analyzer
+          </Link>
+        </nav>
 
         {/* Right: alerts + profile */}
         <div className="flex items-center gap-4">
@@ -119,6 +120,6 @@ export function Header() {
           </div>
         </div>
       </div>
-    </header>
+    </header >
   );
 }
