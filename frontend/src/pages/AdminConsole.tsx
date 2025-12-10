@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Plus, ShieldAlert, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 
 type SortConfig = {
@@ -50,7 +50,7 @@ export function AdminConsole() {
             await AdminService.addToUserlist(newEmail);
             setNewEmail('');
             await loadData();
-            (document.getElementById('invite-dialog') as HTMLDialogElement).close();
+            (document.getElementById('invite-dialog') as HTMLDialogElement)?.close();
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             alert((err as any).response?.data?.message || 'Failed to add email');
@@ -87,8 +87,6 @@ export function AdminConsole() {
             alert((err as any).response?.data?.message || 'Failed to approve user');
         }
     };
-
-    // Removed handleReject as it is merged into handleRevoke
 
     // --- Data Processing Pipeline ---
     const processedData = useMemo(() => {
@@ -141,26 +139,29 @@ export function AdminConsole() {
     };
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-white">
-            <Header title="Admin Console" />
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+            <Header />
 
             <main className="container mx-auto px-4 py-8 max-w-7xl">
                 {error && (
-                    <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center gap-2">
+                    <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive flex items-center gap-2">
                         <ShieldAlert size={20} />
                         {error}
                     </div>
                 )}
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                    <div>
-                        <h1 className="text-2xl font-bold">Access Management</h1>
-                        <p className="text-[#a1a1aa] mt-1">Manage users, invites, and waitlist applications</p>
+                    <div className="flex items-center gap-4">
+                        <Shield className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Access Management</h1>
+                            <p className="text-muted-foreground mt-1">Manage users, invites, and waitlist applications</p>
+                        </div>
                     </div>
 
                     <button
-                        onClick={() => document.getElementById('invite-dialog')?.showModal()}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium"
+                        onClick={() => (document.getElementById('invite-dialog') as HTMLDialogElement)?.showModal()}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium shadow-sm"
                     >
                         <Plus size={18} />
                         Invite User
@@ -168,15 +169,15 @@ export function AdminConsole() {
                 </div>
 
                 {/* --- Filters & Search --- */}
-                <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
+                <div className="bg-card border border-border rounded-lg p-4 mb-6 flex flex-col md:flex-row gap-4 shadow-sm">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                         <input
                             type="text"
                             placeholder="Search by email or name..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-zinc-900 border border-zinc-800 text-white text-sm rounded-lg block w-full pl-10 p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                            className="bg-background border border-input text-foreground text-sm rounded-lg block w-full pl-10 p-2.5 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
                         />
                     </div>
                     <div className="flex gap-2">
@@ -185,8 +186,8 @@ export function AdminConsole() {
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === status
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
                                     }`}
                             >
                                 {status.charAt(0) + status.slice(1).toLowerCase()}
@@ -196,22 +197,22 @@ export function AdminConsole() {
                 </div>
 
                 {/* --- Table --- */}
-                <div className="bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden shadow-xl">
+                <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left bg-[#18181b]">
+                        <table className="w-full text-left">
                             <thead>
-                                <tr className="border-b border-[#27272a]">
+                                <tr className="border-b border-border bg-muted/40">
                                     {[
                                         { label: 'User', key: 'email' },
                                         { label: 'Role', key: 'role' },
                                         { label: 'Status', key: 'status' },
-                                        { label: 'Date', key: 'created_at' },
+                                        { label: 'Timestamp', key: 'created_at' },
                                         { label: 'Actions', key: 'actions' }
                                     ].map((head) => (
                                         <th
                                             key={head.key}
                                             onClick={() => head.key !== 'actions' && handleSort(head.key)}
-                                            className={`p-4 text-xs font-medium text-[#a1a1aa] uppercase tracking-wider ${head.key !== 'actions' ? 'cursor-pointer hover:text-white' : ''}`}
+                                            className={`p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider ${head.key !== 'actions' ? 'cursor-pointer hover:text-foreground' : ''}`}
                                         >
                                             <div className="flex items-center gap-1">
                                                 {head.label}
@@ -221,14 +222,14 @@ export function AdminConsole() {
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-[#27272a]">
+                            <tbody className="divide-y divide-border">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-[#52525b]">Loading identities...</td>
+                                        <td colSpan={5} className="p-8 text-center text-muted-foreground animate-pulse">Loading identities...</td>
                                     </tr>
                                 ) : paginatedData.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-[#52525b]">
+                                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
                                             No users found matching your filters.
                                         </td>
                                     </tr>
@@ -238,34 +239,34 @@ export function AdminConsole() {
                                         const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
 
                                         return (
-                                            <tr key={item.email} className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors">
+                                            <tr key={item.email} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                                                 <td className="p-4">
-                                                    {item.full_name && <div className="font-medium text-white">{item.full_name}</div>}
-                                                    <div className="text-xs text-[#a1a1aa] font-mono">{item.email}</div>
+                                                    {item.full_name && <div className="font-medium text-foreground">{item.full_name}</div>}
+                                                    <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border ${item.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                        item.role === 'user' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                            'bg-zinc-800 text-zinc-400 border-zinc-700'
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${item.role === 'admin' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                                        item.role === 'user' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                                            'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
                                                         }`}>
                                                         {item.role || 'GUEST'}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
-                                                    {item.status === 'ADMIN' && <span className="text-purple-400 flex items-center gap-1.5 text-xs font-medium"><ShieldAlert size={14} /> Admin</span>}
-                                                    {item.status === 'ACTIVE' && <span className="text-green-400 flex items-center gap-1.5 text-xs font-medium"><CheckCircle size={14} /> Active</span>}
-                                                    {item.status === 'WAITLIST' && <span className="text-yellow-500 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Waitlist</span>}
-                                                    {item.status === 'INVITED' && <span className="text-blue-400 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Invited</span>}
+                                                    {item.status === 'ADMIN' && <span className="text-purple-500 flex items-center gap-1.5 text-xs font-medium"><ShieldAlert size={14} /> Admin</span>}
+                                                    {item.status === 'ACTIVE' && <span className="text-emerald-500 flex items-center gap-1.5 text-xs font-medium"><CheckCircle size={14} /> Active</span>}
+                                                    {item.status === 'WAITLIST' && <span className="text-orange-500 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</span>}
+                                                    {item.status === 'INVITED' && <span className="text-blue-500 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</span>}
                                                 </td>
-                                                <td className="p-4 text-xs text-[#a1a1aa]">
-                                                    {new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}
+                                                <td className="p-4 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                                                    {new Date(item.created_at || item.invited_at || Date.now()).toLocaleString()}
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-2 justify-end">
                                                         {item.status === 'WAITLIST' && (
                                                             <button
                                                                 onClick={() => handleApprove(item.email)}
-                                                                className="flex items-center gap-1 bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1.5 rounded-md hover:bg-green-500/20 transition-colors text-xs font-medium mr-auto"
+                                                                className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-md hover:bg-emerald-500/20 transition-colors text-xs font-medium mr-auto"
                                                                 title="Approve & Whitelist"
                                                             >
                                                                 <CheckCircle size={14} />
@@ -278,8 +279,8 @@ export function AdminConsole() {
                                                                 disabled={isSelf || isTargetAdmin}
                                                                 title={isSelf ? "Cannot revoke self" : isTargetAdmin ? "Cannot revoke other admins" : item.status === 'WAITLIST' ? "Reject Application" : "Revoke Access"}
                                                                 className={`p-2 rounded-md transition-colors ${isSelf || isTargetAdmin
-                                                                        ? 'text-zinc-600 cursor-not-allowed'
-                                                                        : 'text-[#a1a1aa] hover:text-red-500 hover:bg-red-500/10'
+                                                                    ? 'text-muted-foreground/30 cursor-not-allowed'
+                                                                    : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
                                                                     }`}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
@@ -296,23 +297,23 @@ export function AdminConsole() {
                     </div>
 
                     {/* --- Pagination Controls --- */}
-                    <div className="p-4 border-t border-[#27272a] bg-[#18181b] flex items-center justify-between">
-                        <span className="text-xs text-zinc-500">
+                    <div className="p-4 border-t border-border bg-card flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
                             Showing {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} users
                         </span>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="p-1 rounded hover:bg-zinc-800 disabled:opacity-50 disabled:hover:bg-transparent text-zinc-400"
+                                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent text-muted-foreground"
                             >
                                 <ChevronLeft size={16} />
                             </button>
-                            <span className="text-xs text-zinc-400 flex items-center">Page {currentPage} of {totalPages || 1}</span>
+                            <span className="text-xs text-muted-foreground flex items-center">Page {currentPage} of {totalPages || 1}</span>
                             <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-1 rounded hover:bg-zinc-800 disabled:opacity-50 disabled:hover:bg-transparent text-zinc-400"
+                                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent text-muted-foreground"
                             >
                                 <ChevronRight size={16} />
                             </button>
@@ -322,28 +323,28 @@ export function AdminConsole() {
             </main>
 
             {/* Invite Modal */}
-            <dialog id="invite-dialog" className="bg-[#18181b] text-white p-6 rounded-xl border border-[#27272a] backdrop:bg-black/80">
-                <h3 className="text-lg font-bold mb-4">Invite New User</h3>
+            <dialog id="invite-dialog" className="bg-popover text-popover-foreground p-8 rounded-lg border border-border backdrop:bg-background/80 shadow-2xl w-full max-w-lg">
+                <h3 className="text-xl font-bold mb-6">Invite New User</h3>
                 <form onSubmit={handleAddEmail} method="dialog">
                     <input
                         type="email"
                         value={newEmail}
                         onChange={(e) => setNewEmail(e.target.value)}
                         placeholder="Enter email address"
-                        className="bg-zinc-900 border border-zinc-800 text-white text-sm rounded-lg block w-full p-2.5 mb-4 focus:ring-blue-500 focus:border-blue-500"
+                        className="bg-background border border-input text-foreground text-sm rounded-lg block w-full p-2.5 mb-4 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
                         required
                     />
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
-                            onClick={() => (document.getElementById('invite-dialog') as HTMLDialogElement).close()}
-                            className="text-zinc-400 hover:text-white px-4 py-2"
+                            onClick={() => (document.getElementById('invite-dialog') as HTMLDialogElement)?.close()}
+                            className="text-muted-foreground hover:text-foreground px-4 py-2 text-sm"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
                         >
                             Send Invite
                         </button>
