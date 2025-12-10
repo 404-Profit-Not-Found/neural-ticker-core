@@ -11,7 +11,7 @@ export function Header() {
         {/* Left: Logo + Nav */}
         <div className="flex items-center gap-8">
           <span className="text-lg font-bold text-white tracking-tight">
-            neuralticker.com
+            NeuralTicker.com
           </span>
 
           <nav className="flex items-center gap-6">
