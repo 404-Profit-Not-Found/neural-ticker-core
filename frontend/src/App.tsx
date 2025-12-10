@@ -4,6 +4,7 @@ import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import TickerDetails from './pages/TickerDetails'; // Added
+import { ProfilePage } from './pages/ProfilePage';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -28,6 +29,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <ThemeController />
         <ToastProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -48,6 +50,7 @@ function App() {
               }
             />
             {/* Add more routes here */}
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -58,6 +61,34 @@ function App() {
       </AuthProvider>
     </BrowserRouter>
   );
+}
+
+// Separate component to consume AuthContext inside AuthProvider
+function ThemeController() {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    // Map legacy 'g100' or default to 'dark'
+    let theme = user?.theme || 'dark';
+    if (theme.startsWith('g')) theme = 'dark'; // Fallback for old themes
+    if (!['light', 'dark', 'rgb'].includes(theme)) theme = 'dark';
+
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
+    document.documentElement.classList.add(`theme-${theme}`);
+    
+    // For RGB mode, we might want to ensure dark mode base styles are applied
+    if (theme === 'rgb') {
+       document.documentElement.classList.add('dark');
+    } else if (theme === 'dark') {
+       document.documentElement.classList.add('dark');
+    } else {
+       document.documentElement.classList.remove('dark');
+    }
+
+  }, [user?.theme]);
+
+  return null;
 }
 
 // Simple Callback Handler to refresh user state

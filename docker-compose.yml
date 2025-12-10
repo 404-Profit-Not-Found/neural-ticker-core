@@ -4,7 +4,7 @@ services:
     container_name: neural_ticker_db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       POSTGRES_DB: ${POSTGRES_DB:-neural_ticker}
     ports:

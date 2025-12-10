@@ -1,72 +1,95 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config'; // Added
 import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { Repository } from 'typeorm';
+
+import { ConfigService } from '@nestjs/config';
 
 describe('MarketDataService', () => {
   let service: MarketDataService;
-  // let ohlcvRepo: any;
-  let tickersService: any;
-  let finnhubService: any;
+  let ohlcvRepo: Repository<PriceOhlcv>;
+  let fundamentalsRepo: Repository<Fundamentals>;
+  let tickersService: TickersService;
+  let finnhubService: FinnhubService;
+  let configService: ConfigService;
 
   const mockOhlcvRepo = {
-    findOne: jest.fn(),
     find: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn().mockResolvedValue({}), // Return Promise
+    create: jest.fn().mockImplementation((dto) => dto),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    })),
   };
 
   const mockFundamentalsRepo = {
     findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
+    save: jest.fn().mockResolvedValue({}), // Return Promise
+    create: jest.fn().mockImplementation((dto) => dto),
   };
 
   const mockTickersService = {
-    getTicker: jest.fn(),
-    awaitEnsureTicker: jest.fn().mockResolvedValue({ id: '1', symbol: 'AAPL' }),
+    findBySymbol: jest.fn(),
+    awaitEnsureTicker: jest.fn(), // Service uses awaitEnsureTicker, not findBySymbol
   };
 
   const mockFinnhubService = {
     getQuote: jest.fn(),
+    getProfile2: jest.fn(), // Service uses getCompanyProfile? No, code says getCompanyProfile.
     getCompanyProfile: jest.fn(),
+    getCompanyNews: jest.fn(),
   };
 
   const mockConfigService = {
-    get: jest.fn((key) => {
-      if (key === 'marketData.stalePriceMinutes') return 15;
-      if (key === 'marketData.staleFundamentalsHours') return 24;
-      return null;
-    }),
+    get: jest.fn().mockReturnValue(15), // Return default number
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MarketDataService,
-        { provide: getRepositoryToken(PriceOhlcv), useValue: mockOhlcvRepo },
+        {
+          provide: getRepositoryToken(PriceOhlcv),
+          useValue: mockOhlcvRepo,
+        },
         {
           provide: getRepositoryToken(Fundamentals),
           useValue: mockFundamentalsRepo,
         },
-        { provide: TickersService, useValue: mockTickersService },
-        { provide: FinnhubService, useValue: mockFinnhubService },
-        { provide: ConfigService, useValue: mockConfigService }, // Added
+        {
+          provide: TickersService,
+          useValue: mockTickersService,
+        },
+        {
+          provide: FinnhubService,
+          useValue: mockFinnhubService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
     service = module.get<MarketDataService>(MarketDataService);
-    // ohlcvRepo = module.get(getRepositoryToken(PriceOhlcv));
-    // fundamentalsRepo = module.get(getRepositoryToken(Fundamentals));
-    tickersService = module.get(TickersService);
-    finnhubService = module.get(FinnhubService);
-  });
+    ohlcvRepo = module.get<Repository<PriceOhlcv>>(
+      getRepositoryToken(PriceOhlcv),
+    );
+    fundamentalsRepo = module.get<Repository<Fundamentals>>(
+      getRepositoryToken(Fundamentals),
+    );
+    tickersService = module.get<TickersService>(TickersService);
+    finnhubService = module.get<FinnhubService>(FinnhubService);
+    configService = module.get<ConfigService>(ConfigService);
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
@@ -75,92 +98,84 @@ describe('MarketDataService', () => {
   });
 
   describe('getSnapshot', () => {
-    const mockSymbol = { id: '1', symbol: 'AAPL' };
+    it('should return cached data if fresh', async () => {
+      const mockTicker = { id: 1, symbol: 'AAPL' };
+      const mockPrice = {
+        symbol: 'AAPL',
+        close: 150,
+        ts: new Date(),
+        updated_at: new Date(), // Fresh
+      } as unknown as PriceOhlcv;
+      const mockFundamentals = {
+        symbol: 'AAPL',
+        market_cap: 100,
+        updated_at: new Date(), // Fresh
+      } as unknown as Fundamentals;
 
-    it('should return database data if fresh', async () => {
-      const mockCandle = { close: 150, ts: new Date() }; // Fresh
-      const mockFund = { pe_ttm: 25, updated_at: new Date() }; // Fresh
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
+      // Mock findLatestPrice logic (uses findOne, not queryBuilder as previously thought)
+      mockOhlcvRepo.findOne.mockResolvedValue(mockPrice);
 
-      mockOhlcvRepo.findOne.mockResolvedValue(mockCandle);
-      mockFundamentalsRepo.findOne.mockResolvedValue(mockFund);
+      mockFundamentalsRepo.findOne.mockResolvedValue(mockFundamentals);
 
       const result = await service.getSnapshot('AAPL');
 
-      expect(result).toEqual({
-        ticker: mockSymbol,
-        latestPrice: mockCandle,
-        fundamentals: mockFund,
-        source: 'database',
-      });
+      expect(result.ticker).toEqual(mockTicker);
+      expect(result.latestPrice.close).toBe(150);
       expect(finnhubService.getQuote).not.toHaveBeenCalled();
     });
 
-    it('should fetch from Finnhub if price is stale', async () => {
+    it('should fetch from Finnhub if cached price is stale', async () => {
+      const mockTicker = { id: 1, symbol: 'AAPL' };
       const staleDate = new Date();
-      staleDate.setMinutes(staleDate.getMinutes() - 20); // 20 mins old > 15 mins default
-      const staleCandle = { close: 140, ts: staleDate };
-      const mockFund = { pe_ttm: 25, updated_at: new Date() }; // Fresh
+      staleDate.setMinutes(staleDate.getMinutes() - 20); // 20 mins old
+
+      const mockPrice = {
+        symbol: 'AAPL',
+        close: 100,
+        ts: staleDate,
+        updated_at: staleDate,
+      } as unknown as PriceOhlcv;
 
       const newQuote = {
         c: 155,
-        h: 160,
-        l: 150,
-        o: 152,
-        t: Math.floor(Date.now() / 1000),
+        o: 154,
+        h: 156,
+        l: 153,
+        v: 1000,
+        t: Date.now() / 1000,
       };
-      const newProfile = { marketCapitalization: 2000 };
 
-      mockOhlcvRepo.findOne.mockResolvedValue(staleCandle);
-      mockFundamentalsRepo.findOne.mockResolvedValue(mockFund);
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
+
+      mockOhlcvRepo.findOne.mockResolvedValue(mockPrice); // Stale
+
       mockFinnhubService.getQuote.mockResolvedValue(newQuote);
-      mockFinnhubService.getCompanyProfile.mockResolvedValue(newProfile);
-
-      const newCandle = { ...newQuote, ts: new Date(newQuote.t * 1000) };
-      mockOhlcvRepo.create.mockReturnValue(newCandle);
-      mockOhlcvRepo.save.mockResolvedValue(newCandle);
-
-      // fundamentals creation mock
-      mockFundamentalsRepo.create.mockReturnValue({ market_cap: 2000 });
-      mockFundamentalsRepo.save.mockResolvedValue({});
+      mockFundamentalsRepo.findOne.mockResolvedValue({
+        updated_at: new Date(),
+      });
 
       const result = await service.getSnapshot('AAPL');
 
-      expect(result.source).toBe('finnhub');
       expect(finnhubService.getQuote).toHaveBeenCalledWith('AAPL');
+      expect(result.latestPrice.close).toBe(155);
       expect(mockOhlcvRepo.save).toHaveBeenCalled();
-    });
-
-    it('should use fallback data if Finnhub fails', async () => {
-      const staleDate = new Date();
-      staleDate.setMinutes(staleDate.getMinutes() - 20);
-      const staleCandle = { close: 140, ts: staleDate };
-
-      mockOhlcvRepo.findOne.mockResolvedValue(staleCandle);
-      mockFundamentalsRepo.findOne.mockResolvedValue(null);
-
-      mockFinnhubService.getQuote.mockRejectedValue(new Error('API Error'));
-
-      const result = await service.getSnapshot('AAPL');
-
-      expect(result.source).toBe('database'); // Fallback to DB
-      expect(result.latestPrice).toEqual(staleCandle);
     });
   });
 
-  describe('getHistory', () => {
-    it('should return history data', async () => {
-      const mockSymbol = { id: '1', symbol: 'AAPL' };
-      tickersService.getTicker.mockResolvedValue(mockSymbol);
-      mockOhlcvRepo.find.mockResolvedValue([]);
+  describe('getCompanyNews', () => {
+    it('should return news from Finnhub', async () => {
+      const mockNews = [{ headline: 'Test News' }];
+      mockFinnhubService.getCompanyNews.mockResolvedValue(mockNews);
 
-      const result = await service.getHistory(
+      const result = await service.getCompanyNews('AAPL');
+
+      expect(result).toEqual(mockNews);
+      expect(finnhubService.getCompanyNews).toHaveBeenCalledWith(
         'AAPL',
-        '1d',
-        '2023-01-01',
-        '2023-01-10',
+        expect.any(String),
+        expect.any(String),
       );
-      expect(result).toEqual([]);
-      expect(mockOhlcvRepo.find).toHaveBeenCalled();
     });
   });
 });

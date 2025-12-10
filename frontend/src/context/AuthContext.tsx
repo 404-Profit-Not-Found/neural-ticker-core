@@ -5,6 +5,9 @@ interface User {
     id: string;
     email: string;
     name: string;
+    nickname?: string;
+    view_mode?: string;
+    theme?: string;
     role: string;
     avatar: string;
 }
@@ -51,19 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const loginWithDevToken = async (email: string) => {
         try {
             // Use httpClient for auth endpoints
-            const { data } = await httpClient.post('/auth/dev/token', { email });
+            const { data } = await httpClient.post('/api/auth/dev/token', { email });
             console.log('Dev token received:', data);
             await checkSession();
         } catch (error) {
-            console.error('Login failed', error);
+            console.log('Login failed', error);
             throw error;
         }
     };
 
-    const logout = () => {
-        // Ideally call logout endpoint to clear cookie
+    const logout = async () => {
+        try {
+            // Call backend logout to clear cookie
+            await httpClient.post('/api/auth/logout');
+        } catch (e) {
+            console.warn('Logout endpoint failed:', e);
+        }
+        // Clear local state
         setUser(null);
-        // document.cookie = ... (clearing)
+        // Redirect to login
+        window.location.href = '/';
     };
 
     return (

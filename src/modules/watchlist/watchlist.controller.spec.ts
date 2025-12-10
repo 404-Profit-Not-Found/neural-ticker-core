@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { WatchlistController } from './watchlist.controller';
 import { WatchlistService } from './watchlist.service';
@@ -12,6 +11,7 @@ describe('WatchlistController', () => {
     createWatchlist: jest.fn(),
     addTickerToWatchlist: jest.fn(),
     removeItemFromWatchlist: jest.fn(),
+    deleteWatchlist: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -69,6 +69,14 @@ describe('WatchlistController', () => {
         'list-1',
         'ticker-1',
       );
+    });
+  });
+
+  describe('deleteWatchlist', () => {
+    it('should call service', async () => {
+      const req = { user: { id: 'user-1', uid: 'user-1' } };
+      await controller.deleteWatchlist(req, 'list-1');
+      expect(service.deleteWatchlist).toHaveBeenCalledWith('user-1', 'list-1');
     });
   });
 });

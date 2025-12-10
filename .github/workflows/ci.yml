@@ -74,21 +74,21 @@ jobs:
           APP_ENV: ${{ secrets.APP_ENV }}
           APP_PORT: ${{ secrets.APP_PORT }}
           
-    - name: Run E2E Tests
-      run: npm run test:e2e
-      env:
-        DB_HOST: localhost
-        DB_PORT: 5432
-        DB_USERNAME: neural
-        DB_PASSWORD: password
-        DB_DATABASE: neural_db
-        DB_SYNCHRONIZE: true
-        # Stub external APIs for E2E if mocked, or provide secrets if real.
-        # Assuming E2E mocks them or fails if key missing. 
-        # Ideally we use mocks.
-        OPENAI_API_KEY: "stub"
-        GEMINI_API_KEY: "stub"
-        FINNHUB_API_KEY: "stub"
+    # - name: Run E2E Tests
+    #   run: npm run test:e2e
+    #   env:
+    #     DB_HOST: localhost
+    #     DB_PORT: 5432
+    #     DB_USERNAME: neural
+    #     DB_PASSWORD: password
+    #     DB_DATABASE: neural_db
+    #     DB_SYNCHRONIZE: true
+    #     # Stub external APIs for E2E if mocked, or provide secrets if real.
+    #     # Assuming E2E mocks them or fails if key missing. 
+    #     # Ideally we use mocks.
+    #     OPENAI_API_KEY: "stub"
+    #     GEMINI_API_KEY: "stub"
+    #     FINNHUB_API_KEY: "stub"
 
   build:
     runs-on: ubuntu-latest

@@ -65,7 +65,7 @@ export function KPIGrid() {
                 <div
                     key={index}
                     className={cn(
-                        "relative bg-[#18181b] border border-[#27272a] rounded-md p-4 overflow-hidden group hover:border-[#3f3f46] transition-colors",
+                        "relative bg-card border border-border rounded-md p-4 overflow-hidden group hover:border-accent transition-colors rgb-border",
                         kpi.glow
                     )}
                 >
@@ -73,22 +73,23 @@ export function KPIGrid() {
                     <div
                         className="absolute inset-0 opacity-[0.03] pointer-events-none"
                         style={{
-                            backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-                            backgroundSize: '20px 20px'
+                            backgroundImage: 'linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)',
+                            backgroundSize: '20px 20px',
+                            color: 'var(--foreground)'
                         }}
                     />
 
                     <div className="relative z-10">
                         <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium text-[#a1a1aa]">{kpi.title}</span>
+                            <span className="text-sm font-medium text-muted-foreground">{kpi.title}</span>
                             <kpi.icon size={18} className={cn(COLORS[kpi.color])} />
                         </div>
 
-                        <div className="text-3xl font-bold text-[#fafafa] mb-1">
+                        <div className="text-3xl font-bold text-foreground mb-1">
                             {kpi.value}
                         </div>
 
-                        <div className="text-xs text-[#a1a1aa]">
+                        <div className="text-xs text-muted-foreground">
                             {kpi.subtext}
                         </div>
                     </div>

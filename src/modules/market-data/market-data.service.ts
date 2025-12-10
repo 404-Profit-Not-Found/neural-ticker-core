@@ -137,6 +137,28 @@ export class MarketDataService {
     };
   }
 
+  async getSnapshots(symbols: string[]) {
+    // Limit concurrency to avoid overwhelming Finnhub if we have many misses
+    const validSymbols = symbols.filter((s) => s && s.trim().length > 0);
+    const uniqueSymbols = [...new Set(validSymbols)];
+
+    // We can run these in parallel since they are internal calls
+    // However, if we possess a large list, we might want to chunk them.
+    // For now, assuming watchlist size < 50, Promise.all is fine.
+    const results = await Promise.all(
+      uniqueSymbols.map((symbol) =>
+        this.getSnapshot(symbol).catch((e) => {
+          this.logger.error(
+            `Failed to get snapshot for ${symbol}: ${e.message}`,
+          );
+          return { symbol, error: e.message }; // Return error object to keep index alignment or just filter later
+        }),
+      ),
+    );
+
+    return results;
+  }
+
   async getHistory(
     symbol: string,
     interval: string,

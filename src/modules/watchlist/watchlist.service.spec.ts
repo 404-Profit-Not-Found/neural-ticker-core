@@ -14,6 +14,7 @@ describe('WatchlistService', () => {
     save: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    softRemove: jest.fn(),
   };
 
   const mockItemRepo = {
@@ -154,6 +155,32 @@ describe('WatchlistService', () => {
       await expect(service.removeHighLevelItem('u', 'i')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('deleteWatchlist', () => {
+    it('should delete watchlist and its items', async () => {
+      const userId = 'user-1';
+      const watchlistId = 'list-1';
+      const mockList = { id: watchlistId, user_id: userId };
+
+      mockWatchlistRepo.findOne.mockResolvedValue(mockList);
+      mockItemRepo.delete.mockResolvedValue({ affected: 1 });
+      mockWatchlistRepo.softRemove.mockResolvedValue(mockList);
+
+      await service.deleteWatchlist(userId, watchlistId);
+
+      expect(mockItemRepo.delete).toHaveBeenCalledWith({
+        watchlist_id: watchlistId,
+      });
+      expect(mockWatchlistRepo.softRemove).toHaveBeenCalledWith(mockList);
+    });
+
+    it('should throw if watchlist not found', async () => {
+      mockWatchlistRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.deleteWatchlist('user-1', 'missing'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
