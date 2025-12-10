@@ -17,6 +17,7 @@ describe('AuthService', () => {
   const mockUsersService = {
     findByEmail: jest.fn(),
     createOrUpdateGoogleUser: jest.fn(),
+    isEmailAllowed: jest.fn().mockResolvedValue(true),
   };
 
   const mockJwtService = {

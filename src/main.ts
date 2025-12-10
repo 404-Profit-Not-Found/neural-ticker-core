@@ -12,8 +12,6 @@ async function bootstrap() {
   app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
 
-
-
   // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
   app.getHttpAdapter().getInstance().set('etag', false);
 

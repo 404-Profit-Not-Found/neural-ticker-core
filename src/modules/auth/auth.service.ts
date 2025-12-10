@@ -36,8 +36,12 @@ export class AuthService {
     // Access Control: Check Whitelist
     const isAllowed = await this.usersService.isEmailAllowed(email);
     if (!isAllowed) {
-      this.logger.warn(`Login attempt blocked for non-whitelisted email: ${email}`);
-      throw new UnauthorizedException('Access Denied: You are not on the invite list.');
+      this.logger.warn(
+        `Login attempt blocked for non-whitelisted email: ${email}`,
+      );
+      throw new UnauthorizedException(
+        'Access Denied: You are not on the invite list.',
+      );
     }
 
     const user = await this.usersService.createOrUpdateGoogleUser({
