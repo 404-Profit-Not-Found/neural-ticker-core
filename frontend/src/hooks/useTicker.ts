@@ -136,6 +136,7 @@ export function useTickerResearch(symbol?: string) {
             if (!symbol) return null;
             const res = await api.get('/research');
             // Client side filtering for latest completed
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const relevant = res.data?.data?.find((t: any) => t.tickers.includes(symbol) && t.status === 'completed');
             return relevant || null;
         },

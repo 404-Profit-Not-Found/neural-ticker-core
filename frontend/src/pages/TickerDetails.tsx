@@ -26,6 +26,21 @@ import {
     useTriggerResearch
 } from '../hooks/useTicker';
 
+interface NewsItem {
+    url: string;
+    headline: string;
+    source: string;
+    datetime: number;
+    summary: string;
+}
+
+interface SocialComment {
+    id: string;
+    user?: { email: string };
+    created_at: string;
+    content: string;
+}
+
 export default function TickerDetails() {
     const { symbol } = useParams();
     const navigate = useNavigate();
@@ -46,17 +61,19 @@ export default function TickerDetails() {
     const [newComment, setNewComment] = useState("");
     const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
     const [isPolling, setIsPolling] = useState(false);
-    const [pollResult, setPollResult] = useState<any>(null); // To store result from immediate poll
+    const [pollResult, setPollResult] = useState<unknown>(null); // To store result from immediate poll
+
 
     // -- Polling Logic for Research --
     useEffect(() => {
         if (!activeTicketId) return;
-        setIsPolling(true);
+        // Moved setIsPolling(true) to trigger handler to avoid sync state update in effect
 
         const interval = setInterval(async () => {
             try {
                 const res = await api.get(`/research/${activeTicketId}`);
-                const ticket = res.data;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const ticket = res.data as any;
                 console.log("Polling ticket:", ticket.status);
 
                 if (ticket.status === 'completed') {
@@ -85,6 +102,7 @@ export default function TickerDetails() {
             onSuccess: (data) => {
                 console.log("Research started, ticket:", data);
                 setActiveTicketId(data.id);
+                setIsPolling(true); // Start polling UI state
             },
             onError: () => alert("Failed to start research")
         });
@@ -111,6 +129,7 @@ export default function TickerDetails() {
         return <div className="p-8 text-foreground">Ticker not found.</div>;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { ticker, latestPrice, fundamentals, watchers } = tickerData as any;
     const price = latestPrice?.close || 0;
     const change = latestPrice?.close && latestPrice?.prevClose
@@ -247,7 +266,7 @@ export default function TickerDetails() {
 
                     {activeTab === 'news' && (
                         <div className="space-y-4">
-                            {news.length > 0 ? news.map((item: any, idx: number) => (
+                            {news.length > 0 ? news.map((item: NewsItem, idx: number) => (
                                 <div key={idx} className="p-4 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors rgb-border">
                                     <a href={item.url} target="_blank" rel="noreferrer" className="block">
                                         <h4 className="font-medium text-primary hover:underline mb-1">{item.headline}</h4>
@@ -280,7 +299,7 @@ export default function TickerDetails() {
 
                             {/* Comments List */}
                             <div className="space-y-4">
-                                {comments.map((comment: any) => (
+                                {comments.map((comment: SocialComment) => (
                                     <div key={comment.id} className="p-4 rounded-lg bg-card border border-border rgb-border">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="font-semibold text-sm text-primary">{comment.user?.email || "User"}</div>

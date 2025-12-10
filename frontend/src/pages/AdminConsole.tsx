@@ -27,8 +27,10 @@ export function AdminConsole() {
                 const data = await AdminService.getUserlist();
                 setUserlist(data);
             }
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to load data');
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to load data';
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -41,8 +43,9 @@ export function AdminConsole() {
             await AdminService.addToUserlist(newEmail);
             setNewEmail('');
             await loadData();
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to add email');
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert((err as any).response?.data?.message || 'Failed to add email');
         }
     };
 
@@ -51,8 +54,9 @@ export function AdminConsole() {
         try {
             await AdminService.revokeAccess(email);
             await loadData();
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to revoke access');
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert((err as any).response?.data?.message || 'Failed to revoke access');
         }
     };
 

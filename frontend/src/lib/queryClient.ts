@@ -1,11 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
-import type { PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
+import type { PersistQueryClientOptions, PersistedClient } from '@tanstack/react-query-persist-client';
 import { get, set, del } from 'idb-keyval';
 
 // 1. Create a custom persister using idb-keyval
 export const createIDBPersister = (key: string = 'REACT_QUERY_OFFLINE_CACHE') => {
   return {
-    persistClient: async (client: any) => {
+    persistClient: async (client: PersistedClient) => {
       await set(key, client);
     },
     restoreClient: async () => {

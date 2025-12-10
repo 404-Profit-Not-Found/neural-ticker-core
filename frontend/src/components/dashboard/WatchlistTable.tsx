@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
     getSortedRowModel,
     flexRender,
-    createColumnHelper
+    createColumnHelper,
+    type Column
 } from '@tanstack/react-table';
 import type { SortingState } from '@tanstack/react-table';
 import {
@@ -40,6 +41,13 @@ import {
 
 // --- Types ---
 
+interface TickerSearchResult {
+    symbol: string;
+    logo_url: string;
+    exchange: string;
+    name: string;
+}
+
 interface TickerData {
     symbol: string;
     logo?: string;
@@ -57,6 +65,31 @@ interface TickerData {
 
 import { TickerLogo } from './TickerLogo';
 
+
+interface MarketSnapshot {
+    ticker: { symbol: string; logo_url?: string; name?: string; id: string };
+    latestPrice?: { close: number; prevClose?: number };
+    fundamentals?: {
+        sector?: string;
+        pe_ttm?: number;
+        market_cap?: number;
+        dividend_yield?: number;
+        beta?: number;
+    };
+}
+
+
+// Move SortableHeader outside component to prevent re-creation on every render
+const SortableHeader = ({ column, title }: { column: Column<TickerData, unknown>, title: string }) => (
+    <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="p-0 hover:bg-transparent font-medium"
+    >
+        {title}
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+    </Button>
+);
 
 export function WatchlistTable() {
     const navigate = useNavigate();
@@ -107,7 +140,7 @@ export function WatchlistTable() {
         watchlists.find(w => w.id === activeWatchlistId),
         [watchlists, activeWatchlistId]);
 
-    const watchlistItems = activeWatchlist?.items || [];
+    const watchlistItems = useMemo(() => activeWatchlist?.items || [], [activeWatchlist]);
     const symbols = useMemo(() => watchlistItems.map(i => i.ticker.symbol), [watchlistItems]);
 
     // -- Market Data Query --
@@ -126,8 +159,8 @@ export function WatchlistTable() {
         if (!activeWatchlist) return [];
 
         return snapshotData
-            .filter((s: any) => s && s.ticker)
-            .map((s: any) => {
+            .filter((s: MarketSnapshot) => s && s.ticker)
+            .map((s: MarketSnapshot) => {
                 const price = Number(s.latestPrice?.close || 0);
                 const prevClose = Number(s.latestPrice?.prevClose || price);
                 const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -189,7 +222,7 @@ export function WatchlistTable() {
         });
     };
 
-    const handleRemoveTicker = (symbol: string) => {
+    const handleRemoveTicker = useCallback((symbol: string) => {
         if (!activeWatchlistId || !activeWatchlist) return;
         const item = activeWatchlist.items.find(i => i.ticker.symbol === symbol);
         if (!item) return;
@@ -198,7 +231,7 @@ export function WatchlistTable() {
             onSuccess: () => showToast(`${symbol} removed`, 'success'),
             onError: () => showToast("Failed to remove ticker", 'error')
         });
-    };
+    }, [activeWatchlistId, activeWatchlist, removeTickerMutation, showToast]);
 
     const selectSuggestion = (symbol: string) => {
         if (!activeWatchlistId) {
@@ -220,8 +253,9 @@ export function WatchlistTable() {
                 setSearchTerm('');
                 setShowSuggestions(false);
             },
-            onError: (err: any) => {
-                const msg = err.response?.data?.message || "Failed to add ticker";
+            onError: (err: unknown) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const msg = (err as any).response?.data?.message || "Failed to add ticker";
                 showToast(msg, 'error');
             }
         });
@@ -280,16 +314,6 @@ export function WatchlistTable() {
 
     // -- Table Setup --
     const columnHelper = createColumnHelper<TickerData>();
-    const SortableHeader = ({ column, title }: { column: any, title: string }) => (
-        <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="p-0 hover:bg-transparent font-medium"
-        >
-            {title}
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-    );
 
     const columns = useMemo(() => [
         columnHelper.accessor('symbol', {
@@ -479,7 +503,7 @@ export function WatchlistTable() {
                                 ref={suggestionsRef}
                                 className="absolute top-full left-0 mt-1 w-80 bg-card border border-border rounded-md shadow-lg z-50 py-1 max-h-64 overflow-y-auto"
                             >
-                                {searchTickerQuery.data?.map((s: any, idx: number) => (
+                                {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
                                     <button
                                         key={s.symbol}
                                         onClick={() => selectSuggestion(s.symbol)}
