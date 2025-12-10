@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { testTypeOrmConfig } from './database/typeorm.test.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static'; // Added
@@ -56,28 +57,32 @@ import configuration from './config/configuration';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const dbConfig = configService.get('database');
-        return {
-          type: 'postgres',
-          url: dbConfig.url,
-          host: dbConfig.host || 'localhost',
-          port: dbConfig.port || 5432,
-          username: dbConfig.username || 'postgres',
-          // Only include password if set; undefined breaks SCRAM if url has password
-          ...(dbConfig.password ? { password: dbConfig.password } : {}),
-          database: dbConfig.database || 'postgres',
-          autoLoadEntities: true,
-          synchronize: dbConfig.synchronize,
-          connectTimeoutMS: 10000,
-          ssl:
-            process.env.DB_SSL === 'false'
-              ? false
-              : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
-                  process.env.DB_SSL === 'true'
-                ? { rejectUnauthorized: false }
-                : false, // Default to false if not explicitly required
-        };
-      },
+  if (process.env.NODE_ENV === 'test') {
+    return testTypeOrmConfig;
+  }
+  const dbConfig = configService.get('database');
+  return {
+    type: 'postgres',
+    url: dbConfig.url,
+    host: dbConfig.host || 'localhost',
+    port: dbConfig.port || 5432,
+    username: (process.env.DB_USERNAME ?? process.env.POSTGRES_USER ?? 'admin'),
+    ...(dbConfig.password ? { password: dbConfig.password } : {}),
+    database: dbConfig.database || 'postgres',
+    autoLoadEntities: true,
+    synchronize: dbConfig.synchronize,
+    connectTimeoutMS: 10000,
+    ssl:
+      process.env.DB_SSL === 'false'
+        ? false
+        : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
+          process.env.DB_SSL === 'true'
+        ? { rejectUnauthorized: false }
+        : false,
+  };
+},
+
+
     }),
     HealthModule,
     FinnhubModule,
