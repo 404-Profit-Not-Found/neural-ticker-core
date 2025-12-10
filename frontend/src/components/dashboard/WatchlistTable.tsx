@@ -573,6 +573,7 @@ export function WatchlistTable() {
                                     onClick={() => handleDeleteList(activeWatchlistId)}
                                     className="h-8 w-8 text-[#a1a1aa] hover:text-red-500"
                                     title="Delete Watchlist"
+                                    aria-label="Delete Watchlist"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </Button>

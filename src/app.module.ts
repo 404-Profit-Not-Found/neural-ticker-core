@@ -63,7 +63,8 @@ import configuration from './config/configuration';
           host: dbConfig.host || 'localhost',
           port: dbConfig.port || 5432,
           username: dbConfig.username || 'postgres',
-          password: dbConfig.password, // Let undefined be undefined if not set, pg handles it if url is present
+          // Only include password if set; undefined breaks SCRAM if url has password
+          ...(dbConfig.password ? { password: dbConfig.password } : {}),
           database: dbConfig.database || 'postgres',
           autoLoadEntities: true,
           synchronize: dbConfig.synchronize,
