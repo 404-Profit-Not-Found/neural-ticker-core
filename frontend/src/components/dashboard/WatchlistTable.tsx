@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
@@ -40,7 +40,8 @@ import {
     useAddTickerToWatchlist,
     useRemoveTickerFromWatchlist,
     useMarketSnapshots,
-    useTickerSearch
+    useTickerSearch,
+    type WatchlistItem
 } from '../../hooks/useWatchlist';
 
 // --- Types ---
@@ -65,10 +66,10 @@ interface TickerData {
     beta: number | null;
     rating: string;
     growthRank: number;
+    itemId?: string;
 }
 
 import { TickerLogo } from './TickerLogo';
-
 
 interface MarketSnapshot {
     ticker: { symbol: string; logo_url?: string; name?: string; id: string };
@@ -82,6 +83,11 @@ interface MarketSnapshot {
     };
 }
 
+// Constant empty arrays to prevent reference changes and infinite loops
+const EMPTY_SYMBOLS: string[] = [];
+const EMPTY_ITEMS: WatchlistItem[] = [];
+const EMPTY_TABLE_DATA: TickerData[] = [];
+const EMPTY_SECTORS: string[] = [];
 
 // Move SortableHeader outside component to prevent re-creation on every render
 const SortableHeader = ({ column, title }: { column: Column<TickerData, unknown>, title: string }) => (
@@ -113,11 +119,12 @@ export function WatchlistTable() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
 
+    // Debounce search term to avoid excessive API calls
+    const deferredSearchTerm = useDeferredValue(searchTerm);
+
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const sectorFilterRef = useRef<HTMLDivElement>(null);
 
     // -- Mutations --
     const createListMutation = useCreateWatchlist();
@@ -125,11 +132,13 @@ export function WatchlistTable() {
     const renameListMutation = useRenameWatchlist();
     const addTickerMutation = useAddTickerToWatchlist();
     const removeTickerMutation = useRemoveTickerFromWatchlist();
-    const searchTickerQuery = useTickerSearch(searchTerm);
+    const searchTickerQuery = useTickerSearch(deferredSearchTerm);
 
     // -- Derived State --
     // Auto-select first watchlist if none selected
     useEffect(() => {
+        if (isLoadingWatchlists) return;
+
         if (!activeWatchlistId && watchlists.length > 0) {
             setActiveWatchlistId(watchlists[0].id);
         } else if (activeWatchlistId && watchlists.length > 0) {
@@ -138,21 +147,30 @@ export function WatchlistTable() {
             if (!exists) {
                 setActiveWatchlistId(watchlists[0].id);
             }
-        } else if (watchlists.length === 0 && !isLoadingWatchlists) {
-            // Create default if completely empty? Or just let user create one.
-            // We'll leave it empty for now, or could trigger a create.
         }
     }, [watchlists, activeWatchlistId, isLoadingWatchlists]);
 
-    const activeWatchlist = useMemo(() =>
-        watchlists.find(w => w.id === activeWatchlistId),
-        [watchlists, activeWatchlistId]);
+    const activeWatchlist = useMemo(() => {
+        if (!watchlists || watchlists.length === 0) return null;
+        return watchlists.find(w => w.id === activeWatchlistId) || null;
+    }, [watchlists, activeWatchlistId]);
 
-    const watchlistItems = useMemo(() => activeWatchlist?.items || [], [activeWatchlist]);
-    const symbols = useMemo(() => watchlistItems.map(i => i.ticker.symbol), [watchlistItems]);
+    const watchlistItems = useMemo(() => {
+        if (!activeWatchlist || !activeWatchlist.items) return EMPTY_ITEMS;
+        return Array.isArray(activeWatchlist.items) ? activeWatchlist.items : EMPTY_ITEMS;
+    }, [activeWatchlist?.items]);
+
+    const symbols = useMemo(() => {
+        if (!watchlistItems || watchlistItems.length === 0) return EMPTY_SYMBOLS;
+        const filtered = watchlistItems
+            .filter(i => i && i.ticker && i.ticker.symbol)
+            .map(i => i.ticker.symbol);
+        // Return EMPTY_SYMBOLS if no symbols to maintain reference stability
+        return filtered.length === 0 ? EMPTY_SYMBOLS : filtered;
+    }, [watchlistItems]);
 
     // -- Market Data Query --
-    const { data: snapshotData = [], isLoading: isLoadingSnapshots, refetch: refetchSnapshots, isRefetching } = useMarketSnapshots(symbols);
+    const { data: snapshotData, isLoading: isLoadingSnapshots, refetch: refetchSnapshots, isRefetching } = useMarketSnapshots(symbols);
 
     // -- Map Data --
     const formatMarketCap = (value: number) => {
@@ -164,10 +182,10 @@ export function WatchlistTable() {
     };
 
     const tableData = useMemo<TickerData[]>(() => {
-        if (!activeWatchlist) return [];
+        if (!activeWatchlist || !snapshotData || !Array.isArray(snapshotData)) return EMPTY_TABLE_DATA;
 
         return snapshotData
-            .filter((s: MarketSnapshot) => !!s && !!s.ticker)
+            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
             .map((s: MarketSnapshot) => {
                 const price = Number(s.latestPrice?.close || 0);
                 const prevClose = Number(s.latestPrice?.prevClose || price);
@@ -186,19 +204,21 @@ export function WatchlistTable() {
                     divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
                     beta: fundamentals.beta ?? null,
                     rating: 'Hold',
-                    growthRank: 5
+                    growthRank: 5,
+                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id
                 };
             });
-    }, [snapshotData, activeWatchlist]);
+    }, [snapshotData, activeWatchlist, watchlistItems]);
 
     const uniqueSectors = useMemo(() => {
-        const sectors = new Set(tableData.map(d => d.sector));
+        if (!tableData || tableData.length === 0) return EMPTY_SECTORS;
+        const sectors = new Set(tableData.filter(d => d && d.sector).map(d => d.sector));
         return Array.from(sectors).sort();
     }, [tableData]);
 
     // -- Handlers --
 
-    const handleCreateList = () => {
+    const handleCreateList = useCallback(() => {
         const name = prompt("Enter new watchlist name:", "New Watchlist");
         if (name) {
             createListMutation.mutate(name, {
@@ -208,9 +228,9 @@ export function WatchlistTable() {
                 }
             });
         }
-    };
+    }, [createListMutation, showToast]);
 
-    const handleRenameList = () => {
+    const handleRenameList = useCallback(() => {
         if (!activeWatchlistId || !activeWatchlist) return;
         const newName = prompt("Rename watchlist:", activeWatchlist.name);
         if (newName && newName !== activeWatchlist.name) {
@@ -218,9 +238,9 @@ export function WatchlistTable() {
                 onSuccess: () => showToast("Watchlist renamed", 'success')
             });
         }
-    };
+    }, [activeWatchlistId, activeWatchlist, renameListMutation, showToast]);
 
-    const handleDeleteList = (watchlistId: string) => {
+    const handleDeleteList = useCallback((watchlistId: string) => {
         const list = watchlists.find((w) => w.id === watchlistId);
         if (!list) return;
 
@@ -233,27 +253,25 @@ export function WatchlistTable() {
                 // Effect will handle active ID switch
             }
         });
-    };
+    }, [watchlists, deleteListMutation, showToast]);
 
-    const handleRemoveTicker = useCallback((symbol: string) => {
-        if (!activeWatchlistId || !activeWatchlist) return;
-        const item = activeWatchlist.items.find(i => i.ticker.symbol === symbol);
-        if (!item) return;
+    const handleRemoveTicker = useCallback((itemId: string, symbol: string) => {
+        if (!activeWatchlistId) return;
 
-        removeTickerMutation.mutate({ watchlistId: activeWatchlistId, itemId: item.ticker.id }, {
+        removeTickerMutation.mutate({ watchlistId: activeWatchlistId, itemId }, {
             onSuccess: () => showToast(`${symbol} removed`, 'success'),
             onError: () => showToast("Failed to remove ticker", 'error')
         });
-    }, [activeWatchlistId, activeWatchlist, removeTickerMutation, showToast]);
+    }, [activeWatchlistId, removeTickerMutation, showToast]);
 
-    const selectSuggestion = (symbol: string) => {
+    const selectSuggestion = useCallback((symbol: string) => {
         if (!activeWatchlistId) {
             showToast("No active watchlist", 'error');
             return;
         }
 
-        // Check duplicates
-        if (activeWatchlist && activeWatchlist.items.some(i => i.ticker.symbol === symbol)) {
+        // Check duplicates using watchlistItems instead of activeWatchlist
+        if (watchlistItems && watchlistItems.some(i => i.ticker.symbol === symbol)) {
             showToast(`${symbol} is already in the watchlist`, 'error');
             setSearchTerm('');
             setShowSuggestions(false);
@@ -272,7 +290,7 @@ export function WatchlistTable() {
                 showToast(msg, 'error');
             }
         });
-    };
+    }, [activeWatchlistId, watchlistItems, addTickerMutation, showToast]);
 
     // -- Search & Dropdown Effects --
     useEffect(() => {
@@ -281,27 +299,17 @@ export function WatchlistTable() {
         } else {
             setShowSuggestions(false);
         }
-    }, [searchTickerQuery.data]);
+    }, [searchTickerQuery.data?.length]);
 
     // Close handlers
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node) &&
-                searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
-                setShowSuggestions(false);
-            }
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsDropdownOpen(false);
-            }
-            if (sectorFilterRef.current && !sectorFilterRef.current.contains(event.target as Node)) {
-                setIsSectorFilterOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Global listeners removed in favor of Backdrop pattern
+    const closeAllDropdowns = useCallback(() => {
+        setIsDropdownOpen(false);
+        setIsSectorFilterOpen(false);
+        setShowSuggestions(false);
     }, []);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         const suggestions = searchTickerQuery.data || [];
         if (!showSuggestions || suggestions.length === 0) {
             if (e.key === 'Enter' && searchTerm.trim()) {
@@ -325,111 +333,112 @@ export function WatchlistTable() {
         } else if (e.key === 'Escape') {
             setShowSuggestions(false);
         }
-    };
+    }, [searchTickerQuery.data, showSuggestions, searchTerm, selectedIndex, selectSuggestion]);
 
 
     // -- Table Setup --
-    const columnHelper = createColumnHelper<TickerData>();
-
-    const columns = useMemo(() => [
-        columnHelper.accessor('symbol', {
-            header: ({ column }) => <SortableHeader column={column} title="Ticker" />,
-            cell: (info) => (
-                <div className="flex items-center gap-3" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
-                    <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
-                    <div className="flex flex-col cursor-pointer">
-                        <span className="text-primary font-bold hover:underline">{info.getValue()}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.company}>
-                            {info.row.original.company}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground/70 truncate max-w-[150px]">
-                            {info.row.original.sector}
-                        </span>
+    const columns = useMemo(() => {
+        const columnHelper = createColumnHelper<TickerData>();
+        return [
+            columnHelper.accessor('symbol', {
+                header: ({ column }) => <SortableHeader column={column} title="Ticker" />,
+                cell: (info) => (
+                    <div className="flex items-center gap-3" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
+                        <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
+                        <div className="flex flex-col cursor-pointer">
+                            <span className="text-primary font-bold hover:underline">{info.getValue()}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.company}>
+                                {info.row.original.company}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground/70 truncate max-w-[150px]">
+                                {info.row.original.sector}
+                            </span>
+                        </div>
                     </div>
-                </div>
-            ),
-        }),
-        // Hidden sector column for filtering
-        columnHelper.accessor('sector', {
-            id: 'sector',
-            header: 'Sector',
-            enableHiding: true, // We don't want to show this column, just filter by it? 
-            // Actually, we merged it into symbol, but we can still have an accessor for it to filter!
-            // But if we don't display it, the table won't show it. Good.
-        }),
-        columnHelper.accessor('price', {
-            header: ({ column }) => <SortableHeader column={column} title="Price" />,
-            cell: (info) => <span className="text-foreground font-mono">${info.getValue().toFixed(2)}</span>,
-        }),
-        columnHelper.accessor('change', {
-            header: ({ column }) => <SortableHeader column={column} title="Change %" />,
-            cell: (info) => {
-                const val = info.getValue();
-                const isPositive = val >= 0;
-                return (
-                    <div className={cn("flex items-center font-medium", isPositive ? "text-green-500" : "text-red-500")}>
-                        {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
-                        {Math.abs(val).toFixed(2)}%
+                ),
+            }),
+            // Hidden sector column for filtering
+            columnHelper.accessor('sector', {
+                id: 'sector',
+                header: 'Sector',
+                enableHiding: true, // We don't want to show this column, just filter by it? 
+                // Actually, we merged it into symbol, but we can still have an accessor for it to filter!
+                // But if we don't display it, the table won't show it. Good.
+            }),
+            columnHelper.accessor('price', {
+                header: ({ column }) => <SortableHeader column={column} title="Price" />,
+                cell: (info) => <span className="text-foreground font-mono">${info.getValue().toFixed(2)}</span>,
+            }),
+            columnHelper.accessor('change', {
+                header: ({ column }) => <SortableHeader column={column} title="Change %" />,
+                cell: (info) => {
+                    const val = info.getValue();
+                    const isPositive = val >= 0;
+                    return (
+                        <div className={cn("flex items-center font-medium", isPositive ? "text-green-500" : "text-red-500")}>
+                            {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
+                            {Math.abs(val).toFixed(2)}%
+                        </div>
+                    );
+                },
+            }),
+            columnHelper.accessor('pe', {
+                header: ({ column }) => <SortableHeader column={column} title="P/E" />,
+                cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
+            }),
+            columnHelper.accessor('marketCap', {
+                header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
+                cell: (info) => <span className="text-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
+            }),
+            columnHelper.accessor('divYield', {
+                header: ({ column }) => <SortableHeader column={column} title="Div Yield %" />,
+                cell: (info) => <span className="text-foreground">{info.getValue() || '-'}</span>,
+            }),
+            columnHelper.accessor('beta', {
+                header: ({ column }) => <SortableHeader column={column} title="Beta" />,
+                cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
+            }),
+            columnHelper.accessor('rating', {
+                header: ({ column }) => <SortableHeader column={column} title="Rating" />,
+                cell: (info) => {
+                    const rating = info.getValue();
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" = "default";
+                    if (rating === 'Strong Buy') variant = 'strongBuy';
+                    else if (rating === 'Buy') variant = 'buy';
+                    else if (rating === 'Hold') variant = 'hold';
+                    return <Badge variant={variant} className="whitespace-nowrap">{rating}</Badge>;
+                },
+            }),
+            columnHelper.accessor('growthRank', {
+                header: ({ column }) => <SortableHeader column={column} title="Growth Rank" />,
+                cell: (info) => (
+                    <div className="flex items-center text-foreground">
+                        {info.getValue()}
+                        <TrendingUp size={14} className="ml-1 text-green-500" />
                     </div>
-                );
-            },
-        }),
-        columnHelper.accessor('pe', {
-            header: ({ column }) => <SortableHeader column={column} title="P/E" />,
-            cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
-        }),
-        columnHelper.accessor('marketCap', {
-            header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
-            cell: (info) => <span className="text-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
-        }),
-        columnHelper.accessor('divYield', {
-            header: ({ column }) => <SortableHeader column={column} title="Div Yield %" />,
-            cell: (info) => <span className="text-foreground">{info.getValue() || '-'}</span>,
-        }),
-        columnHelper.accessor('beta', {
-            header: ({ column }) => <SortableHeader column={column} title="Beta" />,
-            cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
-        }),
-        columnHelper.accessor('rating', {
-            header: ({ column }) => <SortableHeader column={column} title="Rating" />,
-            cell: (info) => {
-                const rating = info.getValue();
-                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" = "default";
-                if (rating === 'Strong Buy') variant = 'strongBuy';
-                else if (rating === 'Buy') variant = 'buy';
-                else if (rating === 'Hold') variant = 'hold';
-                return <Badge variant={variant} className="whitespace-nowrap">{rating}</Badge>;
-            },
-        }),
-        columnHelper.accessor('growthRank', {
-            header: ({ column }) => <SortableHeader column={column} title="Growth Rank" />,
-            cell: (info) => (
-                <div className="flex items-center text-foreground">
-                    {info.getValue()}
-                    <TrendingUp size={14} className="ml-1 text-green-500" />
-                </div>
-            )
-        }),
-        columnHelper.display({
-            id: 'actions',
-            cell: (info) => (
-                <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                        <MoreVertical className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                        onClick={() => handleRemoveTicker(info.row.original.symbol)}
-                        title="Remove from watchlist"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </div>
-            ),
-        }),
-    ], [navigate, handleRemoveTicker, columnHelper]);
+                )
+            }),
+            columnHelper.display({
+                id: 'actions',
+                cell: (info) => (
+                    <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                            onClick={() => handleRemoveTicker(info.row.original.itemId || '', info.row.original.symbol)}
+                            title="Remove from watchlist"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ),
+            }),
+        ];
+    }, [navigate, handleRemoveTicker]);
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
@@ -447,16 +456,23 @@ export function WatchlistTable() {
         }
     });
 
-    const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && tableData.length === 0);
+    const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && symbols.length > 0);
     const activeSectorFilter = (table.getColumn('sector')?.getFilterValue() as string) || null;
 
     return (
         <div className="space-y-4">
+            {/* Backdrop for closing dropdowns */}
+            {(isDropdownOpen || isSectorFilterOpen || showSuggestions) && (
+                <div
+                    className="fixed inset-0 z-40 bg-transparent"
+                    onClick={closeAllDropdowns}
+                />
+            )}
             {/* Header / Dropdown Control */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     {/* Custom Dropdown */}
-                    <div className="relative" ref={dropdownRef}>
+                    <div className="relative">
                         <button
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-sm font-medium text-foreground transition-colors border border-transparent focus:border-primary outline-none min-w-[150px] justify-between"
@@ -578,7 +594,7 @@ export function WatchlistTable() {
                 {/* Filters */}
                 <div className="flex items-center gap-2">
                     {/* Sector Filter Dropdown */}
-                    <div className="relative" ref={sectorFilterRef}>
+                    <div className="relative">
                         <button
                             onClick={() => setIsSectorFilterOpen(!isSectorFilterOpen)}
                             className={cn(

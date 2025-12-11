@@ -10,7 +10,7 @@ export function Login() {
                 <div className="flex justify-center mb-6">
                     <Activity size={48} className="text-emerald-500" />
                 </div>
-                <h1 className="text-3xl font-bold mb-2">Neural Ticket</h1>
+                <h1 className="text-3xl font-bold mb-2">Neural Ticker</h1>
                 <p className="text-zinc-400 mb-8">Institutional Market Intelligence</p>
 
                 <button

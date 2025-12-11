@@ -1,7 +1,9 @@
+import { memo } from 'react';
 import { cn } from '../../lib/api';
 import { useTickerLogo } from '../../hooks/useTicker';
 
-export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
+// Memoize because base64 image rendering is heavy
+export const TickerLogo = memo(({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
     const { data: logoSrc, isLoading, isError } = useTickerLogo(symbol, url);
 
     // Fallback logic
@@ -33,4 +35,4 @@ export const TickerLogo = ({ url, symbol, className }: { url?: string, symbol: s
             <div className="absolute inset-0 rounded-full bg-[#27272a] animate-pulse" />
         </div>
     );
-};
+});

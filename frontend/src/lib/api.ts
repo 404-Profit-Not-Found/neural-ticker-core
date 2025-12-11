@@ -28,7 +28,7 @@ const addInterceptors = (instance: typeof api) => {
         console.warn('Unauthorized access');
       }
       return Promise.reject(error);
-    }
+    },
   );
 };
 

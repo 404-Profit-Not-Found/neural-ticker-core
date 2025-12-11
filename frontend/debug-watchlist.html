@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Watchlist</title>
+</head>
+<body>
+    <h1>Check browser console for render count</h1>
+    <p>Open DevTools and watch for excessive renders</p>
+    <script>
+        let renderCount = 0;
+        const observer = new MutationObserver(() => {
+            renderCount++;
+            if (renderCount > 100) {
+                console.error('INFINITE LOOP DETECTED: More than 100 renders!');
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    </script>
+</body>
+</html>
