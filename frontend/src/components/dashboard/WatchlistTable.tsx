@@ -6,9 +6,10 @@ import {
     getFilteredRowModel,
     flexRender,
     createColumnHelper,
-    type Column
+    type Column,
+    type ColumnFiltersState,
+    type SortingState
 } from '@tanstack/react-table';
-import type { SortingState } from '@tanstack/react-table';
 import {
     Plus,
     Search,
@@ -23,7 +24,8 @@ import {
     Pencil,
     ChevronDown,
     Check,
-    Filter
+    Filter,
+    X
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -103,9 +105,11 @@ export function WatchlistTable() {
     // Local State
     const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(null);
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isSectorFilterOpen, setIsSectorFilterOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
 
@@ -113,6 +117,7 @@ export function WatchlistTable() {
     const searchInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const sectorFilterRef = useRef<HTMLDivElement>(null);
 
     // -- Mutations --
     const createListMutation = useCreateWatchlist();
@@ -173,7 +178,7 @@ export function WatchlistTable() {
                     symbol: s.ticker.symbol,
                     logo: s.ticker.logo_url,
                     company: s.ticker.name || 'Unknown',
-                    sector: fundamentals.sector || 'N/A',
+                    sector: fundamentals.sector || 'Others',
                     price: price,
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
@@ -185,6 +190,11 @@ export function WatchlistTable() {
                 };
             });
     }, [snapshotData, activeWatchlist]);
+
+    const uniqueSectors = useMemo(() => {
+        const sectors = new Set(tableData.map(d => d.sector));
+        return Array.from(sectors).sort();
+    }, [tableData]);
 
     // -- Handlers --
 
@@ -283,6 +293,9 @@ export function WatchlistTable() {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
             }
+            if (sectorFilterRef.current && !sectorFilterRef.current.contains(event.target as Node)) {
+                setIsSectorFilterOpen(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -335,6 +348,14 @@ export function WatchlistTable() {
                     </div>
                 </div>
             ),
+        }),
+        // Hidden sector column for filtering
+        columnHelper.accessor('sector', {
+            id: 'sector',
+            header: 'Sector',
+            enableHiding: true, // We don't want to show this column, just filter by it? 
+            // Actually, we merged it into symbol, but we can still have an accessor for it to filter!
+            // But if we don't display it, the table won't show it. Good.
         }),
         columnHelper.accessor('price', {
             header: ({ column }) => <SortableHeader column={column} title="Price" />,
@@ -419,10 +440,15 @@ export function WatchlistTable() {
         getFilteredRowModel: getFilteredRowModel(),
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        state: { sorting, globalFilter },
+        onColumnFiltersChange: setColumnFilters,
+        state: { sorting, globalFilter, columnFilters },
+        initialState: {
+            columnVisibility: { sector: false }, // Hide the filter column from view
+        }
     });
 
     const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && tableData.length === 0);
+    const activeSectorFilter = (table.getColumn('sector')?.getFilterValue() as string) || null;
 
     return (
         <div className="space-y-4">
@@ -549,16 +575,73 @@ export function WatchlistTable() {
                     </Button>
                 </div>
 
-                {/* Table Filter */}
-                <div className="relative">
-                    <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <input
-                        type="text"
-                        placeholder="Filter list..."
-                        value={globalFilter ?? ''}
-                        onChange={(e) => setGlobalFilter(e.target.value)}
-                        className="h-9 w-48 bg-card border border-border rounded-md pl-9 pr-4 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
-                    />
+                {/* Filters */}
+                <div className="flex items-center gap-2">
+                    {/* Sector Filter Dropdown */}
+                    <div className="relative" ref={sectorFilterRef}>
+                        <button
+                            onClick={() => setIsSectorFilterOpen(!isSectorFilterOpen)}
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border outline-none h-9",
+                                activeSectorFilter
+                                    ? "bg-primary/20 border-primary text-primary hover:bg-primary/30"
+                                    : "bg-card border-border hover:bg-muted text-foreground"
+                            )}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span>{activeSectorFilter || "Sector"}</span>
+                            {activeSectorFilter ? (
+                                <div onClick={(e) => {
+                                    e.stopPropagation();
+                                    table.getColumn('sector')?.setFilterValue(undefined);
+                                }}>
+                                    <X className="w-3 h-3 hover:text-red-500" />
+                                </div>
+                            ) : (
+                                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                            )}
+                        </button>
+
+                        {isSectorFilterOpen && (
+                            <div className="absolute top-full right-0 mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+                                <button
+                                    onClick={() => {
+                                        table.getColumn('sector')?.setFilterValue(undefined);
+                                        setIsSectorFilterOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 flex items-center justify-between"
+                                >
+                                    <span>All Sectors</span>
+                                    {!activeSectorFilter && <Check className="w-3 h-3 text-primary" />}
+                                </button>
+                                {uniqueSectors.map(sector => (
+                                    <button
+                                        key={sector}
+                                        onClick={() => {
+                                            table.getColumn('sector')?.setFilterValue(sector);
+                                            setIsSectorFilterOpen(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 flex items-center justify-between"
+                                    >
+                                        <span className="truncate">{sector}</span>
+                                        {activeSectorFilter === sector && <Check className="w-3 h-3 text-primary" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Global Filter */}
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <input
+                            type="text"
+                            placeholder="Filter list..."
+                            value={globalFilter ?? ''}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="h-9 w-48 bg-card border border-border rounded-md pl-9 pr-4 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
+                        />
+                    </div>
                 </div>
             </div>
 
