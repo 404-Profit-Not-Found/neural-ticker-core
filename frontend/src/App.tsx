@@ -10,6 +10,7 @@ import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -48,7 +49,9 @@ function App() {
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <ErrorBoundary>
+                    <Dashboard />
+                  </ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -77,7 +80,13 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-            <Route path="/admin" element={<AdminRoute><AdminConsole /></AdminRoute>} />
+            <Route path="/admin" element={
+              <AdminRoute>
+                <ErrorBoundary>
+                  <AdminConsole />
+                </ErrorBoundary>
+              </AdminRoute>
+            } />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
           </Routes>

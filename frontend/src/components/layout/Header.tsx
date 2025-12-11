@@ -93,7 +93,7 @@ export function Header() {
                   <UserIcon size={16} />
                   Your Profile
                 </Link>
-                {user?.role === 'admin' && (
+                {user && user.role === 'admin' && (
                   <Link
                     to="/admin"
                     className="flex items-center gap-3 px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-[#27272a] rounded-md transition-colors"

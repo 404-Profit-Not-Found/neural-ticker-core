@@ -167,7 +167,7 @@ export function WatchlistTable() {
         if (!activeWatchlist) return [];
 
         return snapshotData
-            .filter((s: MarketSnapshot) => s && s.ticker)
+            .filter((s: MarketSnapshot) => !!s && !!s.ticker)
             .map((s: MarketSnapshot) => {
                 const price = Number(s.latestPrice?.close || 0);
                 const prevClose = Number(s.latestPrice?.prevClose || price);
@@ -175,9 +175,9 @@ export function WatchlistTable() {
                 const fundamentals = s.fundamentals || {};
 
                 return {
-                    symbol: s.ticker.symbol,
-                    logo: s.ticker.logo_url,
-                    company: s.ticker.name || 'Unknown',
+                    symbol: s.ticker?.symbol || 'UNKNOWN',
+                    logo: s.ticker?.logo_url,
+                    company: s.ticker?.name || 'Unknown',
                     sector: fundamentals.sector || 'Others',
                     price: price,
                     change: change,

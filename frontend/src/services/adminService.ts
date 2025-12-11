@@ -16,38 +16,85 @@ export interface AllowedUser {
   created_at: string;
 }
 
+// Helper to handle admin API errors
+const handleAdminError = (error: unknown) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const err = error as any;
+  if (err.response?.status === 403 || err.response?.status === 401) {
+    throw new Error('Access denied. Admin privileges required.');
+  }
+  throw error;
+};
+
 export const AdminService = {
   getUsers: async () => {
-    const { data } = await api.get<User[]>('/admin/users');
-    return data;
+    try {
+      const { data } = await api.get<User[]>('/admin/users');
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   getUserlist: async () => {
-    const { data } = await api.get<AllowedUser[]>('/admin/userlist');
-    return data;
+    try {
+      const { data } = await api.get<AllowedUser[]>('/admin/userlist');
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   getIdentities: async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await api.get<any[]>('/admin/identities');
-    return data;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await api.get<any[]>('/admin/identities');
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   addToUserlist: async (email: string) => {
-    const { data } = await api.post<AllowedUser>('/admin/userlist', { email });
-    return data;
+    try {
+      const { data } = await api.post<AllowedUser>('/admin/userlist', {
+        email,
+      });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   revokeAccess: async (email: string) => {
-    return api.delete(`/admin/userlist/${encodeURIComponent(email)}`);
+    try {
+      return await api.delete(`/admin/userlist/${encodeURIComponent(email)}`);
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   rejectWaitlistUser: async (email: string) => {
-    return api.delete(`/admin/waitlist/${encodeURIComponent(email)}`);
+    try {
+      return await api.delete(`/admin/waitlist/${encodeURIComponent(email)}`);
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 
   approveUser: async (userId: string) => {
-    const { data } = await api.post<User>(`/users/${userId}/approve`);
-    return data;
+    try {
+      const { data } = await api.post<User>(`/users/${userId}/approve`);
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
   },
 };
