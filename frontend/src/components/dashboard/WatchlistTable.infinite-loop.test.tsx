@@ -40,10 +40,8 @@ const renderWithProviders = (queryClient: QueryClient) =>
 describe('WatchlistTable - Infinite Loop Prevention', () => {
   let mockGet: vi.SpyInstance;
   let mockPost: vi.SpyInstance;
-  let renderCount = 0;
 
   beforeEach(() => {
-    renderCount = 0;
     vi.clearAllMocks();
   });
 
@@ -54,7 +52,7 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
 
   it('should not cause infinite loop with empty watchlist', async () => {
     const queryClient = createQueryClient();
-    
+
     // Mock empty watchlist
     mockGet = vi.spyOn(api, 'get').mockResolvedValue({
       data: [{ id: 'list-1', name: 'Empty List', items: [] }],
@@ -64,7 +62,6 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
       data: [],
     } as AxiosResponse);
 
-    // Track render count
     const OriginalWatchlistTable = WatchlistTable;
     let componentRenderCount = 0;
     const TrackedWatchlistTable = () => {
@@ -99,7 +96,7 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
 
   it('should not cause infinite loop when searching with no results', async () => {
     const queryClient = createQueryClient();
-    
+
     mockGet = vi.spyOn(api, 'get').mockImplementation((url) => {
       if (url === '/watchlists') {
         return Promise.resolve({
@@ -145,7 +142,7 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
 
   it('should maintain stable array references for empty states', async () => {
     const queryClient = createQueryClient();
-    
+
     mockGet = vi.spyOn(api, 'get').mockResolvedValue({
       data: [{ id: 'list-1', name: 'Empty List', items: [] }],
     } as AxiosResponse);
@@ -181,9 +178,10 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
 
   it('should not cause infinite loop when adding ticker to empty watchlist', async () => {
     const queryClient = createQueryClient();
-    
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let watchlistItems: any[] = [];
-    
+
     mockGet = vi.spyOn(api, 'get').mockImplementation((url) => {
       if (url === '/watchlists') {
         return Promise.resolve({
@@ -198,7 +196,7 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
       return Promise.resolve({ data: [] } as AxiosResponse);
     });
 
-    mockPost = vi.spyOn(api, 'post').mockImplementation((url, data) => {
+    mockPost = vi.spyOn(api, 'post').mockImplementation((url) => {
       if (url.includes('/items')) {
         // Simulate adding ticker
         watchlistItems = [
@@ -265,7 +263,7 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
 
   it('should handle rapid state changes without infinite loops', async () => {
     const queryClient = createQueryClient();
-    
+
     mockGet = vi.spyOn(api, 'get').mockResolvedValue({
       data: [
         { id: 'list-1', name: 'List 1', items: [] },
@@ -284,11 +282,11 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
     });
 
     const user = userEvent.setup();
-    
+
     // Rapidly interact with UI
     const dropdown = screen.getByText(/List 1/i);
     await user.click(dropdown);
-    
+
     await waitFor(() => {
       expect(screen.getByText(/List 2/i)).toBeInTheDocument();
     });

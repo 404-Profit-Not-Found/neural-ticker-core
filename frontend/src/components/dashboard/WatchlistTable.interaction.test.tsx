@@ -38,14 +38,13 @@ const renderWithProviders = (queryClient: QueryClient) =>
 
 describe('WatchlistTable - Interaction Freeze', () => {
     let mockGet: vi.SpyInstance;
-    let mockPost: vi.SpyInstance;
 
     beforeEach(() => {
         vi.clearAllMocks();
         mockGet = vi.spyOn(api, 'get').mockResolvedValue({
             data: [{ id: 'list-1', name: 'Test List', items: [] }],
         } as AxiosResponse);
-        mockPost = vi.spyOn(api, 'post').mockResolvedValue({ values: [] });
+        vi.spyOn(api, 'post').mockResolvedValue({ values: [] });
     });
 
     afterEach(() => {
