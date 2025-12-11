@@ -20,9 +20,13 @@ async function generateToken() {
     });
   }
 
+  // 0. Parse CLI Args
+  const targetEmail = process.argv[2] || 'branislavlang@gmail.com';
+  console.log(`Generating token for: ${targetEmail}`);
+
   const uid = 'test-admin-user';
   const additionalClaims = {
-    email: 'branislavlang@gmail.com', // Matches logic for auto-admin
+    email: targetEmail,
     name: 'Test Admin',
   };
 
