@@ -25,9 +25,9 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
-    .setTitle('Neural Ticket Core API')
+    .setTitle('Neural Ticker Core API')
     .setDescription(
-      'API documentation for the Neural Ticket Core backend service.',
+      'API documentation for the Neural Ticker Core backend service.',
     )
     .setVersion('1.0')
     .addTag('Health')

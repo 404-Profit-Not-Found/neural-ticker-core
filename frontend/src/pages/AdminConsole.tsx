@@ -3,6 +3,7 @@ import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
 import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield } from 'lucide-react';
 import { Header } from '../components/layout/Header';
+import { useNavigate } from 'react-router-dom';
 
 type SortConfig = {
     key: string;
@@ -11,11 +12,19 @@ type SortConfig = {
 
 export function AdminConsole() {
     const { user: currentUser } = useAuth();
+    const navigate = useNavigate();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [identities, setIdentities] = useState<any[]>([]);
     const [newEmail, setNewEmail] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Redirect non-admin users immediately
+    useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin') {
+            navigate('/access-denied', { replace: true });
+        }
+    }, [currentUser, navigate]);
 
     // Table State
     const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +38,12 @@ export function AdminConsole() {
     }, []);
 
     const loadData = async () => {
+        // Don't load if not admin
+        if (!currentUser || currentUser.role !== 'admin') {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
@@ -36,8 +51,14 @@ export function AdminConsole() {
             setIdentities(data);
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const msg = (err as any).response?.data?.message || 'Failed to load data';
-            setError(msg);
+            const errorResponse = (err as any).response;
+            if (errorResponse?.status === 403 || errorResponse?.status === 401) {
+                setError('Access denied. Admin privileges required.');
+                navigate('/access-denied', { replace: true });
+            } else {
+                const msg = errorResponse?.data?.message || 'Failed to load data';
+                setError(msg);
+            }
         } finally {
             setLoading(false);
         }
