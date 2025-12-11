@@ -1,8 +1,6 @@
-
-import { useState } from 'react';
-import { Brain, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { Brain, RefreshCw, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface ResearchItem {
     id: string;
@@ -19,16 +17,10 @@ interface ResearchFeedProps {
 }
 
 export function ResearchFeed({ research, onTrigger, isAnalyzing }: ResearchFeedProps) {
-    const [expandedIds, setExpandedIds] = useState<string[]>([]);
-
-    const toggleExpand = (id: string) => {
-        setExpandedIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
-    };
+    const navigate = useNavigate();
 
     return (
-        <div className="bg-card border border-border rounded-lg shadow-sm flex flex-col overflow-hidden">
+        <div className="bg-card border border-border rounded-lg shadow-sm flex flex-col overflow-hidden h-full">
             <div className="p-4 border-b border-border bg-muted/10 flex items-center justify-between">
                 <h3 className="font-bold text-sm flex items-center gap-2">
                     <Brain className="w-4 h-4 text-primary" /> AI Research History
@@ -45,49 +37,38 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing }: ResearchFeedP
                 </Button>
             </div>
 
-            <div className="divide-y divide-border/50 max-h-[500px] overflow-y-auto">
+            <div className="divide-y divide-border/50 overflow-y-auto flex-1">
                 {research && research.length > 0 ? (
                     research.map((item) => (
-                        <div key={item.id} className="bg-background">
+                        <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                             <div
-                                className="p-4 cursor-pointer hover:bg-muted/5 transition-colors flex items-center justify-between"
-                                onClick={() => toggleExpand(item.id)}
+                                className="p-4 cursor-pointer flex items-center justify-between group"
+                                onClick={() => navigate(`/research/${item.id}`)}
                             >
                                 <div className="flex items-center gap-4">
                                     <div className={`w-2 h-2 rounded-full ${item.status === 'completed' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                                    <div>
-                                        <div className="text-xs font-bold uppercase text-muted-foreground">
-                                            {new Date(item.created_at).toLocaleDateString()} • {new Date(item.created_at).toLocaleTimeString()}
+                                    <div className="flex-1">
+                                        <div className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
+                                            <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span>{new Date(item.created_at).toLocaleTimeString()}</span>
                                         </div>
-                                        <div className="text-sm font-medium">
+                                        <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
                                             {item.question || "Smart analysis"}
                                         </div>
                                     </div>
                                 </div>
-                                <Button size="icon" variant="ghost" className="h-6 w-6">
-                                    {expandedIds.includes(item.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground group-hover:text-foreground">
+                                    <ChevronRight size={16} />
                                 </Button>
                             </div>
-
-                            {expandedIds.includes(item.id) && (
-                                <div className="px-6 pb-6 pt-2 bg-muted/5 border-t border-border/30">
-                                    {item.status === 'completed' ? (
-                                        <div className="prose prose-sm prose-invert max-w-none prose-p:text-muted-foreground prose-strong:text-foreground">
-                                            <ReactMarkdown>{item.content}</ReactMarkdown>
-                                        </div>
-                                    ) : (
-                                        <div className="text-sm text-yellow-500 font-medium py-2">
-                                            Analysis in progress...
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     ))
                 ) : (
-                    <div className="p-8 text-center text-muted-foreground">
-                        <p className="text-sm mb-4">No research history available.</p>
-
+                    <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center h-40">
+                        <Brain className="w-8 h-8 opacity-20 mb-3" />
+                        <p className="text-sm">No research history available.</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Start a new analysis to generate insights.</p>
                     </div>
                 )}
             </div>

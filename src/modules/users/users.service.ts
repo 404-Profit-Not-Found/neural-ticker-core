@@ -9,6 +9,8 @@ import { User } from './entities/user.entity';
 import { AllowedUser } from './entities/allowed-user.entity';
 import { NicknameGeneratorService } from './nickname-generator.service';
 
+const DEFAULT_ADMINS = ['branislavlang@gmail.com', 'juraj.hudak79@gmail.com'];
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -20,7 +22,7 @@ export class UsersService {
   ) {}
 
   async isEmailAllowed(email: string): Promise<boolean> {
-    if (email === 'branislavlang@gmail.com') return true; // Super Admin always allowed
+    if (DEFAULT_ADMINS.includes(email)) return true; // Super Admin always allowed
     const count = await this.allowedUserRepo.count({ where: { email } });
     return count > 0;
   }
@@ -121,8 +123,7 @@ export class UsersService {
     }
 
     // Auto-Admin Logic
-    const role =
-      profile.email === 'branislavlang@gmail.com' ? 'admin' : undefined; // Only set on creation/update if matches
+    const role = DEFAULT_ADMINS.includes(profile.email) ? 'admin' : undefined; // Only set on creation/update if matches
 
     if (user) {
       // Update info

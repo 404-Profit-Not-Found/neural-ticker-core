@@ -9,6 +9,7 @@ import { AccessDenied } from './pages/AccessDenied';
 import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
+import { ResearchPage } from './pages/ResearchPage';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
 
@@ -16,15 +17,13 @@ import { api, httpClient } from './lib/api';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      window.location.href = '/api/auth/google';
-    }
-  }, [loading, user]);
-
   if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading Neural Terminal...</div>;
 
-  if (!user) return null;
+  if (!user) {
+    // Redirect to internal login page instead of auto-redirecting to Google
+    // This prevents infinite loops if auth fails repeatedly
+    return <Navigate to="/login" replace />;
+  }
 
   return <>{children}</>;
 }
@@ -58,6 +57,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TickerDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/research/:id"
+              element={
+                <ProtectedRoute>
+                  <ResearchPage />
                 </ProtectedRoute>
               }
             />
