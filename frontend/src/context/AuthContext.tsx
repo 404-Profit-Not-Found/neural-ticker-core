@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { httpClient } from '../lib/api';
+import { queryClient, persister } from '../lib/queryClient';
 
 interface User {
     id: string;
@@ -74,6 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
             console.warn('Logout endpoint failed:', e);
         }
+
+        // CRITICAL: Clear all local state to prevent data leaks between users
+        try {
+            await persister.removeClient(); // Clear IndexedDB
+            queryClient.clear();            // Clear in-memory cache
+        } catch (e) {
+            console.error('Failed to clear local cache:', e);
+        }
+
         // Clear local state
         setUser(null);
         // Redirect to login
