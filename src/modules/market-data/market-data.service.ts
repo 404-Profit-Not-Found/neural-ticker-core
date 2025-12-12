@@ -200,14 +200,15 @@ export class MarketDataService {
       where: { symbol_id: symbol },
     });
 
-    const entity = existing || this.fundamentalsRepo.create({ symbol_id: symbol });
-    
+    const entity =
+      existing || this.fundamentalsRepo.create({ symbol_id: symbol });
+
     // Merge data
     Object.assign(entity, data);
-    
+
     // Explicitly set sector if provided
     if (data.sector) {
-        entity.sector = data.sector;
+      entity.sector = data.sector;
     }
 
     await this.fundamentalsRepo.save(entity);

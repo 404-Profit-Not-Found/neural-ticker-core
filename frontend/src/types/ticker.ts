@@ -42,6 +42,7 @@ export interface ResearchItem {
         email?: string;
         avatar_url?: string;
     };
+    provider?: string;
 }
 
 export interface TickerData {

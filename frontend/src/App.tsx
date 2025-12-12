@@ -57,7 +57,7 @@ function App() {
               }
             />
             <Route
-              path="/ticker/:symbol"
+              path="/ticker/:symbol/:tab?"
               element={
                 <ProtectedRoute>
                   <TickerDetail />

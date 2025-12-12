@@ -6,6 +6,7 @@ import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('ResearchService', () => {
   let service: ResearchService;
@@ -47,6 +48,12 @@ describe('ResearchService', () => {
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

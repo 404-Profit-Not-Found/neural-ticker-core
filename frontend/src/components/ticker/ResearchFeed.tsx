@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { UploadResearchDialog } from './UploadResearchDialog';
+import { Badge } from '../ui/badge';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
@@ -95,29 +96,8 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                         <div className="flex items-center gap-4 flex-1 min-w-0">
                                             <div className={`w-2 h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-bold uppercase text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
-                                                    <span className="text-muted-foreground text-xs">•</span>
-
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-xs text-muted-foreground">By</span>
-
-                                                        <div className="w-4 h-4 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
-                                                            {item.user?.avatar_url ? (
-                                                                <img src={item.user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <span className="text-[9px] font-bold text-muted-foreground">
-                                                                    {(item.user?.nickname || item.user?.email || '?').charAt(0).toUpperCase()}
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        <span className="font-semibold text-foreground text-xs">{authorName}</span>
-                                                    </div>
-                                                </div>
-
                                                 {editingId === item.id ? (
-                                                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-2 mb-1" onClick={e => e.stopPropagation()}>
                                                         <input
                                                             autoFocus
                                                             className="flex-1 bg-background border border-primary rounded px-2 py-1 text-sm focus:outline-none"
@@ -137,7 +117,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center gap-2 group/title">
+                                                    <div className="flex items-center gap-2 group/title mb-1">
                                                         <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
                                                             {item.title || item.question || "Smart analysis"}
                                                         </div>
@@ -153,6 +133,36 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                         )}
                                                     </div>
                                                 )}
+
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold uppercase text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-muted-foreground text-xs">•</span>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs text-muted-foreground">By</span>
+
+                                                        <div className="w-4 h-4 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                                                            {item.user?.avatar_url ? (
+                                                                <img src={item.user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-[9px] font-bold text-muted-foreground">
+                                                                    {(item.user?.nickname || item.user?.email || '?').charAt(0).toUpperCase()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <span className="font-semibold text-foreground text-xs">{authorName}</span>
+                                                    </div>
+
+                                                    {item.provider === 'manual' && (
+                                                        <>
+                                                            <span className="text-muted-foreground text-xs">•</span>
+                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">
+                                                                Manual Upload
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 ml-4">

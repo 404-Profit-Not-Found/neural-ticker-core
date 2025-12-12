@@ -8,7 +8,11 @@ import {
   Request,
   Query,
   Delete,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import {
   ApiTags,
   ApiOperation,
@@ -100,7 +104,10 @@ class AskResearchDto {
 }
 
 class UploadResearchDto {
-  @ApiProperty({ example: ['AAPL'], description: 'Tickers related to this note' })
+  @ApiProperty({
+    example: ['AAPL'],
+    description: 'Tickers related to this note',
+  })
   @IsArray()
   @IsString({ each: true })
   tickers: string[];
@@ -109,7 +116,10 @@ class UploadResearchDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ example: '# Bullish case...', description: 'Markdown content' })
+  @ApiProperty({
+    example: '# Bullish case...',
+    description: 'Markdown content',
+  })
   @IsString()
   content: string;
 
@@ -320,9 +330,26 @@ export class ResearchController {
     try {
       return await this.researchService.updateTitle(id, userId, title);
     } catch (e) {
-      if (e.message === 'Research note not found') throw new NotFoundException(e.message);
-      if (e.message.includes('Unauthorized')) throw new NotFoundException(e.message); // Should be Forbidden but NotFound hides existence
+      if (e.message === 'Research note not found')
+        throw new NotFoundException(e.message);
+      if (e.message.includes('Unauthorized'))
+        throw new NotFoundException(e.message); // Should be Forbidden but NotFound hides existence
       throw e;
     }
+  }
+
+  @Post('stream')
+  @Sse() // Content-Type: text/event-stream
+  startResearch(
+    @Body() body: { ticker: string; questions?: string },
+  ): Observable<MessageEvent> {
+    return this.researchService
+      .streamResearch(body.ticker, body.questions)
+      .pipe(
+        map((event: any) => ({
+          data: event, // Automatically JSON serialized
+          type: event.type, // Allows frontend to verify event listeners
+        })),
+      );
   }
 }

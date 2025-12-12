@@ -13,10 +13,21 @@ import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
+import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
+import { Observable, Subject } from 'rxjs';
+
+export interface ResearchEvent {
+  type: 'status' | 'thought' | 'source' | 'content' | 'error';
+  data: any;
+}
 
 @Injectable()
 export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
+  private client: GoogleGenAI;
+  // Using the model user requested, note: this model ID might change
+  private readonly AGENT_MODEL = 'deep-research-pro-preview-12-2025';
 
   constructor(
     @InjectRepository(ResearchNote)
@@ -25,7 +36,13 @@ export class ResearchService {
     private readonly marketDataService: MarketDataService,
     private readonly usersService: UsersService,
     private readonly riskRewardService: RiskRewardService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    const apiKey = this.config.get<string>('gemini.apiKey');
+    if (apiKey) {
+      this.client = new GoogleGenAI({ apiKey });
+    }
+  }
 
   async createResearchTicket(
     userId: string,
@@ -160,8 +177,10 @@ export class ResearchService {
 
       // 7. Post-Process: Extract Structured Financials (Gemini 3 Extraction)
       this.logger.log(`Triggering Financial Extraction for ticket ${id}`);
-      await this.extractFinancialsFromResearch(note.tickers, result.answerMarkdown);
-
+      await this.extractFinancialsFromResearch(
+        note.tickers,
+        result.answerMarkdown,
+      );
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
@@ -174,15 +193,18 @@ export class ResearchService {
    * Extract key financial metrics from the unstructured research text
    * using a cheap, fast "Flash" model.
    */
-  private async extractFinancialsFromResearch(tickers: string[], text: string): Promise<void> {
+  private async extractFinancialsFromResearch(
+    tickers: string[],
+    text: string,
+  ): Promise<void> {
     if (tickers.length === 0 || !text) return;
-    
+
     // We process each ticker individually for safety, or batch if simple.
     // For now, let's just do the first/main ticker to avoid complexity,
     // or loop if there are multiple.
     for (const ticker of tickers) {
-       try {
-         const extractionPrompt = `You are a strict data extraction engine.
+      try {
+        const extractionPrompt = `You are a strict data extraction engine.
          Extract the following financial metrics for ticker "${ticker}" from the provided text.
          Return a SINGLE JSON OBJECT. keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity".
          Values must be NUMBERS. If not found, use null.
@@ -192,34 +214,36 @@ export class ResearchService {
          
          JSON:`;
 
-         const result = await this.llmService.generateResearch({
-            question: extractionPrompt,
-            tickers: [ticker],
-            numericContext: {},
-            quality: 'extraction' as QualityTier,
-            provider: 'gemini',
-            maxTokens: 200, // Short JSON output
-         });
+        const result = await this.llmService.generateResearch({
+          question: extractionPrompt,
+          tickers: [ticker],
+          numericContext: {},
+          quality: 'extraction' as QualityTier,
+          provider: 'gemini',
+          maxTokens: 200, // Short JSON output
+        });
 
-         // Clean and Parse JSON
-         let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
-         // Attempt to find the first { and last }
-         const start = jsonStr.indexOf('{');
-         const end = jsonStr.lastIndexOf('}');
-         if (start !== -1 && end !== -1) {
-            jsonStr = jsonStr.substring(start, end + 1);
-            const data = JSON.parse(jsonStr);
-            
-            // Upsert to Market Data Service
-            // We need to inject MarketDataService (already injected)
-            // But we need a dedicated method there. 
-            // For now, I will add the method call assuming I will create it next.
-            await this.marketDataService.upsertFundamentals(ticker, data);
-            this.logger.log(`Extracted financials for ${ticker}: ${JSON.stringify(data)}`);
-         }
-       } catch (e) {
-         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
-       }
+        // Clean and Parse JSON
+        let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
+        // Attempt to find the first { and last }
+        const start = jsonStr.indexOf('{');
+        const end = jsonStr.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+          jsonStr = jsonStr.substring(start, end + 1);
+          const data = JSON.parse(jsonStr);
+
+          // Upsert to Market Data Service
+          // We need to inject MarketDataService (already injected)
+          // But we need a dedicated method there.
+          // For now, I will add the method call assuming I will create it next.
+          await this.marketDataService.upsertFundamentals(ticker, data);
+          this.logger.log(
+            `Extracted financials for ${ticker}: ${JSON.stringify(data)}`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn(`Failed to extract financials for ${ticker}`, e);
+      }
     }
   }
 
@@ -293,18 +317,25 @@ Title:`;
     await this.noteRepo.delete(id);
   }
 
-  async updateTitle(id: string, userId: string, newTitle: string): Promise<ResearchNote> {
-    const note = await this.noteRepo.findOne({ where: { id }, relations: ['user'] });
+  async updateTitle(
+    id: string,
+    userId: string,
+    newTitle: string,
+  ): Promise<ResearchNote> {
+    const note = await this.noteRepo.findOne({
+      where: { id },
+      relations: ['user'],
+    });
     if (!note) {
       throw new Error('Research note not found');
     }
-    
+
     // Check permissions: Owner or Admin
     // Note: We need to fetch the requesting user to check if they are admin, unless passed in.
     // simpler: The controller passes userId. We check if note.user_id === userId.
-    // But for admin check, we might need more context. 
+    // But for admin check, we might need more context.
     // For now, let's assume the controller handles the "admin" role check or we fetch the user here.
-    
+
     const requestor = await this.usersService.findById(userId);
     const isAdmin = requestor?.role === 'admin';
     const isOwner = note.user_id === userId;
@@ -370,5 +401,103 @@ Title:`;
 
     this.logger.warn(`Cleaned up ${stuckNotes.length} stuck research tickets.`);
     return stuckNotes.length;
+  }
+
+  // --- STREAMING & DEEP RESEARCH IMPLEMENTATION ---
+
+  streamResearch(
+    ticker: string,
+    questions?: string,
+  ): Observable<ResearchEvent> {
+    const subject = new Subject<ResearchEvent>();
+    const prompt = this.buildPrompt(ticker, questions);
+
+    void this.runAgent(prompt, subject); // Run async, don't await here
+    return subject.asObservable();
+  }
+
+  private async runAgent(prompt: string, subject: Subject<ResearchEvent>) {
+    try {
+      subject.next({
+        type: 'status',
+        data: 'Initializing Deep Research Agent...',
+      });
+
+      if (!this.client) {
+        subject.next({
+          type: 'error',
+          data: 'Gemini Client not initialized (Missing API Key)',
+        });
+        subject.complete();
+        return;
+      }
+
+      // Use the specific Deep Research Agent API as requested
+      // Casting to 'any' as 'interactions' might not be in the public declarations of the installed SDK version yet
+      const stream = await (this.client as any).interactions.create({
+        agent: this.AGENT_MODEL,
+        input: prompt,
+        background: true, // CRITICAL: Offloads execution to Google to avoid HTTP timeouts
+        stream: true,
+        agent_config: { thinking_summaries: 'auto' }, // CRITICAL: Shows the "reasoning"
+      });
+
+      subject.next({ type: 'status', data: 'Deep Research Agent Running...' });
+
+      for await (const chunk of stream) {
+        // 1. Capture Thoughts (The "Thinking" UI)
+        if (
+          chunk.delta?.type === 'thought_summary' ||
+          chunk.delta?.part?.thought
+        ) {
+          const thoughtText =
+            chunk.delta.text || chunk.delta.part?.thought || 'Thinking...';
+          subject.next({ type: 'thought', data: thoughtText });
+        }
+
+        // 2. Capture Sources (The "Sites Browsed" UI)
+        if (chunk.groundingMetadata?.groundingChunks) {
+          const sources = chunk.groundingMetadata.groundingChunks.map(
+            (c: any) => ({
+              title: c.web?.title,
+              url: c.web?.uri,
+            }),
+          );
+          subject.next({ type: 'source', data: sources });
+        }
+
+        // 3. Capture Content (The Report)
+        if (chunk.delta?.type === 'text' || chunk.delta?.text) {
+          subject.next({ type: 'content', data: chunk.delta.text });
+        }
+      }
+
+      subject.complete();
+    } catch (err: any) {
+      this.logger.error('Deep Research Stream Failed', err);
+      // Detailed error logging
+      if (err.status) this.logger.error(`Status: ${err.status}`);
+      if (err.response)
+        this.logger.error(`Response: ${JSON.stringify(err.response)}`);
+
+      subject.next({
+        type: 'error',
+        data: `Deep Research Failed: ${err.message}`,
+      });
+      subject.complete();
+    }
+  }
+
+  private buildPrompt(ticker: string, questions?: string): string {
+    return `
+      ROLE: Senior Equity Research Analyst.
+      TASK: Deep dive due diligence on ${ticker}.
+      FOCUS: ${questions || 'Growth, Moat, Risks, Valuation'}.
+      REQUIREMENTS:
+      1. Use Markdown.
+      2. Prioritize 10-K/10-Q filings over news snippets.
+      3. Create a Markdown table for last 3y Financials.
+      4. Cite every numerical claim.
+    `;
   }
 }
