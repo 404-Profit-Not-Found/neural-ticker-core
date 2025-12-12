@@ -352,4 +352,13 @@ export class ResearchController {
         })),
       );
   }
+  @ApiOperation({
+    summary: 'Manually trigger financial extraction from latest research',
+  })
+  @ApiResponse({ status: 200, description: 'Extraction started.' })
+  @Post('extract-financials/:ticker')
+  async extractFinancials(@Param('ticker') ticker: string) {
+    await this.researchService.reprocessFinancials(ticker);
+    return { message: 'Extraction started' };
+  }
 }

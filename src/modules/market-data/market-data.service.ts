@@ -4,6 +4,7 @@ import { Repository, Between } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
+import { AnalystRating } from './entities/analyst-rating.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 
@@ -16,6 +17,8 @@ export class MarketDataService {
     private readonly ohlcvRepo: Repository<PriceOhlcv>,
     @InjectRepository(Fundamentals)
     private readonly fundamentalsRepo: Repository<Fundamentals>,
+    @InjectRepository(AnalystRating)
+    private readonly analystRatingRepo: Repository<AnalystRating>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -212,5 +215,41 @@ export class MarketDataService {
     }
 
     await this.fundamentalsRepo.save(entity);
+  }
+
+  async upsertAnalystRatings(
+    symbol: string,
+    ratings: Partial<AnalystRating>[],
+  ): Promise<void> {
+    for (const rating of ratings) {
+      // Basic validation
+      if (!rating.firm || !rating.rating_date) continue;
+
+      const existing = await this.analystRatingRepo.findOne({
+        where: {
+          symbol_id: symbol,
+          firm: rating.firm,
+          rating_date: rating.rating_date,
+        },
+      });
+
+      if (!existing) {
+        await this.analystRatingRepo.save({
+          ...rating,
+          symbol_id: symbol,
+        });
+      }
+    }
+  }
+
+  async getAnalystRatings(symbol: string) {
+    const tickerEntity = await this.tickersService.getTicker(symbol);
+    if (!tickerEntity) return [];
+
+    return this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+      order: { rating_date: 'DESC' },
+      take: 20,
+    });
   }
 }

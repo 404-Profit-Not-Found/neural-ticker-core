@@ -8,9 +8,11 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
 import { TickersModule } from '../tickers/tickers.module';
 
+import { AnalystRating } from './entities/analyst-rating.entity';
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PriceOhlcv, Fundamentals]),
+    TypeOrmModule.forFeature([PriceOhlcv, Fundamentals, AnalystRating]),
     FinnhubModule,
     forwardRef(() => TickersModule),
   ],

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -190,6 +190,35 @@ export class ResearchService {
   }
 
   /**
+   * Manually trigger financial extraction from the latest research note.
+   */
+  async reprocessFinancials(ticker: string): Promise<void> {
+    // Fetch last 5 completed notes
+    const notes = await this.noteRepo
+      .createQueryBuilder('note')
+      .where(':symbol = ANY(note.tickers)', { symbol: ticker })
+      .andWhere('note.status = :status', { status: ResearchStatus.COMPLETED })
+      .orderBy('note.created_at', 'DESC')
+      .take(5)
+      .getMany();
+
+    if (!notes || notes.length === 0) {
+      throw new NotFoundException(`No research found for ${ticker}`);
+    }
+
+    // Process from Oldest -> Newest so newer data overwrites older data
+    const sortedNotes = notes.reverse();
+
+    this.logger.log(`Reprocessing ${sortedNotes.length} notes for ${ticker}...`);
+
+    for (const note of sortedNotes) {
+      await this.extractFinancialsFromResearch([ticker], note.answer_markdown);
+    }
+    
+    this.logger.log(`Completed reprocessing for ${ticker}`);
+  }
+
+  /**
    * Extract key financial metrics from the unstructured research text
    * using a cheap, fast "Flash" model.
    */
@@ -199,20 +228,30 @@ export class ResearchService {
   ): Promise<void> {
     if (tickers.length === 0 || !text) return;
 
-    // We process each ticker individually for safety, or batch if simple.
-    // For now, let's just do the first/main ticker to avoid complexity,
-    // or loop if there are multiple.
+    // We process each ticker individually for safety
     for (const ticker of tickers) {
       try {
         const extractionPrompt = `You are a strict data extraction engine.
-         Extract the following financial metrics for ticker "${ticker}" from the provided text.
-         Return a SINGLE JSON OBJECT. keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity".
-         Values must be NUMBERS. If not found, use null.
-         
-         Text:
-         ${text.substring(0, 15000)}
-         
-         JSON:`;
+          Extract the following for ticker "${ticker}" from the provided text.
+          
+          1. Financial Metrics (Return as object "financials"):
+             keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity", "revenue_ttm", "gross_margin", "net_profit_margin", "operating_margin", "roe", "roa", "price_to_book", "book_value_per_share", "free_cash_flow_ttm", "earnings_growth_yoy", "current_ratio", "quick_ratio", "interest_coverage", "debt_to_assets".
+             Values must be NUMBERS. If not found, use null.
+
+          2. Analyst Ratings (Return as array "ratings"):
+             Each object: { "firm": string, "analyst_name": string | null, "rating": "Buy"|"Hold"|"Sell", "price_target": number | null, "rating_date": "YYYY-MM-DD" }
+             Extract only recent ratings mentioned.
+
+          Return a SINGLE JSON OBJECT structure:
+          {
+            "financials": { ... },
+            "ratings": [ ... ]
+          }
+          
+          Text:
+          ${text.substring(0, 15000)}
+          
+          JSON:`;
 
         const result = await this.llmService.generateResearch({
           question: extractionPrompt,
@@ -220,25 +259,33 @@ export class ResearchService {
           numericContext: {},
           quality: 'extraction' as QualityTier,
           provider: 'gemini',
-          maxTokens: 200, // Short JSON output
+          maxTokens: 1000,
         });
 
-        // Clean and Parse JSON
         let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
-        // Attempt to find the first { and last }
         const start = jsonStr.indexOf('{');
         const end = jsonStr.lastIndexOf('}');
+        
         if (start !== -1 && end !== -1) {
           jsonStr = jsonStr.substring(start, end + 1);
           const data = JSON.parse(jsonStr);
 
-          // Upsert to Market Data Service
-          // We need to inject MarketDataService (already injected)
-          // But we need a dedicated method there.
-          // For now, I will add the method call assuming I will create it next.
-          await this.marketDataService.upsertFundamentals(ticker, data);
+          if (data.financials) {
+            await this.marketDataService.upsertFundamentals(
+              ticker,
+              data.financials,
+            );
+          }
+
+          if (data.ratings && Array.isArray(data.ratings)) {
+            await this.marketDataService.upsertAnalystRatings(
+              ticker,
+              data.ratings,
+            );
+          }
+          
           this.logger.log(
-            `Extracted financials for ${ticker}: ${JSON.stringify(data)}`,
+            `Extracted financials & ratings for ${ticker}`,
           );
         }
       } catch (e) {

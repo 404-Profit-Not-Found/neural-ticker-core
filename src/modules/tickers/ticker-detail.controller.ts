@@ -43,7 +43,7 @@ export class TickerDetailController {
     const { ticker, latestPrice, fundamentals } = snapshot;
 
     // 2. Parallel Fetching for Risk, Research, and History
-    const [riskAnalysis, researchNote, priceHistory] = await Promise.all([
+    const [riskAnalysis, researchNote, priceHistory, analystRatings] = await Promise.all([
       this.riskRewardService.getLatestAnalysis(ticker.id).catch(() => null),
       this.researchService.getLatestNoteForTicker(symbol).catch(() => null),
       this.marketDataService
@@ -54,6 +54,7 @@ export class TickerDetailController {
           new Date().toISOString(),
         )
         .catch(() => []),
+      this.marketDataService.getAnalystRatings(symbol).catch(() => []),
     ]);
 
     // 3. Construct Composite Response
@@ -80,10 +81,28 @@ export class TickerDetailController {
         history: priceHistory || [],
       },
       fundamentals: {
+        ...fundamentals,
         market_cap: fundamentals?.market_cap || ticker.market_capitalization,
         pe_ratio: fundamentals?.pe_ttm,
-        dividend_yield: fundamentals?.dividend_yield,
+        // Ensure new fields are passed through explicitly if TypeScript or DTO restriction applies, 
+        // but spread works for generic object return. 
+        // Explicitly mapping for clarity if API contract demands:
+        revenue_ttm: fundamentals?.revenue_ttm,
+        gross_margin: fundamentals?.gross_margin,
+        net_profit_margin: fundamentals?.net_profit_margin,
+        operating_margin: fundamentals?.operating_margin,
+        roe: fundamentals?.roe,
+        roa: fundamentals?.roa,
+        price_to_book: fundamentals?.price_to_book,
+        book_value_per_share: fundamentals?.book_value_per_share,
+        free_cash_flow_ttm: fundamentals?.free_cash_flow_ttm,
+        earnings_growth_yoy: fundamentals?.earnings_growth_yoy,
+        current_ratio: fundamentals?.current_ratio,
+        quick_ratio: fundamentals?.quick_ratio,
+        interest_coverage: fundamentals?.interest_coverage,
         debt_to_equity: fundamentals?.debt_to_equity,
+        dividend_yield: fundamentals?.dividend_yield,
+        shares_outstanding: ticker.share_outstanding, // Included for UI convenience as requested
       },
       risk_analysis: riskAnalysis
         ? {
@@ -103,14 +122,8 @@ export class TickerDetailController {
             updated_at: riskAnalysis.created_at,
           }
         : null,
-      research: researchNote
-        ? {
-            id: researchNote.id,
-            question: researchNote.question,
-            content: researchNote.answer_markdown,
-            updated_at: researchNote.created_at,
-          }
-        : null,
+      notes: researchNote ? [researchNote] : [], // Legacy support expects array
+      ratings: analystRatings,
     };
   }
 }

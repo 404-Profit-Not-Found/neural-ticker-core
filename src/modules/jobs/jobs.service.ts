@@ -99,7 +99,20 @@ export class JobsService {
           const note = await this.researchService.createResearchTicket(
             null, // System
             [symbol],
-            'Generate a comprehensive Risk/Reward Analysis. Focus on Financial Health, Growth, and Valuation.',
+            `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
+      
+      CRITICAL INSTRUCTION:
+      You MUST act as a data gatherer. 
+      Check for and explicitly mention the following in your analysis if available or estimate/search for them:
+      - Revenue Growth (YoY)
+      - Profit Margins (Gross, Operating, Net)
+      - ROE / ROA
+      - Debt/Equity Ratio
+      - Current Ratio
+      - Recent Analyst Ratings (Buy/Sell, Targets)
+
+      Then provide a Risk/Reward Score (0-10) and a succinct summary.
+      `,
             'gemini',
             'low', // Low tier = gemini-1.5-flash-002 (Cheap)
           );

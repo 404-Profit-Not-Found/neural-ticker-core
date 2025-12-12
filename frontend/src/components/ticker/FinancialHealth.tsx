@@ -8,69 +8,107 @@ interface FinancialHealthProps {
 export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
     if (!fundamentals) return <div className="text-muted-foreground">No financial data available</div>;
 
-    const formatCurrency = (val: number | undefined) => {
-        if (val === undefined) return 'N/A';
+    const formatCurrency = (val: number | undefined | null) => {
+        if (val === undefined || val === null) return 'N/A';
         if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
         if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
         if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
         return `$${val.toLocaleString()}`;
     };
 
-    const runwayColor = (years: number) => {
-        if (years > 2) return 'text-green-500';
-        if (years > 1) return 'text-yellow-500';
-        return 'text-red-500';
+    const formatNumber = (val: number | undefined | null, decimals = 2) => {
+        if (val === undefined || val === null) return '-';
+        return val.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     };
 
+    const formatPercent = (val: number | undefined | null) => {
+        if (val === undefined || val === null) return '-';
+        return `${(val * 100).toFixed(2)}%`;
+    };
+
+    const SectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode }) => (
+        <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider mb-4 border-b border-border/40 pb-2">
+            {icon} {title}
+        </div>
+    );
+
+    const Metric = ({ label, value, subtext }: { label: string; value: React.ReactNode; subtext?: string }) => (
+        <div className="flex flex-col gap-1">
+            <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">{label}</div>
+            <div className="text-xl font-mono font-bold tracking-tight">{value}</div>
+            {subtext && <div className="text-[10px] text-muted-foreground">{subtext}</div>}
+        </div>
+    );
+
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8">
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                    <DollarSign size={14} /> Market Cap
-                </div>
-                <div className="text-2xl font-mono font-bold tracking-tight">{formatCurrency(fundamentals.market_cap)}</div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                    <TrendingUp size={14} /> P/E Ratio
-                </div>
-                <div className="text-2xl font-mono font-bold tracking-tight">{fundamentals.pe_ratio ? fundamentals.pe_ratio?.toFixed(2) : '-'}</div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                    <AlertTriangle size={14} /> Debt/Equity
-                </div>
-                <div className="text-2xl font-mono font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-500">
-                    {fundamentals.debt_to_equity ? fundamentals.debt_to_equity.toFixed(2) : '-'}
+        <div className="flex flex-col gap-8">
+            {/* Valuation & Size */}
+            <div>
+                <SectionHeader title="Valuation & Size" icon={<DollarSign size={14} />} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Metric label="Market Cap" value={formatCurrency(fundamentals.market_cap)} />
+                    <Metric label="P/E Ratio" value={formatNumber(fundamentals.pe_ratio)} />
+                    <Metric label="Price/Book" value={formatNumber(fundamentals.price_to_book)} />
+                    <Metric label="Shares Out" value={formatCurrency(fundamentals.shares_outstanding)?.replace('$', '')} subtext="Outstanding" />
                 </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                    <TrendingUp size={14} /> Yield
-                </div>
-                <div className="text-2xl font-mono font-bold tracking-tight text-green-500">
-                    {fundamentals.dividend_yield ? `${(fundamentals.dividend_yield * 100).toFixed(2)}%` : '-'}
+            {/* Profitability */}
+            <div>
+                <SectionHeader title="Profitability" icon={<TrendingUp size={14} />} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Metric label="Revenue (TTM)" value={formatCurrency(fundamentals.revenue_ttm)} />
+                    <Metric label="Gross Margin" value={formatPercent(fundamentals.gross_margin)} />
+                    <Metric label="Operating Margin" value={formatPercent(fundamentals.operating_margin)} />
+                    <Metric label="Net Profit Margin" value={formatPercent(fundamentals.net_profit_margin)} />
+                    <Metric label="ROE" value={formatPercent(fundamentals.roe)} />
+                    <Metric label="ROA" value={formatPercent(fundamentals.roa)} />
+                    <Metric label="Earnings Growth" value={formatPercent(fundamentals.earnings_growth_yoy)} subtext="YoY" />
+                    <Metric label="Free Cash Flow" value={formatCurrency(fundamentals.free_cash_flow_ttm)} />
                 </div>
             </div>
 
-            {fundamentals.cash_on_hand !== undefined && (
-                <div className="flex flex-col gap-1 col-span-2 md:col-span-4 border-t border-border/50 pt-6 mt-2">
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider mb-1">
-                        <Wallet size={14} /> Cash & Runway
-                    </div>
-                    <div className="flex items-baseline gap-4">
-                        <div className="text-2xl font-mono font-bold tracking-tight">{formatCurrency(fundamentals.cash_on_hand)}</div>
-                        {fundamentals.runway_years !== undefined && (
-                            <span className={`text-sm font-bold ${runwayColor(fundamentals.runway_years)} bg-muted/30 px-2 py-0.5 rounded`}>
-                                {fundamentals.runway_years} Years Runway
+            {/* Financial Strength */}
+            <div>
+                <SectionHeader title="Financial Health" icon={<AlertTriangle size={14} />} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Metric
+                        label="Debt/Equity"
+                        value={
+                            <span className={fundamentals.debt_to_equity && fundamentals.debt_to_equity > 2 ? "text-red-500" : ""}>
+                                {formatNumber(fundamentals.debt_to_equity)}
                             </span>
-                        )}
-                    </div>
+                        }
+                    />
+                    <Metric label="Current Ratio" value={formatNumber(fundamentals.current_ratio)} />
+                    <Metric label="Quick Ratio" value={formatNumber(fundamentals.quick_ratio)} />
+                    <Metric label="Interest Cov" value={
+                        <span className={fundamentals.interest_coverage && fundamentals.interest_coverage < 1.5 ? "text-red-500" : ""}>
+                            {formatNumber(fundamentals.interest_coverage)}
+                        </span>
+                    } />
+                    <Metric label="Book Value/Share" value={`$${formatNumber(fundamentals.book_value_per_share)}`} />
+                    <Metric label="Debt/Assets" value={formatNumber(fundamentals.debt_to_assets)} />
                 </div>
-            )}
+            </div>
+
+            {/* Yields & Runway */}
+            <div>
+                <SectionHeader title="Yields & Liquidity" icon={<Wallet size={14} />} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Metric label="Dividend Yield" value={<span className="text-green-500">{formatPercent(fundamentals.dividend_yield)}</span>} />
+                    {fundamentals.cash_on_hand !== undefined && (
+                        <Metric label="Cash on Hand" value={formatCurrency(fundamentals.cash_on_hand)} />
+                    )}
+                    {fundamentals.runway_years !== undefined && (
+                        <Metric
+                            label="Runway"
+                            value={`${fundamentals.runway_years} Years`}
+                            subtext={fundamentals.runway_years < 1 ? "Critical" : "Healthy"}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

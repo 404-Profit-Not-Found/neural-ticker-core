@@ -63,7 +63,24 @@ describe('TickerDetailController', () => {
           volume: 1000,
           ts: new Date(),
         },
-        fundamentals: { market_cap: 2000000000 },
+        fundamentals: {
+          market_cap: 2000000000,
+          revenue_ttm: 100000000,
+          gross_margin: 0.4,
+          net_profit_margin: 0.2,
+          operating_margin: 0.25,
+          roe: 0.15,
+          roa: 0.1,
+          price_to_book: 5,
+          book_value_per_share: 10,
+          free_cash_flow_ttm: 50000000,
+          earnings_growth_yoy: 0.1,
+          current_ratio: 1.5,
+          quick_ratio: 1.0,
+          interest_coverage: 10,
+          debt_to_equity: 0.5,
+          debt_to_assets: 0.2, // This one wasn't in list but prompt asked for it, entity check needed? prompt asked for it, entity missing it? Let's check entity later.
+        },
       };
       const mockRisk = { overall_score: 8.5 };
       const mockResearch = { id: 'note1', answer_markdown: 'Analysis' };
