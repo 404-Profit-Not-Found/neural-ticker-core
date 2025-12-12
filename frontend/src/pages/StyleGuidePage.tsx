@@ -1,10 +1,11 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   Activity,
   ArrowUpRight,
   BadgeCheck,
   BellRing,
   CheckCircle2,
+  ChevronDown,
   LayoutGrid,
   Palette,
   PanelsTopLeft,
@@ -47,17 +48,52 @@ const sampleTable = [
 export function StyleGuidePage() {
   const { showToast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [previewTheme, setPreviewTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
+  const originalTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
 
   const positiveSwatch = 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(59,130,246,0.15))';
+
+  useEffect(() => {
+    const applyTheme = (theme: string) => {
+      let nextTheme = theme;
+      if (nextTheme.startsWith('g')) nextTheme = 'dark';
+      if (!['light', 'dark', 'rgb'].includes(nextTheme)) nextTheme = 'dark';
+
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
+      document.documentElement.classList.add(`theme-${nextTheme}`);
+
+      if (nextTheme === 'rgb' || nextTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme(previewTheme);
+
+    return () => {
+      if (originalTheme.current) {
+        applyTheme(originalTheme.current);
+      }
+    };
+  }, [previewTheme]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
 
       <main className="container mx-auto max-w-[90rem] px-4 py-8 space-y-10">
-        <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-[#0c111c] via-[#0b1224] to-[#0d0f1a] p-8">
-          <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(37,99,235,0.3), transparent 25%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.2), transparent 20%)' }} />
-          <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+        <section className="style-hero rgb-border relative overflow-hidden rounded-lg border border-border bg-card p-8">
+          <div
+            className="style-hero-blob absolute inset-0 pointer-events-none"
+            aria-hidden
+          />
+          <div
+            className="style-hero-grid absolute inset-0 pointer-events-none"
+            aria-hidden
+          />
+          <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-4 max-w-3xl">
@@ -66,9 +102,7 @@ export function StyleGuidePage() {
                 <span>Settings / Style Language</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 border border-primary/30 text-primary">
-                  <Sparkles className="w-6 h-6" />
-                </div>
+                <Sparkles className="w-10 h-10 text-primary" />
                 <div>
                   <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Neural Ticket UI Library</h1>
                   <p className="text-sm md:text-base text-muted-foreground mt-1">
@@ -78,17 +112,17 @@ export function StyleGuidePage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-primary/15 text-primary border-primary/20">Tokens</Badge>
-                <Badge className="bg-muted text-foreground border-border">Components</Badge>
-                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">States &amp; Feedback</Badge>
-                <Badge className="bg-purple-500/15 text-purple-200 border border-purple-500/30">Layouts</Badge>
+                <Badge variant="default">Tokens</Badge>
+                <Badge variant="secondary">Components</Badge>
+                <Badge variant="strongBuy">States &amp; Feedback</Badge>
+                <Badge variant="purple">Layouts</Badge>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 items-start">
               <Button
                 variant="secondary"
-                className="group w-full justify-between border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                className="group w-full justify-between text-primary hover:bg-primary/10"
                 onClick={() => showToast('Primary actions are `Button` default; use `secondary` for supporting actions.', 'info')}
               >
                 Trigger demo toast
@@ -116,7 +150,7 @@ export function StyleGuidePage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card className="rgb-border">
+            <Card rgb>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="w-5 h-5 text-primary" />
@@ -144,7 +178,7 @@ export function StyleGuidePage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rgb-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <LayoutGrid className="w-5 h-5 text-primary" />
@@ -221,7 +255,7 @@ export function StyleGuidePage() {
 
             <TabsContent value="actions">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Card className="rgb-border">
+                <Card rgb>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Wand2 className="w-5 h-5 text-primary" />
@@ -248,7 +282,7 @@ export function StyleGuidePage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="rgb-border">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Activity className="w-5 h-5 text-primary" />
@@ -266,18 +300,25 @@ export function StyleGuidePage() {
                       <p className="text-xs text-muted-foreground">Helper text sits at 12px/18px.</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-primary/60">
-                        <option>Theme: Dark</option>
-                        <option>Theme: Light</option>
-                        <option>Theme: RGB</option>
-                      </select>
+                      <div className="relative">
+                        <select
+                          className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/60 pr-8"
+                          value={previewTheme}
+                          onChange={(e) => setPreviewTheme(e.target.value)}
+                        >
+                          <option value="dark">Theme: Dark</option>
+                          <option value="light">Theme: Light</option>
+                          <option value="rgb">Theme: RGB</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
+                      </div>
                       <div className="flex items-center gap-2">
-                        <button className="flex-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-medium hover:border-primary/40 hover:bg-primary/5">
+                        <Button variant="outline" className="flex-1">
                           Toggle chip
-                        </button>
-                        <button className="flex-1 rounded-md border border-primary bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+                        </Button>
+                        <Button variant="secondary" className="flex-1 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20">
                           Selected
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -324,7 +365,7 @@ export function StyleGuidePage() {
                       <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div className="text-sm text-muted-foreground">Alpha Score</div>
-                          <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">+12.3%</Badge>
+                          <Badge variant="strongBuy" className="[data-theme=light]:text-black px-3 py-1">+12.3%</Badge>
                         </div>
                         <p className="mt-2 text-2xl font-semibold text-foreground">Momentum</p>
                         <p className="text-xs text-muted-foreground">Use for KPI tiles and quick stats.</p>
@@ -335,9 +376,9 @@ export function StyleGuidePage() {
                             <p className="text-sm text-muted-foreground">Portfolio health</p>
                             <p className="text-xl font-semibold">Stable</p>
                           </div>
-                          <div className="rounded-full px-3 py-1 text-xs font-medium text-emerald-300 border border-emerald-500/30" style={{ background: positiveSwatch }}>
+                          <Badge variant="strongBuy" className="[data-theme=light]:text-black px-3 py-1 font-semibold" style={{ background: positiveSwatch }}>
                             Low risk
-                          </div>
+                          </Badge>
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                           <span>Volatility</span>
@@ -378,7 +419,7 @@ export function StyleGuidePage() {
                                 <Badge variant={mapStatusToVariant(row.status)}>{row.status}</Badge>
                               </td>
                               <td className="px-4 py-3 text-right text-foreground">${row.price.toFixed(2)}</td>
-                              <td className={cn('px-4 py-3 text-right font-medium', row.change >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                              <td className={cn('px-4 py-3 text-right font-medium', row.change >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                                 {row.change >= 0 ? '+' : ''}
                                 {row.change.toFixed(1)}%
                               </td>
@@ -411,22 +452,22 @@ export function StyleGuidePage() {
                       <Button size="sm" onClick={() => showToast('Saved to your workspace', 'success')}>Success toast</Button>
                       <Button size="sm" variant="outline" onClick={() => showToast('Connection hiccup, retrying...', 'info')}>Info toast</Button>
                     </div>
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-200 [data-theme='light']:bg-emerald-100 [data-theme='light']:border-emerald-200 [data-theme='light']:text-emerald-800">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 [data-theme='light']:text-emerald-600" />
                         Successful action stays inline when users need context.
                       </div>
                     </div>
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200 [data-theme='light']:bg-red-100 [data-theme='light']:border-red-200 [data-theme='light']:text-red-800">
                       <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4" />
+                        <Activity className="w-4 h-4 text-red-600 [data-theme='light']:text-red-600" />
                         Errors should explain the next step, not just what failed.
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card rgb>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-primary" />
@@ -497,7 +538,7 @@ export function StyleGuidePage() {
           </div>
         </div>
       </Dialog>
-    </div>
+    </div >
   );
 }
 
@@ -512,21 +553,45 @@ function StatPill({
   value: string;
   tone?: 'primary' | 'muted' | 'accent' | 'emerald';
 }) {
-  const toneClass = {
-    primary: 'bg-primary/10 text-primary border-primary/20',
-    muted: 'bg-muted/30 text-foreground border-border',
-    accent: 'bg-purple-500/10 text-purple-200 border-purple-500/30',
-    emerald: 'bg-emerald-500/10 text-emerald-200 border-emerald-500/30'
-  }[tone];
+  const gradients: Record<string, string> = {
+    primary: 'linear-gradient(90deg, #22d3ee, #2563eb)',
+    muted: 'linear-gradient(90deg, #a855f7, #6366f1)',
+    accent: 'linear-gradient(90deg, #6366f1, #a855f7)',
+    emerald: 'linear-gradient(90deg, #22c55e, #14b8a6)',
+  };
+
+  const iconColors: Record<string, string> = {
+    primary: 'text-blue-600 dark:text-blue-400',
+    muted: 'text-purple-600 dark:text-purple-300',
+    accent: 'text-indigo-600 dark:text-indigo-300',
+    emerald: 'text-emerald-600 dark:text-emerald-300',
+  };
 
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl border px-4 py-3 shadow-sm', toneClass)}>
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border/40 bg-background/60">
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-lg font-semibold">{value}</p>
+    <div
+      className={cn(
+        'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
+      )}
+      style={{
+        background:
+          'linear-gradient(rgb(var(--card)), rgb(var(--card))) padding-box, ' +
+          `${gradients[tone] || gradients.primary} border-box`,
+      }}
+    >
+      <div
+        className="style-kpi-grid absolute inset-0 opacity-25 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
+          backgroundSize: '18px 18px'
+        }}
+        aria-hidden
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+        </div>
+        <Icon className={cn('w-5 h-5', iconColors[tone])} />
       </div>
     </div>
   );
