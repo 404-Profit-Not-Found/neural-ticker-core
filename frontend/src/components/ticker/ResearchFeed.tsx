@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { UploadResearchDialog } from './UploadResearchDialog';
-import { RunAnalysisDialog, type ModelOption } from './RunAnalysisDialog'; // Import the new dialog
+import { RunAnalysisDialog } from './RunAnalysisDialog'; // Import the new dialog
 import { Badge } from '../ui/badge';
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';

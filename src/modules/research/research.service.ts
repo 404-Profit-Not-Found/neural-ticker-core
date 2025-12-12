@@ -426,6 +426,7 @@ Title:`;
     status: string,
     page: number = 1,
     limit: number = 10,
+    ticker?: string,
   ): Promise<{
     data: ResearchNote[];
     total: number;
@@ -438,6 +439,10 @@ Title:`;
 
     if (status && status !== 'all') {
       query.andWhere('note.status = :status', { status });
+    }
+
+    if (ticker) {
+      query.andWhere(':ticker = ANY(note.tickers)', { ticker });
     }
 
     query.orderBy('note.created_at', 'DESC');

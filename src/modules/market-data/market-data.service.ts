@@ -302,8 +302,11 @@ export class MarketDataService {
       symbols.map(async (symbol) => {
         try {
           const items =
-            (await this.finnhubService.getCompanyNews(symbol, fromStr, toStr)) ||
-            [];
+            (await this.finnhubService.getCompanyNews(
+              symbol,
+              fromStr,
+              toStr,
+            )) || [];
           return { symbol, count: items.length };
         } catch (err) {
           this.logger.warn(

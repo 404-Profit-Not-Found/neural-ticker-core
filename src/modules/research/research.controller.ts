@@ -237,12 +237,19 @@ export class ResearchController {
       },
     },
   })
+  @ApiQuery({
+    name: 'ticker',
+    required: false,
+    type: String,
+    description: 'Filter by ticker symbol',
+  })
   @Get()
   async list(
     @Request() req: any,
     @Query('status') status: string = 'all',
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
+    @Query('ticker') ticker?: string,
   ) {
     const userId = req.user.id;
     return this.researchService.findAll(
@@ -250,6 +257,7 @@ export class ResearchController {
       status,
       Number(page),
       Number(limit),
+      ticker,
     );
   }
 

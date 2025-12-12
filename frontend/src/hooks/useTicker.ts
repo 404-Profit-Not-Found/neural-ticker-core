@@ -131,14 +131,18 @@ export function usePostComment() {
 // We can use useQuery for fetching completed research, and manual mutation for triggering.
 export function useTickerResearch(symbol?: string) {
     return useQuery({
-        queryKey: tickerKeys.research(symbol || ''),
+        queryKey: tickerKeys.research(symbol || 'all'), // Changed to distinct key if symbol exists
         queryFn: async () => {
-            if (!symbol) return [];
-            const res = await api.get('/research');
-            // Client side filtering for this ticker
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const relevant = res.data?.data?.filter((t: any) => t.tickers.includes(symbol)).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            return relevant || [];
+            // If no symbol, we might want to return empty or all, but here we expect usage context
+            // But API now supports filtering.
+            const params: Record<string, any> = { limit: 50 }; // Increased limit
+            if (symbol) {
+                params.ticker = symbol;
+            }
+            
+            const res = await api.get('/research', { params });
+            // API returns paginated structure { data: [], total, ... }
+            return res.data?.data || [];
         },
         enabled: !!symbol,
         staleTime: 0, 
