@@ -45,7 +45,7 @@ interface ResearchNote {
     error?: string;
     tokens_in?: number; // Add this
     tokens_out?: number; // Add this
-    numeric_context?: Record<string, any>; // Add this
+    numeric_context?: Record<string, unknown>; // Add this
 }
 
 export function ResearchPage() {

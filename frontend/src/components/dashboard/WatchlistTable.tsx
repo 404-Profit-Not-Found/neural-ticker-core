@@ -166,7 +166,7 @@ export function WatchlistTable() {
     const watchlistItems = useMemo(() => {
         if (!activeWatchlist || !activeWatchlist.items) return EMPTY_ITEMS;
         return Array.isArray(activeWatchlist.items) ? activeWatchlist.items : EMPTY_ITEMS;
-    }, [activeWatchlist?.items]);
+    }, [activeWatchlist]);
 
     const symbols = useMemo(() => {
         if (!watchlistItems || watchlistItems.length === 0) return EMPTY_SYMBOLS;
@@ -307,7 +307,7 @@ export function WatchlistTable() {
         } else {
             setShowSuggestions(false);
         }
-    }, [searchTickerQuery.data?.length]);
+    }, [searchTickerQuery.data]);
 
     // Close handlers
     // Global listeners removed in favor of Backdrop pattern

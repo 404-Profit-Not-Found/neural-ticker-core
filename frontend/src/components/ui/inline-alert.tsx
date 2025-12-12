@@ -49,4 +49,4 @@ function InlineAlert({ className, variant = "info", icon = true, children, ...pr
     )
 }
 
-export { InlineAlert, alertVariants }
+export { InlineAlert }

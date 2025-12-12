@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { UploadResearchDialog } from './UploadResearchDialog';
 import { Badge } from '../ui/badge';
-import { useState } from 'react';
+import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
 import type { ResearchItem } from '../../types/ticker';
@@ -26,20 +26,20 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
 
-    const startEditing = (item: ResearchItem, e: React.MouseEvent) => {
+    const startEditing = (item: ResearchItem, e: MouseEvent) => {
         e.stopPropagation();
         setEditingId(item.id);
         setEditValue(item.title || item.question || '');
     };
 
-    const cancelEditing = (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const cancelEditing = (e?: MouseEvent | KeyboardEvent) => {
+        e?.stopPropagation();
         setEditingId(null);
         setEditValue('');
     };
 
-    const saveTitle = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const saveTitle = (id: string, e?: MouseEvent | KeyboardEvent) => {
+        e?.stopPropagation();
         if (editValue.trim()) {
             updateTitleMutation.mutate({ id, title: editValue });
         }
@@ -80,7 +80,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                     {research && research.length > 0 ? (
                         research.map((item) => {
                             // Permission check: Admin or Author
-                            const isOwner = user?.id === (item as any).user_id; // Check if user_id is coming from backend even if type is loose
+                            const isOwner = user?.id === item.user_id;
                             const isAdmin = user?.role?.toLowerCase() === 'admin';
                             const canEdit = isAdmin || isOwner;
 
@@ -104,9 +104,9 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                             value={editValue}
                                                             onChange={(e) => setEditValue(e.target.value)}
                                                             onClick={e => e.stopPropagation()}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') saveTitle(item.id, (e as any));
-                                                                if (e.key === 'Escape') cancelEditing((e as any));
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveTitle(item.id, e);
+                                                                if (e.key === 'Escape') cancelEditing(e);
                                                             }}
                                                         />
                                                         <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500 hover:text-green-600 hover:bg-green-500/10" onClick={(e) => saveTitle(item.id, e)}>

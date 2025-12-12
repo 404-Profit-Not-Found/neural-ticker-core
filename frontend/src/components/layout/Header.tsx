@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Bell, Settings, User as UserIcon, Shield, Palette } from 'lucide-react';
@@ -20,8 +20,10 @@ export function Header() {
       : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
     }`;
 
+  const closeMenu = useEffectEvent(() => setMenuOpen(false));
+
   useEffect(() => {
-    setMenuOpen(false);
+    closeMenu();
   }, [location.pathname]);
 
   const goTo = (path: string) => {

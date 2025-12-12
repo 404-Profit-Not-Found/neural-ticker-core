@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
 import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User } from 'lucide-react';
@@ -47,11 +47,7 @@ export function AdminConsole() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         // Don't load if not admin
         if (!currentUser || currentUser.role !== 'admin') {
             setLoading(false);
@@ -76,7 +72,11 @@ export function AdminConsole() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentUser, navigate]);
+
+    useEffect(() => {
+        void loadData();
+    }, [loadData]);
 
     const handleAddEmail = async (e: React.FormEvent) => {
         e.preventDefault();

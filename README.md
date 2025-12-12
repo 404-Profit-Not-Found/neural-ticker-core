@@ -41,10 +41,21 @@ classDiagram
         +DATE ipo_date
         +NUMERIC market_capitalization
         +NUMERIC share_outstanding
+        +TEXT phone
+        +TEXT web_url
+        +TEXT logo_url
         +TEXT finnhub_industry
         +TEXT sector
+        +TEXT industry
         +JSONB finnhub_raw
+        +TIMESTAMPTZ created_at
         +TIMESTAMPTZ updated_at
+    }
+
+    class ticker_logos {
+        +BIGINT symbol_id
+        +BYTEA image_data
+        +TEXT mime_type
     }
 
     class users {
@@ -53,17 +64,28 @@ classDiagram
         +TEXT google_id
         +TEXT full_name
         +ENUM role
-        +JSONB preferences
         +TEXT avatar_url
+        +TEXT nickname
+        +TEXT view_mode
+        +TEXT theme
+        +JSONB preferences
         +TIMESTAMPTZ last_login
+        +TIMESTAMPTZ created_at
+        +TIMESTAMPTZ updated_at
+    }
+
+    class allowed_users {
+        +UUID id
+        +TEXT email
+        +TIMESTAMPTZ created_at
     }
 
     class auth_logs {
         +UUID id
         +UUID user_id
         +TEXT provider
-        +TIMESTAMPTZ login_at
         +TEXT ip_address
+        +TIMESTAMPTZ login_at
     }
 
     class price_ohlcv {
@@ -113,18 +135,25 @@ classDiagram
     class risk_analyses {
         +BIGINT id
         +BIGINT ticker_id
-        +TIMESTAMPTZ created_at
+        +TEXT model_version
         +NUMERIC overall_score
         +NUMERIC financial_risk
         +NUMERIC execution_risk
+        +NUMERIC dilution_risk
         +NUMERIC competitive_risk
         +NUMERIC regulatory_risk
-        +NUMERIC upside_percent
+        +INTEGER time_horizon_years
         +NUMERIC price_target_weighted
-        +JSONB red_flags
-        +TEXT research_note_id
+        +NUMERIC upside_percent
         +NUMERIC analyst_target_avg
+        +NUMERIC analyst_target_range_low
+        +NUMERIC analyst_target_range_high
         +TEXT sentiment
+        +JSONB fundamentals
+        +JSONB red_flags
+        +JSONB metadata
+        +TEXT research_note_id
+        +TIMESTAMPTZ created_at
     }
 
     class risk_scenarios {
@@ -135,6 +164,29 @@ classDiagram
         +NUMERIC price_mid
         +TEXT description
         +TEXT[] key_drivers
+    }
+
+    class risk_qualitative_factors {
+        +BIGINT id
+        +BIGINT analysis_id
+        +ENUM factor_type
+        +TEXT description
+    }
+
+    class risk_catalysts {
+        +BIGINT id
+        +BIGINT analysis_id
+        +ENUM timeframe
+        +TEXT description
+    }
+
+    class comments {
+        +BIGINT id
+        +TEXT ticker_symbol
+        +UUID user_id
+        +TEXT content
+        +TIMESTAMPTZ created_at
+        +TIMESTAMPTZ updated_at
     }
 
     class stocktwits_posts {
@@ -168,16 +220,21 @@ classDiagram
         +TIMESTAMPTZ added_at
     }
 
+    tickers "1" -- "1" ticker_logos : has logo
     tickers "1" -- "*" price_ohlcv : has history
     tickers "1" -- "1" fundamentals : has current stats
     tickers "1" -- "*" risk_analyses : has risk profile
-    risk_analyses "1" -- "*" risk_scenarios : has scenarios
     tickers "1" -- "*" stocktwits_posts : mentions
     tickers "1" -- "*" stocktwits_watchers : tracked in
+    tickers "1" -- "*" comments : discussed in
+    risk_analyses "1" -- "*" risk_scenarios : has scenarios
+    risk_analyses "1" -- "*" risk_qualitative_factors : has SWOT factors
+    risk_analyses "1" -- "*" risk_catalysts : has catalysts
     research_notes "1" -- "*" risk_analyses : generates
     users "1" -- "*" auth_logs : logs login
     users "1" -- "*" research_notes : requests
     users "1" -- "*" watchlists : owns
+    users "1" -- "*" comments : writes
     watchlists "1" -- "*" watchlist_items : contains
     watchlist_items "*" -- "1" tickers : references
 ```
@@ -203,14 +260,30 @@ Detailed API documentation enabled in development at `/api` (or `/swagger`).
 
 ## 🧠 AI Model Configuration
 
-Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `models.yml` or environment variables.
+Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `src/config/configuration.ts`.
 
-| Tier | OpenAI | Gemini | Notes |
+> [!IMPORTANT]
+> As of December 2025, only **Gemini 3** and **Gemini 2.5** series are supported. Legacy 1.5/2.0 models are deprecated.
+
+| Tier | OpenAI | Gemini | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-3-flash-preview` | Cost-efficient for simple tasks |
-| **Medium** | `gpt-4.1-mini` | `gemini-3-flash-preview` | **Default: Gemini 3 with Google Search** |
-| **High** | `gpt-5-mini` | `gemini-3-flash-preview` | Enhanced reasoning capabilities |
-| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` | Maximum depth with extended thinking |
+| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash` | Quick sentiment, simple extraction |
+| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
+| **Deep** | `gpt-5.1`| `gemini-3-pro` | 10-K analysis, thesis generation |
+
+### Deep Research Agent
+
+For autonomous multi-minute investigations, use the **Deep Research Agent** (`deep-research-pro-preview-12-2025`):
+
+```typescript
+// Interactions API (not generateContent)
+await client.interactions.create({
+  agent: 'deep-research-pro-preview-12-2025',
+  input: 'Deep dive into NVDA focusing on regulatory risks.',
+  background: true,
+  stream: true,
+});
+```
 
 ## 💻 Frontend Integration
 

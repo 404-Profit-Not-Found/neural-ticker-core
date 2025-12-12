@@ -43,6 +43,7 @@ export interface ResearchItem {
         avatar_url?: string;
     };
     provider?: string;
+    user_id?: string;
 }
 
 export interface TickerData {

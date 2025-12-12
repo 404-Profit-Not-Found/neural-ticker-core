@@ -79,11 +79,12 @@ export function StyleGuidePage() {
       }
     };
 
+    const initialTheme = originalTheme.current;
     applyTheme(previewTheme);
 
     return () => {
-      if (originalTheme.current) {
-        applyTheme(originalTheme.current);
+      if (initialTheme) {
+        applyTheme(initialTheme);
       }
     };
   }, [previewTheme]);
