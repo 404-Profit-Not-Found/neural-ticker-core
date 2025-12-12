@@ -51,10 +51,77 @@ export class JobsService {
     }
   }
 
-  runRiskRewardScanner() {
-    this.logger.log(
-      'Risk/Reward Scanner is disabled per configuration (Deep Research only).',
-    );
-    // Logic removed to prevent low-tier score generation.
+  async runRiskRewardScanner() {
+    this.logger.log('Starting Periodic Risk/Reward Scanner (Low Tier)...');
+    try {
+      const tickers = await this.tickersService.getAllTickers();
+      this.logger.log(`Found ${tickers.length} tickers to scan.`);
+
+      let processed = 0;
+      let skipped = 0;
+      const hours48 = 48 * 60 * 60 * 1000;
+
+      for (const ticker of tickers) {
+        if (!ticker.symbol) continue;
+        const symbol = ticker.symbol;
+
+        try {
+          // Check if we have recent analysis
+          // We need Ticker ID for this. getAllTickers returns existing entities with IDs.
+          // TickersService.getAllTickers returns Partial<TickerEntity> but typically includes ID if selected or full object.
+          // Let's verify getAllTickers implementation. It selects specific fields. We might need ID.
+          // Adjusting logic to fetch ticker detail if id is missing or assume getAllTickers returns enough.
+          // If getAllTickers selects are restrictive, we might need to fetch full ticker or use symbol to find ID.
+          // RiskRewardService.getLatestAnalysis takes tickerId.
+          // Let's assume we can fetch the ticker by symbol to get ID efficiently if needed, or update getAllTickers.
+          // Better: TickersService.getTicker(symbol) is cached/fast-ish? No.
+          // Let's rely on TickersService.getAllTickers() returning what we need or fetch fresh.
+          
+          // Optimization: Check existing analysis via RiskRewardService which might need to look up ticker ID internally or we provide it.
+          // RiskRewardService.getLatestScore(symbol) encapsulates this! 
+          // It calls marketDataService.getSnapshot(symbol) which gets Ticker ID.
+          // Then calls getLatestAnalysis(tickerId).
+          
+          const existingAnalysis = await this.riskRewardService.getLatestScore(symbol);
+          
+          const isStale =
+            !existingAnalysis ||
+            Date.now() - existingAnalysis.created_at.getTime() > hours48;
+
+          if (!isStale) {
+            skipped++;
+            continue;
+          }
+
+          this.logger.log(`Queueing Low-Tier Scan for ${symbol}...`);
+
+          // Create System Research Ticket (User ID = null)
+          const note = await this.researchService.createResearchTicket(
+            null, // System
+            [symbol],
+            'Generate a comprehensive Risk/Reward Analysis. Focus on Financial Health, Growth, and Valuation.',
+            'gemini',
+            'low', // Low tier = gemini-1.5-flash-002 (Cheap)
+          );
+
+          // Process immediately (or could just leave it if there was a separate worker, but here we process)
+          await this.researchService.processTicket(note.id);
+          
+          processed++;
+          
+          // Slight delay to be nice to API rate limits
+          await new Promise((r) => setTimeout(r, 2000)); 
+
+        } catch (err) {
+          this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
+        }
+      }
+
+      this.logger.log(
+        `Scanner Complete. Processed: ${processed}, Skipped: ${skipped}`,
+      );
+    } catch (e) {
+      this.logger.error('Risk/Reward Scanner failed globally', e);
+    }
   }
 }

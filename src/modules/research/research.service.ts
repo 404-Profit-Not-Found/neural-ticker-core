@@ -45,7 +45,7 @@ export class ResearchService {
   }
 
   async createResearchTicket(
-    userId: string,
+    userId: string | null, // Nullable for system jobs
     tickers: string[],
     question: string,
     provider: 'openai' | 'gemini' | 'ensemble' = 'gemini',
@@ -59,7 +59,7 @@ export class ResearchService {
       quality,
       numeric_context: {}, // Filled during processing
       status: ResearchStatus.PENDING,
-      user_id: userId,
+      user_id: userId || undefined, // TypeORM expects undefined for nullable columns in create() sometimes if strict
     });
     return this.noteRepo.save(note);
   }

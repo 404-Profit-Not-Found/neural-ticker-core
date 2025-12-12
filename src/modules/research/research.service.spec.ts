@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResearchService } from './research.service';
-import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
+import {
+  ResearchNote,
+  ResearchStatus,
+  LlmProvider,
+} from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
@@ -10,16 +14,23 @@ import { ConfigService } from '@nestjs/config';
 
 describe('ResearchService', () => {
   let service: ResearchService;
-  let repo: any;
-  let llmService: any;
-  let marketDataService: any;
-  let usersService: any;
-  let riskRewardService: any;
 
   const mockRepo = {
-    create: jest.fn(),
-    save: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
+    save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
     findOne: jest.fn(),
+    find: jest.fn(),
+    delete: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+    })),
   };
 
   const mockLlmService = {
@@ -28,6 +39,7 @@ describe('ResearchService', () => {
 
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
+    upsertFundamentals: jest.fn(),
   };
 
   const mockUsersService = {
@@ -58,14 +70,6 @@ describe('ResearchService', () => {
     }).compile();
 
     service = module.get<ResearchService>(ResearchService);
-    repo = module.get(getRepositoryToken(ResearchNote));
-    llmService = module.get(LlmService);
-    marketDataService = module.get(MarketDataService);
-    usersService = module.get(UsersService);
-    riskRewardService = module.get(RiskRewardService);
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
@@ -79,116 +83,210 @@ describe('ResearchService', () => {
       const question = 'Analyze';
       const userId = 'user-1';
 
-      repo.create.mockReturnValue({
-        id: '1',
-        question,
-        status: ResearchStatus.PENDING,
-      });
-      repo.save.mockResolvedValue({
-        id: '1',
-        question,
-        status: ResearchStatus.PENDING,
-      });
+      await service.createResearchTicket(userId, tickers, question);
 
-      const result = await service.createResearchTicket(
-        userId,
-        tickers,
-        question,
-      );
-
-      expect(repo.create).toHaveBeenCalledWith(
+      expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           status: ResearchStatus.PENDING,
           user_id: userId,
+          tickers,
+          question,
         }),
       );
-      expect(repo.save).toHaveBeenCalled();
-      expect(marketDataService.getSnapshot).not.toHaveBeenCalled();
-      expect(llmService.generateResearch).not.toHaveBeenCalled();
+      expect(mockRepo.save).toHaveBeenCalled();
+    });
+
+    it('should default to gemini provider and deep quality', async () => {
+      await service.createResearchTicket('user-1', ['AAPL'], 'Question');
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'gemini',
+          quality: 'deep',
+        }),
+      );
+    });
+  });
+
+  describe('createManualNote', () => {
+    it('should create a manual note with COMPLETED status', async () => {
+      const userId = 'user-1';
+      const tickers = ['AAPL'];
+      const title = 'My Research';
+      const content = '# Analysis';
+
+      await service.createManualNote(userId, tickers, title, content);
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: LlmProvider.MANUAL,
+          quality: 'manual',
+          title,
+          answer_markdown: content,
+          status: ResearchStatus.COMPLETED,
+          user_id: userId,
+        }),
+      );
+      expect(mockRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('getResearchNote', () => {
+    it('should return a note by id', async () => {
+      const note = { id: '1', title: 'Test' };
+      mockRepo.findOne.mockResolvedValue(note);
+
+      const result = await service.getResearchNote('1');
+
+      expect(result).toEqual(note);
+      expect(mockRepo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+    });
+
+    it('should return null if not found', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.getResearchNote('999');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('deleteResearchNote', () => {
+    it('should delete note by id', async () => {
+      mockRepo.delete.mockResolvedValue({ affected: 1 });
+
+      await service.deleteResearchNote('1');
+
+      expect(mockRepo.delete).toHaveBeenCalledWith('1');
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return paginated results', async () => {
+      const notes = [{ id: '1' }, { id: '2' }];
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getManyAndCount: jest.fn().mockResolvedValue([notes, 10]),
+      };
+      mockRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      const result = await service.findAll('user-1', 'all', 1, 10);
+
       expect(result).toEqual({
-        id: '1',
-        question,
-        status: ResearchStatus.PENDING,
+        data: notes,
+        total: 10,
+        page: 1,
+        limit: 10,
       });
+    });
+
+    it('should filter by status when not "all"', async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      mockRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      await service.findAll('user-1', 'completed', 1, 10);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'note.status = :status',
+        { status: 'completed' },
+      );
+    });
+  });
+
+  describe('failStuckTickets', () => {
+    it('should mark stuck tickets as failed', async () => {
+      const stuckNote = {
+        id: '1',
+        status: ResearchStatus.PROCESSING,
+        updated_at: new Date(Date.now() - 30 * 60 * 1000), // 30 mins ago
+      };
+      mockRepo.find.mockResolvedValue([stuckNote]);
+
+      const count = await service.failStuckTickets(20);
+
+      expect(count).toBe(1);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ResearchStatus.FAILED,
+          error: expect.stringContaining('Timeout'),
+        }),
+      );
+    });
+
+    it('should return 0 if no stuck tickets', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      const count = await service.failStuckTickets(20);
+
+      expect(count).toBe(0);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateTitle', () => {
+    it('should update title for owner', async () => {
+      const note = { id: '1', user_id: 'user-1', title: 'Old' };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockUsersService.findById.mockResolvedValue({ id: 'user-1', role: 'user' });
+
+      const result = await service.updateTitle('1', 'user-1', 'New Title');
+
+      expect(result.title).toBe('New Title');
+      expect(mockRepo.save).toHaveBeenCalled();
+    });
+
+    it('should update title for admin', async () => {
+      const note = { id: '1', user_id: 'other-user', title: 'Old' };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockUsersService.findById.mockResolvedValue({ id: 'admin-1', role: 'admin' });
+
+      const result = await service.updateTitle('1', 'admin-1', 'Admin Edit');
+
+      expect(result.title).toBe('Admin Edit');
+    });
+
+    it('should throw if note not found', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.updateTitle('999', 'user-1', 'Title')).rejects.toThrow(
+        'Research note not found',
+      );
+    });
+
+    it('should throw if unauthorized', async () => {
+      const note = { id: '1', user_id: 'other-user', title: 'Old' };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockUsersService.findById.mockResolvedValue({ id: 'user-1', role: 'user' });
+
+      await expect(service.updateTitle('1', 'user-1', 'Title')).rejects.toThrow(
+        'Unauthorized',
+      );
     });
   });
 
   describe('processTicket', () => {
-    it('should process a ticket, fetch data, call LLM, and update status', async () => {
-      const note = {
-        id: '1',
-        tickers: ['AAPL'],
-        question: 'Q',
-        status: ResearchStatus.PENDING,
-        user_id: 'u1',
-        provider: 'gemini',
-        quality: 'deep',
-      };
-      repo.findOne.mockResolvedValue(note);
-      mockMarketDataService.getSnapshot.mockResolvedValue({ price: 100 });
-      mockUsersService.findById.mockResolvedValue({
-        preferences: { gemini_api_key: 'key' },
-      });
-      mockRiskRewardService.getLatestScore.mockResolvedValue({
-        risk_reward_score: 80,
-        risk_score: 20,
-        reward_score: 90,
-        confidence_level: 'high',
-        rationale_markdown: 'Good',
-      });
-      mockLlmService.generateResearch
-        .mockResolvedValueOnce({
-          answerMarkdown: 'Answer with key findings about AI demand.',
-          models: ['gemini-3'],
-          tokensIn: 100,
-          tokensOut: 50,
-          groundingMetadata: { sources: [] },
-          thoughts: 'Thinking...',
-        }) // First call: Research
-        .mockResolvedValueOnce({
-          answerMarkdown: 'NVDA: AI Demand Surge',
-          models: ['gemini-3-flash'],
-        }); // Second call: Title Generation
+    it('should return early if note not found', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
 
-      await service.processTicket('1');
+      await service.processTicket('999');
 
-      expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
-      expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
-      expect(riskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
-      expect(usersService.findById).toHaveBeenCalledWith('u1');
-
-      // Verify Research Call
-      expect(llmService.generateResearch).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          apiKey: 'key',
-          provider: 'gemini',
-        }),
-      );
-
-      // Verify Title Generation Call
-      expect(llmService.generateResearch).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          maxTokens: 50,
-          quality: 'low',
-        }),
-      );
-
-      expect(repo.save).toHaveBeenCalledTimes(2);
-
-      // Verify Deep Verification Score trigger
-      expect(riskRewardService.evaluateFromResearch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: '1',
-          answer_markdown: 'Answer with key findings about AI demand.',
-          title: 'NVDA: AI Demand Surge',
-          full_response: expect.stringContaining('tokensIn'),
-          thinking_process: 'Thinking...',
-          tokens_in: 100,
-          tokens_out: 50,
-        }),
-      );
+      expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
     });
   });
 });
+

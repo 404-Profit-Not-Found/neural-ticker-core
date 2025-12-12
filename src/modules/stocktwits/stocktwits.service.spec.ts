@@ -5,7 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 import { TickersService } from '../tickers/tickers.service';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 describe('StockTwitsService', () => {
   let service: StockTwitsService;
@@ -19,7 +19,7 @@ describe('StockTwitsService', () => {
 
   const mockPostsRepo = {
     findOne: jest.fn(),
-    create: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
     save: jest.fn(),
     find: jest.fn(),
     findAndCount: jest.fn(),
@@ -55,10 +55,11 @@ describe('StockTwitsService', () => {
     httpService = module.get<HttpService>(HttpService);
     postsRepo = module.get(getRepositoryToken(StockTwitsPost));
     watchersRepo = module.get(getRepositoryToken(StockTwitsWatcher));
+    jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 
   describe('fetchAndStorePosts', () => {
@@ -79,8 +80,7 @@ describe('StockTwitsService', () => {
       };
 
       mockHttpService.get.mockReturnValue(of(mockResponse));
-      mockPostsRepo.findOne.mockResolvedValue(null); // Post does not exist
-      mockPostsRepo.create.mockReturnValue({ id: 101, symbol });
+      mockPostsRepo.findOne.mockResolvedValue(null);
 
       await service.fetchAndStorePosts(symbol);
 
@@ -100,11 +100,25 @@ describe('StockTwitsService', () => {
       };
 
       mockHttpService.get.mockReturnValue(of(mockResponse));
-      mockPostsRepo.findOne.mockResolvedValue({ id: 101 }); // Post exists
+      mockPostsRepo.findOne.mockResolvedValue({ id: 101 });
 
       await service.fetchAndStorePosts(symbol);
 
       expect(postsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle missing messages', async () => {
+      mockHttpService.get.mockReturnValue(of({ data: {} }));
+
+      await service.fetchAndStorePosts('AAPL');
+
+      expect(postsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      await expect(service.fetchAndStorePosts('AAPL')).resolves.toBeUndefined();
     });
   });
 
@@ -128,6 +142,60 @@ describe('StockTwitsService', () => {
         }),
       );
     });
+
+    it('should handle missing watcher count', async () => {
+      mockHttpService.get.mockReturnValue(of({ data: {} }));
+
+      await service.trackWatchers('AAPL');
+
+      expect(watchersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      await expect(service.trackWatchers('AAPL')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('handleHourlyPostsSync', () => {
+    it('should sync posts for all tickers', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'GOOGL' },
+      ]);
+      mockHttpService.get.mockReturnValue(of({ data: { messages: [] } }));
+
+      await service.handleHourlyPostsSync();
+
+      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('should skip tickers without symbol', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { name: 'no symbol' },
+      ]);
+      mockHttpService.get.mockReturnValue(of({ data: { messages: [] } }));
+
+      await service.handleHourlyPostsSync();
+
+      expect(mockHttpService.get).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('handleDailyWatchersSync', () => {
+    it('should sync watchers for all tickers', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'GOOGL' },
+      ]);
+      mockHttpService.get.mockReturnValue(of({ data: { symbol: { watchlist_count: 100 } } }));
+
+      await service.handleDailyWatchersSync();
+
+      expect(watchersRepo.save).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getPosts', () => {
@@ -135,9 +203,7 @@ describe('StockTwitsService', () => {
       const symbol = 'AAPL';
       const mockPosts = [{ id: 1 }, { id: 2 }];
       const total = 10;
-      mockPostsRepo.findAndCount = jest
-        .fn()
-        .mockResolvedValue([mockPosts, total]);
+      mockPostsRepo.findAndCount.mockResolvedValue([mockPosts, total]);
 
       const result = await service.getPosts(symbol, 1, 10);
 
@@ -152,6 +218,31 @@ describe('StockTwitsService', () => {
         total,
         page: 1,
         limit: 10,
+      });
+    });
+
+    it('should calculate skip correctly for page 2', async () => {
+      mockPostsRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.getPosts('AAPL', 2, 10);
+
+      expect(postsRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10 }),
+      );
+    });
+  });
+
+  describe('getWatchersHistory', () => {
+    it('should return watcher history', async () => {
+      const history = [{ symbol: 'AAPL', count: 1000, timestamp: new Date() }];
+      mockWatchersRepo.find.mockResolvedValue(history);
+
+      const result = await service.getWatchersHistory('AAPL');
+
+      expect(result).toEqual(history);
+      expect(watchersRepo.find).toHaveBeenCalledWith({
+        where: { symbol: 'AAPL' },
+        order: { timestamp: 'ASC' },
       });
     });
   });

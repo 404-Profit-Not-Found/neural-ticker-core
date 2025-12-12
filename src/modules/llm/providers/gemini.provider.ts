@@ -17,8 +17,8 @@ export class GeminiProvider implements ILlmProvider {
   private readonly defaultModels = {
     deep: 'gemini-2.5-flash',
     medium: 'gemini-2.5-flash',
-    low: 'gemini-1.5-flash',
-    extraction: 'gemini-1.5-flash',
+    low: 'gemini-1.5-flash-002',
+    extraction: 'gemini-1.5-flash-002',
   };
 
   constructor(private readonly configService: ConfigService) {
