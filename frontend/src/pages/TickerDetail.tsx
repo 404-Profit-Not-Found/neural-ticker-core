@@ -164,7 +164,7 @@ export function TickerDetail() {
 
                     {/* FINANCIALS TAB */}
                     <TabsContent value="financials">
-                        <TickerFinancials fundamentals={fundamentals} />
+                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} ratings={tickerData.ratings} />
                     </TabsContent>
 
                     {/* AI RESEARCH TAB */}
