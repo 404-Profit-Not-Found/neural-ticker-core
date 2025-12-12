@@ -1,17 +1,20 @@
-import { Brain, RefreshCw, ChevronRight, Trash2, Upload, Pencil, Check, X } from 'lucide-react';
+import { Brain, ChevronRight, Trash2, Upload, Pencil, Check, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { UploadResearchDialog } from './UploadResearchDialog';
+import { RunAnalysisDialog, type ModelOption } from './RunAnalysisDialog'; // Import the new dialog
 import { Badge } from '../ui/badge';
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
 import type { ResearchItem } from '../../types/ticker';
 
+type ModelTier = 'low' | 'medium' | 'high' | 'deep';
+
 interface ResearchFeedProps {
     research: ResearchItem[];
-    onTrigger: () => void;
+    onTrigger: (options: { provider: 'gemini' | 'openai' | 'ensemble'; quality: ModelTier; question?: string; modelKey: string }) => void;
     isAnalyzing: boolean;
     onDelete?: (id: string) => void;
     defaultTicker?: string;
@@ -62,16 +65,18 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                 </Button>
                             }
                         />
-                        <Button
-                            size="sm"
-                            variant="default"
-                            className="h-7 text-xs gap-2"
-                            onClick={onTrigger}
-                            disabled={isAnalyzing}
-                        >
-                            {isAnalyzing ? <RefreshCw className="animate-spin w-3 h-3" /> : <Brain size={12} />}
-                            {isAnalyzing ? "Analyzing..." : "New Analysis"}
-                        </Button>
+
+                        {/* New Run Analysis Dialog */}
+                        <RunAnalysisDialog
+                            onTrigger={onTrigger}
+                            isAnalyzing={isAnalyzing}
+                            defaultTicker={defaultTicker}
+                            trigger={
+                                <Button size="sm" className="h-7 text-xs gap-2">
+                                    <Brain size={12} /> Run Analysis
+                                </Button>
+                            }
+                        />
                     </div>
                 </div>
             </CardHeader>

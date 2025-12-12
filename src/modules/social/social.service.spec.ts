@@ -90,7 +90,11 @@ describe('SocialService', () => {
       mockCommentRepo.create.mockReturnValue(mockComment);
       mockCommentRepo.save.mockResolvedValue(mockComment);
 
-      const result = await service.postComment('user123', 'AAPL', 'Great stock!');
+      const result = await service.postComment(
+        'user123',
+        'AAPL',
+        'Great stock!',
+      );
 
       expect(result).toEqual(mockComment);
       expect(mockCommentRepo.create).toHaveBeenCalledWith({
@@ -104,13 +108,18 @@ describe('SocialService', () => {
 
   describe('getWatcherCount', () => {
     it('should return watcher count when ticker exists', async () => {
-      mockTickerRepo.findOne.mockResolvedValue({ id: 'ticker-1', symbol: 'AAPL' });
+      mockTickerRepo.findOne.mockResolvedValue({
+        id: 'ticker-1',
+        symbol: 'AAPL',
+      });
       mockWatchlistItemRepo.count.mockResolvedValue(42);
 
       const result = await service.getWatcherCount('AAPL');
 
       expect(result).toBe(42);
-      expect(mockTickerRepo.findOne).toHaveBeenCalledWith({ where: { symbol: 'AAPL' } });
+      expect(mockTickerRepo.findOne).toHaveBeenCalledWith({
+        where: { symbol: 'AAPL' },
+      });
       expect(mockWatchlistItemRepo.count).toHaveBeenCalledWith({
         where: { ticker_id: 'ticker-1' },
       });

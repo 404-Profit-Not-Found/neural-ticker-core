@@ -10,6 +10,7 @@ describe('JobsService', () => {
 
   const mockRiskRewardService = {
     evaluateSymbol: jest.fn(),
+    getLatestScore: jest.fn(),
   };
 
   const mockTickersService = {
@@ -22,6 +23,8 @@ describe('JobsService', () => {
 
   const mockResearchService = {
     failStuckTickets: jest.fn(),
+    createResearchTicket: jest.fn(),
+    processTicket: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -91,10 +94,31 @@ describe('JobsService', () => {
   });
 
   describe('runRiskRewardScanner', () => {
-    it('should be disabled and do nothing (sync)', () => {
-      service.runRiskRewardScanner();
-      expect(mockTickersService.getAllTickers).not.toHaveBeenCalled();
-      expect(mockRiskRewardService.evaluateSymbol).not.toHaveBeenCalled();
+    it('should queue research for tickers with stale or missing analysis', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        // Resolve immediately to keep the test fast
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+
+      const tickers = [{ symbol: 'AAPL' }];
+      mockTickersService.getAllTickers.mockResolvedValue(tickers);
+      mockRiskRewardService.getLatestScore.mockResolvedValue(null);
+      mockResearchService.createResearchTicket.mockResolvedValue({
+        id: 'note-1',
+      });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+
+      await service.runRiskRewardScanner();
+
+      expect(mockTickersService.getAllTickers).toHaveBeenCalled();
+      expect(mockRiskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalled();
+      expect(mockResearchService.processTicket).toHaveBeenCalledWith('note-1');
+
+      sleepSpy.mockRestore();
     });
   });
 });

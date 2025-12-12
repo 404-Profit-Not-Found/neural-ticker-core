@@ -45,7 +45,9 @@ describe('GoogleAuthExceptionFilter', () => {
   describe('catch', () => {
     it('should redirect to invite_only error when email not on invite list', () => {
       const mockHost = createMockHost();
-      const error = new Error('User test@example.com is not on the invite list');
+      const error = new Error(
+        'User test@example.com is not on the invite list',
+      );
 
       filter.catch(error, mockHost as unknown as ArgumentsHost);
 

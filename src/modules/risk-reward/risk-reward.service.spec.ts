@@ -113,7 +113,10 @@ describe('RiskRewardService', () => {
 
   describe('getScoreHistory', () => {
     it('should return analysis history for symbol', async () => {
-      const history = [{ id: '1', overall_score: 7 }, { id: '2', overall_score: 8 }];
+      const history = [
+        { id: '1', overall_score: 7 },
+        { id: '2', overall_score: 8 },
+      ];
       mockMarketDataService.getSnapshot.mockResolvedValue({
         ticker: { id: 'ticker-1' },
       });
@@ -204,7 +207,11 @@ describe('RiskRewardService', () => {
 
       const detailedJson = JSON.stringify({
         risk_score: { overall: 5 },
-        scenarios: { bull: { probability: 0.3 }, base: { probability: 0.5 }, bear: { probability: 0.2 } },
+        scenarios: {
+          bull: { probability: 0.3 },
+          base: { probability: 0.5 },
+          bear: { probability: 0.2 },
+        },
       });
 
       mockLlmService.generateResearch.mockResolvedValue({
@@ -218,4 +225,3 @@ describe('RiskRewardService', () => {
     });
   });
 });
-

@@ -49,12 +49,14 @@ export function TickerDetail() {
     const postCommentMutation = usePostComment();
     const deleteResearchMutation = useDeleteResearch();
 
-
-
-    const handleTriggerResearch = () => {
-        if (symbol) {
-            triggerResearchMutation.mutate(symbol);
-        }
+    const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
+        if (!symbol) return;
+        triggerResearchMutation.mutate({
+            symbol,
+            provider: opts?.provider,
+            quality: opts?.quality,
+            question: opts?.question,
+        });
     };
 
     const handleDeleteResearch = (id: string) => {
@@ -133,7 +135,7 @@ export function TickerDetail() {
                         <div className="h-4 w-px bg-border mx-1" />
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1.5 rounded-md border border-border/50">
                             <Eye size={12} />
-                            <span className="font-semibold text-foreground">{watchers?.toLocaleString() || 0}</span>
+                            <span className="font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
                         </div>
                         <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
                             <Share2 size={12} /> Share
@@ -159,12 +161,13 @@ export function TickerDetail() {
                         <TickerOverview
                             risk_analysis={risk_analysis}
                             market_data={market_data}
+                            ratings={tickerData.ratings}
                         />
                     </TabsContent>
 
                     {/* FINANCIALS TAB */}
                     <TabsContent value="financials">
-                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} ratings={tickerData.ratings} />
+                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} />
                     </TabsContent>
 
                     {/* AI RESEARCH TAB */}
@@ -172,7 +175,7 @@ export function TickerDetail() {
                         <ResearchFeed
                             research={researchList}
                             onTrigger={handleTriggerResearch}
-                            isAnalyzing={triggerResearchMutation.isPending}
+                            isAnalyzing={triggerResearchMutation.isPending || researchList.some(item => item.status === 'processing' || item.status === 'pending')}
                             onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
                             defaultTicker={symbol}
                         />
@@ -203,4 +206,3 @@ export function TickerDetail() {
         </div>
     );
 }
-

@@ -64,9 +64,9 @@ describe('JobsController', () => {
     });
 
     it('should throw UnauthorizedException with invalid secret', async () => {
-      await expect(controller.runRiskRewardScanner('wrong-secret')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.runRiskRewardScanner('wrong-secret'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 

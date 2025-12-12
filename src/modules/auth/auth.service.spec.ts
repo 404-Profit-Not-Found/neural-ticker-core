@@ -105,11 +105,18 @@ describe('AuthService', () => {
     });
 
     it('should add user to waitlist if not allowed and intent is waitlist', async () => {
-      const waitlistUser = { id: '1', email: 'test@example.com', role: 'waitlist' };
+      const waitlistUser = {
+        id: '1',
+        email: 'test@example.com',
+        role: 'waitlist',
+      };
       mockUsersService.isEmailAllowed.mockResolvedValue(false);
       mockUsersService.createOrUpdateGoogleUser.mockResolvedValue(waitlistUser);
 
-      const result = await service.validateOAuthLogin(profile as any, 'waitlist');
+      const result = await service.validateOAuthLogin(
+        profile as any,
+        'waitlist',
+      );
 
       expect(result.isNewWaitlist).toBe(true);
       expect(usersService.createOrUpdateGoogleUser).toHaveBeenCalledWith(
@@ -119,7 +126,11 @@ describe('AuthService', () => {
     });
 
     it('should return existing waitlist user if not allowed', async () => {
-      const existingWaitlist = { id: '1', email: 'test@example.com', role: 'waitlist' };
+      const existingWaitlist = {
+        id: '1',
+        email: 'test@example.com',
+        role: 'waitlist',
+      };
       mockUsersService.isEmailAllowed.mockResolvedValue(false);
       mockUsersService.findByEmail.mockResolvedValue(existingWaitlist);
 
@@ -157,7 +168,9 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for invalid token', async () => {
-      mockFirebaseService.verifyIdToken.mockRejectedValue(new Error('Invalid token'));
+      mockFirebaseService.verifyIdToken.mockRejectedValue(
+        new Error('Invalid token'),
+      );
 
       await expect(service.loginWithFirebase('invalid-token')).rejects.toThrow(
         UnauthorizedException,

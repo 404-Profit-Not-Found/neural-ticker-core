@@ -116,24 +116,37 @@ describe('UsersController', () => {
   describe('updateProfile', () => {
     it('should call service.updateProfile with profile data', async () => {
       const mockReq = { user: { id: 'user-id' } };
-      const profileData = { nickname: 'SuperTrader', view_mode: 'KISS', theme: 'g10' };
+      const profileData = {
+        nickname: 'SuperTrader',
+        view_mode: 'KISS',
+        theme: 'g10',
+      };
       const updatedUser = { id: 'user-id', nickname: 'SuperTrader' };
       mockUsersService.updateProfile.mockResolvedValue(updatedUser);
 
       const result = await controller.updateProfile(mockReq, profileData);
 
       expect(result).toEqual(updatedUser);
-      expect(service.updateProfile).toHaveBeenCalledWith('user-id', profileData);
+      expect(service.updateProfile).toHaveBeenCalledWith(
+        'user-id',
+        profileData,
+      );
     });
 
     it('should handle partial profile update', async () => {
       const mockReq = { user: { id: 'user-id' } };
       const profileData = { nickname: 'NewNick' };
-      mockUsersService.updateProfile.mockResolvedValue({ id: 'user-id', nickname: 'NewNick' });
+      mockUsersService.updateProfile.mockResolvedValue({
+        id: 'user-id',
+        nickname: 'NewNick',
+      });
 
       await controller.updateProfile(mockReq, profileData);
 
-      expect(service.updateProfile).toHaveBeenCalledWith('user-id', profileData);
+      expect(service.updateProfile).toHaveBeenCalledWith(
+        'user-id',
+        profileData,
+      );
     });
   });
 });

@@ -40,9 +40,9 @@ export class JobsController {
   @ApiOperation({ summary: 'Trigger risk/reward scanner (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
-  runRiskRewardScanner(@Headers('X-Cron-Secret') secret: string) {
+  async runRiskRewardScanner(@Headers('X-Cron-Secret') secret: string) {
     this.validateSecret(secret);
-    this.jobsService.runRiskRewardScanner();
+    await this.jobsService.runRiskRewardScanner();
     return { message: 'Risk/Reward scanner completed' };
   }
 

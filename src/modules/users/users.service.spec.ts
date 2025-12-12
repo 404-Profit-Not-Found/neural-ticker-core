@@ -113,13 +113,17 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.deleteWaitlistUser('unknown@example.com')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteWaitlistUser('unknown@example.com'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if user is not waitlist', async () => {
       const user = { id: '1', email: 'test@example.com', role: 'user' };
       mockUserRepo.findOne.mockResolvedValue(user);
-      await expect(service.deleteWaitlistUser('test@example.com')).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.deleteWaitlistUser('test@example.com'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -127,18 +131,24 @@ describe('UsersService', () => {
     it('should revoke email access', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
       await service.revokeEmail('test@example.com');
-      expect(mockAllowedUserRepo.delete).toHaveBeenCalledWith({ email: 'test@example.com' });
+      expect(mockAllowedUserRepo.delete).toHaveBeenCalledWith({
+        email: 'test@example.com',
+      });
     });
 
     it('should throw ForbiddenException if revoking own access', async () => {
       const requester = { email: 'test@example.com' } as User;
-      await expect(service.revokeEmail('test@example.com', requester)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.revokeEmail('test@example.com', requester),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException if target is admin', async () => {
       const admin = { id: '1', email: 'admin@example.com', role: 'admin' };
       mockUserRepo.findOne.mockResolvedValue(admin);
-      await expect(service.revokeEmail('admin@example.com')).rejects.toThrow(ForbiddenException);
+      await expect(service.revokeEmail('admin@example.com')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -149,7 +159,9 @@ describe('UsersService', () => {
 
       const result = await service.getAllowedUsers();
       expect(result).toEqual(users);
-      expect(mockAllowedUserRepo.find).toHaveBeenCalledWith({ order: { created_at: 'DESC' } });
+      expect(mockAllowedUserRepo.find).toHaveBeenCalledWith({
+        order: { created_at: 'DESC' },
+      });
     });
   });
 
@@ -201,7 +213,9 @@ describe('UsersService', () => {
 
     it('should create new user if not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      mockUserRepo.save.mockImplementation((u) => Promise.resolve({ id: 'new', ...u }));
+      mockUserRepo.save.mockImplementation((u) =>
+        Promise.resolve({ id: 'new', ...u }),
+      );
 
       await service.createOrUpdateGoogleUser(profile);
       expect(mockUserRepo.create).toHaveBeenCalled();
@@ -232,7 +246,9 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.updateProfile('999', {})).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfile('999', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -248,7 +264,9 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.updateRole('999', 'admin')).rejects.toThrow(NotFoundException);
+      await expect(service.updateRole('999', 'admin')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -264,7 +282,9 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.updatePreferences('999', {})).rejects.toThrow(NotFoundException);
+      await expect(service.updatePreferences('999', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -283,14 +303,21 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.approveUser('999')).rejects.toThrow(NotFoundException);
+      await expect(service.approveUser('999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('getUnifiedIdentities', () => {
     it('should return unified identity list', async () => {
       mockUserRepo.find.mockResolvedValue([
-        { id: '1', email: 'user@example.com', role: 'user', created_at: new Date() },
+        {
+          id: '1',
+          email: 'user@example.com',
+          role: 'user',
+          created_at: new Date(),
+        },
       ]);
       mockAllowedUserRepo.find.mockResolvedValue([
         { email: 'invited@example.com', created_at: new Date() },

@@ -72,18 +72,29 @@ describe('AdminController', () => {
       const allowed = { email: 'new@example.com', added_by: 'admin' };
       mockUsersService.allowEmail.mockResolvedValue(allowed);
 
-      const result = await controller.addToUserlist({ email: 'new@example.com' });
+      const result = await controller.addToUserlist({
+        email: 'new@example.com',
+      });
 
       expect(result).toEqual(allowed);
-      expect(mockUsersService.allowEmail).toHaveBeenCalledWith('new@example.com', 'admin');
+      expect(mockUsersService.allowEmail).toHaveBeenCalledWith(
+        'new@example.com',
+        'admin',
+      );
     });
 
     it('should use provided addedBy', async () => {
       mockUsersService.allowEmail.mockResolvedValue({});
 
-      await controller.addToUserlist({ email: 'new@example.com', addedBy: 'John' });
+      await controller.addToUserlist({
+        email: 'new@example.com',
+        addedBy: 'John',
+      });
 
-      expect(mockUsersService.allowEmail).toHaveBeenCalledWith('new@example.com', 'John');
+      expect(mockUsersService.allowEmail).toHaveBeenCalledWith(
+        'new@example.com',
+        'John',
+      );
     });
 
     it('should throw if email missing', async () => {
@@ -100,7 +111,10 @@ describe('AdminController', () => {
 
       await controller.revokeAccess('test@example.com', req);
 
-      expect(mockUsersService.revokeEmail).toHaveBeenCalledWith('test@example.com', req.user);
+      expect(mockUsersService.revokeEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        req.user,
+      );
     });
   });
 
@@ -110,7 +124,9 @@ describe('AdminController', () => {
 
       await controller.rejectWaitlistUser('test@example.com');
 
-      expect(mockUsersService.deleteWaitlistUser).toHaveBeenCalledWith('test@example.com');
+      expect(mockUsersService.deleteWaitlistUser).toHaveBeenCalledWith(
+        'test@example.com',
+      );
     });
   });
 });

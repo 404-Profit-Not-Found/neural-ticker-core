@@ -1,4 +1,7 @@
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
 import type { AnalystRating } from '../../types/ticker';
+
 
 interface AnalystRatingsTableProps {
     ratings?: AnalystRating[];
@@ -8,41 +11,54 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
     if (!ratings || ratings.length === 0) return null;
 
     return (
-        <div className="w-full mt-6 bg-[#0B1221] border border-gray-800 rounded-lg p-6">
-            <h3 className="text-xl font-bold text-gray-100 mb-4">Analyst Ratings</h3>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-400">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-900/50">
-                        <tr>
-                            <th className="px-4 py-3">Date</th>
-                            <th className="px-4 py-3">Firm</th>
-                            <th className="px-4 py-3">Analyst</th>
-                            <th className="px-4 py-3">Rating</th>
-                            <th className="px-4 py-3 text-right">Target</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {ratings.map((rating) => (
-                            <tr key={rating.id} className="border-b border-gray-800 hover:bg-gray-800/20">
-                                <td className="px-4 py-3">{rating.rating_date}</td>
-                                <td className="px-4 py-3 font-medium text-white">{rating.firm}</td>
-                                <td className="px-4 py-3">{rating.analyst_name || '-'}</td>
-                                <td className="px-4 py-3">
-                                    <span className={`px-2 py-1 rounded text-xs font-semibold
-                                        ${rating.rating.toLowerCase().includes('buy') || rating.rating.toLowerCase().includes('outperform') ? 'bg-green-900/30 text-green-400' :
-                                            rating.rating.toLowerCase().includes('sell') ? 'bg-red-900/30 text-red-400' :
-                                                'bg-yellow-900/30 text-yellow-400'}`}>
-                                        {rating.rating}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono">
-                                    {rating.price_target ? `$${rating.price_target}` : '-'}
-                                </td>
+        <Card>
+            <CardHeader className="pb-3">
+                <CardTitle>Analyst Ratings</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="relative w-full overflow-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-muted-foreground border-b border-border/50">
+                            <tr>
+                                <th className="h-10 px-2 font-medium">Date</th>
+                                <th className="h-10 px-2 font-medium">Firm</th>
+                                <th className="h-10 px-2 font-medium">Analyst</th>
+                                <th className="h-10 px-2 font-medium">Rating</th>
+                                <th className="h-10 px-2 font-medium text-right">Target</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {ratings.map((rating) => {
+                                const isBuy = rating.rating.toLowerCase().includes('buy') || rating.rating.toLowerCase().includes('outperform');
+                                const isSell = rating.rating.toLowerCase().includes('sell') || rating.rating.toLowerCase().includes('underperform');
+
+                                return (
+                                    <tr key={rating.id} className="hover:bg-muted/50 transition-colors">
+                                        <td className="p-2 font-mono text-xs text-muted-foreground">{rating.rating_date}</td>
+                                        <td className="p-2 font-medium text-foreground">{rating.firm}</td>
+                                        <td className="p-2 text-muted-foreground">{rating.analyst_name || '-'}</td>
+                                        <td className="p-2">
+                                            <Badge
+                                                variant="outline"
+                                                className={`
+                                                    ${isBuy ? 'border-green-500/30 text-green-500 bg-green-500/5' : ''}
+                                                    ${isSell ? 'border-red-500/30 text-red-500 bg-red-500/5' : ''}
+                                                    ${!isBuy && !isSell ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/5' : ''}
+                                                `}
+                                            >
+                                                {rating.rating}
+                                            </Badge>
+                                        </td>
+                                        <td className="p-2 text-right font-mono font-medium">
+                                            {rating.price_target ? `$${rating.price_target.toFixed(2)}` : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </CardContent>
+        </Card>
     );
 }

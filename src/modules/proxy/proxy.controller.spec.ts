@@ -34,7 +34,11 @@ describe('ProxyController', () => {
 
   describe('proxyImage', () => {
     it('should throw BadRequestException if URL is missing', async () => {
-      const res = { set: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() };
+      const res = {
+        set: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
+      };
 
       await expect(controller.proxyImage('', res as any)).rejects.toThrow(
         BadRequestException,
@@ -42,7 +46,11 @@ describe('ProxyController', () => {
     });
 
     it('should return 404 for non-finnhub domain', async () => {
-      const res = { set: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() };
+      const res = {
+        set: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
+      };
 
       await controller.proxyImage('https://evil.com/image.png', res as any);
 
@@ -75,12 +83,17 @@ describe('ProxyController', () => {
         expect.objectContaining({ responseType: 'stream' }),
       );
       expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/png');
-      expect(res.set).toHaveBeenCalledWith('Cache-Control', 'public, max-age=86400');
+      expect(res.set).toHaveBeenCalledWith(
+        'Cache-Control',
+        'public, max-age=86400',
+      );
       expect(mockStream.pipe).toHaveBeenCalledWith(res);
     });
 
     it('should handle upstream errors', async () => {
-      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network Error')));
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('Network Error')),
+      );
 
       const res = {
         set: jest.fn(),

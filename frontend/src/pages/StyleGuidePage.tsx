@@ -260,6 +260,7 @@ export function StyleGuidePage() {
             <TabsList>
               <TabsTrigger value="actions">Actions &amp; forms</TabsTrigger>
               <TabsTrigger value="data">Data display</TabsTrigger>
+              <TabsTrigger value="lists">Lists & Feeds</TabsTrigger>
               <TabsTrigger value="feedback">Feedback &amp; states</TabsTrigger>
             </TabsList>
 
@@ -445,6 +446,85 @@ export function StyleGuidePage() {
                     <p className="text-xs text-muted-foreground">
                       Columns align on a 12px grid. Keep headers left-aligned except numeric data, which should be right-aligned.
                     </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="lists">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="h-full flex flex-col overflow-hidden">
+                  <CardHeader className="py-4 border-b border-border bg-muted/10">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="font-bold text-sm flex items-center gap-2">
+                        Research Feed Pattern
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px]">LIVE DEMO</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border/50">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="group flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("w-2 h-2 rounded-full", i === 1 ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
+                            <div>
+                              <div className="text-sm font-semibold group-hover:text-primary transition-colors">
+                                {i === 1 ? "AAPL: Deep Dive Analysis" : "NVDA: Q3 Earnings Preview"}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-muted-foreground">12/12/2025</span>
+                                <span className="text-xs text-muted-foreground">•</span>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  By <span className="font-medium text-foreground">Local Idiot</span>
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded-sm bg-muted text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                  {i === 1 ? "gemini-2.0-flash" : "processing"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowUpRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="h-full flex flex-col overflow-hidden">
+                  <CardHeader className="py-4 border-b border-border bg-muted/10">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="font-bold text-sm flex items-center gap-2">
+                        News Feed Pattern
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px]">LIVE DEMO</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border/50">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="group p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                          <div className="flex gap-3">
+                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium leading-snug group-hover:text-primary transition-colors">
+                                {i === 1 ? "Capricor Therapeutics Discusses HOPE-3 Phase III Top Line Data" :
+                                  i === 2 ? "Analyst Upgrade: CAPR set to outperform market expectations" :
+                                    "FDA Grant: New orphan drug designation received"}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">10/12/2025</span>
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                  SeekingAlpha
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               </div>

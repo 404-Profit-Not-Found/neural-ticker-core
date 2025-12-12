@@ -2,29 +2,31 @@ import React from 'react';
 import { FinancialHealth } from './FinancialHealth';
 import type { TickerData } from '../../types/ticker';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
-import { AnalystRatingsTable } from './AnalystRatingsTable';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../ui/toast';
+import { api } from '../../lib/api';
 
 interface TickerFinancialsProps {
     symbol: string; // Needed for API call
     fundamentals: TickerData['fundamentals'];
-    ratings?: TickerData['ratings'];
+
 }
 
-export function TickerFinancials({ symbol, fundamentals, ratings }: TickerFinancialsProps) {
+export function TickerFinancials({ symbol, fundamentals }: TickerFinancialsProps) {
     const [isSyncing, setIsSyncing] = React.useState(false);
+    const queryClient = useQueryClient();
+    const { showToast } = useToast();
 
     const handleSync = async () => {
         try {
             setIsSyncing(true);
-            const token = localStorage.getItem('token');
-            await fetch(`http://localhost:3000/api/v1/research/extract-financials/${symbol}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            // Ideally toast success or refresh page
-            window.location.reload();
+            await api.post(`/research/extract-financials/${symbol}`); // api client handles cookies & base URL
+
+            await queryClient.invalidateQueries({ queryKey: ['ticker', symbol] });
+            showToast('Financial data synced successfully', 'success');
         } catch (e) {
             console.error('Sync failed', e);
+            showToast('Failed to sync data', 'error');
         } finally {
             setIsSyncing(false);
         }
@@ -38,7 +40,7 @@ export function TickerFinancials({ symbol, fundamentals, ratings }: TickerFinanc
                     <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="px-3 py-1 text-xs bg-blue-900/40 hover:bg-blue-900/60 text-blue-200 rounded border border-blue-800 transition-colors"
+                        className="px-3 py-1 text-xs bg-blue-900/40 hover:bg-blue-900/60 text-blue-200 rounded border border-blue-800 transition-colors disabled:opacity-50"
                     >
                         {isSyncing ? 'Syncing...' : 'Sync Data'}
                     </button>
@@ -48,7 +50,7 @@ export function TickerFinancials({ symbol, fundamentals, ratings }: TickerFinanc
                 </CardContent>
             </Card>
 
-            <AnalystRatingsTable ratings={ratings} />
+
         </div>
     );
 }

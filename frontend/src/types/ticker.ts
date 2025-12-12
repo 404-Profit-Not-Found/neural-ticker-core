@@ -42,7 +42,7 @@ export interface AnalystRating {
 export interface ResearchItem {
     id: string;
     created_at: string;
-    status: 'completed' | 'pending' | 'failed';
+    status: 'completed' | 'pending' | 'failed' | 'processing';
     question?: string;
     title?: string; // Explicitly adding title
     content?: string;

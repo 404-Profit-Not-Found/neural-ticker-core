@@ -209,18 +209,15 @@ export class RiskRewardService {
       attempts++;
       try {
         const result = await this.llmService.generateResearch(prompt);
-        const jsonStr = result.answerMarkdown
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .trim();
-        const firstBrace = jsonStr.indexOf('{');
-        const lastBrace = jsonStr.lastIndexOf('}');
-
-        if (firstBrace === -1 || lastBrace === -1) {
-          throw new Error('No JSON braces found');
+        const raw = result.answerMarkdown || '';
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          this.logger.warn(
+            'LLM response did not contain a JSON object, retrying...',
+          );
+          throw new Error('No JSON object found');
         }
-
-        const cleanJson = jsonStr.substring(firstBrace, lastBrace + 1);
+        const cleanJson = jsonMatch[0];
         parsed = JSON.parse(cleanJson);
 
         // Basic validation: Check if key fields exist

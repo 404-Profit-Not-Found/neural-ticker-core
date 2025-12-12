@@ -76,14 +76,15 @@ export class JobsService {
           // Let's assume we can fetch the ticker by symbol to get ID efficiently if needed, or update getAllTickers.
           // Better: TickersService.getTicker(symbol) is cached/fast-ish? No.
           // Let's rely on TickersService.getAllTickers() returning what we need or fetch fresh.
-          
+
           // Optimization: Check existing analysis via RiskRewardService which might need to look up ticker ID internally or we provide it.
-          // RiskRewardService.getLatestScore(symbol) encapsulates this! 
+          // RiskRewardService.getLatestScore(symbol) encapsulates this!
           // It calls marketDataService.getSnapshot(symbol) which gets Ticker ID.
           // Then calls getLatestAnalysis(tickerId).
-          
-          const existingAnalysis = await this.riskRewardService.getLatestScore(symbol);
-          
+
+          const existingAnalysis =
+            await this.riskRewardService.getLatestScore(symbol);
+
           const isStale =
             !existingAnalysis ||
             Date.now() - existingAnalysis.created_at.getTime() > hours48;
@@ -119,12 +120,11 @@ export class JobsService {
 
           // Process immediately (or could just leave it if there was a separate worker, but here we process)
           await this.researchService.processTicket(note.id);
-          
-          processed++;
-          
-          // Slight delay to be nice to API rate limits
-          await new Promise((r) => setTimeout(r, 2000)); 
 
+          processed++;
+
+          // Slight delay to be nice to API rate limits
+          await new Promise((r) => setTimeout(r, 2000));
         } catch (err) {
           this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
         }

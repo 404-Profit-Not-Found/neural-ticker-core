@@ -269,7 +269,22 @@ Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `s
 | :--- | :--- | :--- | :--- |
 | **Low** | `gpt-4.1-nano` | `gemini-1.5-flash` | Quick sentiment, simple extraction (Free Tier) |
 | **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
-| **Deep** | `gpt-5.1`| `gemini-2.5-flash` | 10-K analysis, thesis generation |
+| **Deep** | `gpt-5.1`| `gemini-2.0-flash-exp` | 10-K analysis, thesis generation |
+
+### 📊 Gemini Model Benchmarks (Dec 2025)
+
+Empirical testing (3 iterations) on financial research tasks ("Deep Dive AAPL Analysis") yielded the following performance metrics:
+
+| Model | Success Rate | Avg Time | Output Detail (Chars) | Verdict |
+| :--- | :--- | :--- | :--- | :--- |
+| **gemini-2.5-flash-lite** | 100% | **8.7s** | **9,016** | **🏆 Best Value** (Fast & Detailed) |
+| **gemini-2.0-flash-exp** | 100% | 18.0s | **9,195** | **Deepest Analysis** |
+| **gemini-2.0-flash** | 100% | 17.3s | 7,987 | Robust Alternative |
+| **gemini-2.5-flash** | 100% | 11.2s | 631 | Too Terse |
+| **gemini-2.5-pro** | 100% | 17.6s | 176 | Failed / Empty |
+| **gemini-1.5-*** | 0% | - | - | Deprecated / 404 |
+
+**Recommendation**: Use **`gemini-2.5-flash-lite`** for rapid extraction and standard reports, and **`gemini-2.0-flash-exp`** for deep-dive tasks requiring maximum context.
 
 ### Deep Research Agent
 

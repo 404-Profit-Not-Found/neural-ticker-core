@@ -20,6 +20,7 @@ describe('TickerDetailController', () => {
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
     getHistory: jest.fn(),
+    getAnalystRatings: jest.fn(),
   };
 
   const mockRiskRewardService = {
@@ -85,6 +86,7 @@ describe('TickerDetailController', () => {
       const mockRisk = { overall_score: 8.5 };
       const mockResearch = { id: 'note1', answer_markdown: 'Analysis' };
       const mockHistory = [{ time: '2023-01-01', close: 100 }];
+      const mockRatings = [{ firm: 'Firm', rating: 'buy' }];
 
       mockMarketDataService.getSnapshot.mockResolvedValue(mockSnapshot);
       mockMarketDataService.getHistory.mockResolvedValue(mockHistory);
@@ -92,6 +94,7 @@ describe('TickerDetailController', () => {
       mockResearchService.getLatestNoteForTicker.mockResolvedValue(
         mockResearch,
       );
+      mockMarketDataService.getAnalystRatings.mockResolvedValue(mockRatings);
 
       const result = await controller.getCompositeData('AAPL');
 
@@ -99,7 +102,8 @@ describe('TickerDetailController', () => {
       expect(result.market_data.price).toBe(150);
       expect(result.market_data.history).toEqual(mockHistory);
       expect(result.risk_analysis?.overall_score).toBe(8.5);
-      expect(result.research?.content).toBe('Analysis');
+      expect(result.notes).toEqual([mockResearch]);
+      expect(result.ratings).toEqual(mockRatings);
     });
 
     it('should throw NotFoundException if marketDataService throws (Ticker not found)', async () => {
@@ -124,13 +128,15 @@ describe('TickerDetailController', () => {
       mockMarketDataService.getHistory.mockResolvedValue([]);
       mockRiskRewardService.getLatestAnalysis.mockResolvedValue(null);
       mockResearchService.getLatestNoteForTicker.mockResolvedValue(null);
+      mockMarketDataService.getAnalystRatings.mockResolvedValue([]);
 
       const result = await controller.getCompositeData('AAPL');
 
       expect(result.profile.symbol).toBe('AAPL');
       expect(result.market_data.price).toBe(0); // Default
       expect(result.risk_analysis).toBeNull();
-      expect(result.research).toBeNull();
+      expect(result.notes).toEqual([]);
+      expect(result.ratings).toEqual([]);
     });
   });
 });

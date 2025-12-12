@@ -48,7 +48,9 @@ describe('FinnhubService', () => {
       const axiosError = { response: { status: 500, data: 'Server error' } };
       mockHttpService.get.mockReturnValue(throwError(() => axiosError));
 
-      await expect(service.getCompanyProfile('AAPL')).rejects.toEqual(axiosError);
+      await expect(service.getCompanyProfile('AAPL')).rejects.toEqual(
+        axiosError,
+      );
     });
   });
 
@@ -65,7 +67,9 @@ describe('FinnhubService', () => {
     });
 
     it('should handle API error', async () => {
-      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('Network error')),
+      );
 
       await expect(service.getQuote('AAPL')).rejects.toThrow('Network error');
     });
@@ -76,7 +80,11 @@ describe('FinnhubService', () => {
       const mockData = [{ headline: 'News 1' }, { headline: 'News 2' }];
       mockHttpService.get.mockReturnValue(of({ data: mockData }));
 
-      const result = await service.getCompanyNews('AAPL', '2023-01-01', '2023-12-31');
+      const result = await service.getCompanyNews(
+        'AAPL',
+        '2023-01-01',
+        '2023-12-31',
+      );
       expect(result).toEqual(mockData);
       expect(httpService.get).toHaveBeenCalledWith('/company-news', {
         params: { symbol: 'AAPL', from: '2023-01-01', to: '2023-12-31' },
@@ -88,7 +96,9 @@ describe('FinnhubService', () => {
       (axiosError as any).response = { status: 403, data: 'Forbidden' };
       mockHttpService.get.mockReturnValue(throwError(() => axiosError));
 
-      await expect(service.getCompanyNews('AAPL', '2023-01-01', '2023-12-31')).rejects.toBeInstanceOf(AxiosError);
+      await expect(
+        service.getCompanyNews('AAPL', '2023-01-01', '2023-12-31'),
+      ).rejects.toBeInstanceOf(AxiosError);
     });
   });
 });

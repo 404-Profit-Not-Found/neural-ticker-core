@@ -72,6 +72,9 @@ export function ResearchPage() {
         }
     });
 
+    const primaryTicker = note?.tickers?.[0];
+    const { data: tickerData } = useTickerDetails(primaryTicker);
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-background flex flex-col text-foreground font-sans">
@@ -97,8 +100,6 @@ export function ResearchPage() {
         );
     }
 
-    const primaryTicker = note.tickers[0];
-    const { data: tickerData } = useTickerDetails(primaryTicker);
     const profile = tickerData?.profile;
     const marketData = tickerData?.market_data;
     const isPriceUp = (marketData?.change_percent ?? 0) >= 0;
@@ -130,7 +131,7 @@ export function ResearchPage() {
                         </Button>
 
                         {/* Stock Logo */}
-                        <TickerLogo url={profile?.logo_url} symbol={primaryTicker} className="w-12 h-12" />
+                        <TickerLogo url={profile?.logo_url} symbol={primaryTicker || ''} className="w-12 h-12" />
 
                         <div>
                             <div className="flex items-center gap-2">

@@ -79,7 +79,10 @@ describe('TickersController', () => {
       await controller.getLogo('AAPL', res as any);
 
       expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/png');
-      expect(res.set).toHaveBeenCalledWith('Cache-Control', 'public, max-age=604800');
+      expect(res.set).toHaveBeenCalledWith(
+        'Cache-Control',
+        'public, max-age=604800',
+      );
       expect(res.send).toHaveBeenCalledWith(logo.image_data);
     });
 

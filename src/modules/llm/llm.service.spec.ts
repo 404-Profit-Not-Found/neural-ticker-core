@@ -41,7 +41,10 @@ describe('LlmService', () => {
 
     it('should route to OpenAI if provider specified', async () => {
       const prompt = { ...basePrompt, provider: 'openai' as const };
-      openAiGenerate.mockResolvedValue({ answerMarkdown: 'openai', models: ['gpt-4'] });
+      openAiGenerate.mockResolvedValue({
+        answerMarkdown: 'openai',
+        models: ['gpt-4'],
+      });
 
       const result = await service.generateResearch(prompt);
 
@@ -52,7 +55,10 @@ describe('LlmService', () => {
 
     it('should route to Gemini if specified', async () => {
       const prompt = { ...basePrompt, provider: 'gemini' as const };
-      geminiGenerate.mockResolvedValue({ answerMarkdown: 'gemini', models: ['gemini-2.5-flash'] });
+      geminiGenerate.mockResolvedValue({
+        answerMarkdown: 'gemini',
+        models: ['gemini-2.5-flash'],
+      });
 
       const result = await service.generateResearch(prompt);
 
@@ -63,7 +69,10 @@ describe('LlmService', () => {
 
     it('should route to OpenAI by default', async () => {
       const prompt = { question: 'q', quality: 'medium' as QualityTier };
-      openAiGenerate.mockResolvedValue({ answerMarkdown: 'openai', models: ['gpt-4'] });
+      openAiGenerate.mockResolvedValue({
+        answerMarkdown: 'openai',
+        models: ['gpt-4'],
+      });
 
       const result = await service.generateResearch(prompt);
 
@@ -125,7 +134,9 @@ describe('LlmService', () => {
     it('should throw BadRequestException for unknown provider', async () => {
       const prompt = { ...basePrompt, provider: 'unknown' as any };
 
-      await expect(service.generateResearch(prompt)).rejects.toThrow(BadRequestException);
+      await expect(service.generateResearch(prompt)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should optimize numericContext with toon-parser', async () => {
@@ -133,7 +144,10 @@ describe('LlmService', () => {
         ...basePrompt,
         numericContext: { price: 150, date: new Date() },
       };
-      openAiGenerate.mockResolvedValue({ answerMarkdown: 'result', models: ['gpt-4'] });
+      openAiGenerate.mockResolvedValue({
+        answerMarkdown: 'result',
+        models: ['gpt-4'],
+      });
 
       await service.generateResearch(prompt);
 
@@ -151,7 +165,10 @@ describe('LlmService', () => {
         ...basePrompt,
         numericContext: { a: 1 }, // Normal object that can be parsed
       };
-      openAiGenerate.mockResolvedValue({ answerMarkdown: 'result', models: ['gpt-4'] });
+      openAiGenerate.mockResolvedValue({
+        answerMarkdown: 'result',
+        models: ['gpt-4'],
+      });
 
       const result = await service.generateResearch(prompt);
 

@@ -156,7 +156,9 @@ describe('AuthController', () => {
       const body = { email: 'dev@test.com' };
       const result = await controller.devLogin(body);
 
-      expect(mockAuthService.localDevLogin).toHaveBeenCalledWith('dev@test.com');
+      expect(mockAuthService.localDevLogin).toHaveBeenCalledWith(
+        'dev@test.com',
+      );
       expect(result).toEqual(mockResult);
     });
 

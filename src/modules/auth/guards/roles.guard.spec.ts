@@ -25,15 +25,16 @@ describe('RolesGuard', () => {
     reflector = module.get<Reflector>(Reflector);
   });
 
-  const createMockContext = (user: any): ExecutionContext => ({
-    switchToHttp: () => ({
-      getRequest: () => ({ user }),
-      getResponse: () => ({}),
-      getNext: () => ({}),
-    }),
-    getHandler: () => ({}),
-    getClass: () => ({}),
-  } as ExecutionContext);
+  const createMockContext = (user: any): ExecutionContext =>
+    ({
+      switchToHttp: () => ({
+        getRequest: () => ({ user }),
+        getResponse: () => ({}),
+        getNext: () => ({}),
+      }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    }) as ExecutionContext;
 
   it('should be defined', () => {
     expect(guard).toBeDefined();
@@ -55,7 +56,9 @@ describe('RolesGuard', () => {
     });
 
     it('should return true if user has one of multiple required roles', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin', 'moderator']);
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['admin', 'moderator']);
       const context = createMockContext({ id: '1', role: 'moderator' });
 
       expect(guard.canActivate(context)).toBe(true);

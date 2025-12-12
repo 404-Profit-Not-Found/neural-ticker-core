@@ -47,7 +47,11 @@ describe('StockTwitsController', () => {
       const result = await controller.getPosts('AAPL', 1, 50);
 
       expect(result).toEqual(mockPosts);
-      expect(mockStockTwitsService.getPosts).toHaveBeenCalledWith('AAPL', 1, 50);
+      expect(mockStockTwitsService.getPosts).toHaveBeenCalledWith(
+        'AAPL',
+        1,
+        50,
+      );
     });
   });
 
@@ -59,7 +63,9 @@ describe('StockTwitsController', () => {
       const result = await controller.getWatchersHistory('AAPL');
 
       expect(result).toEqual(mockHistory);
-      expect(mockStockTwitsService.getWatchersHistory).toHaveBeenCalledWith('AAPL');
+      expect(mockStockTwitsService.getWatchersHistory).toHaveBeenCalledWith(
+        'AAPL',
+      );
     });
   });
 
@@ -71,7 +77,9 @@ describe('StockTwitsController', () => {
       const result = await controller.triggerSync('AAPL');
 
       expect(result).toEqual({ message: 'Sync triggered successfully' });
-      expect(mockStockTwitsService.fetchAndStorePosts).toHaveBeenCalledWith('AAPL');
+      expect(mockStockTwitsService.fetchAndStorePosts).toHaveBeenCalledWith(
+        'AAPL',
+      );
       expect(mockStockTwitsService.trackWatchers).toHaveBeenCalledWith('AAPL');
     });
   });
@@ -87,15 +95,17 @@ describe('StockTwitsController', () => {
     });
 
     it('should throw UnauthorizedException with invalid secret', async () => {
-      await expect(controller.handleHourlyPostsSync('wrong-secret')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.handleHourlyPostsSync('wrong-secret'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
   describe('handleDailyWatchersSync', () => {
     it('should complete daily sync with valid secret', async () => {
-      mockStockTwitsService.handleDailyWatchersSync.mockResolvedValue(undefined);
+      mockStockTwitsService.handleDailyWatchersSync.mockResolvedValue(
+        undefined,
+      );
 
       const result = await controller.handleDailyWatchersSync('test-secret');
 
@@ -104,9 +114,9 @@ describe('StockTwitsController', () => {
     });
 
     it('should throw UnauthorizedException with invalid secret', async () => {
-      await expect(controller.handleDailyWatchersSync('wrong-secret')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.handleDailyWatchersSync('wrong-secret'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

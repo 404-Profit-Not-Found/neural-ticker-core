@@ -48,7 +48,9 @@ describe('GoogleAuthGuard', () => {
 
       const options = guard.getAuthenticateOptions(context);
 
-      expect(options.callbackURL).toBe('https://myapp.com/api/auth/google/callback');
+      expect(options.callbackURL).toBe(
+        'https://myapp.com/api/auth/google/callback',
+      );
     });
 
     it('should handle intent query parameter', () => {
@@ -78,7 +80,9 @@ describe('GoogleAuthGuard', () => {
 
       const options = guard.getAuthenticateOptions(context);
 
-      expect(options.callbackURL).toBe('https://myapp.com/api/auth/google/callback');
+      expect(options.callbackURL).toBe(
+        'https://myapp.com/api/auth/google/callback',
+      );
     });
 
     it('should fallback to req.protocol if no x-forwarded-proto', () => {
@@ -91,7 +95,9 @@ describe('GoogleAuthGuard', () => {
 
       const options = guard.getAuthenticateOptions(context);
 
-      expect(options.callbackURL).toBe('http://localhost:3000/api/auth/google/callback');
+      expect(options.callbackURL).toBe(
+        'http://localhost:3000/api/auth/google/callback',
+      );
     });
   });
 });
@@ -120,8 +126,8 @@ function createMockContext(opts: {
     getClass: () => ({}),
     getArgs: () => [],
     getArgByIndex: () => ({}),
-    switchToRpc: () => ({} as any),
-    switchToWs: () => ({} as any),
+    switchToRpc: () => ({}) as any,
+    switchToWs: () => ({}) as any,
     getType: () => 'http',
   } as ExecutionContext;
 }

@@ -4,12 +4,15 @@ import { ScenarioCards } from './ScenarioCards';
 import type { TickerData } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
+import { AnalystRatingsTable } from './AnalystRatingsTable';
+
 interface TickerOverviewProps {
     risk_analysis: TickerData['risk_analysis'];
     market_data: TickerData['market_data'];
+    ratings?: TickerData['ratings'];
 }
 
-export function TickerOverview({ risk_analysis, market_data }: TickerOverviewProps) {
+export function TickerOverview({ risk_analysis, market_data, ratings }: TickerOverviewProps) {
     return (
         <div className="flex flex-col gap-6">
             {/* Scenarios - The Core View */}
@@ -62,6 +65,9 @@ export function TickerOverview({ risk_analysis, market_data }: TickerOverviewPro
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Analyst Ratings */}
+            <AnalystRatingsTable ratings={ratings} />
         </div>
     );
 }

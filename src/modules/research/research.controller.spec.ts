@@ -92,7 +92,12 @@ describe('ResearchController', () => {
       const result = await controller.list(req, 'all', 1, 10);
 
       expect(result).toEqual(list);
-      expect(mockResearchService.findAll).toHaveBeenCalledWith('user1', 'all', 1, 10);
+      expect(mockResearchService.findAll).toHaveBeenCalledWith(
+        'user1',
+        'all',
+        1,
+        10,
+      );
     });
   });
 
@@ -109,7 +114,9 @@ describe('ResearchController', () => {
     it('should throw NotFoundException if not found', async () => {
       mockResearchService.getResearchNote.mockResolvedValue(null);
 
-      await expect(controller.getResearch('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.getResearch('999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -141,21 +148,33 @@ describe('ResearchController', () => {
       const result = await controller.updateTitle(req, '1', 'New Title');
 
       expect(result).toEqual(note);
-      expect(mockResearchService.updateTitle).toHaveBeenCalledWith('1', 'user1', 'New Title');
+      expect(mockResearchService.updateTitle).toHaveBeenCalledWith(
+        '1',
+        'user1',
+        'New Title',
+      );
     });
 
     it('should throw NotFoundException if not found', async () => {
-      mockResearchService.updateTitle.mockRejectedValue(new Error('Research note not found'));
+      mockResearchService.updateTitle.mockRejectedValue(
+        new Error('Research note not found'),
+      );
       const req = { user: { id: 'user1' } };
 
-      await expect(controller.updateTitle(req, '999', 'Title')).rejects.toThrow(NotFoundException);
+      await expect(controller.updateTitle(req, '999', 'Title')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException for unauthorized access', async () => {
-      mockResearchService.updateTitle.mockRejectedValue(new Error('Unauthorized access'));
+      mockResearchService.updateTitle.mockRejectedValue(
+        new Error('Unauthorized access'),
+      );
       const req = { user: { id: 'user1' } };
 
-      await expect(controller.updateTitle(req, '1', 'Title')).rejects.toThrow(NotFoundException);
+      await expect(controller.updateTitle(req, '1', 'Title')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

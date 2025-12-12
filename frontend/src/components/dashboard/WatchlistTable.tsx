@@ -20,12 +20,17 @@ import {
     ArrowUp,
     ArrowDown,
     Loader2,
-    TrendingUp,
-    Pencil,
-    ChevronDown,
     Check,
     Filter,
-    X
+    X,
+    Bot,
+    Brain,
+    ShieldCheck,
+    AlertTriangle,
+    Flame,
+    Newspaper,
+    ChevronDown,
+    Pencil,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -70,10 +75,12 @@ interface TickerData {
     change: number;
     pe: number | null;
     marketCap: number | null;
-    divYield: string | null;
-    beta: number | null;
+    riskScore: number | null;
     rating: string;
-    growthRank: number;
+    aiRating: string;
+    newsCount: number;
+    researchCount: number;
+    analystCount: number;
     itemId?: string;
 }
 
@@ -88,6 +95,16 @@ interface MarketSnapshot {
         market_cap?: number;
         dividend_yield?: number;
         beta?: number;
+        consensus_rating?: string;
+    };
+    aiAnalysis?: {
+        overall_score: number;
+        upside_percent: number;
+    };
+    counts?: {
+        news: number;
+        research: number;
+        analysts: number;
     };
 }
 
@@ -199,6 +216,21 @@ export function WatchlistTable() {
                 const prevClose = Number(s.latestPrice?.prevClose || price);
                 const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
                 const fundamentals = s.fundamentals || {};
+                const rawRiskScore = s.aiAnalysis?.overall_score;
+                const parsedRiskScore = typeof rawRiskScore === 'number' ? rawRiskScore : Number(rawRiskScore);
+                const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
+
+                // AI Rating Logic
+                let aiRating = '-';
+                if (s.aiAnalysis) {
+                    const { overall_score, upside_percent } = s.aiAnalysis;
+                    // Score 0-10 (0 safe, 10 risky)
+                    // Upside %
+                    if (upside_percent > 15 && overall_score < 6) aiRating = 'Buy';
+                    if (upside_percent > 40 && overall_score < 7) aiRating = 'Strong Buy';
+                    if (upside_percent < 0 || overall_score > 8) aiRating = 'Sell';
+                    if (aiRating === '-') aiRating = 'Hold'; // Default if data exists but fits no extreme
+                }
 
                 return {
                     symbol: s.ticker?.symbol || 'UNKNOWN',
@@ -209,11 +241,13 @@ export function WatchlistTable() {
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
                     marketCap: fundamentals.market_cap ?? null,
-                    divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
-                    beta: fundamentals.beta ?? null,
-                    rating: 'Hold',
-                    growthRank: 5,
-                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id
+                    rating: fundamentals.consensus_rating || '-',
+                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id,
+                    aiRating: aiRating,
+                    riskScore: safeRiskScore,
+                    newsCount: s.counts?.news || 0,
+                    researchCount: s.counts?.research || 0,
+                    analystCount: s.counts?.analysts || 0,
                 };
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);
@@ -390,43 +424,112 @@ export function WatchlistTable() {
                     );
                 },
             }),
-            columnHelper.accessor('pe', {
-                header: ({ column }) => <SortableHeader column={column} title="P/E" />,
-                cell: (info) => <span className="text-muted-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
-            }),
             columnHelper.accessor('marketCap', {
                 header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
                 cell: (info) => <span className="text-muted-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
             }),
-            columnHelper.accessor('divYield', {
-                header: ({ column }) => <SortableHeader column={column} title="Div Yield %" />,
-                cell: (info) => <span className="text-muted-foreground">{info.getValue() || '-'}</span>,
+            columnHelper.accessor('researchCount', {
+                header: ({ column }) => <SortableHeader column={column} title="Research" />,
+                cell: (info) => {
+                    const count = info.getValue();
+                    if (!count) return <span className="text-muted-foreground">-</span>;
+                    return (
+                        <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
+                            <Brain size={14} className="text-purple-400" />
+                            {count}
+                        </div>
+                    );
+                },
             }),
-            columnHelper.accessor('beta', {
-                header: ({ column }) => <SortableHeader column={column} title="Beta" />,
-                cell: (info) => <span className="text-muted-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
+            columnHelper.accessor('newsCount', {
+                header: ({ column }) => <SortableHeader column={column} title="News" />,
+                cell: (info) => {
+                    const count = info.getValue() || 0;
+                    if (!count) return <span className="text-muted-foreground">-</span>;
+                    return (
+                        <div className="flex items-center gap-1.5 text-sky-400 font-semibold">
+                            <Newspaper size={14} className="text-sky-400" />
+                            {count}
+                        </div>
+                    );
+                },
+            }),
+            columnHelper.accessor('riskScore', {
+                header: ({ column }) => <SortableHeader column={column} title="Risk Score" />,
+                cell: (info) => {
+                    const val = info.getValue();
+                    const numericVal = typeof val === 'number' ? val : Number(val);
+                    if (!Number.isFinite(numericVal)) return <span className="text-muted-foreground">-</span>;
+                    // Color scale: 0-3 Green, 4-6 Yellow, 7-10 Red
+                    let colorClass = "text-muted-foreground";
+                    let Icon = ShieldCheck;
+                    if (numericVal <= 3.5) {
+                        colorClass = "text-emerald-500 font-bold"; // Low risk
+                        Icon = ShieldCheck;
+                    } else if (numericVal <= 6.5) {
+                        colorClass = "text-yellow-500 font-bold"; // Medium risk
+                        Icon = AlertTriangle;
+                    } else {
+                        colorClass = "text-red-500 font-bold"; // High risk
+                        Icon = Flame;
+                    }
+
+                    return (
+                        <span className={cn("flex items-center gap-1.5", colorClass)}>
+                            <Icon size={14} />
+                            {numericVal.toFixed(1)}
+                        </span>
+                    );
+                },
             }),
             columnHelper.accessor('rating', {
                 header: ({ column }) => <SortableHeader column={column} title="Rating" />,
                 cell: (info) => {
                     const rating = info.getValue();
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" = "default";
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+
+                    if (rating && rating !== '-') {
+                        if (rating === 'Strong Buy') variant = 'strongBuy';
+                        else if (rating === 'Buy') variant = 'buy';
+                        else if (rating === 'Hold') variant = 'hold';
+                        else if (rating === 'Sell') variant = 'sell';
+                        else variant = "default"; // Fallback for other valid strings
+
+                        const count = info.row.original.analystCount;
+                        const label = count > 0 ? `${rating} (${count})` : rating;
+
+                        return (
+                            <div className="flex items-center gap-2">
+                                <Badge variant={variant} className="whitespace-nowrap">{label}</Badge>
+                            </div>
+                        );
+                    }
+
+                    // Empty state
+                    return <span className="text-muted-foreground">-</span>;
+                },
+            }),
+            columnHelper.accessor('aiRating', {
+                header: ({ column }) => <SortableHeader column={column} title="AI Rating" />,
+                cell: (info) => {
+                    const rating = info.getValue() as string;
+                    if (!rating || rating === '-') return <span className="text-muted-foreground">-</span>;
+
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
                     if (rating === 'Strong Buy') variant = 'strongBuy';
                     else if (rating === 'Buy') variant = 'buy';
                     else if (rating === 'Hold') variant = 'hold';
                     else if (rating === 'Sell') variant = 'sell';
-                    return <Badge variant={variant} className="whitespace-nowrap">{rating}</Badge>;
+
+                    return (
+                        <Badge variant={variant} className="whitespace-nowrap gap-1.5">
+                            <Bot size={12} className="opacity-80" />
+                            {rating}
+                        </Badge>
+                    );
                 },
             }),
-            columnHelper.accessor('growthRank', {
-                header: ({ column }) => <SortableHeader column={column} title="Growth Rank" />,
-                cell: (info) => (
-                    <div className="flex items-center text-foreground">
-                        {info.getValue()}
-                        <TrendingUp size={14} className="ml-1 text-emerald-500" />
-                    </div>
-                )
-            }),
+
             columnHelper.display({
                 id: 'actions',
                 cell: (info) => (

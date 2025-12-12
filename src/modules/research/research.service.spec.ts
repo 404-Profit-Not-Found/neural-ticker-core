@@ -242,7 +242,10 @@ describe('ResearchService', () => {
     it('should update title for owner', async () => {
       const note = { id: '1', user_id: 'user-1', title: 'Old' };
       mockRepo.findOne.mockResolvedValue(note);
-      mockUsersService.findById.mockResolvedValue({ id: 'user-1', role: 'user' });
+      mockUsersService.findById.mockResolvedValue({
+        id: 'user-1',
+        role: 'user',
+      });
 
       const result = await service.updateTitle('1', 'user-1', 'New Title');
 
@@ -253,7 +256,10 @@ describe('ResearchService', () => {
     it('should update title for admin', async () => {
       const note = { id: '1', user_id: 'other-user', title: 'Old' };
       mockRepo.findOne.mockResolvedValue(note);
-      mockUsersService.findById.mockResolvedValue({ id: 'admin-1', role: 'admin' });
+      mockUsersService.findById.mockResolvedValue({
+        id: 'admin-1',
+        role: 'admin',
+      });
 
       const result = await service.updateTitle('1', 'admin-1', 'Admin Edit');
 
@@ -263,15 +269,18 @@ describe('ResearchService', () => {
     it('should throw if note not found', async () => {
       mockRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.updateTitle('999', 'user-1', 'Title')).rejects.toThrow(
-        'Research note not found',
-      );
+      await expect(
+        service.updateTitle('999', 'user-1', 'Title'),
+      ).rejects.toThrow('Research note not found');
     });
 
     it('should throw if unauthorized', async () => {
       const note = { id: '1', user_id: 'other-user', title: 'Old' };
       mockRepo.findOne.mockResolvedValue(note);
-      mockUsersService.findById.mockResolvedValue({ id: 'user-1', role: 'user' });
+      mockUsersService.findById.mockResolvedValue({
+        id: 'user-1',
+        role: 'user',
+      });
 
       await expect(service.updateTitle('1', 'user-1', 'Title')).rejects.toThrow(
         'Unauthorized',
@@ -289,4 +298,3 @@ describe('ResearchService', () => {
     });
   });
 });
-

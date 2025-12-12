@@ -9,36 +9,52 @@ interface TickerNewsProps {
 
 export function TickerNews({ news }: TickerNewsProps) {
     return (
-        <Card>
+        <Card className="h-full flex flex-col overflow-hidden">
             <CardHeader className="py-4 border-b border-border bg-muted/10">
-                <CardTitle className="flex items-center gap-2 text-sm font-bold">
-                    <Newspaper size={14} /> Global News Feed
+                <CardTitle className="font-bold text-sm flex items-center gap-2">
+                    <Newspaper className="w-4 h-4 text-primary" /> Global News Feed
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 flex-1 overflow-y-auto">
                 <div className="divide-y divide-border/50">
-                    {news.length > 0 ? news.map((item: NewsItem) => (
-                        <a
-                            key={item.id}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-4 hover:bg-muted/5 transition-colors group"
-                        >
-                            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 mb-1">
-                                <h4 className="text-base font-medium leading-snug group-hover:text-primary transition-colors">
-                                    {item.headline}
-                                </h4>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                                    {new Date(item.datetime * 1000).toLocaleString()}
-                                </span>
+                    {news && news.length > 0 ? (
+                        news.map((item) => (
+                            <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
+                                <a
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-4 flex items-center justify-between group block"
+                                >
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <div className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                                                    {item.headline}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold uppercase text-muted-foreground">
+                                                    {new Date(item.datetime * 1000).toLocaleDateString()}
+                                                </span>
+                                                <span className="text-muted-foreground text-xs">•</span>
+
+                                                <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
+                                                    {item.source}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
                             </div>
-                            <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider text-primary/80">
-                                {item.source}
-                            </div>
-                        </a>
-                    )) : (
-                        <div className="p-12 text-center text-muted-foreground">No recent news found for this ticker.</div>
+                        ))
+                    ) : (
+                        <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center h-40">
+                            <Newspaper className="w-8 h-8 opacity-20 mb-3" />
+                            <p className="text-sm">No recent news found.</p>
+                        </div>
                     )}
                 </div>
             </CardContent>

@@ -142,8 +142,34 @@ export class ResearchService {
       }
 
       // 3. Call LLM
+      const dataRequirements = `
+CRITICAL DATA REQUIREMENT:
+You MUST search for and explicitly include the following TTM (Trailing Twelve Month) and MRQ (Most Recent Quarter) data in your report if available:
+- Revenue, Gross Margin, Operating Margin, Net Profit Margin
+- ROE, ROA
+- Debt-to-Equity, Debt-to-Assets, Interest Coverage
+- Current Ratio, Quick Ratio
+- P/E, PEG, Price-to-Book
+- Free Cash Flow
+- Latest Analyst Ratings (Firm, Rating, Price Target)
+
+Present these numbers clearly in the text or a table so they can be parsed for downstream systems.
+
+CRITICAL SECTION REQUIREMENT:
+You MUST include a "Risk/Reward Profile" section at the end of your report with the following specific format:
+- Overall Score: [0-10] (10 = Best Risk/Reward)
+- Financial Risk: [0-10] (10 = High Risk)
+- Execution Risk: [0-10] (10 = High Risk)
+- Reward Target: Estimated 12m price target ($)
+- Upside: % Return to target
+- Scenarios:
+  - Bull: $X.XX (Rationale)
+  - Base: $X.XX (Rationale)
+  - Bear: $X.XX (Rationale)
+`;
+
       const result = await this.llmService.generateResearch({
-        question: note.question,
+        question: note.question + dataRequirements,
         tickers: note.tickers,
         numericContext: context,
         quality: note.quality as QualityTier,
@@ -209,12 +235,14 @@ export class ResearchService {
     // Process from Oldest -> Newest so newer data overwrites older data
     const sortedNotes = notes.reverse();
 
-    this.logger.log(`Reprocessing ${sortedNotes.length} notes for ${ticker}...`);
+    this.logger.log(
+      `Reprocessing ${sortedNotes.length} notes for ${ticker}...`,
+    );
 
     for (const note of sortedNotes) {
       await this.extractFinancialsFromResearch([ticker], note.answer_markdown);
     }
-    
+
     this.logger.log(`Completed reprocessing for ${ticker}`);
   }
 
@@ -235,8 +263,8 @@ export class ResearchService {
           Extract the following for ticker "${ticker}" from the provided text.
           
           1. Financial Metrics (Return as object "financials"):
-             keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity", "revenue_ttm", "gross_margin", "net_profit_margin", "operating_margin", "roe", "roa", "price_to_book", "book_value_per_share", "free_cash_flow_ttm", "earnings_growth_yoy", "current_ratio", "quick_ratio", "interest_coverage", "debt_to_assets".
-             Values must be NUMBERS. If not found, use null.
+             keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity", "revenue_ttm", "net_income_ttm", "gross_margin", "net_profit_margin", "operating_margin", "roe", "roa", "price_to_book", "book_value_per_share", "free_cash_flow_ttm", "earnings_growth_yoy", "current_ratio", "quick_ratio", "interest_coverage", "debt_to_assets", "total_assets", "total_liabilities", "total_debt", "total_cash", "next_earnings_date", "next_earnings_estimate_eps", "consensus_rating".
+             Values must be NUMBERS (except "next_earnings_date" as YYYY-MM-DD and "consensus_rating" as string). If not found, use null.
 
           2. Analyst Ratings (Return as array "ratings"):
              Each object: { "firm": string, "analyst_name": string | null, "rating": "Buy"|"Hold"|"Sell", "price_target": number | null, "rating_date": "YYYY-MM-DD" }
@@ -265,7 +293,7 @@ export class ResearchService {
         let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
         const start = jsonStr.indexOf('{');
         const end = jsonStr.lastIndexOf('}');
-        
+
         if (start !== -1 && end !== -1) {
           jsonStr = jsonStr.substring(start, end + 1);
           const data = JSON.parse(jsonStr);
@@ -283,10 +311,8 @@ export class ResearchService {
               data.ratings,
             );
           }
-          
-          this.logger.log(
-            `Extracted financials & ratings for ${ticker}`,
-          );
+
+          this.logger.log(`Extracted financials & ratings for ${ticker}`);
         }
       } catch (e) {
         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
@@ -545,6 +571,7 @@ Title:`;
       2. Prioritize 10-K/10-Q filings over news snippets.
       3. Create a Markdown table for last 3y Financials.
       4. Cite every numerical claim.
+      5. MANDATORY: End with a "Risk/Reward Profile" section containing: Overall Score (0-10), Financial/Execution Risk scores, Price Targets, and Bull/Base/Bear Scenarios.
     `;
   }
 }

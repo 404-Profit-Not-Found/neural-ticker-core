@@ -88,7 +88,7 @@ export class Fundamentals {
   })
   gross_margin: number;
 
-  @ApiProperty({ example: 0.20, required: false })
+  @ApiProperty({ example: 0.2, required: false })
   @Column({
     type: 'numeric',
     precision: 10,
@@ -118,7 +118,7 @@ export class Fundamentals {
   })
   roe: number;
 
-  @ApiProperty({ example: 0.10, required: false })
+  @ApiProperty({ example: 0.1, required: false })
   @Column({
     type: 'numeric',
     precision: 10,
@@ -207,6 +207,74 @@ export class Fundamentals {
     transformer: new ColumnNumericTransformer(),
   })
   debt_to_assets: number;
+
+  @ApiProperty({ example: 500000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  net_income_ttm: number;
+
+  @ApiProperty({ example: 100000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  total_debt: number;
+
+  @ApiProperty({ example: 2000000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  total_assets: number;
+
+  @ApiProperty({ example: 800000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  total_liabilities: number;
+
+  @ApiProperty({ example: 150000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  total_cash: number;
+
+  @ApiProperty({ example: '2026-03-18', required: false })
+  @Column({ type: 'date', nullable: true })
+  next_earnings_date: string;
+
+  @ApiProperty({ example: -0.51, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  next_earnings_estimate_eps: number;
+
+  @ApiProperty({ example: 'Strong Buy', required: false })
+  @Column({ type: 'text', nullable: true })
+  consensus_rating: string;
 
   @ApiProperty({ example: 'Technology', required: false })
   @Column({ type: 'text', nullable: true })

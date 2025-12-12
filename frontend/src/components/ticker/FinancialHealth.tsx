@@ -13,12 +13,12 @@ export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
         if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
         if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
         if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-        return `$${val.toLocaleString()}`;
+        return `$${Number(val).toLocaleString()}`;
     };
 
     const formatNumber = (val: number | undefined | null, decimals = 2) => {
         if (val === undefined || val === null) return '-';
-        return val.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        return Number(val).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     };
 
     const formatPercent = (val: number | undefined | null) => {

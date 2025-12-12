@@ -116,7 +116,9 @@ describe('StockTwitsService', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('Network error')),
+      );
 
       await expect(service.fetchAndStorePosts('AAPL')).resolves.toBeUndefined();
     });
@@ -152,7 +154,9 @@ describe('StockTwitsService', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('Network error')),
+      );
 
       await expect(service.trackWatchers('AAPL')).resolves.toBeUndefined();
     });
@@ -190,7 +194,9 @@ describe('StockTwitsService', () => {
         { symbol: 'AAPL' },
         { symbol: 'GOOGL' },
       ]);
-      mockHttpService.get.mockReturnValue(of({ data: { symbol: { watchlist_count: 100 } } }));
+      mockHttpService.get.mockReturnValue(
+        of({ data: { symbol: { watchlist_count: 100 } } }),
+      );
 
       await service.handleDailyWatchersSync();
 
