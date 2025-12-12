@@ -92,6 +92,8 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTicker(e.target.value)}
                                 placeholder="e.g. AAPL"
                                 required
+                                disabled={!!defaultTicker}
+                                className={defaultTicker ? 'bg-muted cursor-not-allowed' : ''}
                             />
                         </div>
                         <div className="space-y-2">

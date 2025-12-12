@@ -13,12 +13,12 @@ export class GeminiProvider implements ILlmProvider {
   private readonly logger = new Logger(GeminiProvider.name);
   private client: GoogleGenAI;
 
-  // Per deep_research.md spec (Dec 2025): Only Gemini 3 and 2.5 series, NO legacy 1.5/2.0
+  // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
   private readonly defaultModels = {
-    deep: 'gemini-3-pro',
+    deep: 'gemini-2.5-flash',
     medium: 'gemini-2.5-flash',
-    low: 'gemini-2.5-flash',
-    extraction: 'gemini-2.5-flash',
+    low: 'gemini-1.5-flash',
+    extraction: 'gemini-1.5-flash',
   };
 
   constructor(private readonly configService: ConfigService) {
@@ -47,19 +47,11 @@ export class GeminiProvider implements ILlmProvider {
     let thinkingConfig: ThinkingConfig | undefined;
 
     if (isThinkingModel) {
-      if (modelName.includes('gemini-3')) {
-        // Gemini 3 Pro: higher thinking budget for deep reasoning
-        thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: 4096,
-        };
-      } else {
-        // Gemini 2.5 Flash Thinking
-        thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: 2048,
-        };
-      }
+      // Default thinking budget for pro/flash models
+      thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
+      };
     }
 
     const config: GenerateContentConfig = {

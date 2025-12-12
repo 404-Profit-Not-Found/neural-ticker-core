@@ -44,6 +44,7 @@ export interface ResearchItem {
     };
     provider?: string;
     user_id?: string;
+    models_used?: string[];
 }
 
 export interface TickerData {

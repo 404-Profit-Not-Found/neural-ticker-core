@@ -162,6 +162,15 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                             </Badge>
                                                         </>
                                                     )}
+
+                                                    {item.provider !== 'manual' && item.provider && (
+                                                        <>
+                                                            <span className="text-muted-foreground text-xs">•</span>
+                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
+                                                                {item.models_used && item.models_used.length > 0 ? item.models_used[0] : item.provider}
+                                                            </Badge>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

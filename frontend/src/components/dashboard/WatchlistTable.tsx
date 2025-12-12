@@ -529,7 +529,14 @@ export function WatchlistTable() {
                                 <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List">
                                     <Pencil className="w-3.5 h-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteList(activeWatchlistId!)} className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Delete List">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteList(activeWatchlistId!)}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    title="Delete List"
+                                    aria-label="Delete watchlist"
+                                >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                             </div>
@@ -544,7 +551,7 @@ export function WatchlistTable() {
                         <input
                             ref={searchInputRef}
                             type="text"
-                            placeholder="Add symbol..."
+                            placeholder="Add stock..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={handleKeyDown}

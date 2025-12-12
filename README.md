@@ -267,9 +267,9 @@ Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `s
 
 | Tier | OpenAI | Gemini | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash` | Quick sentiment, simple extraction |
+| **Low** | `gpt-4.1-nano` | `gemini-1.5-flash` | Quick sentiment, simple extraction (Free Tier) |
 | **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
-| **Deep** | `gpt-5.1`| `gemini-3-pro` | 10-K analysis, thesis generation |
+| **Deep** | `gpt-5.1`| `gemini-2.5-flash` | 10-K analysis, thesis generation |
 
 ### Deep Research Agent
 

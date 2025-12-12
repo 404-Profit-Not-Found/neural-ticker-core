@@ -1,4 +1,3 @@
-// import { useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -15,7 +14,11 @@ import {
     FileText,
     Database,
     Printer,
-    Calendar
+    Calendar,
+    CheckCircle2,
+    Clock,
+    TrendingUp,
+    TrendingDown
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -23,10 +26,13 @@ import { Header } from '../components/layout/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { InlineAlert } from '../components/ui/inline-alert';
+// Badge removed - not needed in this component
+import { TickerLogo } from '../components/dashboard/TickerLogo';
+import { useTickerDetails } from '../hooks/useTicker';
 
 interface ResearchNote {
     id: string;
-    request_id: string; // Add this
+    request_id: string;
     created_at: string;
     status: 'completed' | 'pending' | 'failed' | 'processing';
     question?: string;
@@ -43,9 +49,9 @@ interface ResearchNote {
     tickers: string[];
     models_used?: string[];
     error?: string;
-    tokens_in?: number; // Add this
-    tokens_out?: number; // Add this
-    numeric_context?: Record<string, unknown>; // Add this
+    tokens_in?: number;
+    tokens_out?: number;
+    numeric_context?: Record<string, unknown>;
 }
 
 export function ResearchPage() {
@@ -72,7 +78,7 @@ export function ResearchPage() {
                 <Header />
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    <div className="text-muted-foreground animate-pulse">Loading Research Data...</div>
+                    <div className="text-muted-foreground animate-pulse text-sm">Loading Research...</div>
                 </div>
             </div>
         );
@@ -83,12 +89,19 @@ export function ResearchPage() {
             <div className="min-h-screen bg-background flex flex-col text-foreground font-sans">
                 <Header />
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                    <AlertTriangle className="w-12 h-12 text-destructive opacity-50" />
                     <h2 className="text-xl font-bold">Research Note Not Found</h2>
-                    <Button onClick={() => navigate(-1)}>Go Back</Button>
+                    <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
                 </div>
             </div>
         );
     }
+
+    const primaryTicker = note.tickers[0];
+    const { data: tickerData } = useTickerDetails(primaryTicker);
+    const profile = tickerData?.profile;
+    const marketData = tickerData?.market_data;
+    const isPriceUp = (marketData?.change_percent ?? 0) >= 0;
 
     const title = note.title || note.question || "Analysis Request";
     const content = note.answer_markdown;
@@ -104,84 +117,126 @@ export function ResearchPage() {
     })).filter((s: { url?: string }) => s.url);
 
     return (
-        <div className="min-h-screen bg-background flex flex-col text-foreground font-sans selection:bg-primary/20">
+        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
             <Header />
 
-            <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
-                {/* Toolbar */}
-                <div className="flex items-center justify-between mb-8">
-                    <Button variant="ghost" className="gap-2 pl-0 hover:bg-transparent hover:text-primary" onClick={() => navigate(-1)}>
-                        <ArrowLeft size={16} /> Back
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
-                            <Printer size={14} /> Print
+            <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6">
+
+                {/* --- HERO HEADER (matching TickerDetail style exactly) --- */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8">
+                            <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                         </Button>
-                        <Button variant="outline" size="sm" className="gap-2">
-                            <Share2 size={14} /> Share
+
+                        {/* Stock Logo */}
+                        <TickerLogo url={profile?.logo_url} symbol={primaryTicker} className="w-12 h-12" />
+
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-bold tracking-tight">{primaryTicker}</h1>
+                                {profile?.exchange && (
+                                    <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                                        {profile.exchange}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="text-sm text-muted-foreground font-medium">{profile?.name || 'Loading...'}</div>
+                        </div>
+
+                        <div className="h-8 w-px bg-border mx-2 hidden md:block" />
+
+                        {/* Price Display */}
+                        {marketData && (
+                            <div className="hidden md:block">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl font-mono font-semibold tracking-tight">
+                                        ${marketData.price?.toFixed(2)}
+                                    </span>
+                                    <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                        {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+                                        {Math.abs(marketData.change_percent || 0).toFixed(2)}%
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        {/* Status Badge */}
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${isProcessing
+                            ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                            : isFailed
+                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                : 'bg-green-500/10 text-green-500 border-green-500/20'
+                            }`}>
+                            {isProcessing ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isFailed ? (
+                                <AlertTriangle className="w-3 h-3" />
+                            ) : (
+                                <CheckCircle2 className="w-3 h-3" />
+                            )}
+                            <span className="capitalize">{note.status}</span>
+                        </div>
+
+                        {/* Model Badge */}
+                        {note.models_used && note.models_used.length > 0 && (
+                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-lg text-xs font-medium">
+                                <Brain className="w-3 h-3" />
+                                <span>{note.models_used[0]}</span>
+                            </div>
+                        )}
+
+                        <div className="h-4 w-px bg-border mx-1 hidden md:block" />
+
+                        <Button variant="outline" size="sm" className="gap-2 h-9 text-xs" onClick={() => window.print()}>
+                            <Printer size={12} /> Print
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
+                            <Share2 size={12} /> Share
                         </Button>
                     </div>
                 </div>
 
-                {/* Header Section */}
-                <Card className="mb-8 border-border bg-card">
-                    <CardContent className="p-6">
-                        <div className="flex items-start gap-4 mb-4">
-                            <div className="p-3 bg-primary/10 rounded-xl mt-1">
-                                <Brain className="w-8 h-8 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                    <span className="uppercase font-bold tracking-wider text-xs bg-muted px-2 py-0.5 rounded">Research Note</span>
-                                    <span className="text-muted-foreground/50">•</span>
-                                    <span className="font-mono font-medium text-foreground">{note.tickers.join(', ')}</span>
-                                </div>
-                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 leading-tight text-foreground">{title}</h1>
-                                {note.title && note.question && note.title !== note.question && (
-                                    <p className="text-muted-foreground text-sm italic">Query: "{note.question}"</p>
-                                )}
-                            </div>
+                {/* --- RESEARCH TITLE (prominent section below header) --- */}
+                <div className="space-y-2">
+                    <h2 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h2>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                            <Calendar size={12} />
+                            <span>{new Date(note.created_at).toLocaleString()}</span>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground ml-0 md:ml-16 border-t border-border pt-4 mt-4">
-                            <div className="flex items-center gap-2">
-                                <Calendar size={14} />
-                                <span>{new Date(note.created_at).toLocaleString()}</span>
+                        {note.tokens_in && note.tokens_out && (
+                            <div className="flex items-center gap-1.5">
+                                <Clock size={12} />
+                                <span>{note.tokens_in + note.tokens_out} tokens</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {isProcessing ? (
-                                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                                ) : (
-                                    <div className={`w - 2.5 h - 2.5 rounded - full ${note.status === 'completed' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'} `} />
-                                )}
-                                <span className="capitalize font-medium text-foreground">{note.status}</span>
-                            </div>
-                            {note.models_used && note.models_used.length > 0 && (
-                                <div className="flex items-center gap-2 bg-muted/50 px-2 py-1 rounded text-xs">
-                                    <Brain size={12} />
-                                    <span>{note.models_used.join(', ')}</span>
-                                </div>
-                            )}
-                            <span className="font-mono text-xs opacity-30 ml-auto hidden sm:inline-block">ID: {note.id.split('-')[0]}...</span>
-                        </div>
-                    </CardContent>
-                </Card>
+                        )}
+                        <span className="font-mono text-[10px] opacity-30 ml-auto">ID: {note.id}</span>
+                    </div>
+                </div>
 
+                {/* Error State */}
                 {isFailed && (
-                    <InlineAlert variant="error" className="mb-8">
+                    <InlineAlert variant="error">
                         <AlertTriangle className="h-4 w-4" />
                         <span className="ml-2 font-semibold">Analysis Failed:</span>
-                        <span className="ml-2">{note.error || "An unknown error occurred during generation."}</span>
+                        <span className="ml-2">{note.error || "An unknown error occurred."}</span>
                     </InlineAlert>
                 )}
 
+                {/* Processing State */}
                 {isProcessing && (
-                    <Card className="mb-8 border-primary/20">
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardContent className="flex flex-col items-center justify-center py-16">
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+                                <Loader2 className="w-12 h-12 animate-spin text-primary relative z-10" />
+                            </div>
                             <h3 className="text-lg font-semibold mb-2">Generating Research...</h3>
-                            <p className="text-muted-foreground text-center max-w-md">
-                                The AI engines are analyzing market data, news, and financials. This usually takes 10-20 seconds.
+                            <p className="text-muted-foreground text-center max-w-md text-sm">
+                                AI is analyzing market data, news, and financials. This typically takes 15-30 seconds.
                             </p>
                         </CardContent>
                     </Card>
@@ -190,49 +245,38 @@ export function ResearchPage() {
                 {/* Tabs Layout */}
                 {!isProcessing && !isFailed && (
                     <Tabs defaultValue="report" className="w-full">
-                        <TabsList className="mb-8 w-full justify-start border-b border-border rounded-none h-auto p-0 bg-transparent gap-6">
-                            <TabsTrigger
-                                value="report"
-                                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 font-semibold"
-                            >
+                        <TabsList className="mb-6">
+                            <TabsTrigger value="report" className="gap-2">
+                                <FileText size={14} />
                                 Analysis Report
                             </TabsTrigger>
                             {hasThinking && (
-                                <TabsTrigger
-                                    value="thinking"
-                                    className="gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3"
-                                >
+                                <TabsTrigger value="thinking" className="gap-2">
                                     <Lightbulb size={14} className="text-yellow-500" />
                                     Thinking Process
                                 </TabsTrigger>
                             )}
                             {sources && sources.length > 0 && (
-                                <TabsTrigger
-                                    value="sources"
-                                    className="gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3"
-                                >
+                                <TabsTrigger value="sources" className="gap-2">
                                     <Quote size={14} />
                                     Sources ({sources.length})
                                 </TabsTrigger>
                             )}
-                            <TabsTrigger
-                                value="raw"
-                                className="gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3"
-                            >
-                                <FileText size={14} />
+                            <TabsTrigger value="raw" className="gap-2">
+                                <Database size={14} />
                                 Raw Data
                             </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="report" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card className="border border-border bg-card">
+                        <TabsContent value="report" className="mt-0 animate-in fade-in duration-200">
+                            <Card className="border-border">
                                 <CardContent className="p-6 md:p-8">
                                     {content ? (
-                                        <article className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-strong:text-foreground prose-blockquote:border-l-primary/50 prose-blockquote:bg-muted/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-hr:border-border">
+                                        <article className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-strong:text-foreground prose-blockquote:border-l-primary/50 prose-blockquote:bg-muted/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-hr:border-border prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-pre:bg-muted prose-pre:border prose-pre:border-border">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                                         </article>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                             <AlertTriangle className="w-10 h-10 mb-4 opacity-20" />
                                             <p>No content generated.</p>
                                         </div>
@@ -242,12 +286,12 @@ export function ResearchPage() {
                         </TabsContent>
 
                         {hasThinking && (
-                            <TabsContent value="thinking" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <Card className="bg-muted/10 border-primary/20">
+                            <TabsContent value="thinking" className="mt-0 animate-in fade-in duration-200">
+                                <Card className="bg-yellow-500/5 border-yellow-500/20">
                                     <CardHeader>
                                         <CardTitle className="text-lg flex items-center gap-2">
                                             <Lightbulb className="text-yellow-500" size={20} />
-                                            Wait Process (CoT)
+                                            Chain of Thought
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
@@ -260,61 +304,62 @@ export function ResearchPage() {
                         )}
 
                         {sources && sources.length > 0 && (
-                            <TabsContent value="sources" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div className="grid gap-4 md:grid-cols-2">
+                            <TabsContent value="sources" className="mt-0 animate-in fade-in duration-200">
+                                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                     {sources.map((source, i) => (
-                                        <Card key={i} className="hover:border-primary/50 transition-colors group">
-                                            <CardContent className="p-4 flex items-start gap-3">
-                                                <div className="p-2 bg-muted/50 rounded border border-border group-hover:border-primary/50 text-xs font-bold w-8 h-8 flex items-center justify-center shrink-0 transition-colors">
-                                                    {source.index}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium truncate group-hover:text-primary transition-colors">{source.title}</h4>
-                                                    <a
-                                                        href={source.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1 text-xs text-muted-foreground mt-1 hover:underline"
-                                                    >
-                                                        <LinkIcon size={10} />
-                                                        <span className="truncate">{source.url}</span>
-                                                    </a>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
+                                        <a
+                                            key={i}
+                                            href={source.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block"
+                                        >
+                                            <Card className="h-full hover:border-primary/50 hover:bg-muted/30 transition-all group cursor-pointer">
+                                                <CardContent className="p-4 flex items-start gap-3">
+                                                    <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center text-xs font-bold group-hover:bg-primary/20 transition-colors shrink-0">
+                                                        {source.index}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                                                            {source.title}
+                                                        </h4>
+                                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
+                                                            <LinkIcon size={8} />
+                                                            <span className="truncate">{source.url ? new URL(source.url).hostname : ''}</span>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </a>
                                     ))}
                                 </div>
                             </TabsContent>
                         )}
 
-                        <TabsContent value="raw" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-                            {/* Raw Markdown Section */}
-                            <Card className="border border-border bg-card">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <FileText className="text-primary" size={20} />
-                                        Raw Markdown Response
+                        <TabsContent value="raw" className="mt-0 animate-in fade-in duration-200 space-y-4">
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <FileText className="text-primary" size={16} />
+                                        Raw Markdown
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="relative">
-                                        <pre className="w-full h-[400px] p-4 rounded-md bg-muted/50 border border-border overflow-auto text-xs font-mono whitespace-pre-wrap">
-                                            {note?.answer_markdown || "No markdown content available."}
-                                        </pre>
-                                    </div>
+                                    <pre className="w-full max-h-[400px] p-4 rounded-lg bg-muted/50 border border-border overflow-auto text-xs font-mono whitespace-pre-wrap">
+                                        {note?.answer_markdown || "No markdown content."}
+                                    </pre>
                                 </CardContent>
                             </Card>
 
-                            {/* Metadata Section */}
-                            <Card className="border border-border bg-card">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Database className="text-muted-foreground" size={20} />
-                                        Metadata & Context
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <Database className="text-muted-foreground" size={16} />
+                                        Metadata
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <pre className="w-full p-4 rounded-md bg-muted/50 border border-border overflow-auto text-xs font-mono">
+                                    <pre className="w-full max-h-[300px] p-4 rounded-lg bg-muted/50 border border-border overflow-auto text-xs font-mono">
                                         {JSON.stringify({
                                             id: note.id,
                                             request_id: note.request_id,
