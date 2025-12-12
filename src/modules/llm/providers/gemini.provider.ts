@@ -29,18 +29,16 @@ export class GeminiProvider implements ILlmProvider {
     // Re-initialize client if a custom key is provided (or rely on singleton)
     const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
 
-    // Resolve model and determine if it supports "Thinking"
-    const modelName = this.resolveModel(prompt.quality);
+    let modelName = this.resolveModel(prompt.quality);
     const isThinkingModel =
-      modelName.includes('thinking') || modelName.includes('gemini-3');
+      modelName.includes('thinking') || modelName.includes('pro'); // simplified check
 
     // 1. Configure Tools (Google Search)
-    // In the new SDK, tools are simplified.
     const tools: Tool[] = [
       { googleSearch: {} }, // Native Grounding
     ];
 
-    // 2. Configure Thinking (The tricky part)
+    // 2. Configure Thinking
     let thinkingConfig: ThinkingConfig | undefined;
 
     if (isThinkingModel) {
@@ -54,7 +52,7 @@ export class GeminiProvider implements ILlmProvider {
         // Gemini 2.5 uses "Budget" (Token Count)
         thinkingConfig = {
           includeThoughts: true,
-          thinkingBudget: 1024, // Adjust based on complexity
+          thinkingBudget: 1024, 
         };
       }
     }
@@ -68,46 +66,88 @@ export class GeminiProvider implements ILlmProvider {
       Context: ${JSON.stringify(prompt.numericContext)}`,
     };
 
-    try {
-      const result = await client.models.generateContent({
-        model: modelName,
-        contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
-        config: config,
-      });
+    // Retry & Fallback Logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    let currentModel = modelName;
 
-      // 3. Extract Grounding Metadata (New SDK format)
-      // The new SDK returns cleaner metadata objects
-      const groundingMeta = result.candidates?.[0]?.groundingMetadata;
+    while (attempts < maxAttempts * 2) { // Allow attempts for primary + fallback
+      try {
+        attempts++;
+        this.logger.log(`Gemini Request [Attempt ${attempts}] using ${currentModel}`);
+        
+        const result = await client.models.generateContent({
+          model: currentModel,
+          contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
+          config: config,
+        });
 
-      // 4. Extract Thoughts (if available)
-      // Thoughts are often in the first candidate part if includeThoughts is true
-      const thoughts = result.candidates?.[0]?.content?.parts?.filter(
-        (p) => p.thought,
-      );
+        // 3. Extract Grounding Metadata
+        const groundingMeta = result.candidates?.[0]?.groundingMetadata;
 
-      return {
-        provider: 'gemini',
-        models: [modelName],
-        answerMarkdown: result.text || '', // Getter, not method
-        groundingMetadata: groundingMeta,
-        // You might want to return thoughts separately for debugging
-        thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
-        tokensIn: result.usageMetadata?.promptTokenCount,
-        tokensOut: result.usageMetadata?.candidatesTokenCount,
-      };
-    } catch (err) {
-      this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
-      throw err;
+        // 4. Extract Thoughts
+        const thoughts = result.candidates?.[0]?.content?.parts?.filter(
+          (p) => p.thought,
+        );
+
+        return {
+          provider: 'gemini',
+          models: [currentModel],
+          answerMarkdown: result.text || '',
+          groundingMetadata: groundingMeta,
+          thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
+          tokensIn: result.usageMetadata?.promptTokenCount,
+          tokensOut: result.usageMetadata?.candidatesTokenCount,
+        };
+
+      } catch (err: any) {
+        const isQuotaError = err.status === 429 || err.code === 429 || err.message?.includes('429') || err.message?.includes('quota');
+        
+        if (isQuotaError && attempts < maxAttempts) {
+           // Retry same model
+           this.logger.warn(`Gemini 429 Quota Exceeded for ${currentModel}. Retrying in 5s...`);
+           await new Promise(r => setTimeout(r, 5000));
+           continue;
+        } 
+        
+        if (isQuotaError && attempts >= maxAttempts && currentModel !== 'gemini-3-flash-preview') {
+            // Fallback to Flash
+            this.logger.warn(`Gemini 3 Pro Quota Exhausted. Falling back to Gemini 3 Flash.`);
+            currentModel = 'gemini-3-flash-preview';
+            attempts = 0; // Reset attempts for the new model
+            // Adjust thinking config for Flash if needed (Flash supports thinking via same config structure usually, or disable if not supported)
+            // Assuming Flash Preview supports thinking or we keep it as is.
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+        }
+
+        this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
+        throw err;
+      }
     }
+    throw new Error('Gemini request failed after retries');
   }
 
   private resolveModel(quality?: string): string {
-    // Official Model IDs as of Late 2025:
-    // Using Gemini 3 as default for superior reasoning and Google Search integration
-    if (quality === 'deep') return 'gemini-3-pro-preview';
-    if (quality === 'high') return 'gemini-3-flash-preview';
-    if (quality === 'medium') return 'gemini-3-flash-preview';
-    // Low quality still uses Gemini 2.0 for cost efficiency
-    return 'gemini-3-flash-preview';
+    const models = this.configService.get('gemini.models');
+    
+    // Default to 'medium' if quality is not specified
+    if (!quality) return models.medium || 'gemini-2.5-flash';
+
+    // Map quality to config key
+    switch (quality) {
+      case 'deep':
+        return models.deep || 'gemini-3.0-pro-deep';
+      case 'high':
+        // Fallback for 'high' if code still uses it, map to deep or medium? Map to deep as it was previously.
+        return models.deep || 'gemini-3.0-pro-deep';
+      case 'low':
+        return models.low || 'gemini-3.0-low';
+      case 'extraction':
+        return models.extraction || 'gemini-3.0-low';
+      case 'medium':
+      default:
+        return models.medium || 'gemini-2.5-flash';
+    }
   }
 }

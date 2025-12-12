@@ -191,4 +191,25 @@ export class MarketDataService {
 
     return this.finnhubService.getCompanyNews(symbol, from, to);
   }
+
+  async upsertFundamentals(
+    symbol: string,
+    data: Partial<Fundamentals>,
+  ): Promise<void> {
+    const existing = await this.fundamentalsRepo.findOne({
+      where: { symbol_id: symbol },
+    });
+
+    const entity = existing || this.fundamentalsRepo.create({ symbol_id: symbol });
+    
+    // Merge data
+    Object.assign(entity, data);
+    
+    // Explicitly set sector if provided
+    if (data.sector) {
+        entity.sector = data.sector;
+    }
+
+    await this.fundamentalsRepo.save(entity);
+  }
 }

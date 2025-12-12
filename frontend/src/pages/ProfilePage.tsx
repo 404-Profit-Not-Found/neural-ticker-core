@@ -1,9 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
 import { Settings, User, Save, Shield, Eye } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
@@ -58,140 +61,140 @@ export function ProfilePage() {
             <Header />
 
             <main className="max-w-4xl mx-auto p-6 space-y-8 animate-in fade-in duration-500">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border border-border overflow-hidden">
+                <div className="flex items-center gap-6 mb-8">
+                    <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border border-border overflow-hidden shrink-0">
                         {user?.avatar_url ? (
-                            <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                            <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
-                            <User size={32} className="text-muted-foreground" />
+                            <User size={40} className="text-muted-foreground" />
                         )}
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground rgb-text">
+                        <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground">
                             {nickname || user?.name || 'Trader'}
                         </h1>
-                        <p className="text-muted-foreground">{user?.email}</p>
+                        <p className="text-muted-foreground font-mono text-sm mt-1">{user?.email}</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Public Profile Settings */}
-                    <div className="bg-card border border-border rounded-lg p-6 space-y-6 rgb-border">
-                        <div className="flex items-center gap-2 mb-4">
-                            <User className="text-primary" size={20} />
-                            <h2 className="text-lg font-semibold">Identity</h2>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground">Nickname</label>
-                            <input
-                                type="text"
-                                value={nickname}
-                                onChange={(e) => setNickname(e.target.value)}
-                                className="w-full bg-background border border-border rounded-md px-4 py-2 focus:ring-2 focus:ring-primary focus:outline-none transition-all"
-                                placeholder="Enter your nickname"
-                            />
-                            <p className="text-xs text-muted-foreground">Visible to other traders in rankings.</p>
-                        </div>
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <User className="text-primary" size={20} />
+                                Identity
+                            </CardTitle>
+                            <CardDescription>
+                                Manage your public trading persona
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="nickname">Nickname</Label>
+                                <Input
+                                    id="nickname"
+                                    value={nickname}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNickname(e.target.value)}
+                                    placeholder="Enter your nickname"
+                                    className="bg-background"
+                                />
+                                <p className="text-xs text-muted-foreground">Visible to other traders in rankings.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* App Preferences */}
-                    <div className="bg-card border border-border rounded-lg p-6 space-y-6 rgb-border">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Settings className="text-secondary-foreground" size={20} />
-                            <h2 className="text-lg font-semibold">Preferences</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">View Mode</label>
-                                <div className="grid grid-cols-2 gap-2 bg-background p-1 rounded-md border border-border">
-                                    <button
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Settings className="text-primary" size={20} />
+                                Preferences
+                            </CardTitle>
+                            <CardDescription>
+                                Customize your terminal experience
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-3">
+                                <Label>View Mode</Label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Button
+                                        variant={viewMode === 'KISS' ? 'secondary' : 'outline'}
                                         onClick={() => setViewMode('KISS')}
-                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${viewMode === 'KISS'
-                                            ? 'bg-muted text-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                            }`}
+                                        className="h-auto py-3 flex flex-col gap-2 relative overflow-hidden"
                                     >
-                                        <Shield size={14} />
-                                        KISS
-                                    </button>
-                                    <button
+                                        <Shield size={20} className={viewMode === 'KISS' ? 'text-primary' : 'text-muted-foreground'} />
+                                        <span className="font-bold">KISS</span>
+                                        {viewMode === 'KISS' && <div className="absolute inset-0 border-2 border-primary rounded-md opacity-20" />}
+                                    </Button>
+                                    <Button
+                                        variant={viewMode === 'PRO' ? 'secondary' : 'outline'}
                                         onClick={() => setViewMode('PRO')}
-                                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-sm font-medium transition-all ${viewMode === 'PRO'
-                                            ? 'bg-muted text-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                            }`}
+                                        className="h-auto py-3 flex flex-col gap-2 relative overflow-hidden"
                                     >
-                                        <Eye size={14} />
-                                        PRO
-                                    </button>
+                                        <Eye size={20} className={viewMode === 'PRO' ? 'text-primary' : 'text-muted-foreground'} />
+                                        <span className="font-bold">PRO</span>
+                                        {viewMode === 'PRO' && <div className="absolute inset-0 border-2 border-primary rounded-md opacity-20" />}
+                                    </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     {viewMode === 'KISS' ? 'Keep It Super Simple: Simplified interface for clear signals.' : 'Professional: Full data density and advanced charts.'}
                                 </p>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">Theme</label>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <button
-                                            onClick={() => setTheme('light')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${theme === 'light'
-                                                ? 'bg-background text-foreground border-primary ring-2 ring-primary/50'
-                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                                }`}
-                                        >
-                                            <div className="w-8 h-8 rounded-full bg-gray-200 border border-gray-300"></div>
-                                            <span className="text-sm font-medium">Light</span>
-                                        </button>
+                            <div className="space-y-3">
+                                <Label>Theme</Label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setTheme('light')}
+                                        className={`h-auto py-4 flex flex-col gap-2 ${theme === 'light' ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-gray-200 border border-gray-300" />
+                                        <span className="text-xs">Light</span>
+                                    </Button>
 
-                                        <button
-                                            onClick={() => setTheme('dark')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${(theme === 'dark' || theme.startsWith('g'))
-                                                ? 'bg-background text-foreground border-primary ring-2 ring-primary/50'
-                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                                }`}
-                                        >
-                                            <div className="w-8 h-8 rounded-full bg-[#09090b] border border-[#27272a]"></div>
-                                            <span className="text-sm font-medium">Dark</span>
-                                        </button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setTheme('dark')}
+                                        className={`h-auto py-4 flex flex-col gap-2 ${(theme === 'dark' || theme.startsWith('g')) ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-[#09090b] border border-[#27272a]" />
+                                        <span className="text-xs">Dark</span>
+                                    </Button>
 
-                                        <button
-                                            onClick={() => setTheme('rgb')}
-                                            className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all relative overflow-hidden group ${theme === 'rgb'
-                                                ? 'bg-black text-white border-transparent ring-2 ring-purple-500/50'
-                                                : 'bg-muted border-border text-muted-foreground hover:border-foreground/50'
-                                                }`}
-                                        >
-                                            {/* RGB Gradient Background for active state */}
-                                            {theme === 'rgb' && (
-                                                <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-green-500/20 to-blue-500/20 animate-pulse"></div>
-                                            )}
-                                            <div className="w-8 h-8 rounded-full bg-black border border-transparent bg-gradient-to-br from-red-500 via-green-500 to-blue-500 relative z-10"></div>
-                                            <span className="text-sm font-medium relative z-10">RGB</span>
-                                        </button>
-                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setTheme('rgb')}
+                                        className={`h-auto py-4 flex flex-col gap-2 relative overflow-hidden group ${theme === 'rgb' ? 'border-transparent ring-2 ring-purple-500/50' : ''}`}
+                                    >
+                                        {theme === 'rgb' && (
+                                            <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-green-500/20 to-blue-500/20 animate-pulse" />
+                                        )}
+                                        <div className="w-6 h-6 rounded-full bg-black border border-transparent bg-gradient-to-br from-red-500 via-green-500 to-blue-500 relative z-10" />
+                                        <span className="text-xs relative z-10">RGB</span>
+                                    </Button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <div className="flex justify-end pt-4">
-                    <button
+                    <Button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        size="lg"
+                        className="gap-2"
                     >
                         {saving ? (
                             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
                             <Save size={18} />
                         )}
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                        {saving ? 'Saving Changes...' : 'Save Preferences'}
+                    </Button>
                 </div>
             </main>
         </div>

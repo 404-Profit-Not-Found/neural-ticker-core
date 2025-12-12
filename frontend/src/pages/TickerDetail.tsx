@@ -11,6 +11,7 @@ import {
     Send
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Header } from '../components/layout/Header';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { RiskLight } from '../components/ticker/RiskLight';
@@ -25,13 +26,20 @@ import {
     useTickerSocial,
     useTickerResearch,
     useTriggerResearch,
-    usePostComment
+    usePostComment,
+    useDeleteResearch
 } from '../hooks/useTicker';
+import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
 
 export function TickerDetail() {
-    const { symbol } = useParams();
+    const { symbol, tab } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
+
+    // Validate tab or default to overview
+    const validTabs = ['overview', 'financials', 'research', 'news'];
+    const currentTab = (tab && validTabs.includes(tab)) ? tab : 'overview';
 
     // -- Hooks --
     const { data: tickerData, isLoading: isLoadingDetails } = useTickerDetails(symbol);
@@ -42,6 +50,7 @@ export function TickerDetail() {
     // -- Mutations --
     const triggerResearchMutation = useTriggerResearch();
     const postCommentMutation = usePostComment();
+    const deleteResearchMutation = useDeleteResearch();
 
     // -- Local State --
     const [commentInput, setCommentInput] = useState('');
@@ -49,6 +58,12 @@ export function TickerDetail() {
     const handleTriggerResearch = () => {
         if (symbol) {
             triggerResearchMutation.mutate(symbol);
+        }
+    };
+
+    const handleDeleteResearch = (id: string) => {
+        if (confirm('Are you sure you want to delete this research?')) {
+            deleteResearchMutation.mutate(id);
         }
     };
 
@@ -137,7 +152,11 @@ export function TickerDetail() {
                 </div>
 
                 {/* --- 2. TABS LAYOUT --- */}
-                <Tabs defaultValue="overview" className="w-full">
+                <Tabs
+                    value={currentTab}
+                    onValueChange={(value) => navigate(`/ticker/${symbol}/${value}`)}
+                    className="w-full"
+                >
                     <TabsList className="mb-6">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="financials">Financials & Details</TabsTrigger>
@@ -164,6 +183,8 @@ export function TickerDetail() {
                             research={researchList}
                             onTrigger={handleTriggerResearch}
                             isAnalyzing={triggerResearchMutation.isPending}
+                            onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
+                            defaultTicker={symbol}
                         />
                     </TabsContent>
 
@@ -175,49 +196,53 @@ export function TickerDetail() {
 
                 {/* --- 3. DISCUSSION (Global Footer) --- */}
                 <div className="mt-12 border-t border-border pt-8">
-                    <div className="bg-card border border-border rounded-lg shadow-sm flex flex-col border-t-4 border-t-pink-500/20 max-w-4xl mx-auto">
-                        <div className="p-4 border-b border-border bg-muted/10 font-bold flex items-center gap-2 text-sm text-pink-400">
-                            <MessageSquare size={14} /> Community Discussion
-                        </div>
-                        <div className="flex-1 max-h-[400px] overflow-y-auto p-4 space-y-4">
-                            {socialComments.length > 0 ? socialComments.map((comment: SocialComment) => (
-                                <div key={comment.id} className="flex gap-3 text-sm">
-                                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
-                                        {comment.user?.avatar_url ? (
-                                            <img src={comment.user.avatar_url} alt={comment.user.nickname || comment.user.name || 'User avatar'} className="w-full h-full object-cover" />
-                                        ) : (
-                                            (comment.user?.nickname || comment.user?.name || comment.user?.email || 'User').slice(0, 1).toUpperCase()
-                                        )}
-                                    </div>
-                                    <div className="bg-muted/10 p-3 rounded-lg rounded-tl-none flex-1">
-                                        <div className="flex items-baseline justify-between mb-1">
-                                            <span className="font-semibold text-foreground text-xs">
-                                                {comment.user?.nickname || comment.user?.name || comment.user?.email?.split('@')[0] || 'Trader'}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">{new Date(comment.created_at).toLocaleString()}</span>
+                    <Card className="flex flex-col border-t-4 border-t-pink-500/20 max-w-4xl mx-auto shadow-sm">
+                        <CardHeader className="py-4 border-b border-border bg-muted/10">
+                            <CardTitle className="font-bold flex items-center gap-2 text-sm text-pink-400">
+                                <MessageSquare size={14} /> Community Discussion
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 flex flex-col">
+                            <div className="flex-1 max-h-[400px] overflow-y-auto p-4 space-y-4">
+                                {socialComments.length > 0 ? socialComments.map((comment: SocialComment) => (
+                                    <div key={comment.id} className="flex gap-3 text-sm">
+                                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                                            {comment.user?.avatar_url ? (
+                                                <img src={comment.user.avatar_url} alt={comment.user.nickname || comment.user.name || 'User avatar'} className="w-full h-full object-cover" />
+                                            ) : (
+                                                (comment.user?.nickname || comment.user?.name || comment.user?.email || 'User').slice(0, 1).toUpperCase()
+                                            )}
                                         </div>
-                                        <p className="text-muted-foreground leading-relaxed text-xs">{comment.content}</p>
+                                        <div className="bg-muted/10 p-3 rounded-lg rounded-tl-none flex-1">
+                                            <div className="flex items-baseline justify-between mb-1">
+                                                <span className="font-semibold text-foreground text-xs">
+                                                    {comment.user?.nickname || comment.user?.name || comment.user?.email?.split('@')[0] || 'Trader'}
+                                                </span>
+                                                <span className="text-[10px] text-muted-foreground">{new Date(comment.created_at).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-muted-foreground leading-relaxed text-xs">{comment.content}</p>
+                                        </div>
                                     </div>
-                                </div>
-                            )) : (
-                                <div className="text-center text-muted-foreground py-10 text-sm">No comments yet. Be the first to start the discussion!</div>
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-border bg-muted/5">
-                            <div className="flex gap-3">
-                                <input
-                                    className="flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
-                                    placeholder="Share your thoughts on this ticker..."
-                                    value={commentInput}
-                                    onChange={(e) => setCommentInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
-                                />
-                                <Button className="w-10 h-10" size="icon" onClick={handlePostComment} disabled={postCommentMutation.isPending || !commentInput.trim()}>
-                                    <Send size={16} />
-                                </Button>
+                                )) : (
+                                    <div className="text-center text-muted-foreground py-10 text-sm">No comments yet. Be the first to start the discussion!</div>
+                                )}
                             </div>
-                        </div>
-                    </div>
+                            <div className="p-4 border-t border-border bg-muted/5">
+                                <div className="flex gap-3">
+                                    <input
+                                        className="flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
+                                        placeholder="Share your thoughts on this ticker..."
+                                        value={commentInput}
+                                        onChange={(e) => setCommentInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
+                                    />
+                                    <Button className="w-10 h-10" size="icon" onClick={handlePostComment} disabled={postCommentMutation.isPending || !commentInput.trim()}>
+                                        <Send size={16} />
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
             </main>

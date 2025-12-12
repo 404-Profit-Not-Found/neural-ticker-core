@@ -6,6 +6,7 @@ import {
     Calendar
 } from 'lucide-react';
 import { cn } from '../../lib/api';
+import { Card, CardContent } from '../ui/card';
 
 const KPI_DATA = [
     {
@@ -62,10 +63,11 @@ export function KPIGrid() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             {KPI_DATA.map((kpi, index) => (
-                <div
+                <Card
                     key={index}
+                    rgb={true} // Enable RGB border for KPI cards if theme active
                     className={cn(
-                        "relative bg-card border border-border rounded-md p-4 overflow-hidden group hover:border-accent transition-colors rgb-border",
+                        "relative overflow-hidden group hover:border-accent transition-colors",
                         kpi.glow
                     )}
                 >
@@ -79,7 +81,7 @@ export function KPIGrid() {
                         }}
                     />
 
-                    <div className="relative z-10">
+                    <CardContent className="p-4 relative z-10">
                         <div className="flex justify-between items-start mb-2">
                             <span className="text-sm font-medium text-muted-foreground">{kpi.title}</span>
                             <kpi.icon size={18} className={cn(COLORS[kpi.color])} />
@@ -92,8 +94,8 @@ export function KPIGrid() {
                         <div className="text-xs text-muted-foreground">
                             {kpi.subtext}
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             ))}
         </div>
     );

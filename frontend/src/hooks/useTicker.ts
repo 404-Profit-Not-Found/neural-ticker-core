@@ -163,3 +163,28 @@ export function useTriggerResearch() {
         }
     });
 }
+
+export function useDeleteResearch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.delete(`/research/${id}`);
+        },
+        onSuccess: () => {
+            // Invalidate all research queries
+            queryClient.invalidateQueries({ queryKey: tickerKeys.all }); 
+        },
+    });
+}
+
+export function useUpdateResearchTitle() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, title }: { id: string; title: string }) => {
+            await api.post(`/research/${id}/title`, { title });
+        },
+        onSuccess: () => {
+             queryClient.invalidateQueries({ queryKey: tickerKeys.all });
+        }
+    });
+}

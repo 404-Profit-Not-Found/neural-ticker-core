@@ -35,7 +35,13 @@ export interface ResearchItem {
     created_at: string;
     status: 'completed' | 'pending' | 'failed';
     question?: string;
+    title?: string; // Explicitly adding title
     content?: string;
+    user?: {
+        nickname?: string;
+        email?: string;
+        avatar_url?: string;
+    };
 }
 
 export interface TickerData {

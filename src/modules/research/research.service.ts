@@ -31,8 +31,8 @@ export class ResearchService {
     userId: string,
     tickers: string[],
     question: string,
-    provider: 'openai' | 'gemini' | 'ensemble' = 'ensemble',
-    quality: QualityTier = 'medium',
+    provider: 'openai' | 'gemini' | 'ensemble' = 'gemini',
+    quality: QualityTier = 'deep',
   ): Promise<ResearchNote> {
     const note = this.noteRepo.create({
       request_id: uuidv4(),
@@ -43,6 +43,28 @@ export class ResearchService {
       numeric_context: {}, // Filled during processing
       status: ResearchStatus.PENDING,
       user_id: userId,
+    });
+    return this.noteRepo.save(note);
+  }
+
+  async createManualNote(
+    userId: string,
+    tickers: string[],
+    title: string,
+    content: string,
+  ): Promise<ResearchNote> {
+    const note = this.noteRepo.create({
+      request_id: uuidv4(),
+      tickers,
+      question: 'Manual Upload',
+      provider: LlmProvider.MANUAL,
+      quality: 'manual',
+      title,
+      answer_markdown: content,
+      status: ResearchStatus.COMPLETED,
+      user_id: userId,
+      numeric_context: {},
+      models_used: [],
     });
     return this.noteRepo.save(note);
   }
@@ -133,14 +155,71 @@ export class ResearchService {
       await this.noteRepo.save(note);
 
       // 6. Post-Process: Generate "Deep Tier" Risk Score from the analysis
-      // "Flip" logic: Research -> Score
       this.logger.log(`Triggering Deep Verification Score for ticket ${id}`);
       await this.riskRewardService.evaluateFromResearch(note);
+
+      // 7. Post-Process: Extract Structured Financials (Gemini 3 Extraction)
+      this.logger.log(`Triggering Financial Extraction for ticket ${id}`);
+      await this.extractFinancialsFromResearch(note.tickers, result.answerMarkdown);
+
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
       note.error = e.message;
       await this.noteRepo.save(note);
+    }
+  }
+
+  /**
+   * Extract key financial metrics from the unstructured research text
+   * using a cheap, fast "Flash" model.
+   */
+  private async extractFinancialsFromResearch(tickers: string[], text: string): Promise<void> {
+    if (tickers.length === 0 || !text) return;
+    
+    // We process each ticker individually for safety, or batch if simple.
+    // For now, let's just do the first/main ticker to avoid complexity,
+    // or loop if there are multiple.
+    for (const ticker of tickers) {
+       try {
+         const extractionPrompt = `You are a strict data extraction engine.
+         Extract the following financial metrics for ticker "${ticker}" from the provided text.
+         Return a SINGLE JSON OBJECT. keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity".
+         Values must be NUMBERS. If not found, use null.
+         
+         Text:
+         ${text.substring(0, 15000)}
+         
+         JSON:`;
+
+         const result = await this.llmService.generateResearch({
+            question: extractionPrompt,
+            tickers: [ticker],
+            numericContext: {},
+            quality: 'extraction' as QualityTier,
+            provider: 'gemini',
+            maxTokens: 200, // Short JSON output
+         });
+
+         // Clean and Parse JSON
+         let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
+         // Attempt to find the first { and last }
+         const start = jsonStr.indexOf('{');
+         const end = jsonStr.lastIndexOf('}');
+         if (start !== -1 && end !== -1) {
+            jsonStr = jsonStr.substring(start, end + 1);
+            const data = JSON.parse(jsonStr);
+            
+            // Upsert to Market Data Service
+            // We need to inject MarketDataService (already injected)
+            // But we need a dedicated method there. 
+            // For now, I will add the method call assuming I will create it next.
+            await this.marketDataService.upsertFundamentals(ticker, data);
+            this.logger.log(`Extracted financials for ${ticker}: ${JSON.stringify(data)}`);
+         }
+       } catch (e) {
+         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
+       }
     }
   }
 
@@ -210,6 +289,34 @@ Title:`;
       .getOne();
   }
 
+  async deleteResearchNote(id: string): Promise<void> {
+    await this.noteRepo.delete(id);
+  }
+
+  async updateTitle(id: string, userId: string, newTitle: string): Promise<ResearchNote> {
+    const note = await this.noteRepo.findOne({ where: { id }, relations: ['user'] });
+    if (!note) {
+      throw new Error('Research note not found');
+    }
+    
+    // Check permissions: Owner or Admin
+    // Note: We need to fetch the requesting user to check if they are admin, unless passed in.
+    // simpler: The controller passes userId. We check if note.user_id === userId.
+    // But for admin check, we might need more context. 
+    // For now, let's assume the controller handles the "admin" role check or we fetch the user here.
+    
+    const requestor = await this.usersService.findById(userId);
+    const isAdmin = requestor?.role === 'admin';
+    const isOwner = note.user_id === userId;
+
+    if (!isAdmin && !isOwner) {
+      throw new Error('Unauthorized to edit this research title');
+    }
+
+    note.title = newTitle;
+    return this.noteRepo.save(note);
+  }
+
   async findAll(
     userId: string,
     status: string,
@@ -222,6 +329,7 @@ Title:`;
     limit: number;
   }> {
     const query = this.noteRepo.createQueryBuilder('note');
+    query.leftJoinAndSelect('note.user', 'user'); // Ensure user is joined
     query.where('note.user_id = :userId', { userId });
 
     if (status && status !== 'all') {

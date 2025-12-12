@@ -1,5 +1,6 @@
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '../../lib/api';
+import { Card, CardContent } from '../ui/card';
 
 type ScenarioType = 'bull' | 'base' | 'bear';
 
@@ -33,10 +34,10 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                 const isPositive = upside > 0;
 
                 return (
-                    <div
+                    <Card
                         key={scenario.scenario_type}
                         className={cn(
-                            "p-4 rounded-xl border flex flex-col gap-3 relative overflow-hidden transition-all hover:shadow-md",
+                            "relative overflow-hidden transition-all hover:shadow-md flex flex-col",
                             scenario.scenario_type === 'bull' && "bg-green-500/5 border-green-500/20",
                             scenario.scenario_type === 'bear' && "bg-red-500/5 border-red-500/20",
                             scenario.scenario_type === 'base' && "bg-blue-500/5 border-blue-500/20 ring-1 ring-blue-500/30"
@@ -57,45 +58,47 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                             {(Number(scenario.probability) * 100).toFixed(0)}% Prob
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className={cn(
-                                "w-2 h-8 rounded-full",
-                                scenario.scenario_type === 'bull' && "bg-green-500",
-                                scenario.scenario_type === 'bear' && "bg-red-500",
-                                scenario.scenario_type === 'base' && "bg-blue-500"
-                            )} />
-                            <div>
-                                <h3 className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                                    {scenario.scenario_type} CASE
-                                </h3>
-                                <div className="text-2xl font-bold flex items-center gap-2">
-                                    ${Number(scenario.price_mid).toFixed(2)}
-                                    <span className={cn(
-                                        "text-sm font-medium flex items-center",
-                                        isPositive ? "text-green-500" : "text-red-500"
-                                    )}>
-                                        {isPositive ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                                        {Math.abs(upside).toFixed(1)}%
-                                    </span>
+                        <CardContent className="p-4 flex flex-col gap-3 flex-1">
+                            <div className="flex items-center gap-2">
+                                <div className={cn(
+                                    "w-2 h-8 rounded-full",
+                                    scenario.scenario_type === 'bull' && "bg-green-500",
+                                    scenario.scenario_type === 'bear' && "bg-red-500",
+                                    scenario.scenario_type === 'base' && "bg-blue-500"
+                                )} />
+                                <div>
+                                    <h3 className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                                        {scenario.scenario_type} CASE
+                                    </h3>
+                                    <div className="text-2xl font-bold flex items-center gap-2">
+                                        ${Number(scenario.price_mid).toFixed(2)}
+                                        <span className={cn(
+                                            "text-sm font-medium flex items-center",
+                                            isPositive ? "text-green-500" : "text-red-500"
+                                        )}>
+                                            {isPositive ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                                            {Math.abs(upside).toFixed(1)}%
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <p className="text-sm text-muted-foreground line-clamp-3 min-h-[60px]">
-                            {scenario.description}
-                        </p>
+                            <p className="text-sm text-muted-foreground line-clamp-3 min-h-[60px]">
+                                {scenario.description}
+                            </p>
 
-                        <div className="mt-auto space-y-2">
-                            <div className="flex justify-between text-xs text-muted-foreground border-t border-dashed border-border pt-2">
-                                <span>Range</span>
-                                <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>
+                            <div className="mt-auto space-y-2">
+                                <div className="flex justify-between text-xs text-muted-foreground border-t border-dashed border-border pt-2">
+                                    <span>Range</span>
+                                    <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Exp. Cap</span>
+                                    <span>${(Number(scenario.expected_market_cap || 0) / 1e9).toFixed(1)}B</span>
+                                </div>
                             </div>
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Exp. Cap</span>
-                                <span>${(Number(scenario.expected_market_cap || 0) / 1e9).toFixed(1)}B</span>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 );
             })}
         </div>

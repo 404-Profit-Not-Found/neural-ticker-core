@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Request,
   Query,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -98,11 +99,44 @@ class AskResearchDto {
   apiKey?: string;
 }
 
+class UploadResearchDto {
+  @ApiProperty({ example: ['AAPL'], description: 'Tickers related to this note' })
+  @IsArray()
+  @IsString({ each: true })
+  tickers: string[];
+
+  @ApiProperty({ example: 'My Thesis', description: 'Title of the research' })
+  @IsString()
+  title: string;
+
+  @ApiProperty({ example: '# Bullish case...', description: 'Markdown content' })
+  @IsString()
+  content: string;
+
+  @ApiProperty({ required: false, default: 'completed' })
+  @IsString()
+  @IsOptional()
+  status?: string;
+}
+
 @ApiTags('Research')
 @ApiBearerAuth()
 @Controller('v1/research')
 export class ResearchController {
   constructor(private readonly researchService: ResearchService) {}
+
+  @ApiOperation({ summary: 'Upload manual research note' })
+  @ApiResponse({ status: 201, description: 'Note created.' })
+  @Post('upload')
+  async upload(@Request() req: any, @Body() dto: UploadResearchDto) {
+    const userId = req.user.id;
+    return this.researchService.createManualNote(
+      userId,
+      dto.tickers,
+      dto.title,
+      dto.content,
+    );
+  }
 
   @ApiOperation({
     summary: 'Submit a research question (Async)',
@@ -255,5 +289,40 @@ export class ResearchController {
       throw new NotFoundException(`Research note ${id} not found`);
     }
     return note;
+  }
+
+  @ApiOperation({
+    summary: 'Delete a research ticket',
+    description: 'Permanently removes a research ticket and its data.',
+  })
+  @ApiResponse({ status: 200, description: 'Ticket deleted successfully.' })
+  @ApiResponse({ status: 404, description: 'Ticket not found.' })
+  @Delete(':id')
+  async delete(@Param('id') id: string) {
+    // Optional: Check if exists first or just delete
+    const note = await this.researchService.getResearchNote(id);
+    if (!note) {
+      throw new NotFoundException(`Research note ${id} not found`);
+    }
+    await this.researchService.deleteResearchNote(id);
+    return { message: 'Deleted successfully' };
+  }
+
+  @ApiOperation({ summary: 'Update research title' })
+  @ApiResponse({ status: 200, description: 'Title updated.' })
+  @Post(':id/title') // Using POST or PATCH
+  async updateTitle(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('title') title: string,
+  ) {
+    const userId = req.user.id;
+    try {
+      return await this.researchService.updateTitle(id, userId, title);
+    } catch (e) {
+      if (e.message === 'Research note not found') throw new NotFoundException(e.message);
+      if (e.message.includes('Unauthorized')) throw new NotFoundException(e.message); // Should be Forbidden but NotFound hides existence
+      throw e;
+    }
   }
 }

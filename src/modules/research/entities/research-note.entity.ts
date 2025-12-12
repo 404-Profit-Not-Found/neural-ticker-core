@@ -3,13 +3,17 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../users/entities/user.entity';
 
 export enum LlmProvider {
   OPENAI = 'openai',
   GEMINI = 'gemini',
   ENSEMBLE = 'ensemble',
+  MANUAL = 'manual',
 }
 
 export enum ResearchStatus {
@@ -105,6 +109,10 @@ export class ResearchNote {
   @ApiProperty({ description: 'ID of the user who requested this research' })
   @Column({ type: 'uuid', nullable: true })
   user_id: string;
+
+  @ManyToOne('User', 'research_notes', { eager: true, nullable: true }) // eager: true to always fetch author
+  @JoinColumn({ name: 'user_id' })
+  user: any;
 
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })
