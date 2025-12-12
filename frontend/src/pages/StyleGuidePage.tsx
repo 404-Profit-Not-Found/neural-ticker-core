@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   BellRing,
   CheckCircle2,
-  ChevronDown,
   LayoutGrid,
   Palette,
   PanelsTopLeft,
@@ -19,6 +18,16 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { InlineAlert } from '../components/ui/inline-alert';
+import { NativeSelect } from '../components/ui/select-native';
+import {
+  Table as UiTable,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from '../components/ui/table';
 import { useToast } from '../components/ui/toast';
 import { cn } from '../lib/utils';
 
@@ -301,16 +310,14 @@ export function StyleGuidePage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
-                        <select
-                          className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/60 pr-8"
+                        <NativeSelect
                           value={previewTheme}
                           onChange={(e) => setPreviewTheme(e.target.value)}
                         >
                           <option value="dark">Theme: Dark</option>
                           <option value="light">Theme: Light</option>
                           <option value="rgb">Theme: RGB</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
+                        </NativeSelect>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" className="flex-1">
@@ -400,34 +407,39 @@ export function StyleGuidePage() {
                     <CardDescription>Compact density, zebra rows, hover highlight, and right-aligned numbers.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="overflow-hidden rounded-lg border border-border bg-card">
-                      <table className="w-full border-collapse text-sm">
-                        <thead className="bg-muted/30 text-muted-foreground">
-                          <tr className="border-b border-border">
-                            <th className="px-4 py-2 text-left font-semibold">Symbol</th>
-                            <th className="px-4 py-2 text-left font-semibold">Status</th>
-                            <th className="px-4 py-2 text-right font-semibold">Price</th>
-                            <th className="px-4 py-2 text-right font-semibold">Change</th>
-                            <th className="px-4 py-2 text-right font-semibold">Volume</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sampleTable.map((row) => (
-                            <tr key={row.symbol} className="border-b border-border/50 odd:bg-muted/10 even:bg-card hover:bg-primary/5 transition-colors">
-                              <td className="px-4 py-3 font-semibold">{row.symbol}</td>
-                              <td className="px-4 py-3">
-                                <Badge variant={mapStatusToVariant(row.status)}>{row.status}</Badge>
-                              </td>
-                              <td className="px-4 py-3 text-right text-foreground">${row.price.toFixed(2)}</td>
-                              <td className={cn('px-4 py-3 text-right font-medium', row.change >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                                {row.change >= 0 ? '+' : ''}
-                                {row.change.toFixed(1)}%
-                              </td>
-                              <td className="px-4 py-3 text-right text-muted-foreground">{row.volume}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <UiTable>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Symbol</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="text-right">Change</TableHead>
+                          <TableHead className="text-right">Volume</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sampleTable.map((row) => (
+                          <TableRow key={row.symbol}>
+                            <TableCell className="font-semibold">{row.symbol}</TableCell>
+                            <TableCell>
+                              <Badge variant={mapStatusToVariant(row.status)}>{row.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right text-foreground">${row.price.toFixed(2)}</TableCell>
+                            <TableCell className={cn('text-right font-medium', row.change >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                              {row.change >= 0 ? '+' : ''}
+                              {row.change.toFixed(1)}%
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">{row.volume}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </UiTable>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                      <span>Showing 5 of 24 instruments</span>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="h-7 text-xs">Previous</Button>
+                        <Button variant="outline" size="sm" className="h-7 text-xs">Next</Button>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Columns align on a 12px grid. Keep headers left-aligned except numeric data, which should be right-aligned.
@@ -452,18 +464,12 @@ export function StyleGuidePage() {
                       <Button size="sm" onClick={() => showToast('Saved to your workspace', 'success')}>Success toast</Button>
                       <Button size="sm" variant="outline" onClick={() => showToast('Connection hiccup, retrying...', 'info')}>Info toast</Button>
                     </div>
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-200 [data-theme='light']:bg-emerald-100 [data-theme='light']:border-emerald-200 [data-theme='light']:text-emerald-800">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 [data-theme='light']:text-emerald-600" />
-                        Successful action stays inline when users need context.
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200 [data-theme='light']:bg-red-100 [data-theme='light']:border-red-200 [data-theme='light']:text-red-800">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-red-600 [data-theme='light']:text-red-600" />
-                        Errors should explain the next step, not just what failed.
-                      </div>
-                    </div>
+                    <InlineAlert variant="success">
+                      Successful action stays inline when users need context.
+                    </InlineAlert>
+                    <InlineAlert variant="error">
+                      Errors should explain the next step, not just what failed.
+                    </InlineAlert>
                   </CardContent>
                 </Card>
 
