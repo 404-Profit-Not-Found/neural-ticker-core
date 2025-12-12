@@ -182,12 +182,18 @@ export function TickerDetail() {
                         <div className="flex-1 max-h-[400px] overflow-y-auto p-4 space-y-4">
                             {socialComments.length > 0 ? socialComments.map((comment: SocialComment) => (
                                 <div key={comment.id} className="flex gap-3 text-sm">
-                                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-bold shrink-0">
-                                        {comment.user?.email?.[0].toUpperCase() || 'U'}
+                                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                                        {comment.user?.avatar_url ? (
+                                            <img src={comment.user.avatar_url} alt={comment.user.nickname || comment.user.name || 'User avatar'} className="w-full h-full object-cover" />
+                                        ) : (
+                                            (comment.user?.nickname || comment.user?.name || comment.user?.email || 'User').slice(0, 1).toUpperCase()
+                                        )}
                                     </div>
                                     <div className="bg-muted/10 p-3 rounded-lg rounded-tl-none flex-1">
                                         <div className="flex items-baseline justify-between mb-1">
-                                            <span className="font-semibold text-foreground text-xs">{comment.user?.email || 'User'}</span>
+                                            <span className="font-semibold text-foreground text-xs">
+                                                {comment.user?.nickname || comment.user?.name || comment.user?.email?.split('@')[0] || 'Trader'}
+                                            </span>
                                             <span className="text-[10px] text-muted-foreground">{new Date(comment.created_at).toLocaleString()}</span>
                                         </div>
                                         <p className="text-muted-foreground leading-relaxed text-xs">{comment.content}</p>

@@ -1,10 +1,13 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Settings, User as UserIcon, Shield } from 'lucide-react';
+import { Bell, Settings, User as UserIcon, Shield, Palette } from 'lucide-react';
 
 export function Header() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (path: string) => {
     if (path === '/dashboard' && (location.pathname === '/' || location.pathname === '/dashboard')) return true;
@@ -16,6 +19,15 @@ export function Header() {
       ? 'text-white border-b-2 border-blue-500'
       : 'text-[#a1a1aa] hover:text-white border-b-2 border-transparent'
     }`;
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  const goTo = (path: string) => {
+    setMenuOpen(false);
+    navigate(path);
+  };
 
   return (
     <header className="h-14 border-b border-[#27272a] bg-[#09090b] sticky top-0 z-50">
@@ -62,8 +74,15 @@ export function Header() {
             <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
-          <div className="relative group">
-            <button className="flex items-center gap-2 text-[#a1a1aa] hover:text-white transition-colors">
+          <div className="relative">
+            <button
+              className="flex items-center gap-2 text-[#a1a1aa] hover:text-white transition-colors"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              type="button"
+              aria-label="User menu"
+            >
               {user?.avatar_url ? (
                 <img
                   src={user.avatar_url}
@@ -77,7 +96,10 @@ export function Header() {
               )}
             </button>
 
-            <div className="absolute right-0 top-full mt-2 w-64 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div
+              className={`absolute right-0 top-full mt-2 w-64 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl transition-all duration-200 z-50 ${menuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+                }`}
+            >
               <div className="p-4 border-b border-[#27272a]">
                 <p className="font-semibold text-white">
                   {user?.nickname || 'Trader'}
@@ -86,25 +108,39 @@ export function Header() {
               </div>
 
               <div className="p-2">
-                <Link
-                  to="/profile"
-                  className="flex items-center gap-3 px-3 py-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors"
+                <button
+                  type="button"
+                  onClick={() => goTo('/profile')}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors"
                 >
                   <UserIcon size={16} />
                   Your Profile
-                </Link>
+                </button>
                 {user && user.role === 'admin' && (
-                  <Link
-                    to="/admin"
-                    className="flex items-center gap-3 px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-[#27272a] rounded-md transition-colors"
+                  <button
+                    type="button"
+                    onClick={() => goTo('/admin')}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-purple-400 hover:text-purple-300 hover:bg-[#27272a] rounded-md transition-colors"
                   >
                     <Shield size={16} />
                     Admin Console
-                  </Link>
+                  </button>
                 )}
-                <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors">
+                <button
+                  type="button"
+                  onClick={() => goTo('/settings/style')}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors"
+                >
                   <Settings size={16} />
                   Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo('/settings/style')}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-[#a1a1aa] hover:text-white hover:bg-[#27272a] rounded-md transition-colors"
+                >
+                  <Palette size={16} />
+                  Style Guide
                 </button>
               </div>
 

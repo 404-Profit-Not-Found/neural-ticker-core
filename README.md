@@ -93,13 +93,21 @@ classDiagram
         +UUID user_id
         +TEXT[] tickers
         +TEXT question
+        +TEXT title
         +ENUM provider
         +ENUM status
         +TEXT quality
         +TEXT[] models_used
         +TEXT answer_markdown
+        +TEXT full_response
         +JSONB numeric_context
+        +JSONB grounding_metadata
+        +TEXT thinking_process
+        +INTEGER tokens_in
+        +INTEGER tokens_out
         +TEXT error
+        +TIMESTAMPTZ created_at
+        +TIMESTAMPTZ updated_at
     }
 
     class risk_analyses {
@@ -197,12 +205,12 @@ Detailed API documentation enabled in development at `/api` (or `/swagger`).
 
 Multi-provider support (OpenAI, Gemini) with quality tiers configurable via `models.yml` or environment variables.
 
-| Tier | OpenAI | Gemini |
-| :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-2.0-flash` |
-| **Medium** | `gpt-4.1-mini` | `gemini-2.0-flash` |
-| **High** | `gpt-5-mini` | `gemini-2.0-flash-thinking-exp` |
-| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` |
+| Tier | OpenAI | Gemini | Notes |
+| :--- | :--- | :--- | :--- |
+| **Low** | `gpt-4.1-nano` | `gemini-3-flash-preview` | Cost-efficient for simple tasks |
+| **Medium** | `gpt-4.1-mini` | `gemini-3-flash-preview` | **Default: Gemini 3 with Google Search** |
+| **High** | `gpt-5-mini` | `gemini-3-flash-preview` | Enhanced reasoning capabilities |
+| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` | Maximum depth with extended thinking |
 
 ## 💻 Frontend Integration
 
@@ -273,6 +281,7 @@ $ npm run test:cov
 Powered by **Google Cloud Run** and **GitHub Actions**.
 
 - **Push to Main**: Triggers Build, Test, & Lint.
+- **Auto-Migration**: Database migrations run automatically on startup via `migrationsRun: true`.
 - **Release**: Handled via GitHub Release workflow.
 
 ## 📄 License

@@ -20,7 +20,12 @@ export interface NewsItem {
 
 export interface SocialComment {
     id: string;
-    user: { email: string };
+    user: {
+        email?: string;
+        nickname?: string;
+        name?: string;
+        avatar_url?: string;
+    };
     created_at: string;
     content: string;
 }

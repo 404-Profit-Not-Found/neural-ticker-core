@@ -129,10 +129,19 @@ describe('ResearchService', () => {
         confidence_level: 'high',
         rationale_markdown: 'Good',
       });
-      mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: 'Answer',
-        models: ['gemini-3'],
-      });
+      mockLlmService.generateResearch
+        .mockResolvedValueOnce({
+          answerMarkdown: 'Answer with key findings about AI demand.',
+          models: ['gemini-3'],
+          tokensIn: 100,
+          tokensOut: 50,
+          groundingMetadata: { sources: [] },
+          thoughts: 'Thinking...',
+        }) // First call: Research
+        .mockResolvedValueOnce({
+          answerMarkdown: 'NVDA: AI Demand Surge',
+          models: ['gemini-3-flash'],
+        }); // Second call: Title Generation
 
       await service.processTicket('1');
 
@@ -140,10 +149,22 @@ describe('ResearchService', () => {
       expect(marketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
       expect(riskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
       expect(usersService.findById).toHaveBeenCalledWith('u1');
-      expect(llmService.generateResearch).toHaveBeenCalledWith(
+
+      // Verify Research Call
+      expect(llmService.generateResearch).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({
           apiKey: 'key',
           provider: 'gemini',
+        }),
+      );
+
+      // Verify Title Generation Call
+      expect(llmService.generateResearch).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          maxTokens: 50,
+          quality: 'low',
         }),
       );
 
@@ -153,7 +174,12 @@ describe('ResearchService', () => {
       expect(riskRewardService.evaluateFromResearch).toHaveBeenCalledWith(
         expect.objectContaining({
           id: '1',
-          answer_markdown: 'Answer',
+          answer_markdown: 'Answer with key findings about AI demand.',
+          title: 'NVDA: AI Demand Surge',
+          full_response: expect.stringContaining('tokensIn'),
+          thinking_process: 'Thinking...',
+          tokens_in: 100,
+          tokens_out: 50,
         }),
       );
     });

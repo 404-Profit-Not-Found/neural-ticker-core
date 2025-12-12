@@ -112,14 +112,27 @@ export class ResearchService {
         apiKey,
       });
 
-      // 4. Complete
+      // 4. Generate dynamic title based on findings
+      const title = await this.generateTitle(
+        note.question,
+        result.answerMarkdown,
+        note.tickers,
+      );
+
+      // 5. Complete - Store full response and metadata
       note.status = ResearchStatus.COMPLETED;
+      note.title = title;
       note.answer_markdown = result.answerMarkdown;
+      note.full_response = JSON.stringify(result, null, 2); // Store complete response
+      note.grounding_metadata = result.groundingMetadata || null;
+      note.thinking_process = result.thoughts || null;
+      note.tokens_in = result.tokensIn || null;
+      note.tokens_out = result.tokensOut || null;
       note.numeric_context = context;
       note.models_used = result.models;
       await this.noteRepo.save(note);
 
-      // 5. Post-Process: Generate "Deep Tier" Risk Score from the analysis
+      // 6. Post-Process: Generate "Deep Tier" Risk Score from the analysis
       // "Flip" logic: Research -> Score
       this.logger.log(`Triggering Deep Verification Score for ticket ${id}`);
       await this.riskRewardService.evaluateFromResearch(note);
@@ -128,6 +141,59 @@ export class ResearchService {
       note.status = ResearchStatus.FAILED;
       note.error = e.message;
       await this.noteRepo.save(note);
+    }
+  }
+
+  /**
+   * Generate a concise, informative title based on research findings
+   */
+  private async generateTitle(
+    question: string,
+    answerMarkdown: string,
+    tickers: string[],
+  ): Promise<string> {
+    try {
+      // Extract first 500 chars of answer for context
+      const answerPreview = answerMarkdown.substring(0, 500);
+
+      const titlePrompt = `Based on this financial research, generate a concise, informative title (max 80 characters) that captures the KEY FINDING or CONCLUSION. Focus on actionable insights, not generic descriptions.
+
+Question: ${question}
+Tickers: ${tickers.join(', ')}
+Research Summary: ${answerPreview}...
+
+Generate ONLY the title, nothing else. Examples of good titles:
+- "NVDA Q4 Earnings: 50% Revenue Growth Driven by AI Demand"
+- "AAPL Services Revenue Concerns Offset by Strong iPhone Sales"
+- "TSLA Production Delays May Impact Q1 Delivery Targets"
+
+Title:`;
+
+      const result = await this.llmService.generateResearch({
+        question: titlePrompt,
+        tickers: [],
+        numericContext: {},
+        quality: 'low' as QualityTier, // Fast, cheap call
+        provider: 'gemini',
+        maxTokens: 50,
+      });
+
+      // Clean up the title (remove quotes, trim, limit length)
+      let title = result.answerMarkdown
+        .trim()
+        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+        .replace(/\n/g, ' ') // Remove newlines
+        .substring(0, 80); // Enforce max length
+
+      // Fallback to generic title if generation fails or is too short
+      if (!title || title.length < 10) {
+        title = `Research: ${tickers.join(', ')} - ${question.substring(0, 40)}`;
+      }
+
+      return title;
+    } catch (e) {
+      this.logger.warn(`Title generation failed, using fallback`, e);
+      return `Research: ${tickers.join(', ')} - ${question.substring(0, 40)}`;
     }
   }
 

@@ -51,9 +51,9 @@ class AskResearchDto {
   @ApiProperty({
     enum: ['openai', 'gemini', 'ensemble'],
     required: false,
-    default: 'ensemble',
+    default: 'gemini',
     description:
-      'The LLM provider to use. "ensemble" is recommended for best accuracy.',
+      'The LLM provider to use. "gemini" is recommended for best reasoning.',
   })
   @IsEnum(['openai', 'gemini', 'ensemble'])
   @IsOptional()

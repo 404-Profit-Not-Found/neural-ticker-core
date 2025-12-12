@@ -92,6 +92,8 @@ export class GeminiProvider implements ILlmProvider {
         groundingMetadata: groundingMeta,
         // You might want to return thoughts separately for debugging
         thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
+        tokensIn: result.usageMetadata?.promptTokenCount,
+        tokensOut: result.usageMetadata?.candidatesTokenCount,
       };
     } catch (err) {
       this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
@@ -101,8 +103,11 @@ export class GeminiProvider implements ILlmProvider {
 
   private resolveModel(quality?: string): string {
     // Official Model IDs as of Late 2025:
+    // Using Gemini 3 as default for superior reasoning and Google Search integration
     if (quality === 'deep') return 'gemini-3-pro-preview';
-    if (quality === 'high') return 'gemini-2.0-flash-thinking-exp';
-    return 'gemini-2.0-flash';
+    if (quality === 'high') return 'gemini-3-flash-preview';
+    if (quality === 'medium') return 'gemini-3-flash-preview';
+    // Low quality still uses Gemini 2.0 for cost efficiency
+    return 'gemini-3-flash-preview';
   }
 }

@@ -7,6 +7,7 @@ interface ResearchItem {
     created_at: string;
     status: 'completed' | 'pending' | 'failed';
     question?: string;
+    title?: string;
     content?: string;
 }
 
@@ -54,7 +55,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing }: ResearchFeedP
                                             <span>{new Date(item.created_at).toLocaleTimeString()}</span>
                                         </div>
                                         <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
-                                            {item.question || "Smart analysis"}
+                                            {item.title || item.question || "Smart analysis"}
                                         </div>
                                     </div>
                                 </div>
