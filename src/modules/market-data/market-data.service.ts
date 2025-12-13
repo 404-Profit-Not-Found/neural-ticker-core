@@ -391,6 +391,36 @@ export class MarketDataService {
     }
   }
 
+  async dedupeAnalystRatings(symbol: string): Promise<{ removed: number }> {
+    const tickerEntity = await this.tickersService.getTicker(symbol);
+    if (!tickerEntity) return { removed: 0 };
+
+    const existing = await this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+      order: { rating_date: 'DESC' },
+    });
+
+    const seen = new Set<string>();
+    const toRemove: string[] = [];
+
+    for (const r of existing) {
+      const key = `${(r.firm || '').toLowerCase().trim()}|${String(
+        r.rating_date,
+      ).trim()}`;
+      if (seen.has(key)) {
+        toRemove.push(r.id);
+      } else {
+        seen.add(key);
+      }
+    }
+
+    if (toRemove.length > 0) {
+      await this.analystRatingRepo.delete(toRemove);
+    }
+
+    return { removed: toRemove.length };
+  }
+
   async getAnalystRatings(symbol: string) {
     const tickerEntity = await this.tickersService.getTicker(symbol);
     if (!tickerEntity) return [];

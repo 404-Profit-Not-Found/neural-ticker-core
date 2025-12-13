@@ -348,7 +348,7 @@ export class RiskRewardService {
         scenario.key_drivers = data.key_drivers || [];
         analysis.scenarios.push(scenario);
       }
-    }
+    });
 
     // Qualitative Factors
     analysis.qualitative_factors = [];

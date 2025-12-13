@@ -85,7 +85,7 @@ describe('MarketDataController', () => {
       const result = await controller.getNews('AAPL');
 
       expect(result).toEqual(mockNews);
-      expect(service.getCompanyNews).toHaveBeenCalledWith('AAPL');
+      expect(service.getCompanyNews).toHaveBeenCalledWith('AAPL', undefined, undefined);
     });
   });
 });

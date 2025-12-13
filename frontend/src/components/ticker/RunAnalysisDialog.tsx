@@ -6,62 +6,7 @@ import { Brain, Zap, Target, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-
-type ModelTier = 'low' | 'medium' | 'high' | 'deep';
-
-export interface ModelOption {
-    key: string;
-    label: string;
-    provider: 'gemini' | 'openai' | 'ensemble';
-    quality: ModelTier;
-    speed: string;
-    accuracy: string;
-    description: string;
-    defaultQuestion?: string;
-}
-
-export const MODEL_OPTIONS: ModelOption[] = [
-    {
-        key: 'gemini-2.5-flash-lite',
-        label: 'Gemini 2.5 Flash Lite',
-        provider: 'gemini',
-        quality: 'medium',
-        speed: '≈9s',
-        accuracy: 'High detail',
-        description: 'Best value for quick, detailed reads.',
-        defaultQuestion: 'Give me a concise but detailed analysis for {ticker}',
-    },
-    {
-        key: 'gemini-2.0-flash-exp',
-        label: 'Gemini 2.0 Flash Exp',
-        provider: 'gemini',
-        quality: 'deep',
-        speed: '≈18s',
-        accuracy: 'Max depth',
-        description: 'Deep dive with expansive context and reasoning.',
-        defaultQuestion: 'Deep dive into {ticker}, highlighting risks, catalysts, and valuation.',
-    },
-    {
-        key: 'gpt-5.1',
-        label: 'GPT-5.1',
-        provider: 'openai',
-        quality: 'deep',
-        speed: '≈18s',
-        accuracy: 'High precision',
-        description: 'OpenAI flagship for detailed thesis generation.',
-        defaultQuestion: 'Generate a high-precision research brief for {ticker}.',
-    },
-    {
-        key: 'gpt-4.1-mini',
-        label: 'GPT-4.1 Mini',
-        provider: 'openai',
-        quality: 'medium',
-        speed: '≈11s',
-        accuracy: 'Balanced',
-        description: 'Balanced speed vs. thoroughness for routine updates.',
-        defaultQuestion: 'Summarize the latest investment view on {ticker}.',
-    },
-];
+import { MODEL_OPTIONS, type ModelTier } from './model-options';
 
 interface RunAnalysisDialogProps {
     onTrigger: (options: { provider: 'gemini' | 'openai' | 'ensemble'; quality: ModelTier; question?: string; modelKey: string }) => void;
