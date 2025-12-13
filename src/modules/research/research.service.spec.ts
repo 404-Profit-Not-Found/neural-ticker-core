@@ -11,6 +11,7 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
@@ -51,6 +52,10 @@ describe('ResearchService', () => {
     evaluateFromResearch: jest.fn(),
   };
 
+  const mockNotificationsService = {
+    create: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +65,7 @@ describe('ResearchService', () => {
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         {
           provide: ConfigService,
           useValue: {
@@ -139,7 +145,10 @@ describe('ResearchService', () => {
       const result = await service.getResearchNote('1');
 
       expect(result).toEqual(note);
-      expect(mockRepo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { id: '1' },
+        relations: ['user'],
+      });
     });
 
     it('should return null if not found', async () => {
@@ -153,9 +162,15 @@ describe('ResearchService', () => {
 
   describe('deleteResearchNote', () => {
     it('should delete note by id', async () => {
+      const note = { id: '1', user_id: 'user-1' };
+      mockRepo.findOne.mockResolvedValue(note);
       mockRepo.delete.mockResolvedValue({ affected: 1 });
+      mockUsersService.findById.mockResolvedValue({
+        id: 'user-1',
+        role: 'user',
+      });
 
-      await service.deleteResearchNote('1');
+      await service.deleteResearchNote('1', 'user-1');
 
       expect(mockRepo.delete).toHaveBeenCalledWith('1');
     });

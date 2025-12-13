@@ -87,6 +87,7 @@ describe('MarketDataService', () => {
     getProfile2: jest.fn(), // Service uses getCompanyProfile? No, code says getCompanyProfile.
     getCompanyProfile: jest.fn(),
     getCompanyNews: jest.fn(),
+    getBasicFinancials: jest.fn(),
   };
 
   const mockConfigService = {

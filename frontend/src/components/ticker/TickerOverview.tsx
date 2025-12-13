@@ -28,25 +28,6 @@ export function TickerOverview({ risk_analysis, market_data, ratings }: TickerOv
             {/* Catalysts Summary */}
             {/* Catalysts Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Card className="border-green-500/20 bg-green-500/5">
-                    <CardHeader className="pb-2 pt-3 px-3">
-                        <CardTitle className="text-[10px] font-bold text-green-500 uppercase tracking-wide flex items-center gap-2">
-                            <ArrowUpCircle size={12} /> Growth Drivers
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-3 pb-3 pt-0">
-                        <ul className="space-y-1.5">
-                            {risk_analysis?.catalysts?.map((c, i) => (
-                                <li key={i} className="text-xs text-foreground/80 flex items-start gap-2 leading-snug">
-                                    <span className="text-green-500 mt-0.5">•</span>
-                                    <span>{c.description}</span>
-                                </li>
-                            ))}
-                            {!risk_analysis?.catalysts?.length && <li className="text-xs text-muted-foreground italic">No specific catalysts identified.</li>}
-                        </ul>
-                    </CardContent>
-                </Card>
-
                 <Card className="border-red-500/20 bg-red-500/5">
                     <CardHeader className="pb-2 pt-3 px-3">
                         <CardTitle className="text-[10px] font-bold text-red-500 uppercase tracking-wide flex items-center gap-2">
@@ -62,6 +43,25 @@ export function TickerOverview({ risk_analysis, market_data, ratings }: TickerOv
                                 </li>
                             ))}
                             {!risk_analysis?.red_flags?.length && <li className="text-xs text-muted-foreground italic">No critical red flags identified.</li>}
+                        </ul>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-green-500/20 bg-green-500/5">
+                    <CardHeader className="pb-2 pt-3 px-3">
+                        <CardTitle className="text-[10px] font-bold text-green-500 uppercase tracking-wide flex items-center gap-2">
+                            <ArrowUpCircle size={12} /> Growth Drivers
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <ul className="space-y-1.5">
+                            {risk_analysis?.catalysts?.map((c, i) => (
+                                <li key={i} className="text-xs text-foreground/80 flex items-start gap-2 leading-snug">
+                                    <span className="text-green-500 mt-0.5">•</span>
+                                    <span>{c.description}</span>
+                                </li>
+                            ))}
+                            {!risk_analysis?.catalysts?.length && <li className="text-xs text-muted-foreground italic">No specific catalysts identified.</li>}
                         </ul>
                     </CardContent>
                 </Card>

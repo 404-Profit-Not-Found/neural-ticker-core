@@ -154,17 +154,26 @@ describe('ResearchController', () => {
       const note = { id: '1' };
       mockResearchService.getResearchNote.mockResolvedValue(note);
       mockResearchService.deleteResearchNote.mockResolvedValue(undefined);
+      const req = { user: { id: 'user1' } };
 
-      const result = await controller.delete('1');
+      const result = await controller.delete(req, '1');
 
       expect(result).toEqual({ message: 'Deleted successfully' });
-      expect(mockResearchService.deleteResearchNote).toHaveBeenCalledWith('1');
+      expect(mockResearchService.deleteResearchNote).toHaveBeenCalledWith(
+        '1',
+        'user1',
+      );
     });
 
     it('should throw NotFoundException if not found', async () => {
-      mockResearchService.getResearchNote.mockResolvedValue(null);
+      const req = { user: { id: 'user1' } };
+      mockResearchService.deleteResearchNote.mockRejectedValue(
+        new NotFoundException('Research note not found'),
+      );
 
-      await expect(controller.delete('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.delete(req, '999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

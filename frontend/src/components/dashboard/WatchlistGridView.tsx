@@ -64,7 +64,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                 return (
                     <div
                         key={symbol}
-                        className="group flex flex-col p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
+                        className="watchlist-tile group flex flex-col p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
                     >
                         {/* Remove Action (Absolute Top Right) - Only if onRemove is provided */}
                         {onRemove && (
