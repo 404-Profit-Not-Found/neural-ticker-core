@@ -62,6 +62,7 @@ describe('MarketDataService', () => {
     findBySymbol: jest.fn(),
     awaitEnsureTicker: jest.fn(), // Service uses awaitEnsureTicker, not findBySymbol
     getTicker: jest.fn(),
+    getRepo: jest.fn(),
   };
 
   const mockFinnhubService = {
@@ -273,6 +274,82 @@ describe('MarketDataService', () => {
         rating_date: '2025-01-01',
         symbol_id: 1,
       });
+    });
+  });
+
+  describe('getAnalyzerTickers', () => {
+    it('should return paginated data with correct structure', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 1,
+              symbol: 'AAPL',
+              name: 'Apple Inc',
+              exchange: 'NASDAQ',
+              fund: { market_cap: 1000 },
+              latestPrice: { close: 150 },
+              latestRisk: { overall_score: 5 },
+            },
+          ],
+          1,
+        ]),
+      };
+
+      // Mock getRepo correctly using the closure variables
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+      // We need to spy on the tickersService instance we have in closure
+      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      const result = await service.getAnalyzerTickers({
+        page: 1,
+        limit: 10,
+        sortBy: 'market_cap',
+        sortDir: 'DESC',
+      });
+
+      expect(tickersService.getRepo).toHaveBeenCalled();
+      expect(mockQueryBuilder.leftJoinAndMapOne).toHaveBeenCalledTimes(3); // Fund, Price, Risk
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result.items[0].ticker.symbol).toBe('AAPL');
+      expect(result.items[0].fundamentals.market_cap).toBe(1000);
+      expect(result.meta.total).toBe(1);
+    });
+
+    it('should apply search filter when provided', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+
+      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      await service.getAnalyzerTickers({
+        search: 'AAPL',
+      });
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('LIKE :search'),
+        { search: '%AAPL%' },
+      );
     });
   });
 });

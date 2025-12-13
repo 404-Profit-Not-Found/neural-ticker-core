@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { ColumnNumericTransformer } from '../../../common/transformers/column-numeric.transformer';
 import { TickerEntity } from '../../tickers/entities/ticker.entity';
 import { RiskScenario } from './risk-scenario.entity';
 import { RiskCatalyst } from './risk-catalyst.entity';
@@ -37,27 +38,57 @@ export class RiskAnalysis {
 
   // --- Scores ---
   @ApiProperty({ example: 8.0, description: 'Overall Risk Score (0-10)' })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   overall_score: number;
 
   @ApiProperty({ example: 8.5 })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   financial_risk: number;
 
   @ApiProperty({ example: 8.0 })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   execution_risk: number;
 
   @ApiProperty({ example: 8.0 })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   dilution_risk: number;
 
   @ApiProperty({ example: 7.0 })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   competitive_risk: number;
 
   @ApiProperty({ example: 6.5 })
-  @Column({ type: 'numeric', precision: 4, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 4,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   regulatory_risk: number;
 
   // --- Expected Value & Analyst ---
@@ -66,23 +97,51 @@ export class RiskAnalysis {
   time_horizon_years: number;
 
   @ApiProperty({ example: 5.5 })
-  @Column({ type: 'numeric', precision: 10, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   price_target_weighted: number;
 
   @ApiProperty({ example: 150.0 })
-  @Column({ type: 'numeric', precision: 10, scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   upside_percent: number;
 
   @ApiProperty({ example: 8.25 })
-  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
   analyst_target_avg: number;
 
   @ApiProperty({ example: 1.5 })
-  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
   analyst_target_range_low: number;
 
   @ApiProperty({ example: 17 })
-  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
   analyst_target_range_high: number;
 
   @ApiProperty({ example: 'mixed' })

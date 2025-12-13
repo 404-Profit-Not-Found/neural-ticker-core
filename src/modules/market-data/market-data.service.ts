@@ -462,7 +462,6 @@ export class MarketDataService {
     return unique;
   }
 
-
   /**
    * Get count of tickers where both analyst consensus = "Strong Buy" AND AI rating is bullish.
    * Criteria defined in RISK_ALGO config.
@@ -498,9 +497,8 @@ export class MarketDataService {
 
     // Get symbols
     const matchingSymbolIds = matchingRisk.map((r) => r.ticker_id);
-    const symbols = await this.tickersService.getSymbolsByIds(
-      matchingSymbolIds,
-    );
+    const symbols =
+      await this.tickersService.getSymbolsByIds(matchingSymbolIds);
 
     return { count: symbols.length, symbols };
   }
@@ -546,4 +544,103 @@ export class MarketDataService {
     const symbols = await this.tickersService.getSymbolsByIds(allIds);
     return { count: symbols.length, symbols };
   }
+
+  /**
+   * Get paginated analyzer data
+   */
+  async getAnalyzerTickers(options: AnalyzerOptions) {
+    const page = options.page || 1;
+    const limit = options.limit || 50;
+    const skip = (page - 1) * limit;
+    const sortBy = options.sortBy || 'market_cap';
+    const sortDir = options.sortDir || 'DESC';
+    const search = options.search ? options.search.toUpperCase() : null;
+
+    const qb = this.tickersService.getRepo().createQueryBuilder('ticker');
+
+    // Join Fundamentals (MapOne to attach to entity properly)
+    qb.leftJoinAndMapOne(
+      'ticker.fund',
+      Fundamentals,
+      'fund',
+      'fund.symbol_id = CAST(ticker.id AS BIGINT)',
+    );
+
+    // Join Latest Price (Subquery)
+    qb.leftJoinAndMapOne(
+      'ticker.latestPrice',
+      PriceOhlcv,
+      'price',
+      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
+    );
+
+    // Join Latest Risk
+    qb.leftJoinAndMapOne(
+      'ticker.latestRisk',
+      RiskAnalysis,
+      'risk',
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
+    );
+
+    // Filter
+    if (search) {
+      qb.where(
+        '(UPPER(ticker.symbol) LIKE :search OR UPPER(ticker.name) LIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Sort Mapping
+    let sortField = `fund.${sortBy}`; // Default to fundamentals
+    if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
+      sortField = `ticker.${sortBy}`;
+    } else if (
+      ['overall_score', 'upside_percent', 'financial_risk'].includes(sortBy)
+    ) {
+      sortField = `risk.${sortBy}`;
+    } else if (['close', 'volume', 'change'].includes(sortBy)) {
+      sortField = `price.${sortBy}`;
+    }
+
+    qb.orderBy(sortField, sortDir);
+
+    // Add secondary sort for stability
+    qb.addOrderBy('ticker.symbol', 'ASC');
+
+    qb.skip(skip).take(limit);
+
+    // Get Raw Entities (mapped)
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items: items.map((t: any) => ({
+        ticker: {
+          id: t.id,
+          symbol: t.symbol,
+          name: t.name,
+          exchange: t.exchange,
+          sector: t.sector,
+          industry: t.industry,
+          logo_url: t.logo_url,
+        },
+        fundamentals: t.fund || {},
+        latestPrice: t.latestPrice || null,
+        aiAnalysis: t.latestRisk || null,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+}
+
+export interface AnalyzerOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDir?: 'ASC' | 'DESC';
+  search?: string;
 }

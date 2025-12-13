@@ -439,6 +439,7 @@ export class RiskRewardService {
       3. If exact numbers are missing, infer reasonable estimates based on sentiment.
       4. Probabilities must sum to approx 1.0.
       5. Risk Scores are 0-10 (0=safe, 10=extreme risk, 5=average).
+      6. OUTPUT PURE JSON ONLY. Numeric fields must be calculated numbers (e.g., 150.50), NOT equations (e.g., 100 * 1.5).
       `,
       tickers: [symbol],
       numericContext: context,

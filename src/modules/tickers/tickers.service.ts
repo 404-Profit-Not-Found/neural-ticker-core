@@ -207,4 +207,8 @@ export class TickersService {
 
     return tickers.map((t) => t.symbol);
   }
+
+  getRepo(): Repository<TickerEntity> {
+    return this.tickerRepo;
+  }
 }
