@@ -210,14 +210,15 @@ function AiNewsWidget() {
 
 
 function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
-    // Determine AI Rating from core logic similar to WatchlistTable if not explicit
-    let derivedAiRating = item.aiAnalysis?.sentiment || '-';
-    if (derivedAiRating === '-' && item.aiAnalysis) {
+    // Determine AI Rating from core logic (Strictly calculated, ignoring verbose sentiment string)
+    let derivedAiRating = '-';
+    if (item.aiAnalysis) {
         const { overall_score, upside_percent } = item.aiAnalysis;
+        // Logic matching WatchlistTable
         if (upside_percent > 10 && overall_score <= 7) derivedAiRating = 'Buy';
-        else if (upside_percent > 20 && overall_score <= 6) derivedAiRating = 'Strong Buy';
-        else if (upside_percent < 0 || overall_score >= 8) derivedAiRating = 'Sell';
-        else derivedAiRating = 'Hold';
+        if (upside_percent > 20 && overall_score <= 6) derivedAiRating = 'Strong Buy';
+        if (upside_percent < 0 || overall_score >= 8) derivedAiRating = 'Sell';
+        if (derivedAiRating === '-') derivedAiRating = 'Hold';
     }
 
     return {
