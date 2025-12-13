@@ -145,7 +145,10 @@ describe('ResearchService', () => {
       const result = await service.getResearchNote('1');
 
       expect(result).toEqual(note);
-      expect(mockRepo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(mockRepo.findOne).toHaveBeenCalledWith({
+        where: { id: '1' },
+        relations: ['user'],
+      });
     });
 
     it('should return null if not found', async () => {
