@@ -1,17 +1,326 @@
+import { useState, type ComponentType } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+    Activity,
+    ArrowUpRight,
+    Search,
+    Brain,
+    Zap,
+    TrendingUp,
+    Newspaper,
+    MoreHorizontal,
+    ArrowRight,
+    Loader2
+} from 'lucide-react';
 import { Header } from '../components/layout/Header';
-import { KPIGrid } from '../components/dashboard/KPIGrid';
-import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { cn, api } from '../lib/api';
+import { useTickerResearch } from '../hooks/useTicker';
+
+// --- Components based on StyleGuidePage ---
+
+function StatPill({
+    icon: Icon,
+    label,
+    value,
+    tone = 'muted'
+  }: {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    value: string;
+    tone?: 'primary' | 'muted' | 'accent' | 'emerald' | 'rose';
+  }) {
+    const gradients: Record<string, string> = {
+      primary: 'linear-gradient(90deg, #22d3ee, #2563eb)',
+      muted: 'linear-gradient(90deg, #a855f7, #6366f1)',
+      accent: 'linear-gradient(90deg, #6366f1, #a855f7)',
+      emerald: 'linear-gradient(90deg, #22c55e, #14b8a6)',
+      rose: 'linear-gradient(90deg, #f472b6, #e11d48)',
+    };
+  
+    const iconColors: Record<string, string> = {
+      primary: 'text-blue-600 dark:text-blue-400',
+      muted: 'text-purple-600 dark:text-purple-300',
+      accent: 'text-indigo-600 dark:text-indigo-300',
+      emerald: 'text-emerald-600 dark:text-emerald-300',
+      rose: 'text-rose-600 dark:text-rose-300',
+    };
+  
+    return (
+      <div
+        className={cn(
+          'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
+        )}
+        style={{
+          background:
+            'linear-gradient(rgb(var(--card)), rgb(var(--card))) padding-box, ' +
+            `${gradients[tone] || gradients.primary} border-box`,
+        }}
+      >
+        <div
+          className="style-kpi-grid absolute inset-0 opacity-25 pointer-events-none"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
+            backgroundSize: '18px 18px'
+          }}
+          aria-hidden
+        />
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+            <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+          </div>
+          <Icon className={cn('w-5 h-5', iconColors[tone])} />
+        </div>
+      </div>
+    );
+  }
+
+interface ResearchNote {
+    id: string;
+    title?: string;
+    question?: string;
+    status: string;
+    tickers: string[];
+    created_at: string;
+    models_used?: string[];
+}
+
+function ResearchFeedWidget() {
+    const navigate = useNavigate();
+    const { data: research, isLoading } = useTickerResearch();
+    const recentResearch = research?.slice(0, 5) || [];
+
+    if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+
+    return (
+        <div className="divide-y divide-border/50">
+            {recentResearch.map((item: ResearchNote) => (
+                <div 
+                    key={item.id} 
+                    className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/research/${item.id}`)}
+                >
+                    <div className="flex items-center gap-4 min-w-0">
+                         <div className={cn("w-2 h-2 rounded-full shrink-0", item.status === 'completed' ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
+                        <div className="space-y-0.5 min-w-0">
+                            <div className="text-sm font-semibold group-hover:text-primary transition-colors truncate">
+                                {item.title || item.question || "Analysis Request"}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {item.tickers && item.tickers[0] && (
+                                    <>
+                                        <span className="font-medium text-foreground">{item.tickers[0]}</span>
+                                        <span>•</span>
+                                    </>
+                                )}
+                                <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                                {item.models_used && item.models_used[0] && (
+                                    <span className="px-1.5 py-0.5 rounded-sm bg-muted text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">
+                                        {item.models_used[0]}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <ArrowRight size={14} />
+                    </Button>
+                </div>
+            ))}
+            {recentResearch.length === 0 && (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                    No recent analysis found.
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MarketLeadersWidget() {
+    const navigate = useNavigate();
+    const { data: strongBuys } = useQuery({
+        queryKey: ['stats', 'strong-buy'],
+        queryFn: async () => {
+            const res = await api.get<{ count: number; symbols: string[] }>('/stats/strong-buy');
+            return res.data;
+        }
+    });
+
+    const symbols = strongBuys?.symbols?.slice(0, 5) || [];
+
+    return (
+        <div className="space-y-1">
+            {symbols.length > 0 ? symbols.map((symbol) => (
+                <div 
+                    key={symbol} 
+                    className="flex items-center justify-between p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer group"
+                    onClick={() => navigate(`/ticker/${symbol}`)}
+                >
+                    <div className="flex items-center gap-3">
+                         <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/20 text-xs font-bold text-foreground border border-border">
+                            {symbol[0]}
+                        </div>
+                        <div>
+                            <div className="font-bold text-sm tracking-tight">{symbol}</div>
+                            <div className="text-[10px] uppercase tracking-wider text-green-500 font-semibold">Strong Buy</div>
+                        </div>
+                    </div>
+                    <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+            )) : (
+                 <div className="py-8 text-center text-muted-foreground text-sm">
+                    No Strong Buy signals detected.
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function Dashboard() {
+    const navigate = useNavigate();
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const { data: stats } = useQuery({
+        queryKey: ['dashboard-stats'],
+        queryFn: async () => {
+            const [tickers, strongBuy, research] = await Promise.all([
+                api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
+                api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
+                api.get('/research', { params: { limit: 1 } }).catch(() => ({ data: { total: 0 } }))
+            ]);
+            return {
+                tickers: tickers.data.count,
+                strongBuy: strongBuy.data.count,
+                research: research.data.total || 0 
+            };
+        }
+    });
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            navigate(`/ticker/${searchQuery.toUpperCase()}`);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
             <Header />
 
-            <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
-                {/* KPI Cards Row */}
-                <ErrorBoundary>
-                    <KPIGrid />
-                </ErrorBoundary>
+            <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500">
+                
+                {/* --- HEADER / HERO SECTION --- */}
+                <section className="style-hero rgb-border relative overflow-hidden rounded-lg border border-border bg-card p-8">
+                     <div
+                        className="style-hero-grid absolute inset-0 pointer-events-none"
+                        aria-hidden
+                    />
+                    <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
+
+                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
+                         <div className="space-y-4 max-w-3xl">
+                            <div className="flex items-center gap-3">
+                                <Brain className="w-10 h-10 text-primary" />
+                                <div>
+                                    <h1 className="text-3xl font-semibold tracking-tight">Market Intelligence</h1>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Real-time neural analysis of financial markets, news, and risks.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                         <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                <Input 
+                                    className="pl-9 h-10 text-sm bg-background/50 border-input shadow-sm focus-visible:ring-primary"
+                                    placeholder="Search ticker (e.g. NVDA)..." 
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none">
+                                    <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                                        <span className="text-xs">⌘</span>K
+                                    </kbd>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="relative mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <StatPill 
+                            icon={Activity} 
+                            label="Tickers Tracked" 
+                            value={stats?.tickers ? String(stats.tickers) : "..."} 
+                            tone="primary" 
+                        />
+                        <StatPill 
+                            icon={Zap} 
+                            label="Strong Buy" 
+                            value={stats?.strongBuy ? String(stats.strongBuy) : "..."} 
+                            tone="emerald" 
+                        />
+                         <StatPill 
+                            icon={Brain} 
+                            label="AI Reports" 
+                            value={stats?.research !== undefined ? String(stats.research) : "..."} 
+                            tone="muted" 
+                        />
+                        <StatPill 
+                            icon={Newspaper} 
+                            label="News Sentiment" 
+                            value="Bullish" 
+                            tone="accent" 
+                        />
+                    </div>
+                </section>
+
+                {/* --- MAIN CONTENT GRID --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* LEFT COLUMN: 2/3 */}
+                    <Card className="lg:col-span-2 h-full flex flex-col overflow-hidden">
+                        <CardHeader className="py-4 border-b border-border bg-muted/10">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="font-bold text-sm flex items-center gap-2">
+                                    <Brain className="w-4 h-4 text-primary" />
+                                    Latest Research Notes
+                                </CardTitle>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate('/research')}>
+                                    View All <ArrowRight size={12} />
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <ResearchFeedWidget />
+                        </CardContent>
+                    </Card>
+
+                    {/* RIGHT COLUMN: 1/3 */}
+                    <Card className="h-full flex flex-col overflow-hidden border-primary/20 shadow-md">
+                        <CardHeader className="py-4 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="font-bold text-sm flex items-center gap-2">
+                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                    Market Leaders
+                                </CardTitle>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                                    <MoreHorizontal size={14} />
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-3">
+                            <MarketLeadersWidget />
+                        </CardContent>
+                    </Card>
+                </div>
+
             </main>
         </div>
     );

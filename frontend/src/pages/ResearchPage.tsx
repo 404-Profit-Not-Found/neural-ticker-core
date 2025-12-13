@@ -7,7 +7,7 @@ import {
     Share2,
     AlertTriangle,
     Loader2,
-    Lightbulb,
+
     Quote,
     Link as LinkIcon,
     Brain,
@@ -106,7 +106,7 @@ export function ResearchPage() {
 
     const title = note.title || note.question || "Analysis Request";
     const content = note.answer_markdown;
-    const hasThinking = !!note.thinking_process;
+
     const isProcessing = note.status === 'pending' || note.status === 'processing';
     const isFailed = note.status === 'failed';
 
@@ -163,9 +163,9 @@ export function ResearchPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {/* Status Badge */}
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${isProcessing
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wide ${isProcessing
                             ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                             : isFailed
                                 ? 'bg-red-500/10 text-red-500 border-red-500/20'
@@ -183,7 +183,7 @@ export function ResearchPage() {
 
                         {/* Model Badge */}
                         {note.models_used && note.models_used.length > 0 && (
-                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-lg text-xs font-medium">
+                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
                                 <Brain className="w-3 h-3" />
                                 <span>{note.models_used[0]}</span>
                             </div>
@@ -191,30 +191,30 @@ export function ResearchPage() {
 
                         <div className="h-4 w-px bg-border mx-1 hidden md:block" />
 
-                        <Button variant="outline" size="sm" className="gap-2 h-9 text-xs" onClick={() => window.print()}>
-                            <Printer size={12} /> Print
+                        <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2" onClick={() => window.print()}>
+                            <Printer size={10} /> <span className="hidden md:inline">Print</span>
                         </Button>
-                        <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
-                            <Share2 size={12} /> Share
+                        <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2">
+                            <Share2 size={10} /> <span className="hidden md:inline">Share</span>
                         </Button>
                     </div>
                 </div>
 
                 {/* --- RESEARCH TITLE (prominent section below header) --- */}
-                <div className="space-y-2">
-                    <h2 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h2>
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                <div className="space-y-1">
+                    <h2 className="text-lg md:text-xl font-bold tracking-tight leading-tight">{title}</h2>
+                    <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                         <div className="flex items-center gap-1.5">
-                            <Calendar size={12} />
+                            <Calendar size={10} />
                             <span>{new Date(note.created_at).toLocaleString()}</span>
                         </div>
                         {note.tokens_in && note.tokens_out && (
                             <div className="flex items-center gap-1.5">
-                                <Clock size={12} />
+                                <Clock size={10} />
                                 <span>{note.tokens_in + note.tokens_out} tokens</span>
                             </div>
                         )}
-                        <span className="font-mono text-[10px] opacity-30 ml-auto">ID: {note.id}</span>
+                        <span className="font-mono opacity-30 ml-auto">ID: {note.id}</span>
                     </div>
                 </div>
 
@@ -230,14 +230,14 @@ export function ResearchPage() {
                 {/* Processing State */}
                 {isProcessing && (
                     <Card className="border-primary/20 bg-primary/5">
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="relative mb-6">
+                        <CardContent className="flex flex-col items-center justify-center py-12">
+                            <div className="relative mb-4">
                                 <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-                                <Loader2 className="w-12 h-12 animate-spin text-primary relative z-10" />
+                                <Loader2 className="w-8 h-8 animate-spin text-primary relative z-10" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Generating Research...</h3>
-                            <p className="text-muted-foreground text-center max-w-md text-sm">
-                                AI is analyzing market data, news, and financials. This typically takes 15-30 seconds.
+                            <h3 className="text-base font-semibold mb-1">Generating Research...</h3>
+                            <p className="text-muted-foreground text-center max-w-sm text-xs">
+                                AI is analyzing market data, news, and financials. (~20s)
                             </p>
                         </CardContent>
                     </Card>
@@ -246,63 +246,39 @@ export function ResearchPage() {
                 {/* Tabs Layout */}
                 {!isProcessing && !isFailed && (
                     <Tabs defaultValue="report" className="w-full">
-                        <TabsList className="mb-6">
-                            <TabsTrigger value="report" className="gap-2">
-                                <FileText size={14} />
+                        <TabsList className="mb-4 h-9">
+                            <TabsTrigger value="report" className="gap-2 text-xs">
+                                <FileText size={12} />
                                 Analysis Report
                             </TabsTrigger>
-                            {hasThinking && (
-                                <TabsTrigger value="thinking" className="gap-2">
-                                    <Lightbulb size={14} className="text-yellow-500" />
-                                    Thinking Process
-                                </TabsTrigger>
-                            )}
                             {sources && sources.length > 0 && (
-                                <TabsTrigger value="sources" className="gap-2">
-                                    <Quote size={14} />
+                                <TabsTrigger value="sources" className="gap-2 text-xs">
+                                    <Quote size={12} />
                                     Sources ({sources.length})
                                 </TabsTrigger>
                             )}
-                            <TabsTrigger value="raw" className="gap-2">
-                                <Database size={14} />
+                            <TabsTrigger value="raw" className="gap-2 text-xs">
+                                <Database size={12} />
                                 Raw Data
                             </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="report" className="mt-0 animate-in fade-in duration-200">
                             <Card className="border-border">
-                                <CardContent className="p-6 md:p-8">
+                                <CardContent className="p-4 md:p-6">
                                     {content ? (
-                                        <article className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-strong:text-foreground prose-blockquote:border-l-primary/50 prose-blockquote:bg-muted/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-hr:border-border prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-pre:bg-muted prose-pre:border prose-pre:border-border">
+                                        <article className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-lg prose-strong:text-foreground prose-blockquote:border-l-primary/50 prose-blockquote:bg-muted/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-hr:border-border prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-muted prose-pre:border prose-pre:border-border">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                                         </article>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                                            <AlertTriangle className="w-10 h-10 mb-4 opacity-20" />
-                                            <p>No content generated.</p>
+                                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                            <AlertTriangle className="w-8 h-8 mb-3 opacity-20" />
+                                            <p className="text-sm">No content generated.</p>
                                         </div>
                                     )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
-
-                        {hasThinking && (
-                            <TabsContent value="thinking" className="mt-0 animate-in fade-in duration-200">
-                                <Card className="bg-yellow-500/5 border-yellow-500/20">
-                                    <CardHeader>
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <Lightbulb className="text-yellow-500" size={20} />
-                                            Chain of Thought
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
-                                            <ReactMarkdown>{note.thinking_process}</ReactMarkdown>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        )}
 
                         {sources && sources.length > 0 && (
                             <TabsContent value="sources" className="mt-0 animate-in fade-in duration-200">

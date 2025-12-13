@@ -7,6 +7,7 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { RISK_ALGO } from '../../config/risk-algorithm.config';
@@ -26,6 +27,8 @@ export class MarketDataService {
     private readonly riskAnalysisRepo: Repository<RiskAnalysis>,
     @InjectRepository(ResearchNote)
     private readonly researchNoteRepo: Repository<ResearchNote>,
+    @InjectRepository(Comment)
+    private readonly commentRepo: Repository<Comment>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -188,7 +191,7 @@ export class MarketDataService {
     }
 
     // Fetch latest AI Risk Analysis
-    const [aiAnalysis, researchCount, analystCount, newsItems] =
+    const [aiAnalysis, researchCount, analystCount, newsItems, socialCount] =
       await Promise.all([
         this.riskAnalysisRepo.findOne({
           where: { ticker_id: tickerEntity.id },
@@ -203,12 +206,14 @@ export class MarketDataService {
         }),
         this.finnhubService.getCompanyNews(
           symbol,
-          // Last 7 days
           new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0],
           new Date().toISOString().split('T')[0],
         ),
+        this.commentRepo.count({
+            where: { ticker_symbol: symbol }
+        }),
       ]);
 
     return {
@@ -221,6 +226,7 @@ export class MarketDataService {
         news: newsItems.length,
         research: researchCount,
         analysts: analystCount,
+        social: socialCount,
       },
     };
   }
@@ -645,6 +651,7 @@ export class MarketDataService {
          const rawData = raw.find(r => r.ticker_id === t.id); 
          const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
          const researchCount = rawData ? parseInt(rawData.research_count, 10) : 0;
+         const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
          
          return {
             ticker: {
@@ -663,7 +670,7 @@ export class MarketDataService {
                 analysts: isNaN(analystCount) ? 0 : analystCount,
                 research: isNaN(researchCount) ? 0 : researchCount,
                 news: 0, // Not persisted, expensive to fetch in bulk
-                social: 0, // Not persisted
+                social: isNaN(socialCount) ? 0 : socialCount,
             }
         };
       }),

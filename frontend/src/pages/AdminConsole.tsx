@@ -242,110 +242,191 @@ export function AdminConsole() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="hover:bg-transparent">
-                                    {[
-                                        { label: 'User', key: 'email' },
-                                        { label: 'Role', key: 'role' },
-                                        { label: 'Status', key: 'status' },
-                                        { label: 'Timestamp', key: 'created_at' },
-                                        { label: 'Actions', key: 'actions' }
-                                    ].map((head) => (
-                                        <TableHead
-                                            key={head.key}
-                                            onClick={() => head.key !== 'actions' && handleSort(head.key)}
-                                            className={`${head.key !== 'actions' ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                {head.label}
-                                                {head.key !== 'actions' && <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                                            </div>
-                                        </TableHead>
-                                    ))}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                                <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                                Loading directory...
-                                            </div>
-                                        </TableCell>
+                        <div className="hidden md:block">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        {[
+                                            { label: 'User', key: 'email' },
+                                            { label: 'Role', key: 'role' },
+                                            { label: 'Status', key: 'status' },
+                                            { label: 'Timestamp', key: 'created_at' },
+                                            { label: 'Actions', key: 'actions' }
+                                        ].map((head) => (
+                                            <TableHead
+                                                key={head.key}
+                                                onClick={() => head.key !== 'actions' && handleSort(head.key)}
+                                                className={`${head.key !== 'actions' ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    {head.label}
+                                                    {head.key !== 'actions' && <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                                                </div>
+                                            </TableHead>
+                                        ))}
                                     </TableRow>
-                                ) : paginatedData.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                            No users found matching filters.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    paginatedData.map((item) => {
-                                        const isSelf = currentUser?.email === item.email;
-                                        const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
+                                </TableHeader>
+                                <TableBody>
+                                    {loading ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center">
+                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                    <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                                    Loading directory...
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : paginatedData.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                                No users found matching filters.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        paginatedData.map((item) => {
+                                            const isSelf = currentUser?.email === item.email;
+                                            const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
 
-                                        return (
-                                            <TableRow key={item.email}>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                                                            <User size={14} />
+                                            return (
+                                                <TableRow key={item.email}>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                                                                <User size={14} />
+                                                            </div>
+                                                            <div>
+                                                                {item.full_name && <div className="font-medium">{item.full_name}</div>}
+                                                                <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            {item.full_name && <div className="font-medium">{item.full_name}</div>}
-                                                            <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px]">
+                                                            {item.role || 'GUEST'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-xs text-purple-500 font-medium"><ShieldAlert size={14} /> Admin</div>}
+                                                        {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><CheckCircle size={14} /> Active</div>}
+                                                        {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-xs text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
+                                                        {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-xs text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground font-mono">
+                                                        {new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2 justify-end">
+                                                            {item.status === 'WAITLIST' && (
+                                                                <Button
+                                                                    onClick={() => handleApprove(item.email)}
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
+                                                                >
+                                                                    <CheckCircle size={14} className="mr-1.5" />
+                                                                    Approve
+                                                                </Button>
+                                                            )}
+                                                            {(item.status === 'ACTIVE' || item.status === 'ADMIN' || item.status === 'INVITED' || item.status === 'WAITLIST') && (
+                                                                <Button
+                                                                    onClick={() => handleRevoke(item)}
+                                                                    disabled={isSelf || isTargetAdmin}
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                                    title="Revoke Access"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            )}
                                                         </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {/* Mobile Tile View */}
+                        <div className="grid grid-cols-1 gap-3 p-4 md:hidden">
+                            {loading ? (
+                                <div className="text-center py-8 text-muted-foreground text-sm">Loading users...</div>
+                            ) : paginatedData.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground text-sm">No users found.</div>
+                            ) : (
+                                paginatedData.map((item) => {
+                                    const isSelf = currentUser?.email === item.email;
+                                    const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
+
+                                    return (
+                                        <div key={item.email} className="bg-card border border-border rounded-lg p-3 shadow-sm space-y-3">
+                                            {/* Header: User Info & Role */}
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground bg-primary/5 text-primary">
+                                                        <User size={18} />
                                                     </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px]">
-                                                        {item.role || 'GUEST'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-xs text-purple-500 font-medium"><ShieldAlert size={14} /> Admin</div>}
-                                                    {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><CheckCircle size={14} /> Active</div>}
-                                                    {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-xs text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
-                                                    {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-xs text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground font-mono">
-                                                    {new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2 justify-end">
-                                                        {item.status === 'WAITLIST' && (
-                                                            <Button
-                                                                onClick={() => handleApprove(item.email)}
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
-                                                            >
-                                                                <CheckCircle size={14} className="mr-1.5" />
-                                                                Approve
-                                                            </Button>
-                                                        )}
-                                                        {(item.status === 'ACTIVE' || item.status === 'ADMIN' || item.status === 'INVITED' || item.status === 'WAITLIST') && (
-                                                            <Button
-                                                                onClick={() => handleRevoke(item)}
-                                                                disabled={isSelf || isTargetAdmin}
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                                title="Revoke Access"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        )}
+                                                    <div>
+                                                        <div className="font-semibold text-sm">{item.full_name || 'Unknown User'}</div>
+                                                        <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
                                                     </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
+                                                </div>
+                                                <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px] h-5">
+                                                    {item.role || 'GUEST'}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="h-px bg-border/50" />
+
+                                            {/* Details Grid */}
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                    <span className="text-muted-foreground block mb-1">Status</span>
+                                                    {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-purple-500 font-medium"><ShieldAlert size={12} /> Admin</div>}
+                                                    {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-emerald-500 font-medium"><CheckCircle size={12} /> Active</div>}
+                                                    {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
+                                                    {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-muted-foreground block mb-1">Joined</span>
+                                                    <span className="font-mono">{new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            {(item.status === 'WAITLIST' || !isTargetAdmin) && (
+                                                 <div className="flex items-center justify-end gap-2 pt-1">
+                                                    {item.status === 'WAITLIST' && (
+                                                        <Button
+                                                            onClick={() => handleApprove(item.email)}
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-xs border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 w-full"
+                                                        >
+                                                            <CheckCircle size={12} className="mr-1.5" />
+                                                            Approve Request
+                                                        </Button>
+                                                    )}
+                                                    {(item.status === 'ACTIVE' || item.status === 'INVITED' || item.status === 'WAITLIST' || item.status === 'ADMIN') && !isSelf && !isTargetAdmin && (
+                                                        <Button
+                                                            onClick={() => handleRevoke(item)}
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 hover:text-red-600 w-full"
+                                                        >
+                                                            <Trash2 size={12} className="mr-1.5" />
+                                                            Revoke
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </CardContent>
 
                     {/* Pagination */}

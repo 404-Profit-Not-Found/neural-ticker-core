@@ -10,9 +10,10 @@ import {
 interface RiskLightProps {
     score: number;
     reasoning?: string;
+    compact?: boolean;
 }
 
-export function RiskLight({ score, reasoning }: RiskLightProps) {
+export function RiskLight({ score, reasoning, compact = false }: RiskLightProps) {
     // Force cache invalidation
     const getColor = (s: number) => {
         if (s >= 7) return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
@@ -25,6 +26,27 @@ export function RiskLight({ score, reasoning }: RiskLightProps) {
         if (s >= 4) return 'Med Risk';
         return 'Low Risk';
     };
+
+    if (compact) {
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger>
+                        <div className="flex items-center gap-1.5 bg-muted/40 px-2 py-1 rounded border border-border/50">
+                            <span className={`w-2 h-2 rounded-full ${getColor(score)}`} />
+                            <span className="text-xs font-bold font-mono">{score}/10</span>
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px] p-4 text-xs leading-relaxed border-border bg-card shadow-xl">
+                        <div className="font-bold mb-2 flex items-center gap-2">
+                            <ShieldCheck size={14} className="text-primary" /> Risk Assessment ({getLabel(score)})
+                        </div>
+                        {reasoning || "Analysis pending..."}
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
 
     return (
         <div className="flex items-center gap-3 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">

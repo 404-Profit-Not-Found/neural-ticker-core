@@ -3,11 +3,17 @@ import {
     createColumnHelper,
     type SortingState,
 } from '@tanstack/react-table';
-import { ArrowUpRight, ArrowDownRight, Search, ChevronRight, ChevronLeft, LayoutGrid, List } from 'lucide-react';
+import { 
+    Search, ChevronRight, ChevronLeft, LayoutGrid, List,
+    ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle 
+} from 'lucide-react';
 import { useStockAnalyzer, type StockSnapshot } from '../../hooks/useStockAnalyzer';
 import { useNavigate } from 'react-router-dom';
 import { AnalyzerTableView } from './AnalyzerTableView';
 import { AnalyzerGridView } from './AnalyzerGridView';
+import { Badge } from '../ui/badge';
+import { TickerLogo } from '../dashboard/TickerLogo';
+import { cn } from '../../lib/api';
 
 export function AnalyzerTable() {
     const navigate = useNavigate();
@@ -41,25 +47,18 @@ export function AnalyzerTable() {
     const columnHelper = createColumnHelper<StockSnapshot>();
     const columns = [
         columnHelper.accessor('ticker.symbol', {
-            header: 'Symbol',
+            header: 'Ticker',
             cell: (info) => (
-                <div className="flex items-center gap-3">
-                    {info.row.original.ticker.logo_url ? (
-                        <img
-                            src={info.row.original.ticker.logo_url}
-                            alt={info.getValue()}
-                            className="w-8 h-8 rounded-full bg-muted object-contain p-1"
-                        />
-                    ) : (
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {info.getValue().substring(0, 2)}
-                        </div>
-                    )}
-                    <div>
-                        <div className="font-bold text-foreground">{info.getValue()}</div>
-                        <div className="text-xs text-muted-foreground hidden sm:block">
+                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
+                    <TickerLogo key={info.getValue()} url={info.row.original.ticker.logo_url} symbol={info.getValue()} className="w-8 h-8" />
+                    <div className="flex flex-col">
+                        <span className="text-primary font-bold group-hover:underline">{info.getValue()}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.ticker.name}>
                             {info.row.original.ticker.name}
-                        </div>
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/70 truncate max-w-[150px]">
+                            {info.row.original.ticker.sector}
+                        </span>
                     </div>
                 </div>
             ),
@@ -69,56 +68,88 @@ export function AnalyzerTable() {
             header: 'Price',
             cell: (info) =>
                 info.getValue() ? (
-                    <span className="font-mono">${info.getValue()?.toFixed(2)}</span>
+                    <span className="text-foreground font-mono font-medium">${info.getValue()?.toFixed(2)}</span>
                 ) : (
                     '-'
                 ),
         }),
         columnHelper.accessor(row => row.latestPrice?.change, {
             id: 'change', 
-            header: '24h %',
+            header: 'Change %',
             cell: (info) => {
                 const val = info.getValue();
                 if (val === undefined || val === null) return '-';
+                const isPositive = val >= 0;
                 return (
-                    <div
-                        className={`flex items-center gap-1 font-mono ${val >= 0 ? 'text-green-500' : 'text-red-500'
-                            }`}
-                    >
-                        {val >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                    <div className={cn("flex items-center font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                         {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
                         {Math.abs(val).toFixed(2)}%
                     </div>
                 );
             },
         }),
-        columnHelper.accessor(row => row.fundamentals.market_cap, {
-            id: 'market_cap',
-            header: 'Market Cap',
+        columnHelper.accessor(row => row.aiAnalysis?.upside_percent, {
+            id: 'upside_percent',
+            header: 'Potential Upside',
             cell: (info) => {
                 const rawVal = info.getValue();
-                if (!rawVal) return '-';
+                if (rawVal === undefined || rawVal === null) return '-';
                 const val = Number(rawVal);
                 if (isNaN(val)) return '-';
+                const isPositive = val > 0;
 
-                // Format billions/millions
-                if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
-                if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
-                if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-                return `$${val.toLocaleString()}`;
+                return (
+                    <div className={cn("flex items-center font-bold", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                        {isPositive && <ArrowUp size={14} className="mr-1" />}
+                        {val.toFixed(1)}%
+                    </div>
+                );
             },
         }),
-        columnHelper.accessor(row => row.fundamentals.pe_ratio, { 
-            id: 'pe_ttm', 
-            header: 'PE Ratio',
+        columnHelper.accessor(row => row.counts?.research, {
+            id: 'research',
+            header: 'Research',
             cell: (info) => {
-                 const rawVal = info.row.original.fundamentals.pe_ttm || info.getValue();
-                 if (rawVal === undefined || rawVal === null) return '-';
-                 
-                 const val = Number(rawVal);
-                 return isNaN(val) ? '-' : val.toFixed(2);
+                const count = info.getValue();
+                if (!count) return <span className="text-muted-foreground">-</span>;
+                return (
+                    <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
+                        <Brain size={14} className="text-purple-400" />
+                        {count}
+                    </div>
+                );
             },
         }),
-
+        // News (Hidden if 0 usually, but table shows '-' which is fine)
+         columnHelper.accessor(row => row.counts?.news, {
+            id: 'news',
+            header: 'News',
+             cell: (info) => {
+                const count = info.getValue();
+                if (!count) return <span className="text-muted-foreground">-</span>;
+                return (
+                    <div className="flex items-center gap-1.5 text-sky-400 font-semibold">
+                        <Newspaper size={14} className="text-sky-400" />
+                        {count}
+                    </div>
+                );
+            },
+        }),
+        // Social
+        columnHelper.accessor(row => row.counts?.social, {
+            id: 'social',
+            header: 'Social',
+             cell: (info) => {
+                const count = info.getValue();
+                if (!count) return <span className="text-muted-foreground">-</span>;
+                return (
+                    <div className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                        <MessageCircle size={14} className="text-blue-400" />
+                        {count}
+                    </div>
+                );
+            },
+        }),
         columnHelper.accessor(row => row.aiAnalysis?.overall_score, {
             id: 'overall_score',
             header: 'Risk Score',
@@ -128,26 +159,56 @@ export function AnalyzerTable() {
                 const val = Number(rawVal);
                 if (isNaN(val)) return '-';
                 
-                const color = val <= 3 ? 'text-green-500' : val >= 8 ? 'text-red-500' : 'text-yellow-500';
-                return <span className={`font-bold ${color}`}>{val.toFixed(1)}</span>;
-            },
-        }),
-        columnHelper.accessor(row => row.aiAnalysis?.upside_percent, {
-            id: 'upside_percent',
-            header: 'Exp. Upside',
-            cell: (info) => {
-                const rawVal = info.getValue();
-                if (rawVal === undefined || rawVal === null) return '-';
-                const val = Number(rawVal);
-                if (isNaN(val)) return '-';
+                let colorClass = "text-muted-foreground";
+                let Icon = ShieldCheck;
+                if (val <= 3.5) {
+                    colorClass = "text-emerald-500 font-bold";
+                    Icon = ShieldCheck;
+                } else if (val <= 6.5) {
+                    colorClass = "text-yellow-500 font-bold";
+                    Icon = AlertTriangle;
+                } else {
+                    colorClass = "text-red-500 font-bold";
+                    Icon = Flame;
+                }
 
                 return (
-                    <span className={val > 15 ? 'text-green-500 font-bold' : ''}>
-                        {val > 0 ? '+' : ''}{val.toFixed(1)}%
+                    <span className={cn("flex items-center gap-1.5", colorClass)}>
+                        <Icon size={14} />
+                        {val.toFixed(1)}
                     </span>
                 );
             },
         }),
+        // Analyst Consensus
+         columnHelper.accessor(row => row.fundamentals.consensus_rating, {
+            id: 'consensus',
+            header: 'Rating',
+             cell: (info) => {
+                const rating = info.getValue();
+                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+
+                if (rating && rating !== '-') {
+                    if (rating === 'Strong Buy') variant = 'strongBuy';
+                    else if (rating === 'Buy') variant = 'buy';
+                    else if (rating === 'Hold') variant = 'hold';
+                    else if (rating === 'Sell') variant = 'sell';
+                    else variant = "default";
+                    
+                    // We need count if avail
+                    const count = info.row.original.counts?.analysts || 0;
+                    const label = count > 0 ? `${rating} (${count})` : rating;
+
+                    return (
+                        <div className="flex items-center gap-2">
+                             <Badge variant={variant} className="whitespace-nowrap">{label}</Badge>
+                        </div>
+                    );
+                }
+                return <span className="text-muted-foreground">-</span>;
+            },
+        }),
+        // AI Rating
         columnHelper.display({
             id: 'rating',
             header: 'AI Rating',
@@ -162,26 +223,19 @@ export function AnalyzerTable() {
 
                 if (isNaN(risk) || isNaN(upside)) return <span className="text-muted-foreground">-</span>;
                 
-                let label = 'Hold';
-                let style = 'bg-muted text-muted-foreground';
-
-                if (upside > 10 && risk <= 7) {
-                    label = 'Buy';
-                    style = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-                }
-                if (upside > 20 && risk <= 6) {
-                    label = 'Strong Buy';
-                    style = 'bg-emerald-500/20 text-emerald-500 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]';
-                }
-                if (upside < 0 || risk >= 8) {
-                    label = 'Sell';
-                    style = 'bg-red-500/10 text-red-500 border-red-500/20';
-                }
+                let rating = 'Hold';
+                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                
+                if (upside > 10 && risk <= 7) { rating = 'Buy'; variant = 'buy'; }
+                if (upside > 20 && risk <= 6) { rating = 'Strong Buy'; variant = 'strongBuy'; }
+                if (upside < 0 || risk >= 8) { rating = 'Sell'; variant = 'sell'; }
+                if (rating === 'Hold') variant = 'hold';
 
                 return (
-                    <span className={`px-2 py-1 rounded text-xs font-medium border ${style}`}>
-                        {label}
-                    </span>
+                    <Badge variant={variant} className="whitespace-nowrap gap-1.5">
+                        <Bot size={12} className="opacity-80" />
+                        {rating}
+                    </Badge>
                 );
             },
         }),

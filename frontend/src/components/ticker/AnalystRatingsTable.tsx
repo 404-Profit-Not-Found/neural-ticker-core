@@ -22,7 +22,6 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
                             <tr>
                                 <th className="h-10 px-2 font-medium">Date</th>
                                 <th className="h-10 px-2 font-medium">Firm</th>
-                                <th className="h-10 px-2 font-medium">Analyst</th>
                                 <th className="h-10 px-2 font-medium">Rating</th>
                                 <th className="h-10 px-2 font-medium text-right">Target</th>
                             </tr>
@@ -34,10 +33,18 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
 
                                 return (
                                     <tr key={rating.id} className="hover:bg-muted/50 transition-colors">
-                                        <td className="p-2 font-mono text-xs text-muted-foreground">{rating.rating_date}</td>
-                                        <td className="p-2 font-medium text-foreground">{rating.firm}</td>
-                                        <td className="p-2 text-muted-foreground">{rating.analyst_name || '-'}</td>
+                                        <td className="p-2 font-mono text-xs text-muted-foreground whitespace-nowrap align-top pt-3">
+                                            {new Date(rating.rating_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                        </td>
                                         <td className="p-2">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm text-foreground">{rating.firm}</span>
+                                                {rating.analyst_name && (
+                                                    <span className="text-xs text-muted-foreground">{rating.analyst_name}</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-2 align-top pt-2.5">
                                             <Badge
                                                 variant="outline"
                                                 className={`
@@ -49,7 +56,7 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
                                                 {rating.rating}
                                             </Badge>
                                         </td>
-                                        <td className="p-2 text-right font-mono font-medium">
+                                        <td className="p-2 text-right font-mono font-medium align-top pt-3">
                                             {rating.price_target ? `$${rating.price_target.toFixed(2)}` : '-'}
                                         </td>
                                     </tr>

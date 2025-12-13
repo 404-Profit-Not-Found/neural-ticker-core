@@ -33,6 +33,7 @@ export function Header() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line text
     closeMenus();
   }, [location.pathname, closeMenus]);
 

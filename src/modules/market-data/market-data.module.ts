@@ -13,6 +13,7 @@ import { AnalystRating } from './entities/analyst-rating.entity';
 
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
 import { NewsController } from './news.controller';
 
 @Module({
@@ -22,7 +23,9 @@ import { NewsController } from './news.controller';
       Fundamentals,
       AnalystRating,
       RiskAnalysis,
+      RiskAnalysis,
       ResearchNote,
+      Comment,
     ]),
     FinnhubModule,
     forwardRef(() => TickersModule),
