@@ -66,7 +66,7 @@ export function Header() {
             Watchlist
           </Link>
           <Link to="/analyzer" className={linkClass('/analyzer')}>
-            Stock Analyzer
+            Tickers
           </Link>
         </nav>
 
@@ -168,7 +168,7 @@ export function Header() {
             Watchlist
           </Link>
           <Link to="/analyzer" className={mobileLinkClass('/analyzer')}>
-            Stock Analyzer
+            Tickers
           </Link>
           <div className="h-px bg-border my-2" />
            <button

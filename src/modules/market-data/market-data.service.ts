@@ -582,6 +582,26 @@ export class MarketDataService {
       'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
     );
 
+    // Analyst Count Subquery
+    qb.addSelect((subQuery) => {
+        return subQuery
+            .select('COUNT(*)', 'count')
+            .from('analyst_ratings', 'ar')
+            .where('ar.symbol_id = ticker.id');
+    }, 'analyst_count');
+
+    // Research Count Subquery (Approximation using string match on array or jsonb if needed, but here simple count if relation exists)
+    // NOTE: ResearchNotes store tickers in text[] array usually. 
+    // Assuming simple join is hard, we can try a subquery if we know the schema. 
+    // ResearchNoteRepo usage in getSnapshot implies 'tickers' column with ArrayContains.
+    // For SQL subquery on array column: WHERE :symbol = ANY(tickers)
+    qb.addSelect((subQuery) => {
+        return subQuery
+            .select('COUNT(*)', 'count')
+            .from('research_notes', 'rn')
+            .where('ticker.symbol = ANY(rn.tickers)');
+    }, 'research_count');
+
     // Filter
     if (search) {
       qb.where(
@@ -610,23 +630,43 @@ export class MarketDataService {
     qb.skip(skip).take(limit);
 
     // Get Raw Entities (mapped)
-    const [items, total] = await qb.getManyAndCount();
+    // getManyAndCount doesn't include raw selections easily (like subquery counts) if we use getMany.
+    // We need getRawAndEntities or map the raw results. 
+    // However, mapOne puts relations on entity. Subqueries usually end up in "raw" part of getRawAndEntities.
+    const { entities, raw } = await qb.getRawAndEntities();
+    const total = await qb.getCount(); // Separate count query to be safe with subqueries
 
     return {
-      items: items.map((t: any) => ({
-        ticker: {
-          id: t.id,
-          symbol: t.symbol,
-          name: t.name,
-          exchange: t.exchange,
-          sector: t.sector,
-          industry: t.industry,
-          logo_url: t.logo_url,
-        },
-        fundamentals: t.fund || {},
-        latestPrice: t.latestPrice || null,
-        aiAnalysis: t.latestRisk || null,
-      })),
+      items: entities.map((t: any, index) => {
+         // Raw result matching is tricky if sorting/filtering changes order, but getRawAndEntities maintains order.
+         // raw[index] should correspond to entities[index] if 1:1. 
+         // But raw returns flat columns. "analyst_count" should be there.
+         // We need to parse valid number from raw string.
+         const rawData = raw.find(r => r.ticker_id === t.id); 
+         const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
+         const researchCount = rawData ? parseInt(rawData.research_count, 10) : 0;
+         
+         return {
+            ticker: {
+              id: t.id,
+              symbol: t.symbol,
+              name: t.name,
+              exchange: t.exchange,
+              sector: t.sector,
+              industry: t.industry,
+              logo_url: t.logo_url,
+            },
+            fundamentals: t.fund || {},
+            latestPrice: t.latestPrice || null,
+            aiAnalysis: t.latestRisk || null,
+            counts: {
+                analysts: isNaN(analystCount) ? 0 : analystCount,
+                research: isNaN(researchCount) ? 0 : researchCount,
+                news: 0, // Not persisted, expensive to fetch in bulk
+                social: 0, // Not persisted
+            }
+        };
+      }),
       meta: {
         total,
         page,

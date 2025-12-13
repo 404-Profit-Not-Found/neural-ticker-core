@@ -141,19 +141,20 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </div>
 
                                 {/* Stats Grid */}
-                                <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Risk Score</span>
-                                        <div className={cn("flex items-center gap-1.5", riskColorClass)}>
-                                            <RiskIcon size={14} />
-                                            {risk.toFixed(1)}
-                                        </div>
+                                {/* Stats Grid */}
+                                <div className="flex items-center justify-between gap-2 mt-3 mb-1">
+                                    <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
+                                         <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
+                                         <span className="text-muted-foreground">Risk:</span>
+                                         <span className={riskColorClass}>{risk.toFixed(1)}</span>
                                     </div>
-                                    <div className="flex flex-col gap-1 text-right">
-                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Exp. Upside</span>
-                                        <div className={`font-bold ${upside > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                                            {upside > 0 ? '+' : ''}{upside.toFixed(1)}%
-                                        </div>
+
+                                    <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
+                                         <ArrowUp size={12} className={upside > 0 ? "text-emerald-500" : "text-muted-foreground"} />
+                                         <span className="text-muted-foreground">Upside:</span>
+                                         <span className={upside > 0 ? "text-emerald-500 font-bold" : "text-muted-foreground font-bold"}>
+                                             {upside > 0 ? '+' : ''}{upside.toFixed(1)}%
+                                         </span>
                                     </div>
                                 </div>
 
@@ -174,8 +175,12 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                             <MessageCircle size={12} /> {item.socialCount}
                                         </span>
                                     )}
-                                     <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                                        <Bot size={10} className="opacity-70" /> AI Analysis
+                                    <span className="ml-auto flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-0.5 rounded font-medium border border-border/50">
+                                        <ArrowDown size={10} className={risk > 5 ? "text-red-500" : "text-amber-500"} /> 
+                                        <span className="text-muted-foreground">Downside:</span>
+                                        <span className={risk > 5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
+                                            -{(risk * 2.5).toFixed(1)}%
+                                        </span>
                                     </span>
                                 </div>
                             </div>

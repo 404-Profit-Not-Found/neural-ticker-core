@@ -34,6 +34,12 @@ export interface StockSnapshot {
         financial_risk: number;
         sentiment: string;
     } | null;
+    counts?: {
+        news?: number;
+        research?: number;
+        analysts?: number;
+        social?: number;
+    };
 }
 
 export interface AnalyzerResponse {
