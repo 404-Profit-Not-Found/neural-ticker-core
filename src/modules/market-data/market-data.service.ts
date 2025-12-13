@@ -351,6 +351,15 @@ export class MarketDataService {
     ratings: Partial<AnalystRating>[],
   ): Promise<void> {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
+    const existing = await this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+    });
+    const seen = new Set(
+      existing.map(
+        (r) =>
+          `${(r.firm || '').toLowerCase().trim()}|${String(r.rating_date).trim()}`,
+      ),
+    );
 
     for (const rating of ratings) {
       // Enhanced validation: ensure firm exists and rating_date is a real date (not null, undefined, or the string "null")
@@ -359,8 +368,9 @@ export class MarketDataService {
       const dateStr = String(rating.rating_date).trim();
       if (dateStr === 'null' || dateStr === '') continue;
       if (isNaN(new Date(dateStr).getTime())) continue; // skip invalid dates
-      // const parsedDate = new Date(dateStr); // No longer needed
-      // if (isNaN(parsedDate.getTime())) continue; // No longer needed
+
+      const dedupeKey = `${rating.firm.toLowerCase().trim()}|${dateStr}`;
+      if (seen.has(dedupeKey)) continue;
 
       const existing = await this.analystRatingRepo.findOne({
         where: {
@@ -376,6 +386,7 @@ export class MarketDataService {
           rating_date: dateStr,
           symbol_id: tickerEntity.id,
         });
+        seen.add(dedupeKey);
       }
     }
   }
