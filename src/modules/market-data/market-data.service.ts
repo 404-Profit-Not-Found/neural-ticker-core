@@ -112,25 +112,28 @@ export class MarketDataService {
         // Function to save Fundamentals
         if (profile || financials?.metric) {
           const metrics = financials?.metric || {};
-          
+
           // Use existing fundamentals or create new wrapped in merge logic
-          const entity = fundamentals || this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
-          
+          const entity =
+            fundamentals ||
+            this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
+
           if (profile) {
-              entity.market_cap = profile.marketCapitalization;
-              entity.sector = profile.finnhubIndustry;
+            entity.market_cap = profile.marketCapitalization;
+            entity.sector = profile.finnhubIndustry;
           }
-          
+
           if (metrics) {
-              if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
-              if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
-              if (metrics.beta) entity.beta = metrics.beta;
-              if (metrics.dividendYieldIndicatedAnnual) entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
-              // debt_to_equity is not always clean in basic metrics, skipping for now
+            if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
+            if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
+            if (metrics.beta) entity.beta = metrics.beta;
+            if (metrics.dividendYieldIndicatedAnnual)
+              entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
+            // debt_to_equity is not always clean in basic metrics, skipping for now
           }
 
           entity.updated_at = new Date();
-          
+
           await this.fundamentalsRepo.save(entity);
           fundamentals = entity;
         }

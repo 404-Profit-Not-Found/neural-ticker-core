@@ -49,8 +49,6 @@ export class ResearchService {
 
   // ... (createResearchTicket, etc. unchanged)
 
-
-
   async createResearchTicket(
     userId: string | null, // Nullable for system jobs
     tickers: string[],
@@ -215,44 +213,30 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         result.answerMarkdown,
       );
 
-      // 8. NOTIFICATION: Alert user
-      // 8. NOTIFICATION: Broadcast to ALL Users
-      const allUsers = await this.usersService.findAll();
-      for (const user of allUsers) {
-        if (user.id === note.user_id) {
-          // Notify Creator
+      // 8. NOTIFICATION: Alert creator only
+      if (note.user_id) {
           await this.notificationsService.create(
-            user.id,
-            'research_complete',
-            `Research Ready: ${note.tickers.join(', ')}`,
-            `Your AI research on ${note.tickers.join(', ')} is complete.`,
-            { researchId: note.id, ticker: note.tickers[0] },
+              note.user_id,
+              'research_complete',
+              `Research Ready: ${note.tickers.join(', ')}`,
+              `Your AI research on ${note.tickers.join(', ')} is complete.`,
+              { researchId: note.id, ticker: note.tickers[0] }
           );
-        } else {
-          // Notify Community
-          await this.notificationsService.create(
-            user.id,
-            'research_complete',
-            `New Analysis: ${note.tickers.join(', ')}`,
-            `New market intelligence for ${note.tickers.join(', ')} is available.`,
-            { researchId: note.id, ticker: note.tickers[0] },
-          );
-        }
       }
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
       note.error = e.message;
       await this.noteRepo.save(note);
-      
+
       if (note.user_id) {
-           await this.notificationsService.create(
-              note.user_id,
-              'research_failed',
-              `Research Failed: ${note.tickers.join(', ')}`,
-              `We encountered an error analyzing ${note.tickers.join(', ')}.`,
-              { researchId: note.id, error: e.message }
-          );
+        await this.notificationsService.create(
+          note.user_id,
+          'research_failed',
+          `Research Failed: ${note.tickers.join(', ')}`,
+          `We encountered an error analyzing ${note.tickers.join(', ')}.`,
+          { researchId: note.id, error: e.message },
+        );
       }
     }
   }
@@ -436,7 +420,7 @@ Title:`;
   async deleteResearchNote(id: string, userId: string): Promise<void> {
     const note = await this.noteRepo.findOne({ where: { id } });
     if (!note) {
-        throw new NotFoundException('Research note not found');
+      throw new NotFoundException('Research note not found');
     }
 
     // Check permissions
@@ -445,7 +429,9 @@ Title:`;
     const isOwner = note.user_id === userId;
 
     if (!isAdmin && !isOwner) {
-         throw new Error('Unauthorized: Only Admin or Owner can delete research notes');
+      throw new Error(
+        'Unauthorized: Only Admin or Owner can delete research notes',
+      );
     }
 
     await this.noteRepo.delete(id);
@@ -494,7 +480,7 @@ Title:`;
     // MODIFIED: If ticker is provided, we show ALL research for that ticker (Community View).
     // If NO ticker is provided, we filter by User (My Research View).
     if (!ticker) {
-        query.where('note.user_id = :userId', { userId });
+      query.where('note.user_id = :userId', { userId });
     }
 
     if (status && status !== 'all') {

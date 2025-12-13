@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Param, UseGuards, Request, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  Patch,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificationsService } from './notifications.service';
 
@@ -14,7 +21,9 @@ export class NotificationsController {
 
   @Get('count')
   async getUnreadCount(@Request() req: any) {
-    const count = await this.notificationsService.getUnreadCount(req.user.userId);
+    const count = await this.notificationsService.getUnreadCount(
+      req.user.userId,
+    );
     return { count };
   }
 
@@ -22,9 +31,9 @@ export class NotificationsController {
   async markAsRead(@Param('id') id: string, @Request() req: any) {
     return this.notificationsService.markAsRead(id, req.user.userId);
   }
-  
+
   @Patch('read-all')
   async markAllAsRead(@Request() req: any) {
-      return this.notificationsService.markAllAsRead(req.user.userId);
+    return this.notificationsService.markAllAsRead(req.user.userId);
   }
 }

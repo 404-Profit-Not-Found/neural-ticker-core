@@ -4,6 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 import { Bell, User as UserIcon, Shield, Menu, X } from 'lucide-react';
 import { api } from '../../lib/api';
 
+interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+
 // Simple hook to poll notifications
 function useUnreadNotifications(isAuthenticated: boolean) {
     const [unreadCount, setUnreadCount] = useState(0);
@@ -25,7 +37,7 @@ function useUnreadNotifications(isAuthenticated: boolean) {
         return () => clearInterval(interval);
     }, [isAuthenticated, check]);
 
-    return unreadCount;
+    return { unreadCount, check };
 }
 
 export function Header() {
@@ -36,13 +48,13 @@ export function Header() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsMenuOpen, setNotificationsMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const unreadCount = useUnreadNotifications(!!user);
+  const { unreadCount, check: refreshNotifications } = useUnreadNotifications(!!user);
 
   const fetchNotifications = useCallback(async () => {
       try {
-          const { data } = await api.get('/notifications');
+          const { data } = await api.get<Notification[]>('/notifications');
           setNotifications(data);
       } catch (e) {
           console.error('Failed to fetch notifications list', e);
@@ -67,26 +79,23 @@ export function Header() {
       }
   };
 
-  const handleNotificationClick = async (n: any) => {
+  const handleNotificationClick = async (n: Notification) => {
       try {
           // 1. Mark as read
           if (!n.read) {
             await api.patch(`/notifications/${n.id}/read`);
+            refreshNotifications(); // Update badge immediately
           }
           
           // 2. Navigation logic based on type
           if (n.type === 'research_complete' && n.data?.ticker) {
               navigate(`/ticker/${n.data.ticker}`);
-              // Ideally we would also pass a state or query param to open the research tab, 
-              // but standard routing to the ticker page is the MVP request.
-              // If the user wants specific tab: navigate(`/ticker/${n.data.ticker}?tab=research`);
           } else if (n.data?.ticker) {
               navigate(`/ticker/${n.data.ticker}`);
           }
 
           // 3. Close menu
           setNotificationsMenuOpen(false);
-          // Refresh list/count? The hook polls, so count updates automatically.
       } catch (e) {
           console.error('Failed to handle notification click', e);
       }
@@ -183,6 +192,7 @@ export function Header() {
                         onClick={async () => {
                             await api.patch('/notifications/read-all');
                             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                            refreshNotifications(); // Update badge immediately
                         }}
                         className="text-xs text-primary hover:underline"
                     >

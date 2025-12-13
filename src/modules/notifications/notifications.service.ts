@@ -10,7 +10,13 @@ export class NotificationsService {
     private readonly notificationRepo: Repository<Notification>,
   ) {}
 
-  async create(userId: string, type: string, title: string, message: string, data?: any) {
+  async create(
+    userId: string,
+    type: string,
+    title: string,
+    message: string,
+    data?: any,
+  ) {
     const notification = this.notificationRepo.create({
       user_id: userId,
       type,
@@ -25,7 +31,7 @@ export class NotificationsService {
     return this.notificationRepo.find({
       where: { user_id: userId },
       order: { created_at: 'DESC' },
-      take: 20
+      take: 20,
     });
   }
 
@@ -38,8 +44,11 @@ export class NotificationsService {
   async markAsRead(id: string, userId: string) {
     await this.notificationRepo.update({ id, user_id: userId }, { read: true });
   }
-  
+
   async markAllAsRead(userId: string) {
-    await this.notificationRepo.update({ user_id: userId, read: false }, { read: true });
+    await this.notificationRepo.update(
+      { user_id: userId, read: false },
+      { read: true },
+    );
   }
 }
