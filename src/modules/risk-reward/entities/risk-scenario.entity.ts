@@ -54,7 +54,7 @@ export class RiskScenario {
   price_mid: number;
 
   @ApiProperty({ example: 5.0 })
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
+  @Column({ type: 'numeric', precision: 20, scale: 2 })
   expected_market_cap: number;
 
   @ApiProperty({ type: [String] })

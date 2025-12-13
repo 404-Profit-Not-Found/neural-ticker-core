@@ -269,6 +269,22 @@ describe('RiskRewardService', () => {
       expect(result.scenarios.bear.price_target_mid).toBe(50);
     });
 
+    it('should extract large market cap values without overflow', () => {
+      const raw = `{
+        risk_score: { overall: 5 },
+        scenarios: {
+          bull: { price_target_mid: 200, expected_market_cap: 3500000000000 } // 3.5 Trillion
+        }
+      }`;
+      // In a real scenario, this would go through TypeORM which handles the BigInt/numeric string conversion.
+      // Here we just verify the parser doesn't mangle it.
+      // Since our salvageFromRaw uses Number(), JS handles integers up to 2^53 safely (9 quadrillion).
+      // 3.5T is well within safe integer range for JS logic.
+      // The issue was DB column precision.
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.expected_market_cap).toBe(3500000000000);
+    });
+
     it('should extract probabilities from TOON format', () => {
       const raw = `{
         risk_score: { overall: 5 },

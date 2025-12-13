@@ -15,10 +15,10 @@ export class GeminiProvider implements ILlmProvider {
 
   // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
   private readonly defaultModels = {
-    deep: 'gemini-2.5-flash',
+    deep: 'gemini-2.5-pro',
     medium: 'gemini-2.5-flash',
-    low: 'gemini-1.5-flash-002',
-    extraction: 'gemini-1.5-flash-002',
+    low: 'gemini-2.5-flash',
+    extraction: 'gemini-2.5-flash',
   };
 
   constructor(private readonly configService: ConfigService) {

@@ -137,6 +137,20 @@ export class RiskRewardService {
     const bearProb = getScenarioProbability('bear') ?? 0.25;
 
     // Build scenarios from extracted values (or leave empty for fallback builder)
+    // Helper to extract numeric values from specific scenario block
+    const getScenarioNum = (scenario: string, key: string) => {
+      const pattern = new RegExp(
+        `["']?${scenario}["']?\\s*:\\s*\\{[^}]*${key}\\s*:\\s*([-\\d.]+)`,
+        'i',
+      );
+      const match = raw.match(pattern);
+      if (match) {
+        const n = Number(match[1]);
+        if (Number.isFinite(n)) return n;
+      }
+      return 0;
+    };
+
     const scenarios: Record<string, any> = {};
     if (bullMid !== null) {
       scenarios.bull = {
@@ -145,7 +159,7 @@ export class RiskRewardService {
         price_target_mid: bullMid,
         price_target_low: bullMid * 0.9,
         price_target_high: bullMid * 1.1,
-        expected_market_cap: 0,
+        expected_market_cap: getScenarioNum('bull', 'expected_market_cap'),
         key_drivers: [],
       };
     }
@@ -156,7 +170,7 @@ export class RiskRewardService {
         price_target_mid: baseMid,
         price_target_low: baseMid * 0.95,
         price_target_high: baseMid * 1.05,
-        expected_market_cap: 0,
+        expected_market_cap: getScenarioNum('base', 'expected_market_cap'),
         key_drivers: [],
       };
     }
@@ -167,7 +181,7 @@ export class RiskRewardService {
         price_target_mid: bearMid,
         price_target_low: bearMid * 0.9,
         price_target_high: bearMid * 1.1,
-        expected_market_cap: 0,
+        expected_market_cap: getScenarioNum('bear', 'expected_market_cap'),
         key_drivers: [],
       };
     }
@@ -437,9 +451,10 @@ export class RiskRewardService {
       1. Extract ACTUAL price targets from the research if present - do NOT invent numbers.
       2. If specific Bull/Base/Bear targets are mentioned, use those EXACT values.
       3. If exact numbers are missing, infer reasonable estimates based on sentiment.
-      4. Probabilities must sum to approx 1.0.
-      5. Risk Scores are 0-10 (0=safe, 10=extreme risk, 5=average).
-      6. OUTPUT PURE JSON ONLY. Numeric fields must be calculated numbers (e.g., 150.50), NOT equations (e.g., 100 * 1.5).
+      6. OUTPUT PURE JSON ONLY. No markdown formatting (no code blocks).
+      7. Numeric fields must be FINAL CALCULATED NUMBERS (e.g., 150.50).
+      8. DO NOT include equations, math, or "show your work" (e.g., NEVER output "100 * 1.5").
+      9. DO NOT include comments like "// this is a comment".
       `,
       tickers: [symbol],
       numericContext: context,
