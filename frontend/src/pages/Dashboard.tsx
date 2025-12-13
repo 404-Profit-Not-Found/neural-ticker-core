@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
     Activity,
-    ArrowUpRight,
     Search,
     Brain,
     Zap,
     TrendingUp,
     Newspaper,
-    MoreHorizontal,
     ArrowRight,
     Loader2
 } from 'lucide-react';
@@ -18,7 +16,11 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { cn, api } from '../lib/api';
-import { useTickerResearch } from '../hooks/useTicker';
+import { useTickerResearch, useTriggerResearch } from '../hooks/useTicker';
+import { useStockAnalyzer, type StockSnapshot } from '../hooks/useStockAnalyzer';
+import { WatchlistGridView } from '../components/dashboard/WatchlistGridView';
+import type { TickerData } from '../components/dashboard/WatchlistTableView';
+import { Sparkles } from 'lucide-react';
 
 // --- Components based on StyleGuidePage ---
 
@@ -140,44 +142,103 @@ function ResearchFeedWidget() {
     );
 }
 
-function MarketLeadersWidget() {
+function AiNewsWidget() {
     const navigate = useNavigate();
-    const { data: strongBuys } = useQuery({
-        queryKey: ['stats', 'strong-buy'],
-        queryFn: async () => {
-            const res = await api.get<{ count: number; symbols: string[] }>('/stats/strong-buy');
-            return res.data;
-        }
-    });
+    const { data: research } = useTickerResearch();
+    const typedResearch = research as ResearchNote[] | undefined;
+    const { mutate: triggerResearch, isPending } = useTriggerResearch();
 
-    const symbols = strongBuys?.symbols?.slice(0, 5) || [];
+    // Find a recent "News Digest" or similar generic report
+    // Check purely against created_at string if possible or move date calc outside render if strictly needed,
+    // but typically filter inside useMemo or safe block is fine.
+    // The lint error `Cannot call impure function...` suggests Date.now() should not be in render.
+    // We can use a stable reference time or just suppress if we accept minor hydration mismatch risk, 
+    // but better to just use a fixed "yesterday" ref or similar.
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    const oneDayAgoMs = oneDayAgo.getTime();
+
+    const newsDigest = typedResearch?.find((r) =>
+        (r.title?.includes('News') || r.question?.includes('news')) &&
+        new Date(r.created_at).getTime() > oneDayAgoMs
+    );
+
+    const handleGenerate = () => {
+        triggerResearch({
+            symbol: 'MARKET_NEWS', // Special symbol or generic
+            question: "Generate a daily news digest for the top active stocks in the market. Focus on high impact events.",
+            quality: 'deep',
+            provider: 'gemini'
+        });
+    };
+
+    if (newsDigest) {
+        return (
+            <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <h3 className="font-semibold text-sm">Today's AI News Digest</h3>
+                </div>
+                <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
+                    {newsDigest.title || "Daily market analysis and news summary."}
+                </p>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(`/research/${newsDigest.id}`)}>
+                    Read Full Digest
+                </Button>
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-1">
-            {symbols.length > 0 ? symbols.map((symbol) => (
-                <div
-                    key={symbol}
-                    className="flex items-center justify-between p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/ticker/${symbol}`)}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/20 text-xs font-bold text-foreground border border-border">
-                            {symbol[0]}
-                        </div>
-                        <div>
-                            <div className="font-bold text-sm tracking-tight">{symbol}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-green-500 font-semibold">Strong Buy</div>
-                        </div>
-                    </div>
-                    <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-            )) : (
-                <div className="py-8 text-center text-muted-foreground text-sm">
-                    No Strong Buy signals detected.
-                </div>
-            )}
+        <div className="p-4 bg-muted/30 rounded-lg border border-border text-center">
+            <h3 className="font-semibold text-sm mb-1">AI News Digest</h3>
+            <p className="text-xs text-muted-foreground mb-3">No digest generated for today.</p>
+            <Button
+                size="sm"
+                className="w-full gap-2"
+                onClick={handleGenerate}
+                disabled={isPending}
+            >
+                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                Generate Digest
+            </Button>
         </div>
     );
+}
+
+
+
+
+function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
+    // Determine AI Rating from core logic similar to WatchlistTable if not explicit
+    let derivedAiRating = item.aiAnalysis?.sentiment || '-';
+    if (derivedAiRating === '-' && item.aiAnalysis) {
+        const { overall_score, upside_percent } = item.aiAnalysis;
+        if (upside_percent > 10 && overall_score <= 7) derivedAiRating = 'Buy';
+        else if (upside_percent > 20 && overall_score <= 6) derivedAiRating = 'Strong Buy';
+        else if (upside_percent < 0 || overall_score >= 8) derivedAiRating = 'Sell';
+        else derivedAiRating = 'Hold';
+    }
+
+    return {
+        symbol: item.ticker.symbol,
+        company: item.ticker.name,
+        logo: item.ticker.logo_url,
+        sector: item.ticker.sector || 'Unknown',
+        price: Number(item.latestPrice?.close ?? 0),
+        change: Number(item.latestPrice?.change ?? 0),
+        pe: Number(item.fundamentals.pe_ratio ?? 0) || null,
+        marketCap: Number(item.fundamentals.market_cap ?? 0) || null,
+        potentialUpside: Number(item.aiAnalysis?.upside_percent ?? 0),
+        riskScore: Number(item.aiAnalysis?.overall_score ?? 0),
+        rating: item.fundamentals.consensus_rating as string || '-',
+        aiRating: derivedAiRating,
+        analystCount: item.counts?.analysts || 0,
+        newsCount: item.counts?.news || 0,
+        researchCount: item.counts?.research || 0,
+        socialCount: item.counts?.social || 0,
+        itemId: item.ticker.id
+    };
 }
 
 export function Dashboard() {
@@ -281,46 +342,84 @@ export function Dashboard() {
                 </section>
 
                 {/* --- MAIN CONTENT GRID --- */}
+                {/* --- MAIN CONTENT GRID --- */}
+
+                {/* Top Opportunities Section */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-emerald-500" />
+                            Top Opportunities
+                        </h2>
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/analyzer')}>
+                            View Analyzer <ArrowRight className="ml-1 w-4 h-4" />
+                        </Button>
+                    </div>
+
+                    {/* Using Analyzer Hook directly for top items */}
+                    <TopOpportunitiesSection />
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                    {/* LEFT COLUMN: 2/3 */}
-                    <Card className="lg:col-span-2 h-full flex flex-col overflow-hidden">
-                        <CardHeader className="py-4 border-b border-border bg-muted/10">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                    <Brain className="w-4 h-4 text-primary" />
-                                    Latest Research Notes
-                                </CardTitle>
-                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate('/research')}>
-                                    View All <ArrowRight size={12} />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <ResearchFeedWidget />
-                        </CardContent>
-                    </Card>
+                    {/* LEFT COLUMN: Research & News */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <Card className="h-full flex flex-col overflow-hidden">
+                            <CardHeader className="py-4 border-b border-border bg-muted/10">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="font-bold text-sm flex items-center gap-2">
+                                        <Brain className="w-4 h-4 text-primary" />
+                                        Latest Research Notes
+                                    </CardTitle>
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate('/research')}>
+                                        View All <ArrowRight size={12} />
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <ResearchFeedWidget />
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                    {/* RIGHT COLUMN: 1/3 */}
-                    <Card className="h-full flex flex-col overflow-hidden border-primary/20 shadow-md">
-                        <CardHeader className="py-4 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent">
-                            <div className="flex items-center justify-between">
+                    {/* RIGHT COLUMN: AI News & Quick Actions */}
+                    <div className="space-y-6">
+                        <Card className="overflow-hidden border-primary/20 shadow-md">
+                            <CardHeader className="py-4 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent">
                                 <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                    Market Leaders
+                                    <Newspaper className="w-4 h-4 text-emerald-500" />
+                                    Smart News
                                 </CardTitle>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-                                    <MoreHorizontal size={14} />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-3">
-                            <MarketLeadersWidget />
-                        </CardContent>
-                    </Card>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-4">
+                                <AiNewsWidget />
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
 
             </main>
         </div>
+    );
+}
+
+function TopOpportunitiesSection() {
+    const { data, isLoading } = useStockAnalyzer({
+        page: 1,
+        limit: 4,
+        sortBy: 'upside_percent',
+        sortDir: 'DESC',
+        search: ''
+    });
+
+    const items = data?.items || [];
+    const tickerData: TickerData[] = items.map(mapSnapshotToTickerData);
+
+    return (
+        <WatchlistGridView
+            data={tickerData}
+            isLoading={isLoading}
+        // onRemove undefined implies read-only/no-delete
+        />
     );
 }
