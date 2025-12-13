@@ -16,24 +16,22 @@ export class NotificationsController {
 
   @Get()
   async getNotifications(@Request() req: any) {
-    return this.notificationsService.findAllForUser(req.user.userId);
+    return this.notificationsService.findAllForUser(req.user.id);
   }
 
   @Get('count')
   async getUnreadCount(@Request() req: any) {
-    const count = await this.notificationsService.getUnreadCount(
-      req.user.userId,
-    );
+    const count = await this.notificationsService.getUnreadCount(req.user.id);
     return { count };
   }
 
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req: any) {
-    return this.notificationsService.markAsRead(id, req.user.userId);
+    return this.notificationsService.markAsRead(id, req.user.id);
   }
 
   @Patch('read-all')
   async markAllAsRead(@Request() req: any) {
-    return this.notificationsService.markAllAsRead(req.user.userId);
+    return this.notificationsService.markAllAsRead(req.user.id);
   }
 }

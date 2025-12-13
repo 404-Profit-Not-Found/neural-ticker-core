@@ -34,7 +34,7 @@ function useUnreadNotifications(isAuthenticated: boolean) {
     useEffect(() => {
         if (!isAuthenticated) return;
         check(); // Initial check
-        const interval = setInterval(check, 5000); // Poll every 5s for faster testing
+        const interval = setInterval(check, 30000); // Poll every 30s
         return () => clearInterval(interval);
     }, [isAuthenticated, check]);
 
