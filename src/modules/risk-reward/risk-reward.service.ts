@@ -34,9 +34,7 @@ export class RiskRewardService {
   private salvageFromRaw(raw: string) {
     if (!raw) return null;
     const getNum = (key: string) => {
-      const match = raw.match(
-        new RegExp(`"${key}"\\s*:\\s*([-\\d\\.]+)`, 'i'),
-      );
+      const match = raw.match(new RegExp(`"${key}"\\s*:\\s*([-\\d\\.]+)`, 'i'));
       if (!match) return null;
       const n = Number(match[1]);
       return Number.isFinite(n) ? n : null;
@@ -260,11 +258,11 @@ export class RiskRewardService {
 
         try {
           parsed = JSON.parse(cleanJson);
-        } catch (_err) {
+        } catch {
           // Attempt toon-parser first for lenient JSON (handles trailing commas/unquoted keys)
           try {
             parsed = toonToJson(cleanJson, { strict: false }) as any;
-          } catch (_toonErr) {
+          } catch {
             // Attempt a tolerant repair: quote bare keys and strip trailing commas
             const repaired = cleanJson
               .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')

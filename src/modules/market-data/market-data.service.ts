@@ -363,8 +363,7 @@ export class MarketDataService {
 
     const seen = new Set(
       existing.map(
-        (r) =>
-          `${normalizeFirm(r.firm)}|${String(r.rating_date).trim()}`,
+        (r) => `${normalizeFirm(r.firm)}|${String(r.rating_date).trim()}`,
       ),
     );
 

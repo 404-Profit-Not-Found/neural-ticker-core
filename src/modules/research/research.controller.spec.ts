@@ -53,9 +53,9 @@ describe('ResearchController', () => {
       expect(mockResearchService.reprocessFinancials).toHaveBeenCalledWith(
         'AAPL',
       );
-      expect(
-        mockMarketDataService.dedupeAnalystRatings,
-      ).toHaveBeenCalledWith('AAPL');
+      expect(mockMarketDataService.dedupeAnalystRatings).toHaveBeenCalledWith(
+        'AAPL',
+      );
       expect(result).toEqual({ message: 'Sync completed', deduped: 2 });
     });
   });
