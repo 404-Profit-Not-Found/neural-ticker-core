@@ -9,7 +9,7 @@ import type { TickerData } from './WatchlistTableView';
 interface WatchlistGridViewProps {
     data: TickerData[];
     isLoading: boolean;
-    onRemove: (itemId: string, symbol: string) => void;
+    onRemove?: (itemId: string, symbol: string) => void;
 }
 
 export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridViewProps) {
@@ -66,20 +66,22 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                         key={symbol}
                         className="group flex flex-col p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
                     >
-                         {/* Remove Action (Absolute Top Right) */}
-                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemove(itemId || '', symbol);
-                                }}
-                            >
-                                <Trash2 className="h-3 w-3" />
-                            </Button>
-                         </div>
+                        {/* Remove Action (Absolute Top Right) - Only if onRemove is provided */}
+                        {onRemove && (
+                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRemove(itemId || '', symbol);
+                                    }}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        )}
 
                         {/* Top Section Clickable */}
                         <div className="cursor-pointer flex-1" onClick={() => navigate(`/ticker/${symbol}`)}>
@@ -90,13 +92,13 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="font-bold text-lg leading-none">{symbol}</div>
-                                             {/* AI Badge (Aligned Right) */}
-                                             {aiRating && aiRating !== '-' && (
+                                            {/* AI Badge (Aligned Right) */}
+                                            {aiRating && aiRating !== '-' && (
                                                 <Badge variant={variant} className="text-[10px] h-5 px-1.5 whitespace-nowrap gap-1 ml-auto">
                                                     <Bot size={10} className="opacity-80" />
                                                     {aiRating}
                                                 </Badge>
-                                             )}
+                                            )}
                                         </div>
                                         <div className="flex flex-col gap-0.5 mt-1">
                                             <div className="text-xs text-muted-foreground line-clamp-1">{company}</div>
@@ -113,7 +115,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 <div className="flex items-end justify-between border-b border-border pb-3">
                                     <div className="flex flex-col items-start gap-1">
                                         <span className="text-2xl font-mono font-medium">
-                                            ${price.toFixed(2)}
+                                            ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
                                         </span>
                                         {/* Analyst Badge (Under Price) */}
                                         {item.rating && item.rating !== '-' && (() => {
@@ -135,32 +137,34 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Today</span>
                                         <div className={cn("flex items-center gap-0.5 text-sm font-mono font-bold", change >= 0 ? "text-emerald-500" : "text-red-500")}>
                                             {change >= 0 ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                                            {Math.abs(change).toFixed(2)}%
+                                            {typeof change === 'number' ? Math.abs(change).toFixed(2) : '0.00'}%
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Stats Grid */}
-                                {/* Stats Grid */}
                                 <div className="flex items-center justify-between gap-2 mt-3 mb-1">
                                     <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
-                                         <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
-                                         <span className="text-muted-foreground">Risk:</span>
-                                         <span className={riskColorClass}>{risk.toFixed(1)}</span>
+                                        <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
+                                        <span className="text-muted-foreground">Risk:</span>
+                                        <span className={riskColorClass}>
+                                            {typeof risk === 'number' ? risk.toFixed(1) : '0.0'}
+                                        </span>
                                     </div>
 
                                     <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
-                                         <ArrowUp size={12} className={upside > 0 ? "text-emerald-500" : "text-muted-foreground"} />
-                                         <span className="text-muted-foreground">Upside:</span>
-                                         <span className={upside > 0 ? "text-emerald-500 font-bold" : "text-muted-foreground font-bold"}>
-                                             {upside > 0 ? '+' : ''}{upside.toFixed(1)}%
-                                         </span>
+                                        <ArrowUp size={12} className={upside > 0 ? "text-emerald-500" : "text-muted-foreground"} />
+                                        <span className="text-muted-foreground">Upside:</span>
+                                        <span className={upside > 0 ? "text-emerald-500 font-bold" : "text-muted-foreground font-bold"}>
+                                            {upside > 0 ? '+' : ''}
+                                            {typeof upside === 'number' ? upside.toFixed(1) : '0.0'}%
+                                        </span>
                                     </div>
                                 </div>
 
-                                 {/* Footer Counts */}
+                                {/* Footer Counts */}
                                 <div className="flex items-center gap-3 pt-2 border-t border-border/50 text-xs">
-                                     {item.researchCount > 0 && (
+                                    {item.researchCount > 0 && (
                                         <span className="flex items-center gap-1 text-purple-400 font-medium bg-purple-400/10 px-1.5 py-0.5 rounded">
                                             <Brain size={12} /> {item.researchCount}
                                         </span>
@@ -176,10 +180,10 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                         </span>
                                     )}
                                     <span className="ml-auto flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-0.5 rounded font-medium border border-border/50">
-                                        <ArrowDown size={10} className={risk > 5 ? "text-red-500" : "text-amber-500"} /> 
+                                        <ArrowDown size={10} className={risk > 5 ? "text-red-500" : "text-amber-500"} />
                                         <span className="text-muted-foreground">Downside:</span>
                                         <span className={risk > 5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
-                                            -{(risk * 2.5).toFixed(1)}%
+                                            -{typeof risk === 'number' ? (risk * 2.5).toFixed(1) : '0.0'}%
                                         </span>
                                     </span>
                                 </div>
