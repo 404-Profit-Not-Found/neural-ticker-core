@@ -9,6 +9,8 @@ import { MarketDataModule } from '../market-data/market-data.module';
 import { UsersModule } from '../users/users.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 
+import { NotificationsModule } from '../notifications/notifications.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResearchNote]),
@@ -17,6 +19,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
     MarketDataModule,
     UsersModule,
     forwardRef(() => RiskRewardModule),
+    NotificationsModule,
   ],
   controllers: [ResearchController],
   providers: [ResearchService],

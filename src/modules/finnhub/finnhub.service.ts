@@ -48,6 +48,19 @@ export class FinnhubService {
     }
   }
 
+  async getBasicFinancials(symbol: string): Promise<any> {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.get('/stock/metric', {
+          params: { symbol, metric: 'all' },
+        }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error, symbol);
+    }
+  }
+
   private handleError(error: any, context?: string) {
     if (error instanceof AxiosError) {
       this.logger.error(

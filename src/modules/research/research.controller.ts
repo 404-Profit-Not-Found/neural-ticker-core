@@ -320,13 +320,11 @@ export class ResearchController {
   @ApiResponse({ status: 200, description: 'Ticket deleted successfully.' })
   @ApiResponse({ status: 404, description: 'Ticket not found.' })
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Request() req: any, @Param('id') id: string) {
+    const userId = req.user.id;
     // Optional: Check if exists first or just delete
-    const note = await this.researchService.getResearchNote(id);
-    if (!note) {
-      throw new NotFoundException(`Research note ${id} not found`);
-    }
-    await this.researchService.deleteResearchNote(id);
+    // Service now handles permission checking
+    await this.researchService.deleteResearchNote(id, userId);
     return { message: 'Deleted successfully' };
   }
 

@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
+import { Skeleton } from '../ui/skeleton';
 
 interface AnalyzerTableViewProps {
     data: StockSnapshot[];
@@ -66,14 +67,25 @@ export function AnalyzerTableView({
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
                         {isLoading ? (
-                            <tr>
-                                <td colSpan={columns.length} className="h-24 text-center">
-                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                        Loading...
-                                    </div>
-                                </td>
-                            </tr>
+                             Array.from({ length: 5 }).map((_, i) => (
+                                <tr key={i} className="border-b">
+                                     {table.getVisibleFlatColumns().map((col) => (
+                                         <td key={col.id} className="p-4">
+                                            {col.id === 'ticker_symbol' ? (
+                                                <div className="flex items-center gap-3">
+                                                    <Skeleton className="h-8 w-8 rounded-full" />
+                                                    <div className="space-y-1">
+                                                        <Skeleton className="h-4 w-12" />
+                                                        <Skeleton className="h-3 w-20" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <Skeleton className="h-4 w-full max-w-[100px]" />
+                                            )}
+                                         </td>
+                                    ))}
+                                </tr>
+                            ))
                         ) : data.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">

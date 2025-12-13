@@ -12,7 +12,7 @@ import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
-import { StyleGuidePage } from './pages/StyleGuidePage';
+
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
@@ -82,8 +82,7 @@ function App() {
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
-            <Route path="/settings/style" element={<ProtectedRoute><StyleGuidePage /></ProtectedRoute>} />
-            <Route path="/settings" element={<Navigate to="/settings/style" replace />} />
+
 
             <Route path="/admin" element={
               <AdminRoute>
@@ -122,6 +121,12 @@ function ThemeController() {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+
+    // Dynamic Meta Theme Color Update for Mobile Browsers
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', theme === 'light' ? '#ffffff' : '#09090b');
     }
 
   }, [user?.theme]);

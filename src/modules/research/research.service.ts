@@ -22,6 +22,8 @@ export interface ResearchEvent {
   data: any;
 }
 
+import { NotificationsService } from '../notifications/notifications.service';
+
 @Injectable()
 export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
@@ -37,12 +39,15 @@ export class ResearchService {
     private readonly usersService: UsersService,
     private readonly riskRewardService: RiskRewardService,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {
     const apiKey = this.config.get<string>('gemini.apiKey');
     if (apiKey) {
       this.client = new GoogleGenAI({ apiKey });
     }
   }
+
+  // ... (createResearchTicket, etc. unchanged)
 
   async createResearchTicket(
     userId: string | null, // Nullable for system jobs
@@ -207,11 +212,32 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         note.tickers,
         result.answerMarkdown,
       );
+
+      // 8. NOTIFICATION: Alert creator only
+      if (note.user_id) {
+        await this.notificationsService.create(
+          note.user_id,
+          'research_complete',
+          `Research Ready: ${note.tickers.join(', ')}`,
+          `Your AI research on ${note.tickers.join(', ')} is complete.`,
+          { researchId: note.id, ticker: note.tickers[0] },
+        );
+      }
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
       note.error = e.message;
       await this.noteRepo.save(note);
+
+      if (note.user_id) {
+        await this.notificationsService.create(
+          note.user_id,
+          'research_failed',
+          `Research Failed: ${note.tickers.join(', ')}`,
+          `We encountered an error analyzing ${note.tickers.join(', ')}.`,
+          { researchId: note.id, error: e.message },
+        );
+      }
     }
   }
 
@@ -378,19 +404,36 @@ Title:`;
   }
 
   async getResearchNote(id: string): Promise<ResearchNote | null> {
-    return this.noteRepo.findOne({ where: { id } });
+    return this.noteRepo.findOne({ where: { id }, relations: ['user'] });
   }
 
   async getLatestNoteForTicker(symbol: string): Promise<ResearchNote | null> {
     return this.noteRepo
       .createQueryBuilder('note')
+      .leftJoinAndSelect('note.user', 'user')
       .where(':symbol = ANY(note.tickers)', { symbol })
       .andWhere('note.status = :status', { status: ResearchStatus.COMPLETED })
       .orderBy('note.created_at', 'DESC')
       .getOne();
   }
 
-  async deleteResearchNote(id: string): Promise<void> {
+  async deleteResearchNote(id: string, userId: string): Promise<void> {
+    const note = await this.noteRepo.findOne({ where: { id } });
+    if (!note) {
+      throw new NotFoundException('Research note not found');
+    }
+
+    // Check permissions
+    const requestor = await this.usersService.findById(userId);
+    const isAdmin = requestor?.role === 'admin';
+    const isOwner = note.user_id === userId;
+
+    if (!isAdmin && !isOwner) {
+      throw new Error(
+        'Unauthorized: Only Admin or Owner can delete research notes',
+      );
+    }
+
     await this.noteRepo.delete(id);
   }
 
@@ -406,12 +449,6 @@ Title:`;
     if (!note) {
       throw new Error('Research note not found');
     }
-
-    // Check permissions: Owner or Admin
-    // Note: We need to fetch the requesting user to check if they are admin, unless passed in.
-    // simpler: The controller passes userId. We check if note.user_id === userId.
-    // But for admin check, we might need more context.
-    // For now, let's assume the controller handles the "admin" role check or we fetch the user here.
 
     const requestor = await this.usersService.findById(userId);
     const isAdmin = requestor?.role === 'admin';
@@ -438,8 +475,13 @@ Title:`;
     limit: number;
   }> {
     const query = this.noteRepo.createQueryBuilder('note');
-    query.leftJoinAndSelect('note.user', 'user'); // Ensure user is joined
-    query.where('note.user_id = :userId', { userId });
+    query.leftJoinAndSelect('note.user', 'user');
+
+    // MODIFIED: If ticker is provided, we show ALL research for that ticker (Community View).
+    // If NO ticker is provided, we filter by User (My Research View).
+    if (!ticker) {
+      query.where('note.user_id = :userId', { userId });
+    }
 
     if (status && status !== 'all') {
       query.andWhere('note.status = :status', { status });

@@ -78,9 +78,10 @@ export class MarketDataService {
         `Data stale for ${symbol} (Price: ${isPriceStale}, Fundamentals: ${isFundamentalsStale}). Fetching from Finnhub...`,
       );
       try {
-        const [quote, profile] = await Promise.all([
+        const [quote, profile, financials] = await Promise.all([
           this.finnhubService.getQuote(symbol),
-          this.finnhubService.getCompanyProfile(symbol), // Refresh profile too for fundamentals
+          this.finnhubService.getCompanyProfile(symbol),
+          this.finnhubService.getBasicFinancials(symbol),
         ]);
 
         source = 'finnhub';
@@ -90,15 +91,13 @@ export class MarketDataService {
           const newCandle = this.ohlcvRepo.create({
             symbol_id: tickerEntity.id,
             ts: new Date(quote.t * 1000), // Finnhub sends unix timestamp in seconds
-            timeframe: '1d', // Storing daily snapshot as '1d' for simplified history integration? Or 'snapshot'? utilizing '1d' as per common practice for "current day" or "latest" if market open.
-            // Important: Finnhub Quote endpoint returns Current Price (c), High (h), Low (l), Open (o), Previous Close (pc).
-            // We map these to our OHLCV.
+            timeframe: '1d', // Storing daily snapshot as '1d'
             open: quote.o,
             high: quote.h,
             low: quote.l,
             close: quote.c,
             prevClose: quote.pc,
-            volume: 0, // Quote doesn't return volume usually, only candles do.
+            volume: 0,
             source: 'finnhub_quote',
           });
           // Upsert (ignore if exists for this timeframe+ts)
@@ -111,32 +110,32 @@ export class MarketDataService {
         }
 
         // Function to save Fundamentals
-        if (profile) {
-          // Determine Fundamentals values from profile or other endpoints?
-          // The current SymbolEntity stores profile info. Fundamentals entity has specific financial metrics
-          // like PE, EPS which Finnhub Company Profile 2 provides?
-          // Finnhub "Company Profile 2" (which we use) returns: marketCapitalization, shareOutstanding.
-          // It does NOT typically return PE/EPS/DivYield/Beta in that specific endpoint (those are in "Basic Financials").
-          // WITHOUT changing FinnhubService to add a new call for "Basic Financials", we can only update what we have.
-          // For now, we update what matches our Fundamentals entity from what we have in Profile, or leave null.
+        if (profile || financials?.metric) {
+          const metrics = financials?.metric || {};
 
-          // Existing FinnhubService.getCompanyProfile calls /stock/profile2.
-          // Response: country, currency, exchange, name, ticker, ipo, marketCapitalization, shareOutstanding, logo, phone, weburl, finnhubIndustry.
+          // Use existing fundamentals or create new wrapped in merge logic
+          const entity =
+            fundamentals ||
+            this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
 
-          // Our Fundamentals Entity has: market_cap, pe_ttm, eps_ttm, dividend_yield, beta, debt_to_equity.
-          // We can map marketCapitalization. shareOutstanding is on SymbolEntity.
+          if (profile) {
+            entity.market_cap = profile.marketCapitalization;
+            entity.sector = profile.finnhubIndustry;
+          }
 
-          const newFundamentals = this.fundamentalsRepo.create({
-            symbol_id: tickerEntity.id,
-            market_cap: profile.marketCapitalization,
-            sector: profile.finnhubIndustry,
-            // pe_ttm: ??? (Need separate API call)
-            // eps_ttm: ???
-            // beta: ???
-            updated_at: new Date(),
-          });
-          await this.fundamentalsRepo.save(newFundamentals);
-          fundamentals = newFundamentals;
+          if (metrics) {
+            if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
+            if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
+            if (metrics.beta) entity.beta = metrics.beta;
+            if (metrics.dividendYieldIndicatedAnnual)
+              entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
+            // debt_to_equity is not always clean in basic metrics, skipping for now
+          }
+
+          entity.updated_at = new Date();
+
+          await this.fundamentalsRepo.save(entity);
+          fundamentals = entity;
         }
       } catch (error) {
         this.logger.error(

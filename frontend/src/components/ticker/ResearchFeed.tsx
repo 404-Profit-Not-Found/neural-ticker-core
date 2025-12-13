@@ -1,4 +1,4 @@
-import { Brain, ChevronRight, Trash2, Upload, Pencil, Check, X, RefreshCw } from 'lucide-react';
+import { Brain, ChevronRight, Trash2, Upload, Pencil, Check, X, RefreshCw, Bot } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
@@ -67,8 +67,8 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                         <UploadResearchDialog
                             defaultTicker={defaultTicker}
                             trigger={
-                                <Button size="sm" variant="outline" className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2">
-                                    <Upload size={12} /> <span className="hidden md:inline">Upload</span>
+                                <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
+                                    <Upload size={16} /> <span className="hidden md:inline">Upload</span>
                                 </Button>
                             }
                         />
@@ -79,16 +79,15 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                             isAnalyzing={isAnalyzing}
                             defaultTicker={defaultTicker}
                             trigger={
-                                <Button size="sm" className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2">
-                                    <Brain size={12} /> <span className="hidden md:inline">Analytics</span>
+                                <Button className="h-9 px-4 text-sm gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border-transparent hover:border-purple-500/50 transition-all hover:scale-105">
+                                    <Bot size={16} /> <span>Research</span>
                                 </Button>
                             }
                         />
                         {defaultTicker && (
                             <Button
-                                size="sm"
                                 variant="outline"
-                                className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2"
+                                className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
                                 disabled={isSyncing}
                                 onClick={async () => {
                                     if (isSyncing) return;
@@ -105,7 +104,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                     }
                                 }}
                             >
-                                {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw size={12} />}
+                                {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
                                 <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
                             </Button>
                         )}

@@ -1,0 +1,55 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\analyzer\AnalyzerTableView.tsx
+  31:19  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\analyzer\AnalyzerTableView.tsx:31:19
+  29 | }: AnalyzerTableViewProps) {
+  30 |
+> 31 |     const table = useReactTable({
+     |                   ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  32 |         data,
+  33 |         columns,
+  34 |         state: {  react-hooks/incompatible-library
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\dashboard\WatchlistTableView.tsx
+  287:19  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\dashboard\WatchlistTableView.tsx:287:19
+  285 |     }, [navigate, onRemove]);
+  286 |
+> 287 |     const table = useReactTable({
+      |                   ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  288 |         data,
+  289 |         columns,
+  290 |         getCoreRowModel: getCoreRowModel(),  react-hooks/incompatible-library
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\layout\Header.tsx
+  35:9  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\layout\Header.tsx:35:9
+  33 |     useEffect(() => {
+  34 |         if (!isAuthenticated) return;
+> 35 |         check(); // Initial check
+     |         ^^^^^ Avoid calling setState() directly within an effect
+  36 |         const interval = setInterval(check, 5000); // Poll every 5s for faster testing
+  37 |         return () => clearInterval(interval);
+  38 |     }, [isAuthenticated, check]);  react-hooks/set-state-in-effect
+  75:5  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+Γ£û 4 problems (1 error, 3 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
