@@ -10,7 +10,7 @@ import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
 
 interface AnalyzerTableViewProps {
     data: StockSnapshot[];
-    columns: ColumnDef<StockSnapshot, any>[];
+    columns: ColumnDef<StockSnapshot, Record<string, unknown>>[];
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
     navigate: (path: string) => void;
@@ -32,7 +32,7 @@ export function AnalyzerTableView({
         state: {
             sorting,
         },
-        manualPagination: true, 
+        manualPagination: true,
         manualSorting: true,
         onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
@@ -40,7 +40,7 @@ export function AnalyzerTableView({
 
     return (
         <div className="rounded-md border border-border bg-card overflow-hidden">
-             <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
                 <table className="w-full caption-bottom text-sm">
                     <thead className="[&_tr]:border-b">
                         {table.getHeaderGroups().map((headerGroup) => (

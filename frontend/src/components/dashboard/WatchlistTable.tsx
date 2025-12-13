@@ -80,16 +80,16 @@ export function WatchlistTable() {
     const { data: watchlists = [], isLoading: isLoadingWatchlists } = useWatchlists();
 
     // Local State
-    const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(null);
+    const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(
         () => (window.innerWidth < 768 ? 'grid' : 'table')
     );
-    
+
     // Table State (Lifted up to manage filtering/sorting across re-renders of views if needed)
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
-    
+
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -114,20 +114,17 @@ export function WatchlistTable() {
     const searchTickerQuery = useTickerSearch(deferredSearchTerm);
 
     // -- Derived State --
-    useEffect(() => {
-        if (isLoadingWatchlists) return;
-        if (!activeWatchlistId && watchlists.length > 0) {
-            setActiveWatchlistId(watchlists[0].id);
-        } else if (activeWatchlistId && watchlists.length > 0) {
-            const exists = watchlists.find(w => w.id === activeWatchlistId);
-            if (!exists) {
-                setActiveWatchlistId(watchlists[0].id);
-            }
+    // Use selected ID if valid, otherwise failover to first list
+    const activeWatchlistId = useMemo(() => {
+        if (!watchlists || watchlists.length === 0) return null;
+        if (selectedWatchlistId && watchlists.find(w => w.id === selectedWatchlistId)) {
+            return selectedWatchlistId;
         }
-    }, [watchlists, activeWatchlistId, isLoadingWatchlists]);
+        return watchlists[0].id;
+    }, [watchlists, selectedWatchlistId]);
 
     const activeWatchlist = useMemo(() => {
-        if (!watchlists || watchlists.length === 0) return null;
+        if (!activeWatchlistId) return null;
         return watchlists.find(w => w.id === activeWatchlistId) || null;
     }, [watchlists, activeWatchlistId]);
 
@@ -214,7 +211,7 @@ export function WatchlistTable() {
         if (name) {
             createListMutation.mutate(name, {
                 onSuccess: (newList) => {
-                    setActiveWatchlistId(newList.id);
+                    setSelectedWatchlistId(newList.id);
                     showToast("Watchlist created", 'success');
                 }
             });
@@ -267,7 +264,7 @@ export function WatchlistTable() {
                 setShowSuggestions(false);
             },
             onError: (err: unknown) => {
-                const msg = (err as any).response?.data?.message || "Failed to add ticker";
+                const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to add ticker";
                 showToast(msg, 'error');
             }
         });
@@ -275,7 +272,11 @@ export function WatchlistTable() {
 
     // -- Search & Dropdown Effects --
     useEffect(() => {
-        setShowSuggestions(!!(searchTickerQuery.data && searchTickerQuery.data.length > 0));
+        const hasData = !!(searchTickerQuery.data && searchTickerQuery.data.length > 0);
+        const timer = setTimeout(() => {
+            setShowSuggestions(hasData);
+        }, 0);
+        return () => clearTimeout(timer);
     }, [searchTickerQuery.data]);
 
     const closeAllDropdowns = useCallback(() => {
@@ -325,10 +326,10 @@ export function WatchlistTable() {
             <div className="flex flex-col gap-4 p-1">
                 {/* Row 1: Header (Left) and Sector Filter (Right) - on mobile this might wrap/stack, but let's try to keep the header line clean */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    
+
                     {/* LEFT GROUP: Watchlist Selector + View Switcher */}
                     <div className="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto">
-                        
+
                         {/* Watchlist Selector + Edit Actions */}
                         <div className="flex items-center gap-2">
                             <div className="relative">
@@ -345,20 +346,20 @@ export function WatchlistTable() {
                                     <>
                                         <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
                                         <div className="absolute top-full left-0 mt-1 w-64 bg-popover border border-border rounded-md shadow-xl z-50 py-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                            {watchlists.map(w => (
+                                            {watchlists.map(list => (
                                                 <button
-                                                    key={w.id}
+                                                    key={list.id}
                                                     onClick={() => {
-                                                        setActiveWatchlistId(w.id);
+                                                        setSelectedWatchlistId(list.id);
                                                         setIsDropdownOpen(false);
                                                     }}
                                                     className={cn(
                                                         "w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors",
-                                                        activeWatchlistId === w.id ? "bg-accent/50 text-accent-foreground font-medium" : "text-foreground hover:bg-muted/50"
+                                                        activeWatchlistId === list.id ? "bg-accent/50 text-accent-foreground font-medium" : "text-foreground hover:bg-muted/50"
                                                     )}
                                                 >
-                                                    <span className="truncate">{w.name}</span>
-                                                    {activeWatchlistId === w.id && <Check className="w-3.5 h-3.5 text-primary" />}
+                                                    <span className="truncate">{list.name}</span>
+                                                    {activeWatchlistId === list.id && <Check className="w-3.5 h-3.5 text-primary" />}
                                                 </button>
                                             ))}
                                             <div className="border-t border-border mt-1 pt-1 px-1">
@@ -379,7 +380,7 @@ export function WatchlistTable() {
 
                             {activeWatchlistId && (
                                 <div className="flex items-center">
-                                    <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List">
+                                    <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List" aria-label="Rename watchlist">
                                         <Pencil className="w-3.5 h-3.5" />
                                     </Button>
                                     <Button
@@ -388,6 +389,7 @@ export function WatchlistTable() {
                                         onClick={() => handleDeleteList(activeWatchlistId!)}
                                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                         title="Delete List"
+                                        aria-label="Delete watchlist"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </Button>
@@ -396,7 +398,7 @@ export function WatchlistTable() {
                         </div>
 
                         {/* View Switcher - Placed immediately next to selector group */}
-                         <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0">
+                        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0">
                             <button
                                 onClick={() => setViewMode('table')}
                                 className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
@@ -417,7 +419,7 @@ export function WatchlistTable() {
 
                 {/* Row 2: Controls (Add, Filter, Sector) */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                    
+
                     {/* Add Ticker */}
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
@@ -431,7 +433,7 @@ export function WatchlistTable() {
                             disabled={addTickerMutation.isPending}
                             className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
                         />
-                         {showSuggestions && (
+                        {showSuggestions && (
                             <>
                                 <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
                                 <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
@@ -501,7 +503,7 @@ export function WatchlistTable() {
                                     <X className="w-3 h-3" />
                                 </div>
                             ) : (
-                                <ChevronDown className="w-3.5 h-3.5 opacity-50 block sm:hidden" /> 
+                                <ChevronDown className="w-3.5 h-3.5 opacity-50 block sm:hidden" />
                             )}
                         </Button>
 
@@ -545,7 +547,7 @@ export function WatchlistTable() {
 
             {/* Content Area */}
             {viewMode === 'table' ? (
-                <WatchlistTableView 
+                <WatchlistTableView
                     data={tableData}
                     isLoading={isGlobalLoading}
                     onRemove={handleRemoveTicker}
@@ -558,11 +560,11 @@ export function WatchlistTable() {
                     tableRef={tableInstanceRef}
                 />
             ) : (
-                <WatchlistGridView 
+                <WatchlistGridView
                     data={tableData.filter(item => {
                         // Apply Sector Filter
                         if (activeSectorFilter && item.sector !== activeSectorFilter) return false;
-                        
+
                         // Apply Global Search Filter
                         if (globalFilter) {
                             const search = globalFilter.toLowerCase();
@@ -572,7 +574,7 @@ export function WatchlistTable() {
                                 item.sector.toLowerCase().includes(search)
                             );
                         }
-                        
+
                         return true;
                     })}
                     isLoading={isGlobalLoading}

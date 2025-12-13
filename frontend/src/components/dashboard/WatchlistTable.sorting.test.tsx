@@ -115,7 +115,7 @@ describe('WatchlistTable Sorting', () => {
         expect(screen.getByText('-5.0%')).toBeInTheDocument();
 
         // Click Potential Upside header to sort
-        const upsideHeader = screen.getByRole('button', { name: /Potential Upside/i });
+        const upsideHeader = await screen.findByRole('columnheader', { name: /Potential Upside/i });
         fireEvent.click(upsideHeader);
 
         // Helper to get text from specific column in row

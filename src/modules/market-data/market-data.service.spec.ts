@@ -68,10 +68,10 @@ describe('MarketDataService', () => {
     count: jest.fn().mockResolvedValue(0),
     find: jest.fn().mockResolvedValue([]),
     createQueryBuilder: jest.fn(() => ({
-        insert: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orIgnore: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({}),
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
     })),
   };
 
@@ -364,7 +364,9 @@ describe('MarketDataService', () => {
         addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+        getRawAndEntities: jest
+          .fn()
+          .mockResolvedValue({ entities: [], raw: [] }),
         getCount: jest.fn().mockResolvedValue(0),
       };
 

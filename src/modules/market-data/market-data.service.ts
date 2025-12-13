@@ -729,7 +729,7 @@ export class MarketDataService {
     const total = await qb.getCount();
 
     return {
-      items: entities.map((t: any, index) => {
+      items: entities.map((t: any) => {
         // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
         // but strict matching by ID is safer.
         const rawData = raw.find((r) => r.ticker_id === t.id);

@@ -16,7 +16,6 @@ import {
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { cn, api } from '../lib/api';
 import { useTickerResearch } from '../hooks/useTicker';
@@ -28,57 +27,57 @@ function StatPill({
     label,
     value,
     tone = 'muted'
-  }: {
+}: {
     icon: ComponentType<{ className?: string }>;
     label: string;
     value: string;
     tone?: 'primary' | 'muted' | 'accent' | 'emerald' | 'rose';
-  }) {
+}) {
     const gradients: Record<string, string> = {
-      primary: 'linear-gradient(90deg, #22d3ee, #2563eb)',
-      muted: 'linear-gradient(90deg, #a855f7, #6366f1)',
-      accent: 'linear-gradient(90deg, #6366f1, #a855f7)',
-      emerald: 'linear-gradient(90deg, #22c55e, #14b8a6)',
-      rose: 'linear-gradient(90deg, #f472b6, #e11d48)',
+        primary: 'linear-gradient(90deg, #22d3ee, #2563eb)',
+        muted: 'linear-gradient(90deg, #a855f7, #6366f1)',
+        accent: 'linear-gradient(90deg, #6366f1, #a855f7)',
+        emerald: 'linear-gradient(90deg, #22c55e, #14b8a6)',
+        rose: 'linear-gradient(90deg, #f472b6, #e11d48)',
     };
-  
+
     const iconColors: Record<string, string> = {
-      primary: 'text-blue-600 dark:text-blue-400',
-      muted: 'text-purple-600 dark:text-purple-300',
-      accent: 'text-indigo-600 dark:text-indigo-300',
-      emerald: 'text-emerald-600 dark:text-emerald-300',
-      rose: 'text-rose-600 dark:text-rose-300',
+        primary: 'text-blue-600 dark:text-blue-400',
+        muted: 'text-purple-600 dark:text-purple-300',
+        accent: 'text-indigo-600 dark:text-indigo-300',
+        emerald: 'text-emerald-600 dark:text-emerald-300',
+        rose: 'text-rose-600 dark:text-rose-300',
     };
-  
+
     return (
-      <div
-        className={cn(
-          'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
-        )}
-        style={{
-          background:
-            'linear-gradient(rgb(var(--card)), rgb(var(--card))) padding-box, ' +
-            `${gradients[tone] || gradients.primary} border-box`,
-        }}
-      >
         <div
-          className="style-kpi-grid absolute inset-0 opacity-25 pointer-events-none"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
-            backgroundSize: '18px 18px'
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
-          </div>
-          <Icon className={cn('w-5 h-5', iconColors[tone])} />
+            className={cn(
+                'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
+            )}
+            style={{
+                background:
+                    'linear-gradient(rgb(var(--card)), rgb(var(--card))) padding-box, ' +
+                    `${gradients[tone] || gradients.primary} border-box`,
+            }}
+        >
+            <div
+                className="style-kpi-grid absolute inset-0 opacity-25 pointer-events-none"
+                style={{
+                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
+                    backgroundSize: '18px 18px'
+                }}
+                aria-hidden
+            />
+            <div className="relative z-10 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+                    <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+                </div>
+                <Icon className={cn('w-5 h-5', iconColors[tone])} />
+            </div>
         </div>
-      </div>
     );
-  }
+}
 
 interface ResearchNote {
     id: string;
@@ -100,13 +99,13 @@ function ResearchFeedWidget() {
     return (
         <div className="divide-y divide-border/50">
             {recentResearch.map((item: ResearchNote) => (
-                <div 
-                    key={item.id} 
+                <div
+                    key={item.id}
                     className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer"
                     onClick={() => navigate(`/research/${item.id}`)}
                 >
                     <div className="flex items-center gap-4 min-w-0">
-                         <div className={cn("w-2 h-2 rounded-full shrink-0", item.status === 'completed' ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", item.status === 'completed' ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
                         <div className="space-y-0.5 min-w-0">
                             <div className="text-sm font-semibold group-hover:text-primary transition-colors truncate">
                                 {item.title || item.question || "Analysis Request"}
@@ -156,13 +155,13 @@ function MarketLeadersWidget() {
     return (
         <div className="space-y-1">
             {symbols.length > 0 ? symbols.map((symbol) => (
-                <div 
-                    key={symbol} 
+                <div
+                    key={symbol}
                     className="flex items-center justify-between p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer group"
                     onClick={() => navigate(`/ticker/${symbol}`)}
                 >
                     <div className="flex items-center gap-3">
-                         <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/20 text-xs font-bold text-foreground border border-border">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/20 text-xs font-bold text-foreground border border-border">
                             {symbol[0]}
                         </div>
                         <div>
@@ -173,7 +172,7 @@ function MarketLeadersWidget() {
                     <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
             )) : (
-                 <div className="py-8 text-center text-muted-foreground text-sm">
+                <div className="py-8 text-center text-muted-foreground text-sm">
                     No Strong Buy signals detected.
                 </div>
             )}
@@ -196,7 +195,7 @@ export function Dashboard() {
             return {
                 tickers: tickers.data.count,
                 strongBuy: strongBuy.data.count,
-                research: research.data.total || 0 
+                research: research.data.total || 0
             };
         }
     });
@@ -213,17 +212,17 @@ export function Dashboard() {
             <Header />
 
             <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500">
-                
+
                 {/* --- HEADER / HERO SECTION --- */}
                 <section className="style-hero rgb-border relative overflow-hidden rounded-lg border border-border bg-card p-8">
-                     <div
+                    <div
                         className="style-hero-grid absolute inset-0 pointer-events-none"
                         aria-hidden
                     />
                     <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
                     <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
-                         <div className="space-y-4 max-w-3xl">
+                        <div className="space-y-4 max-w-3xl">
                             <div className="flex items-center gap-3">
                                 <Brain className="w-10 h-10 text-primary" />
                                 <div>
@@ -235,12 +234,12 @@ export function Dashboard() {
                             </div>
                         </div>
 
-                         <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+                        <form onSubmit={handleSearch} className="relative w-full max-w-sm">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                                <Input 
+                                <Input
                                     className="pl-9 h-10 text-sm bg-background/50 border-input shadow-sm focus-visible:ring-primary"
-                                    placeholder="Search ticker (e.g. NVDA)..." 
+                                    placeholder="Search ticker (e.g. NVDA)..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
@@ -254,36 +253,36 @@ export function Dashboard() {
                     </div>
 
                     <div className="relative mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <StatPill 
-                            icon={Activity} 
-                            label="Tickers Tracked" 
-                            value={stats?.tickers ? String(stats.tickers) : "..."} 
-                            tone="primary" 
+                        <StatPill
+                            icon={Activity}
+                            label="Tickers Tracked"
+                            value={stats?.tickers ? String(stats.tickers) : "..."}
+                            tone="primary"
                         />
-                        <StatPill 
-                            icon={Zap} 
-                            label="Strong Buy" 
-                            value={stats?.strongBuy ? String(stats.strongBuy) : "..."} 
-                            tone="emerald" 
+                        <StatPill
+                            icon={Zap}
+                            label="Strong Buy"
+                            value={stats?.strongBuy ? String(stats.strongBuy) : "..."}
+                            tone="emerald"
                         />
-                         <StatPill 
-                            icon={Brain} 
-                            label="AI Reports" 
-                            value={stats?.research !== undefined ? String(stats.research) : "..."} 
-                            tone="muted" 
+                        <StatPill
+                            icon={Brain}
+                            label="AI Reports"
+                            value={stats?.research !== undefined ? String(stats.research) : "..."}
+                            tone="muted"
                         />
-                        <StatPill 
-                            icon={Newspaper} 
-                            label="News Sentiment" 
-                            value="Bullish" 
-                            tone="accent" 
+                        <StatPill
+                            icon={Newspaper}
+                            label="News Sentiment"
+                            value="Bullish"
+                            tone="accent"
                         />
                     </div>
                 </section>
 
                 {/* --- MAIN CONTENT GRID --- */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
+
                     {/* LEFT COLUMN: 2/3 */}
                     <Card className="lg:col-span-2 h-full flex flex-col overflow-hidden">
                         <CardHeader className="py-4 border-b border-border bg-muted/10">

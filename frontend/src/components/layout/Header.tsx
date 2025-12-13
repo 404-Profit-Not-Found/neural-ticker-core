@@ -33,7 +33,8 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    closeMenus();
+    const timer = setTimeout(() => closeMenus(), 0);
+    return () => clearTimeout(timer);
   }, [location, location.pathname, closeMenus]);
 
   const goTo = (path: string) => {
@@ -44,17 +45,17 @@ export function Header() {
   return (
     <header className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
-        
+
         {/* Left: Mobile Menu Toggle & Logo */}
         <div className="flex items-center gap-4">
-          <button 
+          <button
             className="md:hidden text-muted-foreground hover:text-foreground"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          
+
           <Link to="/dashboard" className="text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity">
             NeuralTicker.com
           </Link>
@@ -171,8 +172,8 @@ export function Header() {
             Tickers
           </Link>
           <div className="h-px bg-border my-2" />
-           <button
-             type="button"
+          <button
+            type="button"
             onClick={() => goTo('/profile')}
             className="w-full flex items-center gap-3 px-4 py-3 text-base text-left text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           >
