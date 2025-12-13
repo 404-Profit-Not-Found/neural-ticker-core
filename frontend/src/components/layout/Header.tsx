@@ -33,9 +33,8 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line text
     closeMenus();
-  }, [location.pathname, closeMenus]);
+  }, [location, location.pathname, closeMenus]);
 
   const goTo = (path: string) => {
     closeMenus();

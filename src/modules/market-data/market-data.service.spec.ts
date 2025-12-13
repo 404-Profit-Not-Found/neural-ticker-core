@@ -6,6 +6,8 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
+import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
@@ -58,6 +60,21 @@ describe('MarketDataService', () => {
     count: jest.fn(),
   };
 
+  const mockCommentRepo = {
+    count: jest.fn(),
+  };
+
+  const mockCompanyNewsRepo = {
+    count: jest.fn().mockResolvedValue(0),
+    find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(() => ({
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orIgnore: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+    })),
+  };
+
   const mockTickersService = {
     findBySymbol: jest.fn(),
     awaitEnsureTicker: jest.fn(), // Service uses awaitEnsureTicker, not findBySymbol
@@ -99,6 +116,14 @@ describe('MarketDataService', () => {
         {
           provide: getRepositoryToken(ResearchNote),
           useValue: mockResearchNoteRepo,
+        },
+        {
+          provide: getRepositoryToken(Comment),
+          useValue: mockCommentRepo,
+        },
+        {
+          provide: getRepositoryToken(CompanyNews),
+          useValue: mockCompanyNewsRepo,
         },
         {
           provide: TickersService,
@@ -218,6 +243,8 @@ describe('MarketDataService', () => {
     it('should return news from Finnhub', async () => {
       const mockNews = [{ headline: 'Test News' }];
       mockFinnhubService.getCompanyNews.mockResolvedValue(mockNews);
+      // Service now returns what it finds in DB after upsert
+      mockCompanyNewsRepo.find.mockResolvedValue(mockNews);
 
       const result = await service.getCompanyNews('AAPL');
 
@@ -284,10 +311,11 @@ describe('MarketDataService', () => {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([
-          [
+        getRawAndEntities: jest.fn().mockResolvedValue({
+          entities: [
             {
               id: 1,
               symbol: 'AAPL',
@@ -298,8 +326,10 @@ describe('MarketDataService', () => {
               latestRisk: { overall_score: 5 },
             },
           ],
-          1,
-        ]),
+          raw: [],
+        }),
+        getCount: jest.fn().mockResolvedValue(1),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]), // Fallback
       };
 
       // Mock getRepo correctly using the closure variables
@@ -331,9 +361,11 @@ describe('MarketDataService', () => {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+        getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
       };
 
       const repo = {

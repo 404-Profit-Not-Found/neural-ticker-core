@@ -9,7 +9,7 @@ import {
   Unique,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Ticker } from '../../tickers/entities/ticker.entity';
+import { TickerEntity } from '../../tickers/entities/ticker.entity';
 
 @Entity('company_news')
 @Unique(['symbol_id', 'external_id']) // Prevent duplicate imports of same news item
@@ -21,9 +21,9 @@ export class CompanyNews {
   @Column({ type: 'bigint' })
   symbol_id: string;
 
-  @ManyToOne(() => Ticker, (ticker) => ticker.id, { onDelete: 'CASCADE' })
+  @ManyToOne(() => TickerEntity, (ticker) => ticker.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'symbol_id' })
-  ticker: Ticker;
+  ticker: TickerEntity;
 
   @ApiProperty({ description: 'External ID from provider (e.g. Finnhub)' })
   @Column({ type: 'bigint' })

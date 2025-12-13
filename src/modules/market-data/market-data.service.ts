@@ -215,7 +215,7 @@ export class MarketDataService {
           new Date().toISOString().split('T')[0],
         ),
         this.commentRepo.count({
-            where: { ticker_symbol: symbol }
+          where: { ticker_symbol: symbol },
         }),
       ]);
 
@@ -284,28 +284,30 @@ export class MarketDataService {
 
   async getCompanyNews(symbol: string, from?: string, to?: string) {
     const ticker = await this.tickersService.awaitEnsureTicker(symbol);
-    
+
     // Default range: last 7 days if not specified
     const toDate = to ? new Date(to) : new Date();
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
+    const fromDate = from
+      ? new Date(from)
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
     // Check DB first
     // Simplified strategy: If count > 0 in range, return DB. Else fetch API and cache.
     const count = await this.companyNewsRepo.count({
-        where: {
-            symbol_id: ticker.id,
-            datetime: Between(fromDate, toDate),
-        }
+      where: {
+        symbol_id: ticker.id,
+        datetime: Between(fromDate, toDate),
+      },
     });
 
     if (count > 0) {
-        return this.companyNewsRepo.find({
-            where: {
-                symbol_id: ticker.id,
-                datetime: Between(fromDate, toDate),
-            },
-            order: { datetime: 'DESC' }
-        });
+      return this.companyNewsRepo.find({
+        where: {
+          symbol_id: ticker.id,
+          datetime: Between(fromDate, toDate),
+        },
+        order: { datetime: 'DESC' },
+      });
     }
 
     // Fetch from API
@@ -314,37 +316,37 @@ export class MarketDataService {
       fromDate.toISOString().split('T')[0],
       toDate.toISOString().split('T')[0],
     );
-    
+
     // Upsert logic
     if (news && news.length > 0) {
-        const entities = news.map((n: any) => ({
-            symbol_id: ticker.id,
-            external_id: n.id,
-            datetime: new Date(n.datetime * 1000),
-            headline: n.headline,
-            source: n.source,
-            url: n.url,
-            summary: n.summary,
-            image: n.image,
-            related: n.related
-        }));
+      const entities = news.map((n: any) => ({
+        symbol_id: ticker.id,
+        external_id: n.id,
+        datetime: new Date(n.datetime * 1000),
+        headline: n.headline,
+        source: n.source,
+        url: n.url,
+        summary: n.summary,
+        image: n.image,
+        related: n.related,
+      }));
 
-        // Insert ignoring duplicates (on conflict do nothing)
-        await this.companyNewsRepo
-            .createQueryBuilder()
-            .insert()
-            .values(entities)
-            .orIgnore() // Based on unique constraint (symbol_id, external_id)
-            .execute();
-            
-        // Return saved entities to ensure correct format
-        return this.companyNewsRepo.find({
-            where: {
-                symbol_id: ticker.id,
-                datetime: Between(fromDate, toDate),
-            },
-            order: { datetime: 'DESC' }
-        });
+      // Insert ignoring duplicates (on conflict do nothing)
+      await this.companyNewsRepo
+        .createQueryBuilder()
+        .insert()
+        .values(entities)
+        .orIgnore() // Based on unique constraint (symbol_id, external_id)
+        .execute();
+
+      // Return saved entities to ensure correct format
+      return this.companyNewsRepo.find({
+        where: {
+          symbol_id: ticker.id,
+          datetime: Between(fromDate, toDate),
+        },
+        order: { datetime: 'DESC' },
+      });
     }
 
     return [];
@@ -659,34 +661,34 @@ export class MarketDataService {
 
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
-        return subQuery
-            .select('COUNT(*)', 'count')
-            .from('analyst_ratings', 'ar')
-            .where('ar.symbol_id = ticker.id');
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('analyst_ratings', 'ar')
+        .where('ar.symbol_id = ticker.id');
     }, 'analyst_count');
 
     // Research Count Subquery
     qb.addSelect((subQuery) => {
-        return subQuery
-            .select('COUNT(*)', 'count')
-            .from('research_notes', 'rn')
-            .where('ticker.symbol = ANY(rn.tickers)');
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('research_notes', 'rn')
+        .where('ticker.symbol = ANY(rn.tickers)');
     }, 'research_count');
 
     // Social Count Subquery
     qb.addSelect((subQuery) => {
-        return subQuery
-            .select('COUNT(*)', 'count')
-            .from('comments', 'c')
-            .where('c.ticker_symbol = ticker.symbol');
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('comments', 'c')
+        .where('c.ticker_symbol = ticker.symbol');
     }, 'social_count');
 
     // News Count Subquery
     qb.addSelect((subQuery) => {
-        return subQuery
-            .select('COUNT(*)', 'count')
-            .from('company_news', 'cn')
-            .where('cn.symbol_id = ticker.id');
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('company_news', 'cn')
+        .where('cn.symbol_id = ticker.id');
     }, 'news_count');
 
     // Filter
@@ -699,12 +701,12 @@ export class MarketDataService {
 
     // Sort Mapping
     let sortField = `fund.${sortBy}`; // Default to fundamentals
-    
+
     if (sortBy === 'change') {
-       // Sort by computed column expression or alias (alias often works in Postgres if selected)
-       // We use the alias 'price_change_pct' which we defined above.
-       // Note: Postgres allows ordering by alias in ORDER BY clause.
-       sortField = '"price_change_pct"'; 
+      // Sort by computed column expression or alias (alias often works in Postgres if selected)
+      // We use the alias 'price_change_pct' which we defined above.
+      // Note: Postgres allows ordering by alias in ORDER BY clause.
+      sortField = '"price_change_pct"';
     } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
     } else if (
@@ -728,40 +730,42 @@ export class MarketDataService {
 
     return {
       items: entities.map((t: any, index) => {
-         // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
-         // but strict matching by ID is safer.
-         const rawData = raw.find(r => r.ticker_id === t.id); 
-         
-         const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
-         const researchCount = rawData ? parseInt(rawData.research_count, 10) : 0;
-         const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
-         const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
-         const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
-         
-         // Inject change into latestPrice
-         const latestPriceWithChange = t.latestPrice 
-            ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
-            : null;
+        // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
+        // but strict matching by ID is safer.
+        const rawData = raw.find((r) => r.ticker_id === t.id);
 
-         return {
-            ticker: {
-              id: t.id,
-              symbol: t.symbol,
-              name: t.name,
-              exchange: t.exchange,
-              sector: t.sector,
-              industry: t.industry,
-              logo_url: t.logo_url,
-            },
-            fundamentals: t.fund || {},
-            latestPrice: latestPriceWithChange,
-            aiAnalysis: t.latestRisk || null,
-            counts: {
-                analysts: isNaN(analystCount) ? 0 : analystCount,
-                research: isNaN(researchCount) ? 0 : researchCount,
-                news: isNaN(newsCount) ? 0 : newsCount, 
-                social: isNaN(socialCount) ? 0 : socialCount,
-            }
+        const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
+        const researchCount = rawData
+          ? parseInt(rawData.research_count, 10)
+          : 0;
+        const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
+        const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
+        const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
+
+        // Inject change into latestPrice
+        const latestPriceWithChange = t.latestPrice
+          ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
+          : null;
+
+        return {
+          ticker: {
+            id: t.id,
+            symbol: t.symbol,
+            name: t.name,
+            exchange: t.exchange,
+            sector: t.sector,
+            industry: t.industry,
+            logo_url: t.logo_url,
+          },
+          fundamentals: t.fund || {},
+          latestPrice: latestPriceWithChange,
+          aiAnalysis: t.latestRisk || null,
+          counts: {
+            analysts: isNaN(analystCount) ? 0 : analystCount,
+            research: isNaN(researchCount) ? 0 : researchCount,
+            news: isNaN(newsCount) ? 0 : newsCount,
+            social: isNaN(socialCount) ? 0 : socialCount,
+          },
         };
       }),
       meta: {

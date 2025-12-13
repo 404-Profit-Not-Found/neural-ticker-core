@@ -171,6 +171,9 @@ export function WatchlistTable() {
                     if (aiRating === '-') aiRating = 'Hold';
                 }
 
+                // Find corresponding watchlist item to get ID
+                const watchlistItem = watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol);
+
                 return {
                     symbol: s.ticker?.symbol || 'UNKNOWN',
                     logo: s.ticker?.logo_url,
@@ -181,14 +184,14 @@ export function WatchlistTable() {
                     pe: fundamentals.pe_ttm ?? null,
                     marketCap: fundamentals.market_cap ?? null,
                     potentialUpside: s.aiAnalysis?.upside_percent ?? null,
-                    rating: fundamentals.consensus_rating || '-',
-                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id,
-                    aiRating: aiRating,
                     riskScore: safeRiskScore,
+                    rating: fundamentals.consensus_rating || '-',
+                    aiRating: aiRating,
                     newsCount: s.counts?.news || 0,
                     researchCount: s.counts?.research || 0,
                     analystCount: s.counts?.analysts || 0,
                     socialCount: s.counts?.social || 0,
+                    itemId: watchlistItem?.id
                 };
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);
