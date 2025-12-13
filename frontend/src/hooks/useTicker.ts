@@ -135,7 +135,7 @@ export function useTickerResearch(symbol?: string) {
         queryFn: async () => {
             // If no symbol, we might want to return empty or all, but here we expect usage context
             // But API now supports filtering.
-            const params: Record<string, any> = { limit: 50 }; // Increased limit
+            const params: Record<string, string | number> = { limit: 50 }; // Increased limit
             if (symbol) {
                 params.ticker = symbol;
             }
@@ -147,7 +147,7 @@ export function useTickerResearch(symbol?: string) {
         enabled: !!symbol,
         staleTime: 0, 
         refetchInterval: (query) => {
-            const data = query.state.data as any[];
+            const data = query.state.data as Array<{ status: string }>;
             if (data?.some((item) => item.status === 'processing' || item.status === 'pending')) {
                 return 3000; // Poll every 3s if analysis is in progress
             }

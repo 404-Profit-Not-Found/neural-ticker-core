@@ -204,12 +204,14 @@ export class RiskRewardService {
     let attempts = 0;
     const maxRetries = 3;
     let parsed: any;
+    let lastRaw = '';
 
     while (attempts < maxRetries) {
       attempts++;
       try {
         const result = await this.llmService.generateResearch(prompt);
         const raw = result.answerMarkdown || '';
+        lastRaw = raw;
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           this.logger.warn(
@@ -218,7 +220,16 @@ export class RiskRewardService {
           throw new Error('No JSON object found');
         }
         const cleanJson = jsonMatch[0];
-        parsed = JSON.parse(cleanJson);
+
+        try {
+          parsed = JSON.parse(cleanJson);
+        } catch (err) {
+          // Attempt a tolerant repair: quote bare keys and strip trailing commas
+          const repaired = cleanJson
+            .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')
+            .replace(/,(\s*[}\]])/g, '$1');
+          parsed = JSON.parse(repaired);
+        }
 
         // Basic validation: Check if key fields exist
         if (!parsed.risk_score || !parsed.scenarios) {
@@ -232,6 +243,9 @@ export class RiskRewardService {
         );
         if (attempts === maxRetries) {
           this.logger.error(`Final attempt failed for ${symbol}.`);
+          this.logger.error(
+            `Failed payload (truncated): ${String(lastRaw).slice(0, 500)}`,
+          );
           throw new Error(
             'LLM output could not be parsed as JSON after retries.',
           );
@@ -275,22 +289,65 @@ export class RiskRewardService {
 
     // Scenarios
     analysis.scenarios = [];
-    if (parsed.scenarios) {
-      ['bull', 'base', 'bear'].forEach((type) => {
-        const data = parsed.scenarios[type];
-        if (data) {
-          const scenario = new RiskScenario();
-          scenario.scenario_type = type as ScenarioType;
-          scenario.probability = data.probability;
-          scenario.description = data.description || '';
-          scenario.price_low = data.price_target_low || 0;
-          scenario.price_high = data.price_target_high || 0;
-          scenario.price_mid = data.price_target_mid || 0;
-          scenario.expected_market_cap = data.expected_market_cap || 0;
-          scenario.key_drivers = data.key_drivers || [];
-          analysis.scenarios.push(scenario);
-        }
-      });
+    const scenarios = parsed.scenarios || {};
+    const scenarioTypes: ScenarioType[] = ['bull', 'base', 'bear'];
+
+    const buildFallbackScenarios = () => {
+      const baseTarget = ev.price_target_weighted || 0;
+      const bullTarget = baseTarget ? baseTarget * 1.25 : 0;
+      const bearTarget = baseTarget ? baseTarget * 0.75 : 0;
+      const probs = { bull: 0.25, base: 0.5, bear: 0.25 };
+      return {
+        bull: {
+          probability: probs.bull,
+          description: 'AI-estimated bull case (fallback)',
+          price_target_low: bullTarget * 0.9,
+          price_target_mid: bullTarget,
+          price_target_high: bullTarget * 1.1,
+          expected_market_cap: 0,
+          key_drivers: [],
+        },
+        base: {
+          probability: probs.base,
+          description: 'AI-estimated base case (fallback)',
+          price_target_low: baseTarget * 0.95,
+          price_target_mid: baseTarget || 0,
+          price_target_high: baseTarget * 1.05,
+          expected_market_cap: 0,
+          key_drivers: [],
+        },
+        bear: {
+          probability: probs.bear,
+          description: 'AI-estimated bear case (fallback)',
+          price_target_low: bearTarget * 0.9,
+          price_target_mid: bearTarget || 0,
+          price_target_high: bearTarget * 1.05,
+          expected_market_cap: 0,
+          key_drivers: [],
+        },
+      };
+    };
+
+    const completeScenarios =
+      scenarioTypes.every((t) => scenarios[t]) &&
+      scenarioTypes.some((t) => scenarios[t]?.price_target_mid);
+
+    const scenarioSource = completeScenarios ? scenarios : buildFallbackScenarios();
+
+    scenarioTypes.forEach((type) => {
+      const data = scenarioSource[type];
+      if (data) {
+        const scenario = new RiskScenario();
+        scenario.scenario_type = type as ScenarioType;
+        scenario.probability = data.probability;
+        scenario.description = data.description || '';
+        scenario.price_low = data.price_target_low || 0;
+        scenario.price_high = data.price_target_high || 0;
+        scenario.price_mid = data.price_target_mid || 0;
+        scenario.expected_market_cap = data.expected_market_cap || 0;
+        scenario.key_drivers = data.key_drivers || [];
+        analysis.scenarios.push(scenario);
+      }
     }
 
     // Qualitative Factors
