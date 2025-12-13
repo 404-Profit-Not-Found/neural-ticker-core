@@ -171,7 +171,7 @@ describe('MarketDataService', () => {
       const result = await service.getSnapshot('AAPL');
 
       expect(result.ticker).toEqual(mockTicker);
-      expect(result.latestPrice.close).toBe(150);
+      expect(result.latestPrice!.close).toBe(150);
       expect(finnhubService.getQuote).not.toHaveBeenCalled();
     });
 
@@ -208,7 +208,7 @@ describe('MarketDataService', () => {
       const result = await service.getSnapshot('AAPL');
 
       expect(finnhubService.getQuote).toHaveBeenCalledWith('AAPL');
-      expect(result.latestPrice.close).toBe(155);
+      expect(result.latestPrice!.close).toBe(155);
       expect(mockOhlcvRepo.save).toHaveBeenCalled();
     });
   });
@@ -226,6 +226,53 @@ describe('MarketDataService', () => {
         expect.any(String),
         expect.any(String),
       );
+    });
+  });
+
+  describe('upsertAnalystRatings', () => {
+    it('should skip ratings with no firm', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [{ rating: 5, rating_date: new Date() }] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should skip ratings with no rating_date or invalid date', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [
+        { firm: 'Firm A', rating: 5, rating_date: null },
+        { firm: 'Firm B', rating: 5, rating_date: 'invalid' },
+      ] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should skip ratings where rating value is null or undefined', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [
+        { firm: 'Firm A', rating: null, rating_date: '2025-01-01' },
+        { firm: 'Firm B', rating: undefined, rating_date: '2025-01-01' },
+      ] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should upsert valid rating if not exists', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      mockAnalystRatingRepo.findOne.mockResolvedValue(null); // Not exists
+
+      const ratings = [
+        { firm: 'Firm A', rating: 'Buy', rating_date: '2025-01-01' },
+      ] as any;
+
+      await service.upsertAnalystRatings('AAPL', ratings);
+
+      expect(mockAnalystRatingRepo.save).toHaveBeenCalledWith({
+        firm: 'Firm A',
+        rating: 'Buy',
+        rating_date: '2025-01-01',
+        symbol_id: 1,
+      });
     });
   });
 });

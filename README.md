@@ -300,6 +300,87 @@ await client.interactions.create({
 });
 ```
 
+## 🔬 Risk Analysis Data Extraction
+
+The `RiskRewardService` automatically extracts structured risk analysis data from unstructured research notes using a resilient two-phase approach.
+
+### Extraction Pipeline
+
+```
+Research Note (Markdown)
+         │
+         ▼
+┌─────────────────────────────────────┐
+│    LLM Extraction (TOON Format)     │
+│    - Primary: toonToJson parser     │
+│    - Fallback 1: JSON.parse         │
+│    - Fallback 2: Manual repair      │
+└─────────────────────────────────────┘
+         │ (up to 3 retries)
+         ▼
+┌─────────────────────────────────────┐
+│     salvageFromRaw (Regex)          │  ◄── Last Resort Fallback
+│     Extracts data even from         │
+│     malformed LLM output            │
+└─────────────────────────────────────┘
+         │
+         ▼
+      RiskAnalysis Entity (Saved to DB)
+```
+
+### What Gets Extracted
+
+| Category | Fields | Description |
+|----------|--------|-------------|
+| **Risk Scores** | `overall_score`, `financial_risk`, `execution_risk`, `dilution_risk`, `competitive_risk`, `regulatory_risk` | 0-10 scale (0=safe, 10=extreme risk) |
+| **Price Scenarios** | `bull`, `base`, `bear` | Each with `probability`, `price_target_mid/low/high`, `key_drivers[]` |
+| **Qualitative Factors** | `strengths`, `weaknesses`, `opportunities`, `threats` | SWOT-style analysis |
+| **Catalysts** | `near_term`, `long_term` | Upcoming events that could move the stock |
+| **Red Flags** | `red_flags[]` | Warning signs to monitor |
+
+### salvageFromRaw Fallback
+
+When the LLM produces malformed JSON (common with complex analysis), `salvageFromRaw` uses regex patterns to extract data:
+
+```typescript
+// Extracts from TOON/JSON format:
+bull: { price_target_mid: 150, key_drivers: ["AI growth"] }
+
+// Also handles text patterns:
+Bull Case: $150
+strengths: ["Strong pipeline", "Good management"]
+```
+
+**Patterns Supported:**
+- **Numeric values:** `key: value` or `"key": value`
+- **Arrays:** `key: ["item1", "item2"]`
+- **Scenario prices:** `Bull Case: $X` or `bull: { price_target_mid: X }`
+- **Probabilities:** `probability: 0.25` or `25%`
+
+### Triggering Extraction
+
+Extraction happens automatically when:
+1. **New Research Created:** `POST /api/v1/research/ask` → Research completed → Risk analysis generated
+2. **Manual Sync:** `POST /api/v1/research/sync/{symbol}` → Reprocesses last 5 notes
+
+To manually reprocess all research for a ticker:
+```bash
+curl -X POST http://localhost:3000/api/v1/research/sync/AAPL
+```
+
+### Console Logging
+
+Extraction results are logged for debugging:
+```
+[RiskRewardService] [AAPL] === EXTRACTION RESULTS ===
+[RiskRewardService] [AAPL] Risk Score: overall=6
+[RiskRewardService] [AAPL] Scenarios: bull=$180, base=$150, bear=$120
+[RiskRewardService] [AAPL] Qualitative strengths: ["Strong ecosystem","Services growth"]
+[RiskRewardService] [AAPL] Catalysts near_term: ["iPhone 16 launch","Q4 earnings"]
+[RiskRewardService] [AAPL] Red flags: ["China sales decline"]
+[RiskRewardService] [AAPL] === END EXTRACTION ===
+```
+
 ## 💻 Frontend Integration
 
 For detailed instructions on connecting a frontend (Web/Mobile), please refer to **[FRONTEND.md](FRONTEND.md)**.

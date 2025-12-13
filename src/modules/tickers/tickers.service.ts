@@ -192,6 +192,19 @@ export class TickersService {
       .orWhere('UPPER(ticker.name) LIKE :pattern', { pattern: searchPattern })
       .orderBy('ticker.symbol', 'ASC')
       .limit(20)
+      .limit(20)
       .getMany();
+  }
+
+  async getSymbolsByIds(ids: string[] | number[]): Promise<string[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const tickers = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select('ticker.symbol')
+      .where('ticker.id IN (:...ids)', { ids })
+      .getMany();
+
+    return tickers.map((t) => t.symbol);
   }
 }

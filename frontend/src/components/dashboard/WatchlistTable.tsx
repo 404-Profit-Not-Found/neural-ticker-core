@@ -221,9 +221,9 @@ export function WatchlistTable() {
                     const { overall_score, upside_percent } = s.aiAnalysis;
                     // Score 0-10 (0 safe, 10 risky)
                     // Upside %
-                    if (upside_percent > 15 && overall_score < 6) aiRating = 'Buy';
-                    if (upside_percent > 40 && overall_score < 7) aiRating = 'Strong Buy';
-                    if (upside_percent < 0 || overall_score > 8) aiRating = 'Sell';
+                    if (upside_percent > 10 && overall_score <= 7) aiRating = 'Buy';
+                    if (upside_percent > 20 && overall_score <= 6) aiRating = 'Strong Buy';
+                    if (upside_percent < 0 || overall_score >= 8) aiRating = 'Sell';
                     if (aiRating === '-') aiRating = 'Hold'; // Default if data exists but fits no extreme
                 }
 

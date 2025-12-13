@@ -9,6 +9,7 @@ import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { RISK_ALGO } from '../../config/risk-algorithm.config';
 
 @Injectable()
 export class MarketDataService {
@@ -371,6 +372,9 @@ export class MarketDataService {
       // Enhanced validation: ensure firm exists and rating_date is a real date (not null, undefined, or the string "null")
       if (!rating.firm) continue;
       if (!rating.rating_date) continue;
+      // Also ensure rating itself is present (database constraint)
+      if (rating.rating === null || rating.rating === undefined) continue;
+
       const dateStr = String(rating.rating_date).trim();
       if (dateStr === 'null' || dateStr === '') continue;
       if (isNaN(new Date(dateStr).getTime())) continue; // skip invalid dates
@@ -458,9 +462,10 @@ export class MarketDataService {
     return unique;
   }
 
+
   /**
    * Get count of tickers where both analyst consensus = "Strong Buy" AND AI rating is bullish.
-   * AI bullish = overall_score <= 3 (low risk) AND upside_percent > 20%
+   * Criteria defined in RISK_ALGO config.
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
     // Query fundamentals with Strong Buy consensus
@@ -475,62 +480,70 @@ export class MarketDataService {
 
     const symbolIds = strongBuyFundamentals.map((f) => f.symbol_id);
 
-    // For each, check if AI analysis also signals bullish (low risk + high upside)
-    const matchingSymbols: string[] = [];
+    // Filter by AI Opinion
+    const matchingRisk = await this.riskAnalysisRepo
+      .createQueryBuilder('risk')
+      .select('risk.ticker_id')
+      .distinctOn(['risk.ticker_id'])
+      .where('risk.ticker_id IN (:...ids)', { ids: symbolIds })
+      .andWhere('risk.overall_score <= :maxRisk', {
+        maxRisk: RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE,
+      })
+      .andWhere('risk.upside_percent > :minUpside', {
+        minUpside: RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT,
+      })
+      .orderBy('risk.ticker_id')
+      .addOrderBy('risk.created_at', 'DESC')
+      .getMany();
 
-    for (const symbolId of symbolIds) {
-      const aiAnalysis = await this.riskAnalysisRepo.findOne({
-        where: { ticker_id: symbolId },
-        order: { created_at: 'DESC' },
-        relations: ['ticker'],
-      });
+    // Get symbols
+    const matchingSymbolIds = matchingRisk.map((r) => r.ticker_id);
+    const symbols = await this.tickersService.getSymbolsByIds(
+      matchingSymbolIds,
+    );
 
-      // AI Strong Buy: low risk (≤ 3) AND positive upside (> 20%)
-      if (
-        aiAnalysis &&
-        aiAnalysis.overall_score <= 3 &&
-        aiAnalysis.upside_percent > 20
-      ) {
-        matchingSymbols.push(aiAnalysis.ticker?.symbol || symbolId);
-      }
-    }
-
-    return { count: matchingSymbols.length, symbols: matchingSymbols };
+    return { count: symbols.length, symbols };
   }
 
   /**
-   * Get count of tickers where both analyst consensus = "Sell" AND AI rating is bearish.
-   * AI bearish = overall_score >= 7 (high risk) OR upside_percent < -10%
+   * Get count of tickers where both analyst consensus = "Sell" OR AI rating is bearish.
+   * Criteria defined in RISK_ALGO config.
    */
   async getSellCount(): Promise<{ count: number; symbols: string[] }> {
+    // For Sell, we can be broader. Any "Sell" consensus OR terrible AI rating.
     const sellFundamentals = await this.fundamentalsRepo.find({
       where: { consensus_rating: 'Sell' },
       select: ['symbol_id'],
     });
 
-    if (sellFundamentals.length === 0) {
+    const sellSymbolIds = sellFundamentals.map((f) => f.symbol_id);
+
+    // AI Bearish
+    const bearishRisk = await this.riskAnalysisRepo
+      .createQueryBuilder('risk')
+      .select('risk.ticker_id')
+      .distinctOn(['risk.ticker_id'])
+      .where('risk.overall_score >= :minRisk', {
+        minRisk: RISK_ALGO.SELL.MIN_RISK_SCORE,
+      })
+      .orWhere('risk.upside_percent < :maxUpside', {
+        maxUpside: RISK_ALGO.SELL.MAX_UPSIDE_PERCENT,
+      })
+      .orderBy('risk.ticker_id')
+      .addOrderBy('risk.created_at', 'DESC')
+      .getMany();
+
+    // Union of IDs
+    const bearishSymbolIds = bearishRisk.map((r) => r.ticker_id);
+    const allIds = Array.from(
+      new Set([...sellSymbolIds, ...bearishSymbolIds]),
+    ).map((id) => Number(id)); // Ensure they are numbers
+
+    if (allIds.length === 0) {
       return { count: 0, symbols: [] };
     }
 
-    const symbolIds = sellFundamentals.map((f) => f.symbol_id);
-    const matchingSymbols: string[] = [];
-
-    for (const symbolId of symbolIds) {
-      const aiAnalysis = await this.riskAnalysisRepo.findOne({
-        where: { ticker_id: symbolId },
-        order: { created_at: 'DESC' },
-        relations: ['ticker'],
-      });
-
-      // AI Sell: high risk (≥ 7) OR negative upside (< -10%)
-      if (
-        aiAnalysis &&
-        (aiAnalysis.overall_score >= 7 || aiAnalysis.upside_percent < -10)
-      ) {
-        matchingSymbols.push(aiAnalysis.ticker?.symbol || symbolId);
-      }
-    }
-
-    return { count: matchingSymbols.length, symbols: matchingSymbols };
+    const symbols = await this.tickersService.getSymbolsByIds(allIds);
+    return { count: symbols.length, symbols };
   }
 }
