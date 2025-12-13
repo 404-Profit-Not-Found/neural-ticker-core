@@ -30,6 +30,7 @@ function useUnreadNotifications(isAuthenticated: boolean) {
         }
     }, [isAuthenticated]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!isAuthenticated) return;
         check(); // Initial check
@@ -61,7 +62,14 @@ export function Header() {
       }
   }, []);
 
+  const closeMenus = useCallback(() => {
+    setProfileMenuOpen(false);
+    setMobileMenuOpen(false);
+    setNotificationsMenuOpen(false);
+  }, []);
+
   // Close menus on route change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setProfileMenuOpen(false);
     setMobileMenuOpen(false);
@@ -118,16 +126,7 @@ export function Header() {
       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
     }`;
 
-  const closeMenus = useCallback(() => {
-    setProfileMenuOpen(false);
-    setMobileMenuOpen(false);
-    setNotificationsMenuOpen(false);
-  }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => closeMenus(), 0);
-    return () => clearTimeout(timer);
-  }, [location, location.pathname, closeMenus]);
 
   const goTo = (path: string) => {
     closeMenus();
@@ -191,7 +190,7 @@ export function Header() {
                     <button 
                         onClick={async () => {
                             await api.patch('/notifications/read-all');
-                            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                            await fetchNotifications(); // Re-fetch to get updated read status
                             refreshNotifications(); // Update badge immediately
                         }}
                         className="text-xs text-primary hover:underline"

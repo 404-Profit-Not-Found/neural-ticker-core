@@ -215,13 +215,13 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
       // 8. NOTIFICATION: Alert creator only
       if (note.user_id) {
-          await this.notificationsService.create(
-              note.user_id,
-              'research_complete',
-              `Research Ready: ${note.tickers.join(', ')}`,
-              `Your AI research on ${note.tickers.join(', ')} is complete.`,
-              { researchId: note.id, ticker: note.tickers[0] }
-          );
+        await this.notificationsService.create(
+          note.user_id,
+          'research_complete',
+          `Research Ready: ${note.tickers.join(', ')}`,
+          `Your AI research on ${note.tickers.join(', ')} is complete.`,
+          { researchId: note.id, ticker: note.tickers[0] },
+        );
       }
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
