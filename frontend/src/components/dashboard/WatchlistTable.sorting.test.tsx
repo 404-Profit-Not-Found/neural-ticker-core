@@ -74,17 +74,20 @@ describe('WatchlistTable Sorting', () => {
                         {
                             ticker: { id: '1', symbol: 'AAPL', name: 'Apple Inc' },
                             latestPrice: { close: 150, prevClose: 140 },
-                            fundamentals: { market_cap: 3000000000000 }
+                            fundamentals: { market_cap: 3000000000000 },
+                            aiAnalysis: { upside_percent: 25.5, overall_score: 4 }
                         },
                         {
                             ticker: { id: '2', symbol: 'MSFT', name: 'Microsoft' },
                             latestPrice: { close: 300, prevClose: 290 },
-                            fundamentals: { market_cap: 2500000000000 }
+                            fundamentals: { market_cap: 2500000000000 },
+                            aiAnalysis: { upside_percent: 10.0, overall_score: 3 }
                         },
                         {
                             ticker: { id: '3', symbol: 'SMALL', name: 'Small Cap' },
                             latestPrice: { close: 10, prevClose: 9 },
-                            fundamentals: { market_cap: 500000000 }
+                            fundamentals: { market_cap: 500000000 },
+                            aiAnalysis: { upside_percent: -5.0, overall_score: 8 }
                         }
                     ]
                 } as AxiosResponse<SnapshotPayload>);
@@ -100,79 +103,62 @@ describe('WatchlistTable Sorting', () => {
         queryClient.clear();
     });
 
-    it('sorts by Market Cap numerically', async () => {
+    it('sorts by Potential Upside numerically', async () => {
         renderWithProviders();
 
         // Wait for data to load
         await screen.findByText('Apple Inc');
 
-        // Initial order is likely by symbol or insertion (AAPL, MSFT, SMALL)
-        // Let's verify initial Market Caps are present (formatted)
-        expect(screen.getByText('$3.00T')).toBeInTheDocument();
-        expect(screen.getByText('$2.50T')).toBeInTheDocument();
-        expect(screen.getByText('$500.00M')).toBeInTheDocument();
+        // Initial check for formatted upside values
+        expect(screen.getByText('25.5%')).toBeInTheDocument();
+        expect(screen.getByText('10.0%')).toBeInTheDocument();
+        expect(screen.getByText('-5.0%')).toBeInTheDocument();
 
-        // Click Market Cap header to sort
-        const marketCapHeader = screen.getByRole('button', { name: /Market Cap/i });
-        fireEvent.click(marketCapHeader);
-
-        // Sorting usually toggles ASC/DESC. Default behavior depends on react-table implementation.
-        // Let's check the order of rows.
-        // Row 0 is header. Rows 1, 2, 3 are data.
-
-        // We'll extract text from the rows to verify order
-        // Assuming default sort might be ASC (Smallest first: 500M) or DESC (Largest first: 3T)
-        // Let's click it again to be sure of direction if needed, or check logic.
-        // Usually, first click is Ascending.
-
-        // Let's capture the text content of the Market Cap cell for each row
-        // Market Cap is the 7th column (index 6, 0-based) based on the definition
+        // Click Potential Upside header to sort
+        const upsideHeader = screen.getByRole('button', { name: /Potential Upside/i });
+        fireEvent.click(upsideHeader);
 
         // Helper to get text from specific column in row
-        const getMarketCapFromRow = (row: HTMLElement) => {
+        const getUpsideFromRow = (row: HTMLElement) => {
             const cells = row.querySelectorAll('td');
-            // Columns: Symbol(0), Price(1), Change(2), MarketCap(3)
+            // Columns: Symbol(0), Price(1), Change(2), Potential Upside(3)
             return cells[3]?.textContent;
         };
 
-        // Wait a bit for sorting to apply if needed (usually sync with fireEvent but safe to wait)
+        // Wait a bit for sorting to apply
         await waitFor(() => {
             const sortedRows = screen.getAllByRole('row').slice(1); // skip header
-            const firstVal = getMarketCapFromRow(sortedRows[0]);
-            // If ASC: 500M ($500.00M) -> 2.5T -> 3T
-            // If DESC: 3T -> 2.5T -> 500M
+            const firstVal = getUpsideFromRow(sortedRows[0]);
 
-            // Let's just assert the order of symbols or values
-            // We know numeric values: 500M < 2.5T < 3T
-            // We'll check if it matches either valid specific order, or specifically target one.
+            // Numeric Sort: -5.0 < 10.0 < 25.5
 
-            // If current sort is Ascending:
-            if (firstVal === '$500.00M') {
-                expect(getMarketCapFromRow(sortedRows[1])).toBe('$2.50T');
-                expect(getMarketCapFromRow(sortedRows[2])).toBe('$3.00T');
+            // If Ascending: -5.0% -> 10.0% -> 25.5%
+            if (firstVal === '-5.0%') {
+                expect(getUpsideFromRow(sortedRows[1])).toBe('10.0%');
+                expect(getUpsideFromRow(sortedRows[2])).toBe('25.5%');
             } else {
-                // Descending
-                expect(getMarketCapFromRow(sortedRows[0])).toBe('$3.00T');
-                expect(getMarketCapFromRow(sortedRows[1])).toBe('$2.50T');
-                expect(getMarketCapFromRow(sortedRows[2])).toBe('$500.00M');
+                // Descending: 25.5% -> 10.0% -> -5.0%
+                expect(getUpsideFromRow(sortedRows[0])).toBe('25.5%');
+                expect(getUpsideFromRow(sortedRows[1])).toBe('10.0%');
+                expect(getUpsideFromRow(sortedRows[2])).toBe('-5.0%');
             }
         });
 
-        // Use userEvent click to toggle direction
-        fireEvent.click(marketCapHeader);
+        // Toggle direction
+        fireEvent.click(upsideHeader);
 
         await waitFor(() => {
             const sortedRows = screen.getAllByRole('row').slice(1);
-            const firstVal = getMarketCapFromRow(sortedRows[0]);
+            const firstVal = getUpsideFromRow(sortedRows[0]);
 
-            // Should be the reverse of whatever it was
-            if (firstVal === '$500.00M') {
-                expect(getMarketCapFromRow(sortedRows[1])).toBe('$2.50T');
-                expect(getMarketCapFromRow(sortedRows[2])).toBe('$3.00T');
+            // Should be reversed
+            if (firstVal === '-5.0%') {
+                expect(getUpsideFromRow(sortedRows[1])).toBe('10.0%');
+                expect(getUpsideFromRow(sortedRows[2])).toBe('25.5%');
             } else {
-                expect(getMarketCapFromRow(sortedRows[0])).toBe('$3.00T');
-                expect(getMarketCapFromRow(sortedRows[1])).toBe('$2.50T');
-                expect(getMarketCapFromRow(sortedRows[2])).toBe('$500.00M');
+                expect(getUpsideFromRow(sortedRows[0])).toBe('25.5%');
+                expect(getUpsideFromRow(sortedRows[1])).toBe('10.0%');
+                expect(getUpsideFromRow(sortedRows[2])).toBe('-5.0%');
             }
         });
     });
