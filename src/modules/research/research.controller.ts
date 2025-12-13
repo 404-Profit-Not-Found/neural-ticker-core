@@ -7,7 +7,12 @@ import {
   NotFoundException,
   Request,
   Query,
+  Delete,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import {
   ApiTags,
   ApiOperation,
@@ -18,6 +23,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ResearchService } from './research.service';
+import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import {
   IsArray,
@@ -51,9 +57,9 @@ class AskResearchDto {
   @ApiProperty({
     enum: ['openai', 'gemini', 'ensemble'],
     required: false,
-    default: 'ensemble',
+    default: 'gemini',
     description:
-      'The LLM provider to use. "ensemble" is recommended for best accuracy.',
+      'The LLM provider to use. "gemini" is recommended for best reasoning.',
   })
   @IsEnum(['openai', 'gemini', 'ensemble'])
   @IsOptional()
@@ -98,11 +104,53 @@ class AskResearchDto {
   apiKey?: string;
 }
 
+class UploadResearchDto {
+  @ApiProperty({
+    example: ['AAPL'],
+    description: 'Tickers related to this note',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  tickers: string[];
+
+  @ApiProperty({ example: 'My Thesis', description: 'Title of the research' })
+  @IsString()
+  title: string;
+
+  @ApiProperty({
+    example: '# Bullish case...',
+    description: 'Markdown content',
+  })
+  @IsString()
+  content: string;
+
+  @ApiProperty({ required: false, default: 'completed' })
+  @IsString()
+  @IsOptional()
+  status?: string;
+}
+
 @ApiTags('Research')
 @ApiBearerAuth()
 @Controller('v1/research')
 export class ResearchController {
-  constructor(private readonly researchService: ResearchService) {}
+  constructor(
+    private readonly researchService: ResearchService,
+    private readonly marketDataService: MarketDataService,
+  ) {}
+
+  @ApiOperation({ summary: 'Upload manual research note' })
+  @ApiResponse({ status: 201, description: 'Note created.' })
+  @Post('upload')
+  async upload(@Request() req: any, @Body() dto: UploadResearchDto) {
+    const userId = req.user.id;
+    return this.researchService.createManualNote(
+      userId,
+      dto.tickers,
+      dto.title,
+      dto.content,
+    );
+  }
 
   @ApiOperation({
     summary: 'Submit a research question (Async)',
@@ -193,12 +241,19 @@ export class ResearchController {
       },
     },
   })
+  @ApiQuery({
+    name: 'ticker',
+    required: false,
+    type: String,
+    description: 'Filter by ticker symbol',
+  })
   @Get()
   async list(
     @Request() req: any,
     @Query('status') status: string = 'all',
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
+    @Query('ticker') ticker?: string,
   ) {
     const userId = req.user.id;
     return this.researchService.findAll(
@@ -206,6 +261,7 @@ export class ResearchController {
       status,
       Number(page),
       Number(limit),
+      ticker,
     );
   }
 
@@ -255,5 +311,77 @@ export class ResearchController {
       throw new NotFoundException(`Research note ${id} not found`);
     }
     return note;
+  }
+
+  @ApiOperation({
+    summary: 'Delete a research ticket',
+    description: 'Permanently removes a research ticket and its data.',
+  })
+  @ApiResponse({ status: 200, description: 'Ticket deleted successfully.' })
+  @ApiResponse({ status: 404, description: 'Ticket not found.' })
+  @Delete(':id')
+  async delete(@Param('id') id: string) {
+    // Optional: Check if exists first or just delete
+    const note = await this.researchService.getResearchNote(id);
+    if (!note) {
+      throw new NotFoundException(`Research note ${id} not found`);
+    }
+    await this.researchService.deleteResearchNote(id);
+    return { message: 'Deleted successfully' };
+  }
+
+  @ApiOperation({ summary: 'Update research title' })
+  @ApiResponse({ status: 200, description: 'Title updated.' })
+  @Post(':id/title') // Using POST or PATCH
+  async updateTitle(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('title') title: string,
+  ) {
+    const userId = req.user.id;
+    try {
+      return await this.researchService.updateTitle(id, userId, title);
+    } catch (e) {
+      if (e.message === 'Research note not found')
+        throw new NotFoundException(e.message);
+      if (e.message.includes('Unauthorized'))
+        throw new NotFoundException(e.message); // Should be Forbidden but NotFound hides existence
+      throw e;
+    }
+  }
+
+  @Post('stream')
+  @Sse() // Content-Type: text/event-stream
+  startResearch(
+    @Body() body: { ticker: string; questions?: string },
+  ): Observable<MessageEvent> {
+    return this.researchService
+      .streamResearch(body.ticker, body.questions)
+      .pipe(
+        map((event: any) => ({
+          data: event, // Automatically JSON serialized
+          type: event.type, // Allows frontend to verify event listeners
+        })),
+      );
+  }
+  @ApiOperation({
+    summary: 'Manually trigger financial extraction from latest research',
+  })
+  @ApiResponse({ status: 200, description: 'Extraction started.' })
+  @Post('extract-financials/:ticker')
+  async extractFinancials(@Param('ticker') ticker: string) {
+    await this.researchService.reprocessFinancials(ticker);
+    return { message: 'Extraction started' };
+  }
+
+  @ApiOperation({
+    summary: 'Reprocess research and dedupe analyst ratings for a ticker',
+  })
+  @ApiResponse({ status: 200, description: 'Sync completed.' })
+  @Post('sync/:ticker')
+  async syncResearch(@Param('ticker') ticker: string) {
+    await this.researchService.reprocessFinancials(ticker);
+    const dedupe = await this.marketDataService.dedupeAnalystRatings(ticker);
+    return { message: 'Sync completed', deduped: dedupe.removed };
   }
 }

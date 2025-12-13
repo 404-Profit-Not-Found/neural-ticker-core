@@ -1,9 +1,12 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, ArrayContains } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
+import { AnalystRating } from './entities/analyst-rating.entity';
+import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { ResearchNote } from '../research/entities/research-note.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 
@@ -16,6 +19,12 @@ export class MarketDataService {
     private readonly ohlcvRepo: Repository<PriceOhlcv>,
     @InjectRepository(Fundamentals)
     private readonly fundamentalsRepo: Repository<Fundamentals>,
+    @InjectRepository(AnalystRating)
+    private readonly analystRatingRepo: Repository<AnalystRating>,
+    @InjectRepository(RiskAnalysis)
+    private readonly riskAnalysisRepo: Repository<RiskAnalysis>,
+    @InjectRepository(ResearchNote)
+    private readonly researchNoteRepo: Repository<ResearchNote>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -130,11 +139,88 @@ export class MarketDataService {
       }
     }
 
+    // Fallback: If consensus_rating is missing in fundamentals but we have analyst ratings, derive it.
+    if (fundamentals && !fundamentals.consensus_rating) {
+      const recentRatings = await this.analystRatingRepo.find({
+        where: { symbol_id: tickerEntity.id },
+        order: { rating_date: 'DESC' },
+        take: 10,
+      });
+
+      if (recentRatings.length > 0) {
+        const scores = { Buy: 0, Hold: 0, Sell: 0 };
+        let totalWeight = 0;
+        const now = new Date();
+
+        for (const r of recentRatings) {
+          const ratingDate = new Date(r.rating_date);
+          const diffTime = Math.abs(now.getTime() - ratingDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // Weighting: Recent ratings matter much more
+          let weight = 1;
+          if (diffDays <= 30)
+            weight = 3; // Last month: 3x impact
+          else if (diffDays <= 90) weight = 2; // Last quarter: 2x impact
+
+          const rating = r.rating?.toLowerCase();
+          if (rating?.includes('buy')) scores.Buy += weight;
+          else if (rating?.includes('sell')) scores.Sell += weight;
+          else scores.Hold += weight; // Default to hold for 'neutral'
+
+          totalWeight += weight;
+        }
+
+        if (totalWeight > 0) {
+          // Determine winner based on weighted score
+          if (scores.Buy > scores.Hold && scores.Buy > scores.Sell)
+            fundamentals.consensus_rating = 'Buy';
+          else if (scores.Sell > scores.Buy && scores.Sell > scores.Hold)
+            fundamentals.consensus_rating = 'Sell';
+          else fundamentals.consensus_rating = 'Hold';
+
+          // Strong buy threshold based on weighted percentage
+          if (scores.Buy / totalWeight > 0.7)
+            fundamentals.consensus_rating = 'Strong Buy';
+        }
+      }
+    }
+
+    // Fetch latest AI Risk Analysis
+    const [aiAnalysis, researchCount, analystCount, newsItems] =
+      await Promise.all([
+        this.riskAnalysisRepo.findOne({
+          where: { ticker_id: tickerEntity.id },
+          order: { created_at: 'DESC' },
+          relations: ['scenarios'],
+        }),
+        this.researchNoteRepo.count({
+          where: { tickers: ArrayContains([symbol]) },
+        }),
+        this.analystRatingRepo.count({
+          where: { symbol_id: tickerEntity.id },
+        }),
+        this.finnhubService.getCompanyNews(
+          symbol,
+          // Last 7 days
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+          new Date().toISOString().split('T')[0],
+        ),
+      ]);
+
     return {
       ticker: tickerEntity,
       latestPrice: latestCandle,
       fundamentals,
+      aiAnalysis,
       source,
+      counts: {
+        news: newsItems.length,
+        research: researchCount,
+        analysts: analystCount,
+      },
     };
   }
 
@@ -182,13 +268,193 @@ export class MarketDataService {
     });
   }
 
-  async getCompanyNews(symbol: string) {
-    // Default to last 7 days
-    const to = new Date().toISOString().split('T')[0];
-    const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - 7);
-    const from = fromDate.toISOString().split('T')[0];
+  private formatDateOnly(date: Date) {
+    return date.toISOString().split('T')[0];
+  }
 
-    return this.finnhubService.getCompanyNews(symbol, from, to);
+  async getCompanyNews(symbol: string, from?: string, to?: string) {
+    // Default window: last 7 days if not provided
+    const toDate = to ? new Date(to) : new Date();
+    const fromDate = from
+      ? new Date(from)
+      : new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const toStr = this.formatDateOnly(toDate);
+    const fromStr = this.formatDateOnly(fromDate);
+
+    return this.finnhubService.getCompanyNews(symbol, fromStr, toStr);
+  }
+
+  async getNewsStats(symbols: string[], from?: string, to?: string) {
+    if (!symbols || symbols.length === 0) {
+      return { total: 0, from, to, breakdown: [] };
+    }
+
+    const toDate = to ? new Date(to) : new Date();
+    const fromDate = from
+      ? new Date(from)
+      : new Date(toDate.getTime() - 24 * 60 * 60 * 1000);
+
+    const toStr = this.formatDateOnly(toDate);
+    const fromStr = this.formatDateOnly(fromDate);
+
+    const breakdown = await Promise.all(
+      symbols.map(async (symbol) => {
+        try {
+          const items =
+            (await this.finnhubService.getCompanyNews(
+              symbol,
+              fromStr,
+              toStr,
+            )) || [];
+          return { symbol, count: items.length };
+        } catch (err) {
+          this.logger.warn(
+            `Failed to fetch news for ${symbol}: ${err?.message ?? err}`,
+          );
+          return { symbol, count: 0, error: true };
+        }
+      }),
+    );
+
+    const total = breakdown.reduce((sum, item) => sum + (item.count || 0), 0);
+
+    return { total, from: fromStr, to: toStr, breakdown };
+  }
+
+  async upsertFundamentals(
+    symbol: string,
+    data: Partial<Fundamentals>,
+  ): Promise<void> {
+    const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
+
+    const existing = await this.fundamentalsRepo.findOne({
+      where: { symbol_id: tickerEntity.id },
+    });
+
+    const entity =
+      existing || this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
+
+    // Merge data
+    Object.assign(entity, data);
+
+    // Explicitly set sector if provided
+    if (data.sector) {
+      entity.sector = data.sector;
+    }
+
+    await this.fundamentalsRepo.save(entity);
+  }
+
+  async upsertAnalystRatings(
+    symbol: string,
+    ratings: Partial<AnalystRating>[],
+  ): Promise<void> {
+    const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
+    const existing = await this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+    });
+    const normalizeFirm = (firm?: string) =>
+      (firm || '')
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
+    const seen = new Set(
+      existing.map(
+        (r) => `${normalizeFirm(r.firm)}|${String(r.rating_date).trim()}`,
+      ),
+    );
+
+    for (const rating of ratings) {
+      // Enhanced validation: ensure firm exists and rating_date is a real date (not null, undefined, or the string "null")
+      if (!rating.firm) continue;
+      if (!rating.rating_date) continue;
+      const dateStr = String(rating.rating_date).trim();
+      if (dateStr === 'null' || dateStr === '') continue;
+      if (isNaN(new Date(dateStr).getTime())) continue; // skip invalid dates
+
+      const dedupeKey = `${normalizeFirm(rating.firm)}|${dateStr}`;
+      if (seen.has(dedupeKey)) continue;
+
+      const existing = await this.analystRatingRepo.findOne({
+        where: {
+          symbol_id: tickerEntity.id,
+          firm: rating.firm,
+          rating_date: dateStr,
+        },
+      });
+
+      if (!existing) {
+        await this.analystRatingRepo.save({
+          ...rating,
+          rating_date: dateStr,
+          symbol_id: tickerEntity.id,
+        });
+        seen.add(dedupeKey);
+      }
+    }
+  }
+
+  async dedupeAnalystRatings(symbol: string): Promise<{ removed: number }> {
+    const tickerEntity = await this.tickersService.getTicker(symbol);
+    if (!tickerEntity) return { removed: 0 };
+
+    const existing = await this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+      order: { rating_date: 'DESC' },
+    });
+
+    const seen = new Set<string>();
+    const toRemove: string[] = [];
+
+    for (const r of existing) {
+      const key = `${(r.firm || '').toLowerCase().trim()}|${String(
+        r.rating_date,
+      ).trim()}`;
+      if (seen.has(key)) {
+        toRemove.push(r.id);
+      } else {
+        seen.add(key);
+      }
+    }
+
+    if (toRemove.length > 0) {
+      await this.analystRatingRepo.delete(toRemove);
+    }
+
+    return { removed: toRemove.length };
+  }
+
+  async getAnalystRatings(symbol: string) {
+    const tickerEntity = await this.tickersService.getTicker(symbol);
+    if (!tickerEntity) return [];
+
+    const ratings = await this.analystRatingRepo.find({
+      where: { symbol_id: tickerEntity.id },
+      order: { rating_date: 'DESC' },
+      take: 20,
+    });
+
+    const normalizeFirm = (firm?: string) =>
+      (firm || '')
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
+    // Deduplicate by normalized firm, keep most recent
+    const seen = new Set<string>();
+    const unique: AnalystRating[] = [];
+    for (const r of ratings) {
+      const key = normalizeFirm(r.firm);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(r);
+      }
+    }
+
+    return unique;
   }
 }

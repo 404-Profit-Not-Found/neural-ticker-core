@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
+import { UnauthorizedException } from '@nestjs/common';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -21,6 +22,7 @@ describe('AuthController', () => {
   const mockAuthService = {
     login: jest.fn(),
     loginWithFirebase: jest.fn(),
+    localDevLogin: jest.fn(),
   };
 
   const mockConfigService = {
@@ -83,6 +85,36 @@ describe('AuthController', () => {
       );
       expect(res.redirect).toHaveBeenCalled();
     });
+
+    it('should redirect to access-denied for new waitlist users', async () => {
+      const waitlistUser = { ...mockUser, isNewWaitlist: true };
+      const req = { user: waitlistUser };
+      const res = {
+        redirect: jest.fn(),
+      };
+
+      await controller.googleAuthRedirect(req as any, res as any);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/access-denied?error=waitlist_joined',
+      );
+      expect(mockAuthService.login).not.toHaveBeenCalled();
+    });
+
+    it('should redirect to access-denied for pending waitlist users', async () => {
+      const waitlistUser = { ...mockUser, role: 'waitlist' };
+      const req = { user: waitlistUser };
+      const res = {
+        redirect: jest.fn(),
+      };
+
+      await controller.googleAuthRedirect(req as any, res as any);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/access-denied?error=waitlist_pending',
+      );
+      expect(mockAuthService.login).not.toHaveBeenCalled();
+    });
   });
 
   describe('getProfile', () => {
@@ -113,6 +145,49 @@ describe('AuthController', () => {
       await expect(controller.firebaseLogin(body)).rejects.toThrow(
         'Token required',
       );
+    });
+  });
+
+  describe('devLogin', () => {
+    it('should return token for valid email', async () => {
+      const mockResult = { access_token: 'dev-token' };
+      mockAuthService.localDevLogin.mockResolvedValue(mockResult);
+
+      const body = { email: 'dev@test.com' };
+      const result = await controller.devLogin(body);
+
+      expect(mockAuthService.localDevLogin).toHaveBeenCalledWith(
+        'dev@test.com',
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should throw if email missing', async () => {
+      const body = { email: '' };
+      await expect(controller.devLogin(body)).rejects.toThrow('Email required');
+    });
+  });
+
+  describe('logout', () => {
+    it('should clear authentication cookie', () => {
+      const res = {
+        clearCookie: jest.fn().mockReturnThis(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
+      };
+
+      controller.logout(res as any);
+
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'authentication',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+        }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.send).toHaveBeenCalledWith({ success: true });
     });
   });
 });

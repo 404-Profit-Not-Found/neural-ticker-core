@@ -5,7 +5,6 @@ import {
   Tool,
   ThinkingConfig,
   GenerateContentConfig,
-  ThinkingLevel,
 } from '@google/genai'; // NEW SDK
 import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
 
@@ -13,6 +12,14 @@ import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
 export class GeminiProvider implements ILlmProvider {
   private readonly logger = new Logger(GeminiProvider.name);
   private client: GoogleGenAI;
+
+  // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
+  private readonly defaultModels = {
+    deep: 'gemini-2.5-flash',
+    medium: 'gemini-2.5-flash',
+    low: 'gemini-1.5-flash-002',
+    extraction: 'gemini-1.5-flash-002',
+  };
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
@@ -29,80 +36,173 @@ export class GeminiProvider implements ILlmProvider {
     // Re-initialize client if a custom key is provided (or rely on singleton)
     const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
 
-    // Resolve model and determine if it supports "Thinking"
     const modelName = this.resolveModel(prompt.quality);
     const isThinkingModel =
-      modelName.includes('thinking') || modelName.includes('gemini-3');
+      modelName.includes('thinking') || modelName.includes('pro'); // simplified check
 
     // 1. Configure Tools (Google Search)
-    // In the new SDK, tools are simplified.
-    const tools: Tool[] = [
-      { googleSearch: {} }, // Native Grounding
-    ];
+    const tools: Tool[] = [{ googleSearch: {} }]; // Native Grounding
 
-    // 2. Configure Thinking (The tricky part)
+    // 2. Configure Thinking (per SDK types: use thinkingBudget for depth control)
     let thinkingConfig: ThinkingConfig | undefined;
 
     if (isThinkingModel) {
-      if (modelName.includes('gemini-3')) {
-        // Gemini 3 uses "Level" (Low/High)
-        thinkingConfig = {
-          includeThoughts: true,
-          thinkingLevel: ThinkingLevel.HIGH,
-        };
-      } else {
-        // Gemini 2.5 uses "Budget" (Token Count)
-        thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: 1024, // Adjust based on complexity
-        };
-      }
+      // Default thinking budget for pro/flash models
+      thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
+      };
     }
 
     const config: GenerateContentConfig = {
       tools: tools,
       thinkingConfig: thinkingConfig,
       systemInstruction: `You are a financial analyst performing deep research. 
-      CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge.
-      
+      CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge. Gather all available information and resources including news, filings, and press releases, fundamentals, and market data.
       Context: ${JSON.stringify(prompt.numericContext)}`,
     };
 
-    try {
-      const result = await client.models.generateContent({
-        model: modelName,
-        contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
-        config: config,
-      });
+    // Retry & Fallback Logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    const currentModel = modelName;
 
-      // 3. Extract Grounding Metadata (New SDK format)
-      // The new SDK returns cleaner metadata objects
-      const groundingMeta = result.candidates?.[0]?.groundingMetadata;
+    // Branch for Deep Research Agent (Interactions API)
+    if (currentModel === 'deep-research-pro-preview-12-2025') {
+      try {
+        this.logger.log(`Executing Deep Research Agent: ${currentModel}`);
+        // Cast to any for v1beta interactions support
+        const interactionStream = await (client as any).interactions.create({
+          agent: currentModel,
+          input: prompt.question,
+          background: true,
+          stream: true,
+          agent_config: { thinking_summaries: 'auto' },
+        });
 
-      // 4. Extract Thoughts (if available)
-      // Thoughts are often in the first candidate part if includeThoughts is true
-      const thoughts = result.candidates?.[0]?.content?.parts?.filter(
-        (p) => p.thought,
-      );
+        let fullText = '';
+        const collectedThoughts: string[] = [];
+        let collectedSources: any[] = [];
 
-      return {
-        provider: 'gemini',
-        models: [modelName],
-        answerMarkdown: result.text || '', // Getter, not method
-        groundingMetadata: groundingMeta,
-        // You might want to return thoughts separately for debugging
-        thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
-      };
-    } catch (err) {
-      this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
-      throw err;
+        for await (const chunk of interactionStream) {
+          // 1. Thoughts
+          if (
+            chunk.delta?.type === 'thought_summary' ||
+            chunk.delta?.part?.thought
+          ) {
+            const t = chunk.delta.text || chunk.delta.part?.thought;
+            if (t) collectedThoughts.push(t);
+          }
+          // 2. Sources
+          if (chunk.groundingMetadata?.groundingChunks) {
+            collectedSources = collectedSources.concat(
+              chunk.groundingMetadata.groundingChunks,
+            );
+          }
+          // 3. Content
+          if (chunk.delta?.type === 'text' || chunk.delta?.text) {
+            fullText += chunk.delta.text || '';
+          }
+        }
+
+        return {
+          provider: 'gemini',
+          models: [currentModel],
+          answerMarkdown: fullText,
+          groundingMetadata: { groundingChunks: collectedSources },
+          thoughts: JSON.stringify(collectedThoughts),
+          tokensIn: 0, // Not provided in stream easily
+          tokensOut: 0,
+        };
+      } catch (err: any) {
+        // If interaction fails, we might want to fall back or throw.
+        // Given user strictness, we throw specific error.
+        this.logger.error(`Deep Research Interaction Failed: ${err.message}`);
+        throw err;
+      }
     }
+
+    // Standard GenerateContent Flow
+    while (attempts < maxAttempts * 2) {
+      // Allow attempts for primary + fallback
+      try {
+        attempts++;
+        this.logger.log(
+          `Gemini Request [Attempt ${attempts}] using ${currentModel}`,
+        );
+
+        const result = await client.models.generateContent({
+          model: currentModel,
+          contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
+          config: config,
+        });
+
+        // 3. Extract Grounding Metadata
+        const groundingMeta = result.candidates?.[0]?.groundingMetadata;
+
+        // 4. Extract Thoughts
+        const thoughts = result.candidates?.[0]?.content?.parts?.filter(
+          (p) => p.thought,
+        );
+
+        return {
+          provider: 'gemini',
+          models: [currentModel],
+          answerMarkdown: result.text || '',
+          groundingMetadata: groundingMeta,
+          thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
+          tokensIn: result.usageMetadata?.promptTokenCount,
+          tokensOut: result.usageMetadata?.candidatesTokenCount,
+        };
+      } catch (err: any) {
+        const isQuotaError =
+          err.status === 429 ||
+          err.code === 429 ||
+          err.message?.includes('429') ||
+          err.message?.includes('quota');
+
+        if (isQuotaError && attempts < maxAttempts) {
+          // Retry same model
+          this.logger.warn(
+            `Gemini 429 Quota Exceeded for ${currentModel}. Retrying in 5s...`,
+          );
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
+        }
+
+        // Removed fallback to legacy models as per user instruction.
+
+        this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
+        throw err;
+      }
+    }
+    throw new Error('Gemini request failed after retries');
   }
 
   private resolveModel(quality?: string): string {
-    // Official Model IDs as of Late 2025:
-    if (quality === 'deep') return 'gemini-3-pro-preview';
-    if (quality === 'high') return 'gemini-2.0-flash-thinking-exp';
-    return 'gemini-2.0-flash';
+    const models = {
+      ...this.defaultModels,
+      ...(this.configService.get<Record<string, string>>('gemini.models') ||
+        {}),
+    };
+
+    // Default to 'medium' if quality is not specified
+    if (!quality) return models.medium;
+
+    // Map quality to config key
+    switch (quality) {
+      case 'deep':
+        return models.deep;
+      case 'high':
+        // Fallback for 'high' if code still uses it, map to deep or medium? Map to deep as it was previously.
+        return models.deep;
+      case 'low':
+        return models.low;
+      case 'extraction':
+        return models.extraction;
+      case 'medium':
+      default:
+        return models.medium;
+    }
   }
 }

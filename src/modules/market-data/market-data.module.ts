@@ -8,13 +8,25 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
 import { TickersModule } from '../tickers/tickers.module';
 
+import { AnalystRating } from './entities/analyst-rating.entity';
+
+import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { ResearchNote } from '../research/entities/research-note.entity';
+import { NewsController } from './news.controller';
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PriceOhlcv, Fundamentals]),
+    TypeOrmModule.forFeature([
+      PriceOhlcv,
+      Fundamentals,
+      AnalystRating,
+      RiskAnalysis,
+      ResearchNote,
+    ]),
     FinnhubModule,
     forwardRef(() => TickersModule),
   ],
-  controllers: [MarketDataController, MarketDataBulkController],
+  controllers: [MarketDataController, MarketDataBulkController, NewsController],
   providers: [MarketDataService],
   exports: [MarketDataService],
 })

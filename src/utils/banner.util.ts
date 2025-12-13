@@ -2,6 +2,20 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import figlet from 'figlet';
 
+function maskDatabaseUrl(rawUrl?: string) {
+  if (!rawUrl) return '';
+  try {
+    const parsed = new URL(rawUrl);
+    const auth = parsed.username
+      ? `${parsed.username}${parsed.password ? ':****' : ''}@`
+      : '';
+    return `${parsed.protocol}//${auth}${parsed.host}${parsed.pathname}${parsed.search}`;
+  } catch {
+    // Fallback: best-effort masking of any password segment
+    return rawUrl.replace(/:[^:@/]*@/, ':****@');
+  }
+}
+
 export async function showBanner(app: INestApplication) {
   try {
     const { default: chalk } = await import('chalk');
@@ -70,11 +84,30 @@ export async function showBanner(app: INestApplication) {
         'neural_db';
     }
 
+    const dbUrlEnv = process.env.DATABASE_URL;
+    const maskedDbUrl = maskDatabaseUrl(dbUrlEnv);
+    let dbHost =
+      (dataSource.isInitialized && (dataSource.options as any)?.host) ||
+      process.env.DB_HOST;
+    if (!dbHost && dbUrlEnv) {
+      try {
+        dbHost = new URL(dbUrlEnv).host;
+      } catch {
+        dbHost = undefined;
+      }
+    }
+
     // Log details below the banner
     console.log(` ${chalk.bold('Environment:')} ${chalk.yellow(environment)}`);
     console.log(
       ` ${chalk.bold('Database:')}    ${dbStatus} [${chalk.blue(dbName)}]`,
     );
+    if (dbHost) {
+      console.log(` ${chalk.bold('DB Host:')}     ${chalk.cyan(dbHost)}`);
+    }
+    if (maskedDbUrl) {
+      console.log(` ${chalk.bold('DB Url:')}      ${chalk.cyan(maskedDbUrl)}`);
+    }
     console.log(` ${chalk.bold('Port:')}        ${chalk.green(port)}`);
     console.log(
       ` ${chalk.bold('Url:')}         ${chalk.underline.blue(`http://localhost:${port}`)}`,

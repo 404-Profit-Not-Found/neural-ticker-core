@@ -94,7 +94,21 @@ export class MarketDataController {
   @ApiParam({ name: 'symbol', example: 'AAPL' })
   @ApiResponse({ status: 200, description: 'List of company news.' })
   @Get('news')
-  getNews(@Param('symbol') symbol: string) {
-    return this.service.getCompanyNews(symbol);
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'Start date (YYYY-MM-DD). Defaults to 7 days ago.',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    description: 'End date (YYYY-MM-DD). Defaults to today.',
+  })
+  getNews(
+    @Param('symbol') symbol: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.getCompanyNews(symbol, from, to);
   }
 }

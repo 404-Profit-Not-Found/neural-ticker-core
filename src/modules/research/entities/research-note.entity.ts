@@ -3,6 +3,8 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -10,6 +12,7 @@ export enum LlmProvider {
   OPENAI = 'openai',
   GEMINI = 'gemini',
   ENSEMBLE = 'ensemble',
+  MANUAL = 'manual',
 }
 
 export enum ResearchStatus {
@@ -49,13 +52,46 @@ export class ResearchNote {
   @Column({ type: 'text', array: true, default: '{}' })
   models_used: string[];
 
+  @ApiProperty({
+    example: 'NVDA Earnings Beat: AI Chip Demand Surge Analysis',
+    description: 'Auto-generated title reflecting key findings',
+  })
+  @Column({ type: 'text', nullable: true })
+  title: string;
+
   @ApiProperty({ example: 'Based on recent earnings...' })
   @Column({ type: 'text', nullable: true })
   answer_markdown: string;
 
+  @ApiProperty({
+    description: 'Complete original LLM response with all metadata',
+  })
+  @Column({ type: 'text', nullable: true })
+  full_response: string;
+
   @ApiProperty()
   @Column({ type: 'jsonb', default: {} })
   numeric_context: Record<string, any>;
+
+  @ApiProperty({
+    description: 'Google Search grounding metadata from Gemini',
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  grounding_metadata: Record<string, any>;
+
+  @ApiProperty({
+    description: 'Chain of thought reasoning process (if available)',
+  })
+  @Column({ type: 'text', nullable: true })
+  thinking_process: string | null;
+
+  @ApiProperty({ example: 1500, description: 'Input tokens used' })
+  @Column({ type: 'integer', nullable: true })
+  tokens_in: number | null;
+
+  @ApiProperty({ example: 3000, description: 'Output tokens used' })
+  @Column({ type: 'integer', nullable: true })
+  tokens_out: number | null;
 
   @ApiProperty({ enum: ResearchStatus, default: ResearchStatus.PENDING })
   @Column({
@@ -72,6 +108,10 @@ export class ResearchNote {
   @ApiProperty({ description: 'ID of the user who requested this research' })
   @Column({ type: 'uuid', nullable: true })
   user_id: string;
+
+  @ManyToOne('User', 'research_notes', { eager: true, nullable: true }) // eager: true to always fetch author
+  @JoinColumn({ name: 'user_id' })
+  user: any;
 
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })

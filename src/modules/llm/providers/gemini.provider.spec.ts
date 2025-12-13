@@ -16,15 +16,20 @@ describe('GeminiProvider', () => {
   let provider: GeminiProvider;
   let configService: ConfigService;
   let mockGenerateContent: jest.Mock;
+  let mockInteractionsCreate: jest.Mock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockGenerateContent = jest.fn();
+    mockInteractionsCreate = jest.fn();
 
     // Setup the mock implementation for this test run
     (GoogleGenAI as unknown as jest.Mock).mockImplementation(() => ({
       models: {
         generateContent: mockGenerateContent,
+      },
+      interactions: {
+        create: mockInteractionsCreate,
       },
     }));
 
@@ -86,7 +91,7 @@ describe('GeminiProvider', () => {
       expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'user-key' });
     });
 
-    it('should configure Thinking Mode logic for "deep" quality', async () => {
+    it('should use gemini-2.5-flash for "deep" quality', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Deep Response',
         candidates: [],
@@ -96,12 +101,9 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3-pro-preview',
+          model: 'gemini-2.5-flash',
           config: expect.objectContaining({
-            thinkingConfig: expect.objectContaining({
-              includeThoughts: true,
-              thinkingLevel: 'HIGH',
-            }),
+            tools: expect.arrayContaining([{ googleSearch: {} }]),
           }),
         }),
       );
@@ -157,7 +159,7 @@ describe('GeminiProvider', () => {
       const result = await provider.generate(validPrompt);
 
       expect(result.answerMarkdown).toBe('Final Answer');
-      expect(result.models).toContain('gemini-2.0-flash');
+      expect(result.models).toContain('gemini-2.5-flash');
       expect(result.groundingMetadata).toBeDefined();
     });
   });

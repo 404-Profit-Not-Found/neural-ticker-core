@@ -1,9 +1,22 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield } from 'lucide-react';
+import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '../components/ui/table';
 
 type SortConfig = {
     key: string;
@@ -18,6 +31,7 @@ export function AdminConsole() {
     const [newEmail, setNewEmail] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
 
     // Redirect non-admin users immediately
     useEffect(() => {
@@ -33,11 +47,7 @@ export function AdminConsole() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         // Don't load if not admin
         if (!currentUser || currentUser.role !== 'admin') {
             setLoading(false);
@@ -62,7 +72,11 @@ export function AdminConsole() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentUser, navigate]);
+
+    useEffect(() => {
+        void loadData();
+    }, [loadData]);
 
     const handleAddEmail = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,7 +85,7 @@ export function AdminConsole() {
             await AdminService.addToUserlist(newEmail);
             setNewEmail('');
             await loadData();
-            (document.getElementById('invite-dialog') as HTMLDialogElement)?.close();
+            setIsInviteOpen(false);
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             alert((err as any).response?.data?.message || 'Failed to add email');
@@ -160,10 +174,10 @@ export function AdminConsole() {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans">
             <Header />
 
-            <main className="container mx-auto px-4 py-8 max-w-7xl">
+            <main className="container mx-auto px-4 py-8 max-w-7xl animate-in fade-in duration-500">
                 {error && (
                     <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive flex items-center gap-2">
                         <ShieldAlert size={20} />
@@ -173,56 +187,64 @@ export function AdminConsole() {
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div className="flex items-center gap-4">
-                        <Shield className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                        <div className="p-3 bg-primary/10 rounded-full">
+                            <Shield className="w-8 h-8 text-primary" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Access Management</h1>
-                            <p className="text-muted-foreground mt-1">Manage users, invites, and waitlist applications</p>
+                            <h1 className="text-3xl font-bold tracking-tight">Access Management</h1>
+                            <p className="text-muted-foreground mt-1">Manage users, invites, and permissions</p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => (document.getElementById('invite-dialog') as HTMLDialogElement)?.showModal()}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium shadow-sm"
+                    <Button
+                        onClick={() => setIsInviteOpen(true)}
+                        className="gap-2"
                     >
                         <Plus size={18} />
                         Invite User
-                    </button>
+                    </Button>
                 </div>
 
-                {/* --- Filters & Search --- */}
-                <div className="bg-card border border-border rounded-lg p-4 mb-6 flex flex-col md:flex-row gap-4 shadow-sm">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Search by email or name..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-background border border-input text-foreground text-sm rounded-lg block w-full pl-10 p-2.5 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
-                        />
-                    </div>
-                    <div className="flex gap-2">
-                        {(['ALL', 'ACTIVE', 'WAITLIST', 'INVITED'] as const).map(status => (
-                            <button
-                                key={status}
-                                onClick={() => setStatusFilter(status)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === status
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                                    }`}
-                            >
-                                {status.charAt(0) + status.slice(1).toLowerCase()}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                            <CardTitle>Users Directory</CardTitle>
 
-                {/* --- Table --- */}
-                <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/40">
+                            <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                                {/* Search */}
+                                <div className="relative w-full md:w-64">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search users..."
+                                        value={searchTerm}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                                        className="pl-9 h-9"
+                                    />
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="flex p-1 bg-muted rounded-md border border-border">
+                                    {(['ALL', 'ACTIVE', 'WAITLIST', 'INVITED'] as const).map(status => (
+                                        <button
+                                            key={status}
+                                            onClick={() => setStatusFilter(status)}
+                                            className={`px-3 py-1 text-xs font-medium rounded-sm transition-all ${statusFilter === status
+                                                ? 'bg-background text-foreground shadow-sm'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                        >
+                                            {status.charAt(0) + status.slice(1).toLowerCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent">
                                     {[
                                         { label: 'User', key: 'email' },
                                         { label: 'Role', key: 'role' },
@@ -230,148 +252,168 @@ export function AdminConsole() {
                                         { label: 'Timestamp', key: 'created_at' },
                                         { label: 'Actions', key: 'actions' }
                                     ].map((head) => (
-                                        <th
+                                        <TableHead
                                             key={head.key}
                                             onClick={() => head.key !== 'actions' && handleSort(head.key)}
-                                            className={`p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider ${head.key !== 'actions' ? 'cursor-pointer hover:text-foreground' : ''}`}
+                                            className={`${head.key !== 'actions' ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
                                         >
                                             <div className="flex items-center gap-1">
                                                 {head.label}
                                                 {head.key !== 'actions' && <ArrowUpDown className="w-3 h-3 opacity-50" />}
                                             </div>
-                                        </th>
+                                        </TableHead>
                                     ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                 {loading ? (
-                                    <tr>
-                                        <td colSpan={5} className="p-8 text-center text-muted-foreground animate-pulse">Loading identities...</td>
-                                    </tr>
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                                <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                                Loading directory...
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
                                 ) : paginatedData.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                                            No users found matching your filters.
-                                        </td>
-                                    </tr>
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                            No users found matching filters.
+                                        </TableCell>
+                                    </TableRow>
                                 ) : (
                                     paginatedData.map((item) => {
                                         const isSelf = currentUser?.email === item.email;
                                         const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
 
                                         return (
-                                            <tr key={item.email} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                                <td className="p-4">
-                                                    {item.full_name && <div className="font-medium text-foreground">{item.full_name}</div>}
-                                                    <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${item.role === 'admin' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
-                                                        item.role === 'user' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                            'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
-                                                        }`}>
+                                            <TableRow key={item.email}>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                                                            <User size={14} />
+                                                        </div>
+                                                        <div>
+                                                            {item.full_name && <div className="font-medium">{item.full_name}</div>}
+                                                            <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px]">
                                                         {item.role || 'GUEST'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4">
-                                                    {item.status === 'ADMIN' && <span className="text-purple-500 flex items-center gap-1.5 text-xs font-medium"><ShieldAlert size={14} /> Admin</span>}
-                                                    {item.status === 'ACTIVE' && <span className="text-emerald-500 flex items-center gap-1.5 text-xs font-medium"><CheckCircle size={14} /> Active</span>}
-                                                    {item.status === 'WAITLIST' && <span className="text-orange-500 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</span>}
-                                                    {item.status === 'INVITED' && <span className="text-blue-500 flex items-center gap-1.5 text-xs font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</span>}
-                                                </td>
-                                                <td className="p-4 text-xs text-muted-foreground font-mono whitespace-nowrap">
-                                                    {new Date(item.created_at || item.invited_at || Date.now()).toLocaleString()}
-                                                </td>
-                                                <td className="p-4">
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-xs text-purple-500 font-medium"><ShieldAlert size={14} /> Admin</div>}
+                                                    {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><CheckCircle size={14} /> Active</div>}
+                                                    {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-xs text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
+                                                    {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-xs text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground font-mono">
+                                                    {new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell>
                                                     <div className="flex items-center gap-2 justify-end">
                                                         {item.status === 'WAITLIST' && (
-                                                            <button
+                                                            <Button
                                                                 onClick={() => handleApprove(item.email)}
-                                                                className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1.5 rounded-md hover:bg-emerald-500/20 transition-colors text-xs font-medium mr-auto"
-                                                                title="Approve & Whitelist"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
                                                             >
-                                                                <CheckCircle size={14} />
+                                                                <CheckCircle size={14} className="mr-1.5" />
                                                                 Approve
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                         {(item.status === 'ACTIVE' || item.status === 'ADMIN' || item.status === 'INVITED' || item.status === 'WAITLIST') && (
-                                                            <button
+                                                            <Button
                                                                 onClick={() => handleRevoke(item)}
                                                                 disabled={isSelf || isTargetAdmin}
-                                                                title={isSelf ? "Cannot revoke self" : isTargetAdmin ? "Cannot revoke other admins" : item.status === 'WAITLIST' ? "Reject Application" : "Revoke Access"}
-                                                                className={`p-2 rounded-md transition-colors ${isSelf || isTargetAdmin
-                                                                    ? 'text-muted-foreground/30 cursor-not-allowed'
-                                                                    : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
-                                                                    }`}
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                                title="Revoke Access"
                                                             >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                                <Trash2 size={16} />
+                                                            </Button>
                                                         )}
                                                     </div>
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
 
-                    {/* --- Pagination Controls --- */}
-                    <div className="p-4 border-t border-border bg-card flex items-center justify-between">
+                    {/* Pagination */}
+                    <div className="p-4 border-t border-border flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                             Showing {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} users
                         </span>
                         <div className="flex gap-2">
-                            <button
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent text-muted-foreground"
                             >
                                 <ChevronLeft size={16} />
-                            </button>
-                            <span className="text-xs text-muted-foreground flex items-center">Page {currentPage} of {totalPages || 1}</span>
-                            <button
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent text-muted-foreground"
                             >
                                 <ChevronRight size={16} />
-                            </button>
+                            </Button>
                         </div>
                     </div>
-                </div>
+                </Card>
             </main>
 
-            {/* Invite Modal */}
-            <dialog id="invite-dialog" className="bg-popover text-popover-foreground p-8 rounded-lg border border-border backdrop:bg-background/80 shadow-2xl w-full max-w-lg">
-                <h3 className="text-xl font-bold mb-6">Invite New User</h3>
-                <form onSubmit={handleAddEmail} method="dialog">
-                    <input
-                        type="email"
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        placeholder="Enter email address"
-                        className="bg-background border border-input text-foreground text-sm rounded-lg block w-full p-2.5 mb-4 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
-                        required
-                    />
-                    <div className="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => (document.getElementById('invite-dialog') as HTMLDialogElement)?.close()}
-                            className="text-muted-foreground hover:text-foreground px-4 py-2 text-sm"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
-                        >
-                            Send Invite
-                        </button>
-                    </div>
-                </form>
-            </dialog>
+            {/* Invite Dialog */}
+            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                <div className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Invite New User</DialogTitle>
+                        <DialogDescription>
+                            Send an invitation email to add a new user.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleAddEmail} className="flex flex-col gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Email Address</label>
+                            <Input
+                                type="email"
+                                value={newEmail}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEmail(e.target.value)}
+                                placeholder="colleague@example.com"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setIsInviteOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit">
+                                Send Invitation
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </Dialog>
         </div>
     );
 }

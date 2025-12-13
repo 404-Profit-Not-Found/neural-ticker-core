@@ -20,15 +20,28 @@ import {
     ArrowUp,
     ArrowDown,
     Loader2,
-    TrendingUp,
-    Pencil,
-    ChevronDown,
     Check,
     Filter,
-    X
+    X,
+    Bot,
+    Brain,
+    ShieldCheck,
+    AlertTriangle,
+    Flame,
+    Newspaper,
+    ChevronDown,
+    Pencil,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import {
+    Table as UiTable,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell
+} from '../ui/table';
 import { cn } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../ui/toast';
@@ -62,10 +75,12 @@ interface TickerData {
     change: number;
     pe: number | null;
     marketCap: number | null;
-    divYield: string | null;
-    beta: number | null;
+    riskScore: number | null;
     rating: string;
-    growthRank: number;
+    aiRating: string;
+    newsCount: number;
+    researchCount: number;
+    analystCount: number;
     itemId?: string;
 }
 
@@ -80,6 +95,16 @@ interface MarketSnapshot {
         market_cap?: number;
         dividend_yield?: number;
         beta?: number;
+        consensus_rating?: string;
+    };
+    aiAnalysis?: {
+        overall_score: number;
+        upside_percent: number;
+    };
+    counts?: {
+        news: number;
+        research: number;
+        analysts: number;
     };
 }
 
@@ -94,10 +119,10 @@ const SortableHeader = ({ column, title }: { column: Column<TickerData, unknown>
     <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 hover:bg-transparent font-medium"
+        className="p-0 hover:bg-transparent font-medium text-xs"
     >
         {title}
-        <ArrowUpDown className="ml-2 h-4 w-4" />
+        <ArrowUpDown className="ml-2 h-3 w-3" />
     </Button>
 );
 
@@ -158,7 +183,7 @@ export function WatchlistTable() {
     const watchlistItems = useMemo(() => {
         if (!activeWatchlist || !activeWatchlist.items) return EMPTY_ITEMS;
         return Array.isArray(activeWatchlist.items) ? activeWatchlist.items : EMPTY_ITEMS;
-    }, [activeWatchlist?.items]);
+    }, [activeWatchlist]);
 
     const symbols = useMemo(() => {
         if (!watchlistItems || watchlistItems.length === 0) return EMPTY_SYMBOLS;
@@ -191,6 +216,21 @@ export function WatchlistTable() {
                 const prevClose = Number(s.latestPrice?.prevClose || price);
                 const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
                 const fundamentals = s.fundamentals || {};
+                const rawRiskScore = s.aiAnalysis?.overall_score;
+                const parsedRiskScore = typeof rawRiskScore === 'number' ? rawRiskScore : Number(rawRiskScore);
+                const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
+
+                // AI Rating Logic
+                let aiRating = '-';
+                if (s.aiAnalysis) {
+                    const { overall_score, upside_percent } = s.aiAnalysis;
+                    // Score 0-10 (0 safe, 10 risky)
+                    // Upside %
+                    if (upside_percent > 15 && overall_score < 6) aiRating = 'Buy';
+                    if (upside_percent > 40 && overall_score < 7) aiRating = 'Strong Buy';
+                    if (upside_percent < 0 || overall_score > 8) aiRating = 'Sell';
+                    if (aiRating === '-') aiRating = 'Hold'; // Default if data exists but fits no extreme
+                }
 
                 return {
                     symbol: s.ticker?.symbol || 'UNKNOWN',
@@ -201,11 +241,13 @@ export function WatchlistTable() {
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
                     marketCap: fundamentals.market_cap ?? null,
-                    divYield: fundamentals.dividend_yield ? Number(fundamentals.dividend_yield).toFixed(2) + '%' : '-',
-                    beta: fundamentals.beta ?? null,
-                    rating: 'Hold',
-                    growthRank: 5,
-                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id
+                    rating: fundamentals.consensus_rating || '-',
+                    itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id,
+                    aiRating: aiRating,
+                    riskScore: safeRiskScore,
+                    newsCount: s.counts?.news || 0,
+                    researchCount: s.counts?.research || 0,
+                    analystCount: s.counts?.analysts || 0,
                 };
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);
@@ -299,7 +341,7 @@ export function WatchlistTable() {
         } else {
             setShowSuggestions(false);
         }
-    }, [searchTickerQuery.data?.length]);
+    }, [searchTickerQuery.data]);
 
     // Close handlers
     // Global listeners removed in favor of Backdrop pattern
@@ -343,10 +385,10 @@ export function WatchlistTable() {
             columnHelper.accessor('symbol', {
                 header: ({ column }) => <SortableHeader column={column} title="Ticker" />,
                 cell: (info) => (
-                    <div className="flex items-center gap-3" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
+                    <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
                         <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} />
-                        <div className="flex flex-col cursor-pointer">
-                            <span className="text-primary font-bold hover:underline">{info.getValue()}</span>
+                        <div className="flex flex-col">
+                            <span className="text-primary font-bold group-hover:underline">{info.getValue()}</span>
                             <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.company}>
                                 {info.row.original.company}
                             </span>
@@ -367,7 +409,7 @@ export function WatchlistTable() {
             }),
             columnHelper.accessor('price', {
                 header: ({ column }) => <SortableHeader column={column} title="Price" />,
-                cell: (info) => <span className="text-foreground font-mono">${info.getValue().toFixed(2)}</span>,
+                cell: (info) => <span className="text-foreground font-mono font-medium">${info.getValue().toFixed(2)}</span>,
             }),
             columnHelper.accessor('change', {
                 header: ({ column }) => <SortableHeader column={column} title="Change %" />,
@@ -375,49 +417,119 @@ export function WatchlistTable() {
                     const val = info.getValue();
                     const isPositive = val >= 0;
                     return (
-                        <div className={cn("flex items-center font-medium", isPositive ? "text-green-500" : "text-red-500")}>
+                        <div className={cn("flex items-center font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                             {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
                             {Math.abs(val).toFixed(2)}%
                         </div>
                     );
                 },
             }),
-            columnHelper.accessor('pe', {
-                header: ({ column }) => <SortableHeader column={column} title="P/E" />,
-                cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
-            }),
             columnHelper.accessor('marketCap', {
                 header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
-                cell: (info) => <span className="text-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
+                cell: (info) => <span className="text-muted-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
             }),
-            columnHelper.accessor('divYield', {
-                header: ({ column }) => <SortableHeader column={column} title="Div Yield %" />,
-                cell: (info) => <span className="text-foreground">{info.getValue() || '-'}</span>,
+            columnHelper.accessor('researchCount', {
+                header: ({ column }) => <SortableHeader column={column} title="Research" />,
+                cell: (info) => {
+                    const count = info.getValue();
+                    if (!count) return <span className="text-muted-foreground">-</span>;
+                    return (
+                        <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
+                            <Brain size={14} className="text-purple-400" />
+                            {count}
+                        </div>
+                    );
+                },
             }),
-            columnHelper.accessor('beta', {
-                header: ({ column }) => <SortableHeader column={column} title="Beta" />,
-                cell: (info) => <span className="text-foreground">{info.getValue() ? Number(info.getValue()).toFixed(2) : '-'}</span>,
+            columnHelper.accessor('newsCount', {
+                header: ({ column }) => <SortableHeader column={column} title="News" />,
+                cell: (info) => {
+                    const count = info.getValue() || 0;
+                    if (!count) return <span className="text-muted-foreground">-</span>;
+                    return (
+                        <div className="flex items-center gap-1.5 text-sky-400 font-semibold">
+                            <Newspaper size={14} className="text-sky-400" />
+                            {count}
+                        </div>
+                    );
+                },
+            }),
+            columnHelper.accessor('riskScore', {
+                header: ({ column }) => <SortableHeader column={column} title="Risk Score" />,
+                cell: (info) => {
+                    const val = info.getValue();
+                    const numericVal = typeof val === 'number' ? val : Number(val);
+                    if (!Number.isFinite(numericVal)) return <span className="text-muted-foreground">-</span>;
+                    // Color scale: 0-3 Green, 4-6 Yellow, 7-10 Red
+                    let colorClass = "text-muted-foreground";
+                    let Icon = ShieldCheck;
+                    if (numericVal <= 3.5) {
+                        colorClass = "text-emerald-500 font-bold"; // Low risk
+                        Icon = ShieldCheck;
+                    } else if (numericVal <= 6.5) {
+                        colorClass = "text-yellow-500 font-bold"; // Medium risk
+                        Icon = AlertTriangle;
+                    } else {
+                        colorClass = "text-red-500 font-bold"; // High risk
+                        Icon = Flame;
+                    }
+
+                    return (
+                        <span className={cn("flex items-center gap-1.5", colorClass)}>
+                            <Icon size={14} />
+                            {numericVal.toFixed(1)}
+                        </span>
+                    );
+                },
             }),
             columnHelper.accessor('rating', {
                 header: ({ column }) => <SortableHeader column={column} title="Rating" />,
                 cell: (info) => {
                     const rating = info.getValue();
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" = "default";
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+
+                    if (rating && rating !== '-') {
+                        if (rating === 'Strong Buy') variant = 'strongBuy';
+                        else if (rating === 'Buy') variant = 'buy';
+                        else if (rating === 'Hold') variant = 'hold';
+                        else if (rating === 'Sell') variant = 'sell';
+                        else variant = "default"; // Fallback for other valid strings
+
+                        const count = info.row.original.analystCount;
+                        const label = count > 0 ? `${rating} (${count})` : rating;
+
+                        return (
+                            <div className="flex items-center gap-2">
+                                <Badge variant={variant} className="whitespace-nowrap">{label}</Badge>
+                            </div>
+                        );
+                    }
+
+                    // Empty state
+                    return <span className="text-muted-foreground">-</span>;
+                },
+            }),
+            columnHelper.accessor('aiRating', {
+                header: ({ column }) => <SortableHeader column={column} title="AI Rating" />,
+                cell: (info) => {
+                    const rating = info.getValue() as string;
+                    if (!rating || rating === '-') return <span className="text-muted-foreground">-</span>;
+
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
                     if (rating === 'Strong Buy') variant = 'strongBuy';
                     else if (rating === 'Buy') variant = 'buy';
                     else if (rating === 'Hold') variant = 'hold';
-                    return <Badge variant={variant} className="whitespace-nowrap">{rating}</Badge>;
+                    else if (rating === 'Sell') variant = 'sell';
+
+                    return (
+                        <Badge variant={variant} className="whitespace-nowrap gap-1.5">
+                            <Bot size={12} className="opacity-80" />
+                            {rating}
+                        </Badge>
+                    );
                 },
             }),
-            columnHelper.accessor('growthRank', {
-                header: ({ column }) => <SortableHeader column={column} title="Growth Rank" />,
-                cell: (info) => (
-                    <div className="flex items-center text-foreground">
-                        {info.getValue()}
-                        <TrendingUp size={14} className="ml-1 text-green-500" />
-                    </div>
-                )
-            }),
+
             columnHelper.display({
                 id: 'actions',
                 cell: (info) => (
@@ -428,7 +540,7 @@ export function WatchlistTable() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => handleRemoveTicker(info.row.original.itemId || '', info.row.original.symbol)}
                             title="Remove from watchlist"
                         >
@@ -460,82 +572,85 @@ export function WatchlistTable() {
     const activeSectorFilter = (table.getColumn('sector')?.getFilterValue() as string) || null;
 
     return (
-        <div className="space-y-4">
-            {/* Backdrop for closing dropdowns */}
-            {(isDropdownOpen || isSectorFilterOpen || showSuggestions) && (
-                <div
-                    className="fixed inset-0 z-40 bg-transparent"
-                    onClick={closeAllDropdowns}
-                />
-            )}
-            {/* Header / Dropdown Control */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    {/* Custom Dropdown */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-sm font-medium text-foreground transition-colors border border-transparent focus:border-primary outline-none min-w-[150px] justify-between"
-                        >
-                            <span className="truncate max-w-[200px]">{activeWatchlist?.name || "Select Watchlist"}</span>
-                            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
+        <div className="w-full space-y-4">
+            {/* Toolbar Section */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-1">
+                {/* Left Side: Watchlist Selector & Add Ticker */}
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
 
-                        {isDropdownOpen && (
-                            <div className="absolute top-full left-0 mt-1 w-64 bg-card border border-border rounded-md shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
-                                {watchlists.map(w => (
-                                    <button
-                                        key={w.id}
-                                        onClick={() => {
-                                            setActiveWatchlistId(w.id);
-                                            setIsDropdownOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 flex items-center justify-between group"
-                                    >
-                                        <span className={activeWatchlistId === w.id ? "font-semibold" : ""}>{w.name}</span>
-                                        {activeWatchlistId === w.id && <Check className="w-3 h-3 text-primary" />}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    {/* Watchlist Selector Group */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative w-full sm:w-auto">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                className="w-full sm:w-auto justify-start px-2 hover:bg-muted/50 gap-2"
+                            >
+                                <span className="truncate font-bold text-lg">{activeWatchlist?.name || "Select Watchlist"}</span>
+                                <ChevronDown className={`w-4 h-4 opacity-50 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                            </Button>
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={handleCreateList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Create New List" disabled={createListMutation.isPending}>
-                            <Plus className="w-4 h-4" />
-                        </Button>
+                            {isDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
+                                    <div className="absolute top-full left-0 mt-1 w-64 bg-popover border border-border rounded-md shadow-xl z-50 py-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                        {watchlists.map(w => (
+                                            <button
+                                                key={w.id}
+                                                onClick={() => {
+                                                    setActiveWatchlistId(w.id);
+                                                    setIsDropdownOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors",
+                                                    activeWatchlistId === w.id ? "bg-accent/50 text-accent-foreground font-medium" : "text-foreground hover:bg-muted/50"
+                                                )}
+                                            >
+                                                <span className="truncate">{w.name}</span>
+                                                {activeWatchlistId === w.id && <Check className="w-3.5 h-3.5 text-primary" />}
+                                            </button>
+                                        ))}
+                                        <div className="border-t border-border mt-1 pt-1 px-1">
+                                            <button
+                                                onClick={() => {
+                                                    setIsDropdownOpen(false);
+                                                    handleCreateList();
+                                                }}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm transition-colors"
+                                            >
+                                                <Plus className="w-3 h-3" /> Create New List
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* List Actions (Rename/Delete) - Only show when hovering or on mobile? Keeping visible for utility */}
                         {activeWatchlistId && (
-                            <>
-                                <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List" disabled={renameListMutation.isPending}>
-                                    <Pencil className="w-4 h-4" />
+                            <div className="flex items-center">
+                                <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List">
+                                    <Pencil className="w-3.5 h-3.5" />
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleDeleteList(activeWatchlistId)}
-                                    className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                                    title="Delete Watchlist"
-                                    disabled={deleteListMutation.isPending}
+                                    onClick={() => handleDeleteList(activeWatchlistId!)}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    title="Delete List"
+                                    aria-label="Delete watchlist"
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
-                            </>
+                            </div>
                         )}
                     </div>
-                </div>
-            </div>
 
-            {/* Filter & Add Actions */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {/* Add Ticker */}
-                    <div className="relative">
-                        {addTickerMutation.isPending ? (
-                            <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary w-4 h-4 animate-spin" />
-                        ) : (
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                        )}
+                    <div className="hidden sm:block w-px h-6 bg-border mx-2" />
+
+                    {/* Add Ticker Input - Now close to selector */}
+                    <div className="relative flex-1 sm:flex-none w-full sm:w-auto">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
                         <input
                             ref={searchInputRef}
                             type="text"
@@ -544,179 +659,189 @@ export function WatchlistTable() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={addTickerMutation.isPending}
-                            className="h-9 w-64 bg-card border border-border rounded-md pl-9 pr-4 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground disabled:opacity-50"
-                        />
+                            className="h-9 w-full sm:w-[180px] bg-transparent border-none rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground hover:bg-muted/50 transition-all"
 
-                        {/* Autocomplete Dropdown */}
+                        />
+                        {/* Suggestions Dropdown */}
                         {showSuggestions && (
-                            <div
-                                ref={suggestionsRef}
-                                className="absolute top-full left-0 mt-1 w-80 bg-card border border-border rounded-md shadow-lg z-50 py-1 max-h-64 overflow-y-auto"
-                            >
-                                {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
-                                    <button
-                                        key={s.symbol}
-                                        onClick={() => selectSuggestion(s.symbol)}
-                                        className={cn(
-                                            "w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-muted/50 transition-colors",
-                                            selectedIndex === idx && "bg-muted/50"
-                                        )}
-                                    >
-                                        <TickerLogo
-                                            url={s.logo_url}
-                                            symbol={s.symbol}
-                                            className="w-6 h-6"
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-primary">{s.symbol}</span>
-                                                <span className="text-xs text-muted-foreground">{s.exchange}</span>
-                                            </div>
-                                            <span className="text-xs text-muted-foreground truncate block">{s.name}</span>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
+                            <>
+                                <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
+                                <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-[300px] bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
+                                    <div className="py-1 max-h-[300px] overflow-y-auto">
+                                        {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
+                                            <button
+                                                key={s.symbol}
+                                                onClick={() => selectSuggestion(s.symbol)}
+                                                className={cn(
+                                                    "w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0",
+                                                    selectedIndex === idx && "bg-muted/50"
+                                                )}
+                                            >
+                                                <div className="bg-background p-1.5 rounded-md border border-border/50 shadow-sm">
+                                                    <TickerLogo url={s.logo_url} symbol={s.symbol} className="w-6 h-6" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-sm text-foreground">{s.symbol}</span>
+                                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{s.exchange}</Badge>
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground truncate block mt-0.5">{s.name}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetchSnapshots()}
-                        disabled={isRefetching || isLoadingSnapshots}
-                        className="h-9 gap-2 bg-card border-border text-foreground hover:bg-muted hover:text-foreground"
-                    >
-                        <RefreshCw size={14} className={isRefetching ? "animate-spin" : ""} />
-                        Refresh Data
-                    </Button>
                 </div>
 
-                {/* Filters */}
-                <div className="flex items-center gap-2">
-                    {/* Sector Filter Dropdown */}
+                {/* Center: Global Search Filter */}
+                <div className="flex-1 px-4 flex justify-center">
+                    <div className="relative group w-full max-w-[240px]">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground group-hover:text-foreground transition-colors w-3.5 h-3.5" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            value={globalFilter ?? ''}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="h-9 w-full bg-transparent border-none rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground hover:bg-muted/50 transition-all"
+                        />
+                    </div>
+                </div>
+
+                {/* Right Side: Filtering & View Controls */}
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    {/* Clean Sector Filter */}
                     <div className="relative">
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setIsSectorFilterOpen(!isSectorFilterOpen)}
                             className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border outline-none h-9",
-                                activeSectorFilter
-                                    ? "bg-primary/20 border-primary text-primary hover:bg-primary/30"
-                                    : "bg-card border-border hover:bg-muted text-foreground"
+                                "h-9 gap-2 text-muted-foreground hover:text-foreground",
+                                activeSectorFilter && "text-primary bg-primary/10 hover:bg-primary/20 hover:text-primary"
                             )}
                         >
-                            <Filter className="w-4 h-4" />
-                            <span>{activeSectorFilter || "Sector"}</span>
-                            {activeSectorFilter ? (
-                                <div onClick={(e) => {
-                                    e.stopPropagation();
-                                    table.getColumn('sector')?.setFilterValue(undefined);
-                                }}>
-                                    <X className="w-3 h-3 hover:text-red-500" />
+                            <Filter className="w-3.5 h-3.5" />
+                            <span className="text-sm">{activeSectorFilter || "Sector"}</span>
+                            {activeSectorFilter && (
+                                <div
+                                    className="p-0.5 hover:bg-background/20 rounded-full cursor-pointer ml-1"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        table.getColumn('sector')?.setFilterValue(undefined);
+                                    }}
+                                >
+                                    <X className="w-3 h-3" />
                                 </div>
-                            ) : (
-                                <ChevronDown className="w-3 h-3 text-muted-foreground" />
                             )}
-                        </button>
+                        </Button>
 
                         {isSectorFilterOpen && (
-                            <div className="absolute top-full right-0 mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
-                                <button
-                                    onClick={() => {
-                                        table.getColumn('sector')?.setFilterValue(undefined);
-                                        setIsSectorFilterOpen(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 flex items-center justify-between"
-                                >
-                                    <span>All Sectors</span>
-                                    {!activeSectorFilter && <Check className="w-3 h-3 text-primary" />}
-                                </button>
-                                {uniqueSectors.map(sector => (
+                            <>
+                                <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
+                                <div className="absolute top-full right-0 mt-1 w-56 bg-popover border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95">
+                                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                                        Filter by Sector
+                                    </div>
                                     <button
-                                        key={sector}
                                         onClick={() => {
-                                            table.getColumn('sector')?.setFilterValue(sector);
+                                            table.getColumn('sector')?.setFilterValue(undefined);
                                             setIsSectorFilterOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 flex items-center justify-between"
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
                                     >
-                                        <span className="truncate">{sector}</span>
-                                        {activeSectorFilter === sector && <Check className="w-3 h-3 text-primary" />}
+                                        <span className="text-muted-foreground">All Sectors</span>
+                                        {!activeSectorFilter && <Check className="w-3.5 h-3.5 text-primary" />}
                                     </button>
-                                ))}
-                            </div>
+                                    {uniqueSectors.map(sector => (
+                                        <button
+                                            key={sector}
+                                            onClick={() => {
+                                                table.getColumn('sector')?.setFilterValue(sector);
+                                                setIsSectorFilterOpen(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
+                                        >
+                                            <span className="truncate text-foreground">{sector}</span>
+                                            {activeSectorFilter === sector && <Check className="w-3.5 h-3.5 text-primary" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
                         )}
                     </div>
 
-                    {/* Global Filter */}
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Filter list..."
-                            value={globalFilter ?? ''}
-                            onChange={(e) => setGlobalFilter(e.target.value)}
-                            className="h-9 w-48 bg-card border border-border rounded-md pl-9 pr-4 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
-                        />
-                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => refetchSnapshots()}
+                        disabled={isRefetching || isLoadingSnapshots}
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                        title="Refresh Data"
+                    >
+                        <RefreshCw size={14} className={isRefetching ? "animate-spin" : ""} />
+                    </Button>
                 </div>
             </div>
 
-            <div className="rounded-md border border-border bg-card overflow-hidden rgb-border">
+            {/* Table Area - No outer card, just the table */}
+            <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
                 {isGlobalLoading ? (
-                    <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-4">
+                    <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-4 bg-muted/5">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        <p>Loading Market Data...</p>
+                        <p className="text-sm font-medium animate-pulse">Syncing Market Data...</p>
                     </div>
                 ) : (
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/30 border-b border-border text-muted-foreground font-medium">
+                    <UiTable>
+                        <TableHeader className="bg-muted/20 hover:bg-muted/20">
                             {table.getHeaderGroups().map((headerGroup) => (
-                                <tr key={headerGroup.id}>
+                                <TableRow key={headerGroup.id} className="hover:bg-transparent border-border">
                                     {headerGroup.headers.map((header) => (
-                                        <th key={header.id} className="px-4 py-3 h-10 align-middle [&:has([role=checkbox])]:pr-0 font-medium">
+                                        <TableHead key={header.id} className="h-10 text-xs uppercase tracking-wider font-bold text-muted-foreground">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
                                                     header.column.columnDef.header,
                                                     header.getContext()
                                                 )}
-                                        </th>
+                                        </TableHead>
                                     ))}
-                                </tr>
+                                </TableRow>
                             ))}
-                        </thead>
-                        <tbody className="[&_tr:last-child]:border-0 divide-y divide-border">
+                        </TableHeader>
+                        <TableBody>
                             {table.getRowModel().rows?.length ? (
                                 table.getRowModel().rows.map((row) => (
-                                    <tr
+                                    <TableRow
                                         key={row.id}
                                         data-state={row.getIsSelected() && "selected"}
-                                        className="transition-colors hover:bg-muted/50"
+                                        className="border-border hover:bg-muted/50 transition-colors"
                                     >
                                         {row.getVisibleCells().map((cell) => (
-                                            <td key={cell.id} className="px-4 py-3 align-middle [&:has([role=checkbox])]:pr-0">
+                                            <TableCell key={cell.id} className="py-3">
                                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                            </td>
+                                            </TableCell>
                                         ))}
-                                    </tr>
+                                    </TableRow>
                                 ))
                             ) : (
-                                <tr>
-                                    <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <span>No stocks in your watchlist.</span>
-                                            <span className="text-xs">Add a symbol to get started.</span>
+                                <TableRow>
+                                    <TableCell colSpan={columns.length} className="h-64 text-center p-0">
+                                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
+                                            <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                                                <Search className="w-6 h-6 text-muted-foreground/50" />
+                                            </div>
+                                            <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>
+                                            <p className="text-sm text-muted-foreground mb-4">Add your first ticker to track its performance.</p>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             )}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </UiTable>
                 )}
-            </div>
-
-            <div className="flex items-center justify-between text-sm text-muted-foreground px-2">
-                <div>Total: {tableData.length} items</div>
             </div>
         </div>
     );

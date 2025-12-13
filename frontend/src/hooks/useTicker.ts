@@ -131,35 +131,72 @@ export function usePostComment() {
 // We can use useQuery for fetching completed research, and manual mutation for triggering.
 export function useTickerResearch(symbol?: string) {
     return useQuery({
-        queryKey: tickerKeys.research(symbol || ''),
+        queryKey: tickerKeys.research(symbol || 'all'), // Changed to distinct key if symbol exists
         queryFn: async () => {
-            if (!symbol) return [];
-            const res = await api.get('/research');
-            // Client side filtering for this ticker
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const relevant = res.data?.data?.filter((t: any) => t.tickers.includes(symbol)).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            return relevant || [];
+            // If no symbol, we might want to return empty or all, but here we expect usage context
+            // But API now supports filtering.
+            const params: Record<string, string | number> = { limit: 50 }; // Increased limit
+            if (symbol) {
+                params.ticker = symbol;
+            }
+            
+            const res = await api.get('/research', { params });
+            // API returns paginated structure { data: [], total, ... }
+            return res.data?.data || [];
         },
         enabled: !!symbol,
-        staleTime: 1000 * 60 * 10, // 10 min
+        staleTime: 0, 
+        refetchInterval: (query) => {
+            const data = query.state.data as Array<{ status: string }>;
+            if (data?.some((item) => item.status === 'processing' || item.status === 'pending')) {
+                return 3000; // Poll every 3s if analysis is in progress
+            }
+            return false;
+        }
     });
 }
 
 export function useTriggerResearch() {
-     const queryClient = useQueryClient();
-     return useMutation({
-        mutationFn: async (symbol: string) => {
-             const res = await api.post('/research/ask', {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ symbol, provider, quality, question }: { symbol: string; provider?: 'openai' | 'gemini' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string }) => {
+            const res = await api.post('/research/ask', {
                 tickers: [symbol],
-                question: `Deep dive analysis into ${symbol}`,
-                quality: 'deep'
+                question: question || `Deep dive analysis into ${symbol}`,
+                quality: quality || 'deep',
+                provider: provider || 'gemini'
             });
             return res.data;
         },
-        onSuccess: (_, symbol) => {
+        onSuccess: (_, variables) => {
             // We might want to invalidate, but polling is usually manual or requires specialized logic.
             // For now, simpler to just return the ticket ID.
-            queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
+            queryClient.invalidateQueries({ queryKey: tickerKeys.research(variables.symbol) });
+        }
+    });
+}
+
+export function useDeleteResearch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.delete(`/research/${id}`);
+        },
+        onSuccess: () => {
+            // Invalidate all research queries
+            queryClient.invalidateQueries({ queryKey: tickerKeys.all }); 
+        },
+    });
+}
+
+export function useUpdateResearchTitle() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, title }: { id: string; title: string }) => {
+            await api.post(`/research/${id}/title`, { title });
+        },
+        onSuccess: () => {
+             queryClient.invalidateQueries({ queryKey: tickerKeys.all });
         }
     });
 }

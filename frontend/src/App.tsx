@@ -10,6 +10,7 @@ import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
+import { StyleGuidePage } from './pages/StyleGuidePage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
@@ -56,7 +57,7 @@ function App() {
               }
             />
             <Route
-              path="/ticker/:symbol"
+              path="/ticker/:symbol/:tab?"
               element={
                 <ProtectedRoute>
                   <TickerDetail />
@@ -79,6 +80,8 @@ function App() {
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/settings/style" element={<ProtectedRoute><StyleGuidePage /></ProtectedRoute>} />
+            <Route path="/settings" element={<Navigate to="/settings/style" replace />} />
 
             <Route path="/admin" element={
               <AdminRoute>

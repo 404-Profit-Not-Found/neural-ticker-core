@@ -3,6 +3,9 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
+import { AnalystRating } from './entities/analyst-rating.entity';
+import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { ResearchNote } from '../research/entities/research-note.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
@@ -13,6 +16,9 @@ describe('MarketDataService', () => {
   let service: MarketDataService;
   let ohlcvRepo: Repository<PriceOhlcv>;
   let fundamentalsRepo: Repository<Fundamentals>;
+  let analystRatingRepo: Repository<AnalystRating>;
+  let riskAnalysisRepo: Repository<RiskAnalysis>;
+  let researchNoteRepo: Repository<ResearchNote>;
   let tickersService: TickersService;
   let finnhubService: FinnhubService;
   let configService: ConfigService;
@@ -36,9 +42,26 @@ describe('MarketDataService', () => {
     create: jest.fn().mockImplementation((dto) => dto),
   };
 
+  const mockAnalystRatingRepo = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
+  };
+
+  const mockRiskAnalysisRepo = {
+    findOne: jest.fn(),
+  };
+
+  const mockResearchNoteRepo = {
+    count: jest.fn(),
+  };
+
   const mockTickersService = {
     findBySymbol: jest.fn(),
     awaitEnsureTicker: jest.fn(), // Service uses awaitEnsureTicker, not findBySymbol
+    getTicker: jest.fn(),
   };
 
   const mockFinnhubService = {
@@ -65,6 +88,18 @@ describe('MarketDataService', () => {
           useValue: mockFundamentalsRepo,
         },
         {
+          provide: getRepositoryToken(AnalystRating),
+          useValue: mockAnalystRatingRepo,
+        },
+        {
+          provide: getRepositoryToken(RiskAnalysis),
+          useValue: mockRiskAnalysisRepo,
+        },
+        {
+          provide: getRepositoryToken(ResearchNote),
+          useValue: mockResearchNoteRepo,
+        },
+        {
           provide: TickersService,
           useValue: mockTickersService,
         },
@@ -86,11 +121,26 @@ describe('MarketDataService', () => {
     fundamentalsRepo = module.get<Repository<Fundamentals>>(
       getRepositoryToken(Fundamentals),
     );
+    analystRatingRepo = module.get<Repository<AnalystRating>>(
+      getRepositoryToken(AnalystRating),
+    );
+    riskAnalysisRepo = module.get<Repository<RiskAnalysis>>(
+      getRepositoryToken(RiskAnalysis),
+    );
+    researchNoteRepo = module.get<Repository<ResearchNote>>(
+      getRepositoryToken(ResearchNote),
+    );
     tickersService = module.get<TickersService>(TickersService);
     finnhubService = module.get<FinnhubService>(FinnhubService);
     configService = module.get<ConfigService>(ConfigService);
 
     jest.clearAllMocks();
+
+    mockAnalystRatingRepo.find.mockResolvedValue([]);
+    mockAnalystRatingRepo.count.mockResolvedValue(0);
+    mockRiskAnalysisRepo.findOne.mockResolvedValue(null);
+    mockResearchNoteRepo.count.mockResolvedValue(0);
+    mockFinnhubService.getCompanyNews.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
