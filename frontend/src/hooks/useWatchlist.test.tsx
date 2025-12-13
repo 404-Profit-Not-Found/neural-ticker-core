@@ -45,7 +45,7 @@ describe('useWatchlist Hooks', () => {
     describe('useWatchlists', () => {
         it('fetches watchlists successfully', async () => {
             const mockData = [{ id: '1', name: 'My List', items: [] }];
-            (api.get as any).mockResolvedValueOnce({ data: mockData });
+            (api.get as Mock).mockResolvedValueOnce({ data: mockData });
 
             const { result } = renderHook(() => useWatchlists(), { wrapper });
 
@@ -55,7 +55,7 @@ describe('useWatchlist Hooks', () => {
         });
 
         it('handles failure gracefully', async () => {
-            (api.get as any).mockRejectedValue(new Error('Failed')); // Persistent failure
+            (api.get as Mock).mockRejectedValue(new Error('Failed')); // Persistent failure
             const { result } = renderHook(() => useWatchlists(), { wrapper });
 
             await waitFor(() => expect(result.current.data).toEqual([]));
@@ -64,7 +64,7 @@ describe('useWatchlist Hooks', () => {
 
     describe('useCreateWatchlist', () => {
         it('creates watchlist', async () => {
-            (api.post as any).mockResolvedValueOnce({ data: { id: '1', name: 'New' } });
+            (api.post as Mock).mockResolvedValueOnce({ data: { id: '1', name: 'New' } });
             const { result } = renderHook(() => useCreateWatchlist(), { wrapper });
 
             result.current.mutate('New');
@@ -76,7 +76,7 @@ describe('useWatchlist Hooks', () => {
 
     describe('useDeleteWatchlist', () => {
         it('deletes watchlist', async () => {
-            (api.delete as any).mockResolvedValueOnce({});
+            (api.delete as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => useDeleteWatchlist(), { wrapper });
 
             result.current.mutate('1');
@@ -88,7 +88,7 @@ describe('useWatchlist Hooks', () => {
 
     describe('useRenameWatchlist', () => {
         it('renames watchlist', async () => {
-            (api.patch as any).mockResolvedValueOnce({});
+            (api.patch as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => useRenameWatchlist(), { wrapper });
 
             result.current.mutate({ id: '1', name: 'Renamed' });
@@ -100,7 +100,7 @@ describe('useWatchlist Hooks', () => {
 
     describe('useAddTickerToWatchlist', () => {
         it('adds ticker', async () => {
-            (api.post as any).mockResolvedValueOnce({ data: { id: 'i1' } });
+            (api.post as Mock).mockResolvedValueOnce({ data: { id: 'i1' } });
             const { result } = renderHook(() => useAddTickerToWatchlist(), { wrapper });
 
             result.current.mutate({ watchlistId: '1', symbol: 'AAPL' });
@@ -112,7 +112,7 @@ describe('useWatchlist Hooks', () => {
 
     describe('useRemoveTickerFromWatchlist', () => {
         it('removes ticker', async () => {
-            (api.delete as any).mockResolvedValueOnce({});
+            (api.delete as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => useRemoveTickerFromWatchlist(), { wrapper });
 
             result.current.mutate({ watchlistId: '1', itemId: 'i1' });
@@ -125,7 +125,7 @@ describe('useWatchlist Hooks', () => {
     describe('useMarketSnapshots', () => {
         it('fetches snapshots for symbols', async () => {
             const mockData = [{ ticker: { symbol: 'AAPL' } }];
-            (api.post as any).mockResolvedValueOnce({ data: mockData });
+            (api.post as Mock).mockResolvedValueOnce({ data: mockData });
 
             const { result } = renderHook(() => useMarketSnapshots(['AAPL']), { wrapper });
 
@@ -146,7 +146,7 @@ describe('useWatchlist Hooks', () => {
     describe('useTickerSearch', () => {
         it('searches tickers', async () => {
             const mockData = [{ symbol: 'AAPL' }];
-            (api.get as any).mockResolvedValueOnce({ data: mockData });
+            (api.get as Mock).mockResolvedValueOnce({ data: mockData });
 
             const { result } = renderHook(() => useTickerSearch('AAP'), { wrapper });
 

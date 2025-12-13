@@ -47,7 +47,7 @@ describe('useTicker Hooks', () => {
 
     describe('useTickerDetails', () => {
         it('fetches composite details and watchers', async () => {
-            (api.get as any)
+            (api.get as Mock)
                 .mockResolvedValueOnce({ data: { symbol: 'AAPL', price: 150 } }) // composite
                 .mockResolvedValueOnce({ data: { watchers: 42 } }); // watchers
 
@@ -74,7 +74,7 @@ describe('useTicker Hooks', () => {
     describe('useTickerNews', () => {
         it('fetches news properly', async () => {
             const mockNews = [{ id: 1, headline: 'Apple is King' }];
-            (api.get as any).mockResolvedValueOnce({ data: mockNews });
+            (api.get as Mock).mockResolvedValueOnce({ data: mockNews });
 
             const { result } = renderHook(() => useTickerNews('AAPL'), { wrapper });
 
@@ -87,7 +87,7 @@ describe('useTicker Hooks', () => {
     describe('useTickerLogo', () => {
         it('fetches logo via proxy if finnhub', async () => {
             const mockBlob = new Blob(['fake-image'], { type: 'image/png' });
-            (httpClient.get as any).mockResolvedValueOnce({ data: mockBlob });
+            (httpClient.get as Mock).mockResolvedValueOnce({ data: mockBlob });
 
             const { result } = renderHook(() => useTickerLogo('AAPL', 'https://finnhub.io/logo.png'), { wrapper });
 
@@ -99,7 +99,7 @@ describe('useTicker Hooks', () => {
 
         it('fetches logo via api if not finnhub', async () => {
             const mockBlob = new Blob(['fake-image'], { type: 'image/png' });
-            (api.get as any).mockResolvedValueOnce({ data: mockBlob });
+            (api.get as Mock).mockResolvedValueOnce({ data: mockBlob });
 
             const { result } = renderHook(() => useTickerLogo('AAPL', 'https://other.com/logo.png'), { wrapper });
 
@@ -111,14 +111,14 @@ describe('useTicker Hooks', () => {
 
     describe('useTickerOthers', () => {
         it('fetches risk data', async () => {
-            (api.get as any).mockResolvedValueOnce({ data: { score: 5 } });
+            (api.get as Mock).mockResolvedValueOnce({ data: { score: 5 } });
             const { result } = renderHook(() => useTickerRisk('AAPL'), { wrapper });
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
             expect(result.current.data).toEqual({ score: 5 });
         });
 
         it('fetches social data', async () => {
-            (api.get as any).mockResolvedValueOnce({ data: [{ id: 1 }] });
+            (api.get as Mock).mockResolvedValueOnce({ data: [{ id: 1 }] });
             const { result } = renderHook(() => useTickerSocial('AAPL'), { wrapper });
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
             expect(result.current.data).toEqual([{ id: 1 }]);
@@ -127,7 +127,7 @@ describe('useTicker Hooks', () => {
 
     describe('useTickerMutations', () => {
         it('posts a comment', async () => {
-            (api.post as any).mockResolvedValueOnce({});
+            (api.post as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => usePostComment(), { wrapper });
 
             result.current.mutate({ symbol: 'AAPL', content: 'Hello' });
@@ -137,7 +137,7 @@ describe('useTicker Hooks', () => {
         });
 
         it('triggers research', async () => {
-            (api.post as any).mockResolvedValueOnce({ data: { id: 'job-1' } });
+            (api.post as Mock).mockResolvedValueOnce({ data: { id: 'job-1' } });
             const { result } = renderHook(() => useTriggerResearch(), { wrapper });
 
             result.current.mutate({ symbol: 'AAPL', provider: 'gemini' });
@@ -147,7 +147,7 @@ describe('useTicker Hooks', () => {
         });
 
         it('deletes research', async () => {
-            (api.delete as any).mockResolvedValueOnce({});
+            (api.delete as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => useDeleteResearch(), { wrapper });
             result.current.mutate('r1');
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -155,7 +155,7 @@ describe('useTicker Hooks', () => {
         });
 
         it('updates research title', async () => {
-            (api.post as any).mockResolvedValueOnce({});
+            (api.post as Mock).mockResolvedValueOnce({});
             const { result } = renderHook(() => useUpdateResearchTitle(), { wrapper });
             result.current.mutate({ id: 'r1', title: 'New Title' });
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -166,7 +166,7 @@ describe('useTicker Hooks', () => {
     describe('useTickerResearch', () => {
         it('fetches research with params', async () => {
             const mockResearch = { data: [{ id: 'r1' }] };
-            (api.get as any).mockResolvedValueOnce({ data: mockResearch });
+            (api.get as Mock).mockResolvedValueOnce({ data: mockResearch });
 
             const { result } = renderHook(() => useTickerResearch('AAPL'), { wrapper });
 

@@ -25,7 +25,7 @@ describe('useStockAnalyzer', () => {
 
     it('fetches stock analysis data with params', async () => {
         const mockData = { items: [], total: 0 };
-        (api.get as any).mockResolvedValueOnce({ data: mockData });
+        (api.get as Mock).mockResolvedValueOnce({ data: mockData });
 
         const params = {
             page: 1,
@@ -45,7 +45,7 @@ describe('useStockAnalyzer', () => {
 
     it('fetches stock analysis data with updated filters', async () => {
         const mockData = { items: [{ id: 1 }], total: 1 };
-        (api.get as any).mockResolvedValueOnce({ data: mockData });
+        (api.get as Mock).mockResolvedValueOnce({ data: mockData });
 
         const params = {
             page: 2,

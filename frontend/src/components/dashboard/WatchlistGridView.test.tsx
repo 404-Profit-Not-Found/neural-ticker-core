@@ -87,8 +87,7 @@ describe('WatchlistGridView', () => {
     it('displays correct risk and upside styling', () => {
         renderComponent();
         // AAPL (Low Risk, High Upside)
-        const appleCard = screen.getByText('AAPL').closest('.group');
-        expect(appleCard).toBeInTheDocument();
+        expect(screen.getByText('Apple Inc.').closest('div')).toBeInTheDocument();
 
         // TSLA (High Risk, Negative Upside)
         const teslaCard = screen.getByText('TSLA').closest('.group');
@@ -101,6 +100,7 @@ describe('WatchlistGridView', () => {
 
         // Buttons are hidden by opacity but present. We can click them.
         const removeButtons = screen.getAllByRole('button');
+        expect(removeButtons).toHaveLength(2);
         // Filter for trash button (usually has Trash icon)
         // Since we didn't add aria-label to the button in GridView (maybe we should have), 
         // we can find it by looking for the one that calls the function.
@@ -126,7 +126,6 @@ describe('WatchlistGridView', () => {
 
     it('navigates to ticker page on card click', () => {
         renderComponent();
-        const appleCard = screen.getByText('AAPL').closest('.group');
         // The clickable area is the div inside the card
         const clickableArea = screen.getByText('AAPL').closest('.cursor-pointer');
 

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { Dashboard } from './Dashboard';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -44,15 +44,15 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 
 // Mock Components
 vi.mock('../components/dashboard/WatchlistGridView', () => ({
-    WatchlistGridView: ({ data, isLoading }: any) => (
+    WatchlistGridView: ({ data, isLoading }: { data: unknown[], isLoading: boolean }) => (
         <div data-testid="watchlist-grid">
-            {isLoading ? 'Loading Grid...' : `Grid Items: ${data.length}`}
+            {isLoading ? 'Loading Grid...' : `Grid Items: ${data.length} `}
         </div>
     )
 }));
 // Mock Chart to avoid canvas issues
 vi.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: any) => <div>{children}</div>
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
 import { useTickerResearch, useTriggerResearch } from '../hooks/useTicker';
@@ -67,19 +67,19 @@ describe('Dashboard', () => {
         mockNavigate.mockClear(); // Clear the hoisted mock
 
         // Default Mock Returns
-        (useTickerResearch as any).mockReturnValue({
+        (useTickerResearch as Mock).mockReturnValue({
             data: [],
             isLoading: false
         });
-        (useTriggerResearch as any).mockReturnValue({
+        (useTriggerResearch as Mock).mockReturnValue({
             mutate: mockTriggerResearch,
             isPending: false
         });
-        (useStockAnalyzer as any).mockReturnValue({
+        (useStockAnalyzer as Mock).mockReturnValue({
             data: { items: [] },
             isLoading: false
         });
-        (useQuery as any).mockReturnValue({
+        (useQuery as Mock).mockReturnValue({
             data: { tickers: 100, strongBuy: 5, research: 50 },
             isLoading: false
         });
@@ -103,7 +103,7 @@ describe('Dashboard', () => {
     });
 
     it('renders Top Opportunities section', () => {
-        (useStockAnalyzer as any).mockReturnValue({
+        (useStockAnalyzer as Mock).mockReturnValue({
             data: {
                 items: [
                     {
@@ -123,7 +123,7 @@ describe('Dashboard', () => {
     });
 
     it('renders Latest Research Feed', () => {
-        (useTickerResearch as any).mockReturnValue({
+        (useTickerResearch as Mock).mockReturnValue({
             data: [
                 { id: '1', title: 'Research Note 1', status: 'completed', tickers: ['AAPL'], created_at: new Date().toISOString() }
             ],
@@ -151,7 +151,7 @@ describe('Dashboard', () => {
 
     it('displays recent news digest if available', () => {
         const recentDate = new Date().toISOString();
-        (useTickerResearch as any).mockReturnValue({
+        (useTickerResearch as Mock).mockReturnValue({
             data: [
                 {
                     id: 'news-1',
