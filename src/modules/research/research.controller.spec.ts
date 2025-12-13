@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ResearchController } from './research.controller';
 import { ResearchService } from './research.service';
+import { MarketDataService } from '../market-data/market-data.service';
 
 describe('ResearchController', () => {
   let controller: ResearchController;
@@ -15,6 +16,10 @@ describe('ResearchController', () => {
     deleteResearchNote: jest.fn(),
     updateTitle: jest.fn(),
     streamResearch: jest.fn(),
+    reprocessFinancials: jest.fn(),
+  };
+  const mockMarketDataService = {
+    dedupeAnalystRatings: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,11 +30,34 @@ describe('ResearchController', () => {
           provide: ResearchService,
           useValue: mockResearchService,
         },
+        {
+          provide: MarketDataService,
+          useValue: mockMarketDataService,
+        },
       ],
     }).compile();
 
     controller = module.get<ResearchController>(ResearchController);
     jest.clearAllMocks();
+  });
+
+  describe('syncResearch', () => {
+    it('should reprocess and dedupe', async () => {
+      mockResearchService.reprocessFinancials.mockResolvedValue(undefined);
+      mockMarketDataService.dedupeAnalystRatings.mockResolvedValue({
+        removed: 2,
+      });
+
+      const result = await controller.syncResearch('AAPL');
+
+      expect(mockResearchService.reprocessFinancials).toHaveBeenCalledWith(
+        'AAPL',
+      );
+      expect(
+        mockMarketDataService.dedupeAnalystRatings,
+      ).toHaveBeenCalledWith('AAPL');
+      expect(result).toEqual({ message: 'Sync completed', deduped: 2 });
+    });
   });
 
   it('should be defined', () => {
@@ -97,6 +125,7 @@ describe('ResearchController', () => {
         'all',
         1,
         10,
+        undefined,
       );
     });
   });

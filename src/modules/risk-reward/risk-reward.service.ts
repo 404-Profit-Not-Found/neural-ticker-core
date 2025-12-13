@@ -223,7 +223,7 @@ export class RiskRewardService {
 
         try {
           parsed = JSON.parse(cleanJson);
-        } catch (err) {
+        } catch (_err) {
           // Attempt a tolerant repair: quote bare keys and strip trailing commas
           const repaired = cleanJson
             .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')
@@ -290,8 +290,11 @@ export class RiskRewardService {
     // Scenarios
     analysis.scenarios = [];
     const scenarios = parsed.scenarios || {};
-    const scenarioTypes: ScenarioType[] = ['bull', 'base', 'bear'];
-
+    const scenarioTypes: ScenarioType[] = [
+      ScenarioType.BULL,
+      ScenarioType.BASE,
+      ScenarioType.BEAR,
+    ];
     const buildFallbackScenarios = () => {
       const baseTarget = ev.price_target_weighted || 0;
       const bullTarget = baseTarget ? baseTarget * 1.25 : 0;
@@ -332,13 +335,15 @@ export class RiskRewardService {
       scenarioTypes.every((t) => scenarios[t]) &&
       scenarioTypes.some((t) => scenarios[t]?.price_target_mid);
 
-    const scenarioSource = completeScenarios ? scenarios : buildFallbackScenarios();
+    const scenarioSource = completeScenarios
+      ? scenarios
+      : buildFallbackScenarios();
 
     scenarioTypes.forEach((type) => {
       const data = scenarioSource[type];
       if (data) {
         const scenario = new RiskScenario();
-        scenario.scenario_type = type as ScenarioType;
+        scenario.scenario_type = type;
         scenario.probability = data.probability;
         scenario.description = data.description || '';
         scenario.price_low = data.price_target_low || 0;

@@ -7,9 +7,17 @@ interface FinancialHealthProps {
 
 const Metric = ({ label, value, subtext }: { label: string; value: React.ReactNode; subtext?: string }) => (
     <div className="flex flex-col gap-1">
-        <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">{label}</div>
-        <div className="text-xl font-mono font-bold tracking-tight">{value}</div>
-        {subtext && <div className="text-[10px] text-muted-foreground">{subtext}</div>}
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
+        <div className="text-lg font-bold text-foreground tracking-tight flex items-baseline gap-1">
+            {value}
+            {subtext && <span className="text-xs text-muted-foreground font-normal">{subtext}</span>}
+        </div>
+    </div>
+);
+
+const SectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode }) => (
+    <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider mb-4 border-b border-border/40 pb-2">
+        {icon} {title}
     </div>
 );
 
@@ -34,11 +42,7 @@ export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
         return `${(val * 100).toFixed(2)}%`;
     };
 
-    const SectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode }) => (
-        <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider mb-4 border-b border-border/40 pb-2">
-            {icon} {title}
-        </div>
-    );
+
 
     return (
         <div className="flex flex-col gap-8">

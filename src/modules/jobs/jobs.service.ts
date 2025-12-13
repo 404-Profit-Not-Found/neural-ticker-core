@@ -137,4 +137,22 @@ export class JobsService {
       this.logger.error('Risk/Reward Scanner failed globally', e);
     }
   }
+
+  async syncResearchAndRatings(symbol: string) {
+    this.logger.log(`Syncing research + dedupe ratings for ${symbol}...`);
+    try {
+      // Reprocess research to refresh bull/base/bear and financials
+      await this.researchService.reprocessFinancials(symbol);
+      // Dedupe analyst ratings for the ticker
+      const { removed } =
+        await this.marketDataService.dedupeAnalystRatings(symbol);
+      this.logger.log(
+        `Sync complete for ${symbol}. Removed ${removed} duplicate ratings.`,
+      );
+      return { removed };
+    } catch (e) {
+      this.logger.error(`Sync failed for ${symbol}: ${e.message}`);
+      throw e;
+    }
+  }
 }

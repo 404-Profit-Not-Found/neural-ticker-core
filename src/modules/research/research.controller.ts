@@ -23,6 +23,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ResearchService } from './research.service';
+import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import {
   IsArray,
@@ -133,7 +134,10 @@ class UploadResearchDto {
 @ApiBearerAuth()
 @Controller('v1/research')
 export class ResearchController {
-  constructor(private readonly researchService: ResearchService) {}
+  constructor(
+    private readonly researchService: ResearchService,
+    private readonly marketDataService: MarketDataService,
+  ) {}
 
   @ApiOperation({ summary: 'Upload manual research note' })
   @ApiResponse({ status: 201, description: 'Note created.' })
@@ -368,5 +372,16 @@ export class ResearchController {
   async extractFinancials(@Param('ticker') ticker: string) {
     await this.researchService.reprocessFinancials(ticker);
     return { message: 'Extraction started' };
+  }
+
+  @ApiOperation({
+    summary: 'Reprocess research and dedupe analyst ratings for a ticker',
+  })
+  @ApiResponse({ status: 200, description: 'Sync completed.' })
+  @Post('sync/:ticker')
+  async syncResearch(@Param('ticker') ticker: string) {
+    await this.researchService.reprocessFinancials(ticker);
+    const dedupe = await this.marketDataService.dedupeAnalystRatings(ticker);
+    return { message: 'Sync completed', deduped: dedupe.removed };
   }
 }

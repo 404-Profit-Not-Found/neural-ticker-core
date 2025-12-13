@@ -1,4 +1,4 @@
-import { Brain, ChevronRight, Trash2, Upload, Pencil, Check, X } from 'lucide-react';
+import { Brain, ChevronRight, Trash2, Upload, Pencil, Check, X, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
@@ -9,6 +9,7 @@ import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
 import type { ResearchItem } from '../../types/ticker';
+import { api } from '../../lib/api';
 
 type ModelTier = 'low' | 'medium' | 'high' | 'deep';
 
@@ -28,6 +29,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     // Local state for editing
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const startEditing = (item: ResearchItem, e: MouseEvent) => {
         e.stopPropagation();
@@ -77,6 +79,28 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                 </Button>
                             }
                         />
+                        {defaultTicker && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-2"
+                                disabled={isSyncing}
+                                onClick={async () => {
+                                    if (isSyncing) return;
+                                    try {
+                                        setIsSyncing(true);
+                                        await api.post(`/research/sync/${defaultTicker}`);
+                                    } catch (err) {
+                                        console.error('Sync failed', err);
+                                    } finally {
+                                        setIsSyncing(false);
+                                    }
+                                }}
+                            >
+                                {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw size={12} />}
+                                {isSyncing ? 'Syncing...' : 'Sync AI Data'}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>

@@ -310,6 +310,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
               ticker,
               data.ratings,
             );
+            await this.marketDataService.dedupeAnalystRatings(ticker);
           }
 
           this.logger.log(`Extracted financials & ratings for ${ticker}`);

@@ -4,6 +4,7 @@ import {
   Headers,
   UnauthorizedException,
   Logger,
+  Param,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
@@ -54,5 +55,20 @@ export class JobsController {
     this.validateSecret(secret);
     const result = await this.jobsService.cleanupStuckResearch();
     return { message: 'Cleanup completed', stats: result };
+  }
+
+  @Post('sync-research/:symbol')
+  @ApiOperation({
+    summary: 'Reprocess research + dedupe analyst ratings for a ticker',
+  })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Sync completed' })
+  async syncResearch(
+    @Headers('X-Cron-Secret') secret: string,
+    @Param('symbol') symbol: string,
+  ) {
+    this.validateSecret(secret);
+    const result = await this.jobsService.syncResearchAndRatings(symbol);
+    return { message: 'Sync completed', ...result };
   }
 }
