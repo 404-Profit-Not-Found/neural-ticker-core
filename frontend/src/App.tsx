@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { WatchlistPage } from './pages/WatchlistPage';
+import { AnalyzerPage } from './pages/AnalyzerPage';
 // import TickerDetails from './pages/TickerDetails'; // Legacy replaced by TickerDetail
 import { ProfilePage } from './pages/ProfilePage';
 import { AccessDenied } from './pages/AccessDenied';
@@ -78,8 +80,8 @@ function App() {
             {/* Add more routes here */}
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/watchlist" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/analyzer" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
+            <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/settings/style" element={<ProtectedRoute><StyleGuidePage /></ProtectedRoute>} />
             <Route path="/settings" element={<Navigate to="/settings/style" replace />} />
 

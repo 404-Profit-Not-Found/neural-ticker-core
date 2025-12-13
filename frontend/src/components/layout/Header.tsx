@@ -1,13 +1,14 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Settings, User as UserIcon, Shield, Palette } from 'lucide-react';
+import { Bell, Settings, User as UserIcon, Shield, Palette, Menu, X } from 'lucide-react';
 
 export function Header() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (path: string) => {
     if (path === '/dashboard' && (location.pathname === '/' || location.pathname === '/dashboard')) return true;
@@ -20,40 +21,53 @@ export function Header() {
       : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
     }`;
 
-  const closeMenu = useEffectEvent(() => setMenuOpen(false));
+  const mobileLinkClass = (path: string) =>
+    `block px-4 py-3 text-base font-medium transition-colors rounded-md ${isActive(path)
+      ? 'bg-primary/10 text-primary'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+    }`;
+
+  const closeMenus = useCallback(() => {
+    setProfileMenuOpen(false);
+    setMobileMenuOpen(false);
+  }, []);
 
   useEffect(() => {
-    closeMenu();
-  }, [location.pathname]);
+    const timer = setTimeout(() => closeMenus(), 0);
+    return () => clearTimeout(timer);
+  }, [location, location.pathname, closeMenus]);
 
   const goTo = (path: string) => {
-    setMenuOpen(false);
+    closeMenus();
     navigate(path);
   };
 
   return (
     <header className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
-        {/* Left: Logo */}
-        <div className="flex items-center">
+
+        {/* Left: Mobile Menu Toggle & Logo */}
+        <div className="flex items-center gap-4">
+          <button
+            className="md:hidden text-muted-foreground hover:text-foreground"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+
           <Link to="/dashboard" className="text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity">
             NeuralTicker.com
           </Link>
         </div>
 
-        {/* Center: Nav */}
-        <nav className="flex items-center gap-8">
-          <Link to="/dashboard" className={linkClass('/dashboard')}>
-            Dashboard
-          </Link>
-          <Link to="/portfolio" className={linkClass('/portfolio')}>
-            My Portfolio
-          </Link>
+        {/* Center: Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-8">
           <Link to="/watchlist" className={linkClass('/watchlist')}>
-            My Watchlist
+            Watchlist
           </Link>
           <Link to="/analyzer" className={linkClass('/analyzer')}>
-            Stock Analyzer
+            Tickers
           </Link>
         </nav>
 
@@ -67,8 +81,8 @@ export function Header() {
           <div className="relative">
             <button
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-expanded={menuOpen}
+              onClick={() => setProfileMenuOpen((open) => !open)}
+              aria-expanded={profileMenuOpen}
               aria-haspopup="menu"
               type="button"
               aria-label="User menu"
@@ -86,8 +100,9 @@ export function Header() {
               )}
             </button>
 
+            {/* Profile Dropdown */}
             <div
-              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${menuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${profileMenuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
                 }`}
             >
               <div className="p-4 border-b border-border">
@@ -146,6 +161,27 @@ export function Header() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-14 left-0 w-full bg-background border-b border-border shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2">
+          <Link to="/watchlist" className={mobileLinkClass('/watchlist')}>
+            Watchlist
+          </Link>
+          <Link to="/analyzer" className={mobileLinkClass('/analyzer')}>
+            Tickers
+          </Link>
+          <div className="h-px bg-border my-2" />
+          <button
+            type="button"
+            onClick={() => goTo('/profile')}
+            className="w-full flex items-center gap-3 px-4 py-3 text-base text-left text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            <UserIcon size={18} />
+            Your Profile
+          </button>
+        </div>
+      )}
     </header >
   );
 }

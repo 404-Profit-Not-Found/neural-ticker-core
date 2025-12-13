@@ -94,51 +94,87 @@ export function TickerDetail() {
             <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6">
 
                 {/* --- 1. HERO HEADER --- */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8">
+                {/* --- 1. HERO HEADER --- */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 border-b border-border pb-4 md:pb-6">
+                    <div className="flex items-start md:items-center gap-3 md:gap-4 w-full">
+                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0">
                             <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                         </Button>
 
-                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-12 h-12" />
+                        <div className="flex-1 min-w-0 grid grid-cols-[auto_1fr] md:flex md:items-center gap-x-3 gap-y-1">
+                            {/* Logo */}
+                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 md:w-12 md:h-12 row-span-2 md:row-span-1" />
 
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-2xl font-bold tracking-tight">{profile?.symbol}</h1>
-                                <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{profile?.exchange}</span>
+                            {/* Top Row: Symbol + Exchange + Price (Mobile Right) */}
+                            <div className="flex items-center justify-between md:justify-start gap-2 col-start-2">
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                    <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide hidden md:inline-block">{profile?.exchange}</span>
+                                </div>
+                                
+                                {/* Mobile Price Display */}
+                                <div className="md:hidden flex items-center gap-2">
+                                    <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                        {isPriceUp ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
+                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                    </span>
+                                    <span className="text-lg font-mono font-bold tracking-tight">
+                                        ${market_data?.price?.toFixed(2)}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="text-sm text-muted-foreground font-medium">{profile?.name}</div>
-                        </div>
 
-                        <div className="h-8 w-px bg-border mx-2 hidden md:block" />
+                            {/* Bottom Row: Name + Divider + Regular Price (Desktop) */}
+                            <div className="flex items-center justify-between md:justify-start gap-4 col-start-2 md:col-auto w-full md:w-auto">
+                                <div className="text-xs md:text-sm text-muted-foreground font-medium truncate">{profile?.name}</div>
 
-                        <div className="hidden md:block">
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-mono font-semibold tracking-tight">
-                                    ${market_data?.price?.toFixed(2)}
-                                </span>
-                                <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                    {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                                    {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
-                                </span>
+                                {/* Desktop Price Display */}
+                                <div className="hidden md:flex items-center gap-4">
+                                     <div className="h-4 w-px bg-border hidden md:block" />
+                                     <div className="flex items-baseline gap-2">
+                                        <span className="text-2xl font-mono font-semibold tracking-tight">
+                                            ${market_data?.price?.toFixed(2)}
+                                        </span>
+                                        <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                            {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+                                            {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {risk_analysis && (
-                            <RiskLight
-                                score={risk_analysis.overall_score}
-                                reasoning={risk_analysis.summary}
-                            />
-                        )}
-                        <div className="h-4 w-px bg-border mx-1" />
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1.5 rounded-md border border-border/50">
-                            <Eye size={12} />
-                            <span className="font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                    <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                        <div className="flex items-center gap-3">
+                            {risk_analysis && (
+                                <>
+                                    {/* Desktop Risk */}
+                                    <div className="hidden md:block">
+                                        <RiskLight
+                                            score={risk_analysis.overall_score}
+                                            reasoning={risk_analysis.summary}
+                                        />
+                                    </div>
+                                    {/* Mobile Compact Risk */}
+                                    <div className="md:hidden block">
+                                        <RiskLight
+                                            score={risk_analysis.overall_score}
+                                            reasoning={risk_analysis.summary}
+                                            compact={true}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                            <div className="h-4 w-px bg-border mx-1 hidden md:block" />
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1.5 rounded-md border border-border/50">
+                                <Eye size={14} className="md:w-3 md:h-3" />
+                                <span className="font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                            </div>
                         </div>
-                        <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
-                            <Share2 size={12} /> Share
+                        
+                        <Button variant="outline" size="sm" className="gap-2 h-8 md:h-9 text-xs ml-auto md:ml-0">
+                            <Share2 size={12} /> <span className="hidden md:inline">Share</span>
                         </Button>
                     </div>
                 </div>
@@ -151,8 +187,8 @@ export function TickerDetail() {
                 >
                     <TabsList className="mb-6">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="financials">Financials & Details</TabsTrigger>
                         <TabsTrigger value="research">AI Research</TabsTrigger>
+                        <TabsTrigger value="financials">Financials</TabsTrigger>
                         <TabsTrigger value="news">News</TabsTrigger>
                     </TabsList>
 
@@ -165,11 +201,6 @@ export function TickerDetail() {
                         />
                     </TabsContent>
 
-                    {/* FINANCIALS TAB */}
-                    <TabsContent value="financials">
-                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} />
-                    </TabsContent>
-
                     {/* AI RESEARCH TAB */}
                     <TabsContent value="research">
                         <ResearchFeed
@@ -179,6 +210,11 @@ export function TickerDetail() {
                             onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
                             defaultTicker={symbol}
                         />
+                    </TabsContent>
+
+                    {/* FINANCIALS TAB */}
+                    <TabsContent value="financials">
+                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} />
                     </TabsContent>
 
                     {/* NEWS TAB */}

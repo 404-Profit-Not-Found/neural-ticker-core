@@ -7,8 +7,11 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
+import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { RISK_ALGO } from '../../config/risk-algorithm.config';
 
 @Injectable()
 export class MarketDataService {
@@ -25,6 +28,10 @@ export class MarketDataService {
     private readonly riskAnalysisRepo: Repository<RiskAnalysis>,
     @InjectRepository(ResearchNote)
     private readonly researchNoteRepo: Repository<ResearchNote>,
+    @InjectRepository(Comment)
+    private readonly commentRepo: Repository<Comment>,
+    @InjectRepository(CompanyNews)
+    private readonly companyNewsRepo: Repository<CompanyNews>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -187,7 +194,7 @@ export class MarketDataService {
     }
 
     // Fetch latest AI Risk Analysis
-    const [aiAnalysis, researchCount, analystCount, newsItems] =
+    const [aiAnalysis, researchCount, analystCount, newsItems, socialCount] =
       await Promise.all([
         this.riskAnalysisRepo.findOne({
           where: { ticker_id: tickerEntity.id },
@@ -202,12 +209,14 @@ export class MarketDataService {
         }),
         this.finnhubService.getCompanyNews(
           symbol,
-          // Last 7 days
           new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0],
           new Date().toISOString().split('T')[0],
         ),
+        this.commentRepo.count({
+          where: { ticker_symbol: symbol },
+        }),
       ]);
 
     return {
@@ -220,6 +229,7 @@ export class MarketDataService {
         news: newsItems.length,
         research: researchCount,
         analysts: analystCount,
+        social: socialCount,
       },
     };
   }
@@ -273,16 +283,73 @@ export class MarketDataService {
   }
 
   async getCompanyNews(symbol: string, from?: string, to?: string) {
-    // Default window: last 7 days if not provided
+    const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+
+    // Default range: last 7 days if not specified
     const toDate = to ? new Date(to) : new Date();
     const fromDate = from
       ? new Date(from)
-      : new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const toStr = this.formatDateOnly(toDate);
-    const fromStr = this.formatDateOnly(fromDate);
+    // Check DB first
+    // Simplified strategy: If count > 0 in range, return DB. Else fetch API and cache.
+    const count = await this.companyNewsRepo.count({
+      where: {
+        symbol_id: ticker.id,
+        datetime: Between(fromDate, toDate),
+      },
+    });
 
-    return this.finnhubService.getCompanyNews(symbol, fromStr, toStr);
+    if (count > 0) {
+      return this.companyNewsRepo.find({
+        where: {
+          symbol_id: ticker.id,
+          datetime: Between(fromDate, toDate),
+        },
+        order: { datetime: 'DESC' },
+      });
+    }
+
+    // Fetch from API
+    const news = await this.finnhubService.getCompanyNews(
+      symbol,
+      fromDate.toISOString().split('T')[0],
+      toDate.toISOString().split('T')[0],
+    );
+
+    // Upsert logic
+    if (news && news.length > 0) {
+      const entities = news.map((n: any) => ({
+        symbol_id: ticker.id,
+        external_id: n.id,
+        datetime: new Date(n.datetime * 1000),
+        headline: n.headline,
+        source: n.source,
+        url: n.url,
+        summary: n.summary,
+        image: n.image,
+        related: n.related,
+      }));
+
+      // Insert ignoring duplicates (on conflict do nothing)
+      await this.companyNewsRepo
+        .createQueryBuilder()
+        .insert()
+        .values(entities)
+        .orIgnore() // Based on unique constraint (symbol_id, external_id)
+        .execute();
+
+      // Return saved entities to ensure correct format
+      return this.companyNewsRepo.find({
+        where: {
+          symbol_id: ticker.id,
+          datetime: Between(fromDate, toDate),
+        },
+        order: { datetime: 'DESC' },
+      });
+    }
+
+    return [];
   }
 
   async getNewsStats(symbols: string[], from?: string, to?: string) {
@@ -371,6 +438,9 @@ export class MarketDataService {
       // Enhanced validation: ensure firm exists and rating_date is a real date (not null, undefined, or the string "null")
       if (!rating.firm) continue;
       if (!rating.rating_date) continue;
+      // Also ensure rating itself is present (database constraint)
+      if (rating.rating === null || rating.rating === undefined) continue;
+
       const dateStr = String(rating.rating_date).trim();
       if (dateStr === 'null' || dateStr === '') continue;
       if (isNaN(new Date(dateStr).getTime())) continue; // skip invalid dates
@@ -457,4 +527,261 @@ export class MarketDataService {
 
     return unique;
   }
+
+  /**
+   * Get count of tickers where both analyst consensus = "Strong Buy" AND AI rating is bullish.
+   * Criteria defined in RISK_ALGO config.
+   */
+  async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
+    // Query fundamentals with Strong Buy consensus
+    const strongBuyFundamentals = await this.fundamentalsRepo.find({
+      where: { consensus_rating: 'Strong Buy' },
+      select: ['symbol_id'],
+    });
+
+    if (strongBuyFundamentals.length === 0) {
+      return { count: 0, symbols: [] };
+    }
+
+    const symbolIds = strongBuyFundamentals.map((f) => f.symbol_id);
+
+    // Filter by AI Opinion
+    const matchingRisk = await this.riskAnalysisRepo
+      .createQueryBuilder('risk')
+      .select('risk.ticker_id')
+      .distinctOn(['risk.ticker_id'])
+      .where('risk.ticker_id IN (:...ids)', { ids: symbolIds })
+      .andWhere('risk.overall_score <= :maxRisk', {
+        maxRisk: RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE,
+      })
+      .andWhere('risk.upside_percent > :minUpside', {
+        minUpside: RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT,
+      })
+      .orderBy('risk.ticker_id')
+      .addOrderBy('risk.created_at', 'DESC')
+      .getMany();
+
+    // Get symbols
+    const matchingSymbolIds = matchingRisk.map((r) => r.ticker_id);
+    const symbols =
+      await this.tickersService.getSymbolsByIds(matchingSymbolIds);
+
+    return { count: symbols.length, symbols };
+  }
+
+  /**
+   * Get count of tickers where both analyst consensus = "Sell" OR AI rating is bearish.
+   * Criteria defined in RISK_ALGO config.
+   */
+  async getSellCount(): Promise<{ count: number; symbols: string[] }> {
+    // For Sell, we can be broader. Any "Sell" consensus OR terrible AI rating.
+    const sellFundamentals = await this.fundamentalsRepo.find({
+      where: { consensus_rating: 'Sell' },
+      select: ['symbol_id'],
+    });
+
+    const sellSymbolIds = sellFundamentals.map((f) => f.symbol_id);
+
+    // AI Bearish
+    const bearishRisk = await this.riskAnalysisRepo
+      .createQueryBuilder('risk')
+      .select('risk.ticker_id')
+      .distinctOn(['risk.ticker_id'])
+      .where('risk.overall_score >= :minRisk', {
+        minRisk: RISK_ALGO.SELL.MIN_RISK_SCORE,
+      })
+      .orWhere('risk.upside_percent < :maxUpside', {
+        maxUpside: RISK_ALGO.SELL.MAX_UPSIDE_PERCENT,
+      })
+      .orderBy('risk.ticker_id')
+      .addOrderBy('risk.created_at', 'DESC')
+      .getMany();
+
+    // Union of IDs
+    const bearishSymbolIds = bearishRisk.map((r) => r.ticker_id);
+    const allIds = Array.from(
+      new Set([...sellSymbolIds, ...bearishSymbolIds]),
+    ).map((id) => Number(id)); // Ensure they are numbers
+
+    if (allIds.length === 0) {
+      return { count: 0, symbols: [] };
+    }
+
+    const symbols = await this.tickersService.getSymbolsByIds(allIds);
+    return { count: symbols.length, symbols };
+  }
+
+  /**
+   * Get paginated analyzer data
+   */
+  async getAnalyzerTickers(options: AnalyzerOptions) {
+    const page = options.page || 1;
+    const limit = options.limit || 50;
+    const skip = (page - 1) * limit;
+    const sortBy = options.sortBy || 'market_cap';
+    const sortDir = options.sortDir || 'DESC';
+    const search = options.search ? options.search.toUpperCase() : null;
+
+    const qb = this.tickersService.getRepo().createQueryBuilder('ticker');
+
+    // Join Fundamentals (MapOne to attach to entity properly)
+    qb.leftJoinAndMapOne(
+      'ticker.fund',
+      Fundamentals,
+      'fund',
+      'fund.symbol_id = CAST(ticker.id AS BIGINT)',
+    );
+
+    // Join Latest Price (Subquery)
+    qb.leftJoinAndMapOne(
+      'ticker.latestPrice',
+      PriceOhlcv,
+      'price',
+      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
+    );
+
+    // Calculate Price Change %
+    // (close - prevClose) / prevClose * 100. Handle division by zero.
+    qb.addSelect(
+      `CASE 
+        WHEN price.prevClose IS NOT NULL AND price.prevClose != 0 
+        THEN ((price.close - price.prevClose) / price.prevClose) * 100 
+        ELSE 0 
+       END`,
+      'price_change_pct',
+    );
+
+    // Join Latest Risk
+    qb.leftJoinAndMapOne(
+      'ticker.latestRisk',
+      RiskAnalysis,
+      'risk',
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
+    );
+
+    // Analyst Count Subquery
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('analyst_ratings', 'ar')
+        .where('ar.symbol_id = ticker.id');
+    }, 'analyst_count');
+
+    // Research Count Subquery
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('research_notes', 'rn')
+        .where('ticker.symbol = ANY(rn.tickers)');
+    }, 'research_count');
+
+    // Social Count Subquery
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('comments', 'c')
+        .where('c.ticker_symbol = ticker.symbol');
+    }, 'social_count');
+
+    // News Count Subquery
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('COUNT(*)', 'count')
+        .from('company_news', 'cn')
+        .where('cn.symbol_id = ticker.id');
+    }, 'news_count');
+
+    // Filter
+    if (search) {
+      qb.where(
+        '(UPPER(ticker.symbol) LIKE :search OR UPPER(ticker.name) LIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Sort Mapping
+    let sortField = `fund.${sortBy}`; // Default to fundamentals
+
+    if (sortBy === 'change') {
+      // Sort by computed column expression or alias (alias often works in Postgres if selected)
+      // We use the alias 'price_change_pct' which we defined above.
+      // Note: Postgres allows ordering by alias in ORDER BY clause.
+      sortField = '"price_change_pct"';
+    } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
+      sortField = `ticker.${sortBy}`;
+    } else if (
+      ['overall_score', 'upside_percent', 'financial_risk'].includes(sortBy)
+    ) {
+      sortField = `risk.${sortBy}`;
+    } else if (['close', 'volume'].includes(sortBy)) {
+      sortField = `price.${sortBy}`;
+    }
+
+    qb.orderBy(sortField, sortDir);
+
+    // Add secondary sort for stability
+    qb.addOrderBy('ticker.symbol', 'ASC');
+
+    qb.skip(skip).take(limit);
+
+    // Get Raw Entities (mapped)
+    const { entities, raw } = await qb.getRawAndEntities();
+    const total = await qb.getCount();
+
+    return {
+      items: entities.map((t: any) => {
+        // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
+        // but strict matching by ID is safer.
+        const rawData = raw.find((r) => r.ticker_id === t.id);
+
+        const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
+        const researchCount = rawData
+          ? parseInt(rawData.research_count, 10)
+          : 0;
+        const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
+        const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
+        const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
+
+        // Inject change into latestPrice
+        const latestPriceWithChange = t.latestPrice
+          ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
+          : null;
+
+        return {
+          ticker: {
+            id: t.id,
+            symbol: t.symbol,
+            name: t.name,
+            exchange: t.exchange,
+            sector: t.sector,
+            industry: t.industry,
+            logo_url: t.logo_url,
+          },
+          fundamentals: t.fund || {},
+          latestPrice: latestPriceWithChange,
+          aiAnalysis: t.latestRisk || null,
+          counts: {
+            analysts: isNaN(analystCount) ? 0 : analystCount,
+            research: isNaN(researchCount) ? 0 : researchCount,
+            news: isNaN(newsCount) ? 0 : newsCount,
+            social: isNaN(socialCount) ? 0 : socialCount,
+          },
+        };
+      }),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+}
+
+export interface AnalyzerOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDir?: 'ASC' | 'DESC';
+  search?: string;
 }

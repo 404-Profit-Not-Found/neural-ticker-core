@@ -54,46 +54,48 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                         />
 
                         {/* Probability Badge */}
-                        <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border z-10">
+                        <div className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-background/50 backdrop-blur-sm border z-10 shadow-sm">
                             {(Number(scenario.probability) * 100).toFixed(0)}% Prob
                         </div>
 
-                        <CardContent className="p-4 flex flex-col gap-3 flex-1">
-                            <div className="flex items-center gap-2">
-                                <div className={cn(
-                                    "w-2 h-8 rounded-full",
-                                    scenario.scenario_type === 'bull' && "bg-green-500",
-                                    scenario.scenario_type === 'bear' && "bg-red-500",
-                                    scenario.scenario_type === 'base' && "bg-blue-500"
-                                )} />
-                                <div>
-                                    <h3 className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                                        {scenario.scenario_type} CASE
-                                    </h3>
-                                    <div className="text-2xl font-bold flex items-center gap-2">
-                                        ${Number(scenario.price_mid).toFixed(2)}
-                                        <span className={cn(
-                                            "text-sm font-medium flex items-center",
-                                            isPositive ? "text-green-500" : "text-red-500"
-                                        )}>
-                                            {isPositive ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                                            {Math.abs(upside).toFixed(1)}%
-                                        </span>
+                        <CardContent className="p-3 flex flex-col gap-2 flex-1">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                        "w-1.5 h-8 rounded-full",
+                                        scenario.scenario_type === 'bull' && "bg-green-500",
+                                        scenario.scenario_type === 'bear' && "bg-red-500",
+                                        scenario.scenario_type === 'base' && "bg-blue-500"
+                                    )} />
+                                    <div>
+                                        <h3 className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground leading-none">
+                                            {scenario.scenario_type} CASE
+                                        </h3>
+                                        <div className="text-lg font-bold flex items-center gap-1.5 leading-tight mt-0.5">
+                                            ${Number(scenario.price_mid).toFixed(2)}
+                                            <span className={cn(
+                                                "text-xs font-medium flex items-center",
+                                                isPositive ? "text-green-500" : "text-red-500"
+                                            )}>
+                                                {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                                                {Math.abs(upside).toFixed(1)}%
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <p className="text-sm text-muted-foreground line-clamp-3 min-h-[60px]">
+                            <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
                                 {scenario.description}
                             </p>
 
-                            <div className="mt-auto space-y-2">
-                                <div className="flex justify-between text-xs text-muted-foreground border-t border-dashed border-border pt-2">
-                                    <span>Range</span>
+                            <div className="mt-auto pt-2 border-t border-dashed border-border flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+                                <div className="flex gap-2">
+                                    <span className="opacity-70">Range:</span>
                                     <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>
                                 </div>
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>Exp. Cap</span>
+                                <div className="flex gap-2">
+                                    <span className="opacity-70">Cap:</span>
                                     <span>${(Number(scenario.expected_market_cap || 0) / 1e9).toFixed(1)}B</span>
                                 </div>
                             </div>

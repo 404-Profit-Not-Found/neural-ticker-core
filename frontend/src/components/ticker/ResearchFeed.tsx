@@ -56,17 +56,19 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
 
     return (
         <Card className="h-full flex flex-col overflow-hidden">
-            <CardHeader className="py-4 border-b border-border bg-muted/10">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="font-bold text-sm flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-primary" /> AI Research History
+            <CardHeader className="py-3 px-3 md:py-4 md:px-4 border-b border-border bg-muted/10">
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
+                        <Brain className="w-4 h-4 text-primary" />
+                        <span className="hidden xs:inline">AI Research History</span>
+                        <span className="xs:hidden">History</span>
                     </CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 md:gap-2">
                         <UploadResearchDialog
                             defaultTicker={defaultTicker}
                             trigger={
-                                <Button size="sm" variant="outline" className="h-7 text-xs gap-2">
-                                    <Upload size={12} /> Upload
+                                <Button size="sm" variant="outline" className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2">
+                                    <Upload size={12} /> <span className="hidden md:inline">Upload</span>
                                 </Button>
                             }
                         />
@@ -77,8 +79,8 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                             isAnalyzing={isAnalyzing}
                             defaultTicker={defaultTicker}
                             trigger={
-                                <Button size="sm" className="h-7 text-xs gap-2">
-                                    <Brain size={12} /> Run Analysis
+                                <Button size="sm" className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2">
+                                    <Brain size={12} /> <span className="hidden md:inline">Analytics</span>
                                 </Button>
                             }
                         />
@@ -86,7 +88,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-xs gap-2"
+                                className="h-7 w-7 p-0 md:w-auto md:px-3 text-xs gap-2"
                                 disabled={isSyncing}
                                 onClick={async () => {
                                     if (isSyncing) return;
@@ -104,7 +106,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                 }}
                             >
                                 {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw size={12} />}
-                                {isSyncing ? 'Syncing...' : 'Sync AI Data'}
+                                <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
                             </Button>
                         )}
                     </div>
@@ -125,11 +127,11 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                             return (
                                 <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                                     <div
-                                        className="p-4 cursor-pointer flex items-center justify-between group"
+                                        className="p-3 md:p-4 cursor-pointer flex items-center justify-between group"
                                         onClick={() => navigate(`/research/${item.id}`)}
                                     >
-                                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                                            <div className={`w-2 h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
+                                        <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                                            <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
                                             <div className="flex-1 min-w-0">
                                                 {editingId === item.id ? (
                                                     <div className="flex items-center gap-2 mb-1" onClick={e => e.stopPropagation()}>
@@ -152,15 +154,15 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center gap-2 group/title mb-1">
-                                                        <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                                                    <div className="flex items-center gap-2 group/title mb-0.5 md:mb-1">
+                                                        <div className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors leading-tight">
                                                             {item.title || item.question || "Smart analysis"}
                                                         </div>
                                                         {canEdit && (
                                                             <Button
                                                                 size="icon"
                                                                 variant="ghost"
-                                                                className="h-5 w-5 opacity-0 group-hover/title:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
+                                                                className="h-4 w-4 md:h-5 md:w-5 opacity-0 group-hover/title:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
                                                                 onClick={(e) => startEditing(item, e)}
                                                             >
                                                                 <Pencil size={10} />
@@ -169,39 +171,39 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                     </div>
                                                 )}
 
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold uppercase text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
-                                                    <span className="text-muted-foreground text-xs">•</span>
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                    <span className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">{new Date(item.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
 
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-xs text-muted-foreground">By</span>
+                                                    <div className="flex items-center gap-1.5 min-w-0 max-w-[120px] md:max-w-[200px]">
+                                                        <span className="text-[10px] md:text-xs text-muted-foreground hidden md:inline">By</span>
 
-                                                        <div className="w-4 h-4 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                                                        <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
                                                             {item.user?.avatar_url ? (
                                                                 <img src={item.user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <span className="text-[9px] font-bold text-muted-foreground">
+                                                                <span className="text-[8px] md:text-[9px] font-bold text-muted-foreground">
                                                                     {(item.user?.nickname || item.user?.email || '?').charAt(0).toUpperCase()}
                                                                 </span>
                                                             )}
                                                         </div>
 
-                                                        <span className="font-semibold text-foreground text-xs">{authorName}</span>
+                                                        <span className="font-semibold text-foreground text-[10px] md:text-xs truncate">{authorName}</span>
                                                     </div>
 
                                                     {item.provider === 'manual' && (
                                                         <>
-                                                            <span className="text-muted-foreground text-xs">•</span>
-                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">
-                                                                Manual Upload
+                                                            <span className="text-muted-foreground text-[10px] md:text-xs">•</span>
+                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20 whitespace-nowrap">
+                                                                Manual
                                                             </Badge>
                                                         </>
                                                     )}
 
                                                     {item.provider !== 'manual' && item.provider && (
                                                         <>
-                                                            <span className="text-muted-foreground text-xs">•</span>
-                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
+                                                            <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
+                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20 whitespace-nowrap max-w-[100px] truncate">
                                                                 {item.models_used && item.models_used.length > 0 ? item.models_used[0] : item.provider}
                                                             </Badge>
                                                         </>
@@ -224,7 +226,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                 </Button>
                                             )}
                                             {!editingId && (
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground group-hover:text-foreground">
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground group-hover:text-foreground hidden md:inline-flex">
                                                     <ChevronRight size={16} />
                                                 </Button>
                                             )}

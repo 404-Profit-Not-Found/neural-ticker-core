@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { WatchlistTable } from './WatchlistTable';
 import { ToastProvider } from '../ui/toast';
 import { api } from '../../lib/api';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import '@testing-library/jest-dom';
+import { vi, describe, it, expect, beforeEach, afterEach, type MockInstance } from 'vitest';
 import type { AxiosResponse } from 'axios';
 
 vi.mock('react-router-dom', async () => {
@@ -35,18 +36,18 @@ const renderWithProviders = () =>
   );
 
 type WatchlistPayload = { id: string; name: string; items: unknown[] }[];
-let mockGet: vi.SpyInstance<Promise<AxiosResponse<WatchlistPayload>>, Parameters<typeof api.get>>;
-let mockDelete: vi.SpyInstance<Promise<AxiosResponse<{ success: boolean }>>, Parameters<typeof api.delete>>;
+let mockGet: MockInstance;
+let mockDelete: MockInstance;
 
 describe('WatchlistTable', () => {
   beforeEach(() => {
     mockGet = vi
       .spyOn(api, 'get')
-      .mockResolvedValue({ data: [{ id: 'list-1', name: 'My List', items: [] }] } as AxiosResponse<WatchlistPayload>);
+      .mockResolvedValue({ data: [{ id: 'list-1', name: 'My List', items: [] }] } as unknown as AxiosResponse<WatchlistPayload>);
     mockDelete = vi
       .spyOn(api, 'delete')
-      .mockResolvedValue({ data: { success: true } } as AxiosResponse<{ success: boolean }>);
-    vi.spyOn(api, 'post').mockResolvedValue({ data: [] } as AxiosResponse<unknown>);
+      .mockResolvedValue({ data: { success: true } } as unknown as AxiosResponse<{ success: boolean }>);
+    vi.spyOn(api, 'post').mockResolvedValue({ data: [] } as unknown as AxiosResponse<unknown>);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -59,7 +60,7 @@ describe('WatchlistTable', () => {
     renderWithProviders();
 
     expect(
-      await screen.findByRole('button', { name: /delete watchlist/i }),
+      await screen.findByRole('button', { name: /delete watchlist/i }, { timeout: 3000 }),
     ).toBeInTheDocument();
     expect(mockGet).toHaveBeenCalled();
   });

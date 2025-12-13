@@ -65,36 +65,36 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-6 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-4 py-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {MODEL_OPTIONS.map((model) => (
                             <div
                                 key={model.key}
                                 className={cn(
-                                    "relative flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all hover:bg-muted/50",
+                                    "relative flex flex-col gap-1.5 rounded-lg border p-3 cursor-pointer transition-all hover:bg-muted/50",
                                     selectedModelKey === model.key
                                         ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                                         : "border-border"
                                 )}
                                 onClick={() => setSelectedModelKey(model.key)}
                             >
-                                <div className="flex items-start justify-between">
-                                    <div className="font-semibold text-sm">{model.label}</div>
+                                <div className="flex items-center justify-between">
+                                    <div className="font-bold text-xs">{model.label}</div>
                                     {selectedModelKey === model.key && (
-                                        <div className="h-2 w-2 rounded-full bg-primary absolute top-4 right-4" />
+                                        <div className="h-1.5 w-1.5 rounded-full bg-primary absolute top-3 right-3" />
                                     )}
                                 </div>
 
-                                <div className="text-xs text-muted-foreground leading-relaxed min-h-[40px]">
+                                <div className="text-[10px] text-muted-foreground leading-snug line-clamp-2 min-h-[2.5em]">
                                     {model.description}
                                 </div>
 
-                                <div className="flex items-center gap-2 mt-auto pt-2">
-                                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 gap-1 font-normal">
-                                        <Zap size={10} /> {model.speed}
+                                <div className="flex items-center gap-1.5 mt-auto pt-1">
+                                    <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
+                                        <Zap size={8} /> {model.speed}
                                     </Badge>
-                                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 gap-1 font-normal">
-                                        <Target size={10} /> {model.accuracy}
+                                    <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
+                                        <Target size={8} /> {model.accuracy}
                                     </Badge>
                                 </div>
                             </div>

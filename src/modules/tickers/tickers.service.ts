@@ -163,6 +163,10 @@ export class TickersService {
     return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }
 
+  async getCount(): Promise<number> {
+    return this.tickerRepo.count();
+  }
+
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
       select: ['symbol', 'name', 'exchange'],
@@ -188,6 +192,23 @@ export class TickersService {
       .orWhere('UPPER(ticker.name) LIKE :pattern', { pattern: searchPattern })
       .orderBy('ticker.symbol', 'ASC')
       .limit(20)
+      .limit(20)
       .getMany();
+  }
+
+  async getSymbolsByIds(ids: string[] | number[]): Promise<string[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const tickers = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select('ticker.symbol')
+      .where('ticker.id IN (:...ids)', { ids })
+      .getMany();
+
+    return tickers.map((t) => t.symbol);
+  }
+
+  getRepo(): Repository<TickerEntity> {
+    return this.tickerRepo;
   }
 }

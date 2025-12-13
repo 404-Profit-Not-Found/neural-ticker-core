@@ -6,6 +6,8 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
+import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
@@ -58,10 +60,26 @@ describe('MarketDataService', () => {
     count: jest.fn(),
   };
 
+  const mockCommentRepo = {
+    count: jest.fn(),
+  };
+
+  const mockCompanyNewsRepo = {
+    count: jest.fn().mockResolvedValue(0),
+    find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(() => ({
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
+    })),
+  };
+
   const mockTickersService = {
     findBySymbol: jest.fn(),
     awaitEnsureTicker: jest.fn(), // Service uses awaitEnsureTicker, not findBySymbol
     getTicker: jest.fn(),
+    getRepo: jest.fn(),
   };
 
   const mockFinnhubService = {
@@ -98,6 +116,14 @@ describe('MarketDataService', () => {
         {
           provide: getRepositoryToken(ResearchNote),
           useValue: mockResearchNoteRepo,
+        },
+        {
+          provide: getRepositoryToken(Comment),
+          useValue: mockCommentRepo,
+        },
+        {
+          provide: getRepositoryToken(CompanyNews),
+          useValue: mockCompanyNewsRepo,
         },
         {
           provide: TickersService,
@@ -171,7 +197,7 @@ describe('MarketDataService', () => {
       const result = await service.getSnapshot('AAPL');
 
       expect(result.ticker).toEqual(mockTicker);
-      expect(result.latestPrice.close).toBe(150);
+      expect(result.latestPrice!.close).toBe(150);
       expect(finnhubService.getQuote).not.toHaveBeenCalled();
     });
 
@@ -208,7 +234,7 @@ describe('MarketDataService', () => {
       const result = await service.getSnapshot('AAPL');
 
       expect(finnhubService.getQuote).toHaveBeenCalledWith('AAPL');
-      expect(result.latestPrice.close).toBe(155);
+      expect(result.latestPrice!.close).toBe(155);
       expect(mockOhlcvRepo.save).toHaveBeenCalled();
     });
   });
@@ -217,6 +243,8 @@ describe('MarketDataService', () => {
     it('should return news from Finnhub', async () => {
       const mockNews = [{ headline: 'Test News' }];
       mockFinnhubService.getCompanyNews.mockResolvedValue(mockNews);
+      // Service now returns what it finds in DB after upsert
+      mockCompanyNewsRepo.find.mockResolvedValue(mockNews);
 
       const result = await service.getCompanyNews('AAPL');
 
@@ -225,6 +253,136 @@ describe('MarketDataService', () => {
         'AAPL',
         expect.any(String),
         expect.any(String),
+      );
+    });
+  });
+
+  describe('upsertAnalystRatings', () => {
+    it('should skip ratings with no firm', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [{ rating: 5, rating_date: new Date() }] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should skip ratings with no rating_date or invalid date', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [
+        { firm: 'Firm A', rating: 5, rating_date: null },
+        { firm: 'Firm B', rating: 5, rating_date: 'invalid' },
+      ] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should skip ratings where rating value is null or undefined', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const ratings = [
+        { firm: 'Firm A', rating: null, rating_date: '2025-01-01' },
+        { firm: 'Firm B', rating: undefined, rating_date: '2025-01-01' },
+      ] as any;
+      await service.upsertAnalystRatings('AAPL', ratings);
+      expect(mockAnalystRatingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should upsert valid rating if not exists', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      mockAnalystRatingRepo.findOne.mockResolvedValue(null); // Not exists
+
+      const ratings = [
+        { firm: 'Firm A', rating: 'Buy', rating_date: '2025-01-01' },
+      ] as any;
+
+      await service.upsertAnalystRatings('AAPL', ratings);
+
+      expect(mockAnalystRatingRepo.save).toHaveBeenCalledWith({
+        firm: 'Firm A',
+        rating: 'Buy',
+        rating_date: '2025-01-01',
+        symbol_id: 1,
+      });
+    });
+  });
+
+  describe('getAnalyzerTickers', () => {
+    it('should return paginated data with correct structure', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest.fn().mockResolvedValue({
+          entities: [
+            {
+              id: 1,
+              symbol: 'AAPL',
+              name: 'Apple Inc',
+              exchange: 'NASDAQ',
+              fund: { market_cap: 1000 },
+              latestPrice: { close: 150 },
+              latestRisk: { overall_score: 5 },
+            },
+          ],
+          raw: [],
+        }),
+        getCount: jest.fn().mockResolvedValue(1),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]), // Fallback
+      };
+
+      // Mock getRepo correctly using the closure variables
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+      // We need to spy on the tickersService instance we have in closure
+      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      const result = await service.getAnalyzerTickers({
+        page: 1,
+        limit: 10,
+        sortBy: 'market_cap',
+        sortDir: 'DESC',
+      });
+
+      expect(tickersService.getRepo).toHaveBeenCalled();
+      expect(mockQueryBuilder.leftJoinAndMapOne).toHaveBeenCalledTimes(3); // Fund, Price, Risk
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result.items[0].ticker.symbol).toBe('AAPL');
+      expect(result.items[0].fundamentals.market_cap).toBe(1000);
+      expect(result.meta.total).toBe(1);
+    });
+
+    it('should apply search filter when provided', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest
+          .fn()
+          .mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+
+      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      await service.getAnalyzerTickers({
+        search: 'AAPL',
+      });
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('LIKE :search'),
+        { search: '%AAPL%' },
       );
     });
   });
