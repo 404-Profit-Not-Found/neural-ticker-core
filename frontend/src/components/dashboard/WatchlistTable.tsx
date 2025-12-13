@@ -74,7 +74,8 @@ interface TickerData {
     price: number;
     change: number;
     pe: number | null;
-    marketCap: number | null;
+    marketCap: number | null; // Keep for now in case other logic needs it, or strictly remove if unused. Let's keep data, remove column.
+    potentialUpside: number | null; // Added
     riskScore: number | null;
     rating: string;
     aiRating: string;
@@ -198,13 +199,7 @@ export function WatchlistTable() {
     const { data: snapshotData, isLoading: isLoadingSnapshots, refetch: refetchSnapshots, isRefetching } = useMarketSnapshots(symbols);
 
     // -- Map Data --
-    const formatMarketCap = (value: number) => {
-        if (!value) return '-';
-        if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-        if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-        if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-        return `$${value.toLocaleString()}`;
-    };
+
 
     const tableData = useMemo<TickerData[]>(() => {
         if (!activeWatchlist || !snapshotData || !Array.isArray(snapshotData)) return EMPTY_TABLE_DATA;
@@ -241,6 +236,7 @@ export function WatchlistTable() {
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
                     marketCap: fundamentals.market_cap ?? null,
+                    potentialUpside: s.aiAnalysis?.upside_percent ?? null,
                     rating: fundamentals.consensus_rating || '-',
                     itemId: watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol)?.ticker.id,
                     aiRating: aiRating,
@@ -409,12 +405,16 @@ export function WatchlistTable() {
             }),
             columnHelper.accessor('price', {
                 header: ({ column }) => <SortableHeader column={column} title="Price" />,
-                cell: (info) => <span className="text-foreground font-mono font-medium">${info.getValue().toFixed(2)}</span>,
+                cell: (info) => {
+                    const val = Number(info.getValue());
+                    return <span className="text-foreground font-mono font-medium">${Number.isFinite(val) ? val.toFixed(2) : '0.00'}</span>;
+                },
             }),
             columnHelper.accessor('change', {
                 header: ({ column }) => <SortableHeader column={column} title="Change %" />,
                 cell: (info) => {
-                    const val = info.getValue();
+                    const val = Number(info.getValue());
+                    if (!Number.isFinite(val)) return <span className="text-muted-foreground">-</span>;
                     const isPositive = val >= 0;
                     return (
                         <div className={cn("flex items-center font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
@@ -424,9 +424,24 @@ export function WatchlistTable() {
                     );
                 },
             }),
-            columnHelper.accessor('marketCap', {
-                header: ({ column }) => <SortableHeader column={column} title="Market Cap" />,
-                cell: (info) => <span className="text-muted-foreground">{formatMarketCap(info.getValue() || 0)}</span>,
+            columnHelper.accessor('potentialUpside', {
+                header: ({ column }) => <SortableHeader column={column} title="Potential Upside" />,
+                cell: (info) => {
+                    const rawVal = info.getValue();
+                    const val = typeof rawVal === 'number' ? rawVal : Number(rawVal);
+
+                    if (rawVal === null || rawVal === undefined || !Number.isFinite(val)) {
+                        return <span className="text-muted-foreground">-</span>;
+                    }
+
+                    const isPositive = val > 0;
+                    return (
+                        <div className={cn("flex items-center font-bold", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                            {isPositive && <ArrowUp size={14} className="mr-1" />}
+                            {val.toFixed(1)}%
+                        </div>
+                    );
+                },
             }),
             columnHelper.accessor('researchCount', {
                 header: ({ column }) => <SortableHeader column={column} title="Research" />,
