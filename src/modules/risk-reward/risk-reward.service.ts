@@ -30,14 +30,93 @@ export class RiskRewardService {
     private readonly marketDataService: MarketDataService,
   ) {}
 
-  // Heuristic salvage to keep processing when JSON is malformed but key numbers exist.
+  // Heuristic salvage to keep processing when TOON/JSON is malformed but key numbers exist.
   private salvageFromRaw(raw: string) {
     if (!raw) return null;
+
+    // Helper to extract numeric values by key (supports both quoted and unquoted keys)
     const getNum = (key: string) => {
-      const match = raw.match(new RegExp(`"${key}"\\s*:\\s*([-\\d\\.]+)`, 'i'));
-      if (!match) return null;
-      const n = Number(match[1]);
-      return Number.isFinite(n) ? n : null;
+      // Match quoted or unquoted key patterns
+      const patterns = [
+        new RegExp(`["']?${key}["']?\\s*:\\s*([-\\d.]+)`, 'i'),
+        new RegExp(`${key}\\s*:\\s*([-\\d.]+)`, 'i'),
+      ];
+      for (const pattern of patterns) {
+        const match = raw.match(pattern);
+        if (match) {
+          const n = Number(match[1]);
+          if (Number.isFinite(n)) return n;
+        }
+      }
+      return null;
+    };
+
+    // Helper to extract scenario price from various text patterns
+    const getScenarioPrice = (scenario: string) => {
+      // Try TOON/JSON format first: bull: { price_target_mid: X }
+      const jsonPattern = new RegExp(
+        `["']?${scenario}["']?\\s*:\\s*\\{[^}]*price_target_mid\\s*:\\s*([-\\d.]+)`,
+        'i',
+      );
+      let match = raw.match(jsonPattern);
+      if (match) return Number(match[1]);
+
+      // Try text format: Bull Case: $X or Bull: $X
+      const textPatterns = [
+        new RegExp(`${scenario}\\s*(?:case)?\\s*[:=]\\s*\\$?([\\d,.]+)`, 'i'),
+        new RegExp(`${scenario}\\s*target\\s*[:=]\\s*\\$?([\\d,.]+)`, 'i'),
+      ];
+      for (const pattern of textPatterns) {
+        match = raw.match(pattern);
+        if (match) {
+          const n = Number(match[1].replace(/,/g, ''));
+          if (Number.isFinite(n)) return n;
+        }
+      }
+      return null;
+    };
+
+    // Helper to extract scenario probability from various text patterns
+    const getScenarioProbability = (scenario: string): number | null => {
+      // Try TOON/JSON format: bull: { probability: 0.25 }
+      const jsonPattern = new RegExp(
+        `["']?${scenario}["']?\\s*:\\s*\\{[^}]*probability\\s*:\\s*(\\d+\\.?\\d*)`,
+        'i',
+      );
+      let match = raw.match(jsonPattern);
+      if (match) {
+        const n = Number(match[1]);
+        // If value > 1, assume it's a percentage
+        return n > 1 ? n / 100 : n;
+      }
+
+      // Try text format: Bull probability: 25% or Bull: 25%
+      const textPatterns = [
+        new RegExp(
+          `${scenario}\\s*(?:probability|prob|chance)\\s*[:=]?\\s*(\\d+\\.?\\d*)\\s*%`,
+          'i',
+        ),
+        new RegExp(`${scenario}\\s*[:=]?\\s*(\\d+\\.?\\d*)\\s*%`, 'i'),
+        new RegExp(
+          `${scenario}\\s*(?:probability|prob|chance)\\s*[:=]?\\s*0?\\.(\\d+)`,
+          'i',
+        ),
+      ];
+      for (const pattern of textPatterns) {
+        match = raw.match(pattern);
+        if (match) {
+          let n = Number(match[1]);
+          // Handle percentage vs decimal
+          if (pattern.source.includes('%')) {
+            n = n / 100;
+          } else if (n > 1) {
+            // If extracted from decimal pattern but > 1, treat as percentage part
+            n = Number('0.' + match[1]);
+          }
+          if (Number.isFinite(n) && n >= 0 && n <= 1) return n;
+        }
+      }
+      return null;
     };
 
     const overall = getNum('overall');
@@ -46,6 +125,125 @@ export class RiskRewardService {
     const priceTarget =
       getNum('price_target_weighted') ?? getNum('price_target_mid') ?? 0;
     const upside = getNum('upside_vs_current_percent') ?? 0;
+
+    // Extract scenario-specific values from raw text
+    const bullMid = getScenarioPrice('bull');
+    const baseMid = getScenarioPrice('base');
+    const bearMid = getScenarioPrice('bear');
+
+    // Extract probabilities (with sensible defaults)
+    const bullProb = getScenarioProbability('bull') ?? 0.25;
+    const baseProb = getScenarioProbability('base') ?? 0.5;
+    const bearProb = getScenarioProbability('bear') ?? 0.25;
+
+    // Build scenarios from extracted values (or leave empty for fallback builder)
+    const scenarios: Record<string, any> = {};
+    if (bullMid !== null) {
+      scenarios.bull = {
+        probability: bullProb,
+        description: 'Extracted from research text',
+        price_target_mid: bullMid,
+        price_target_low: bullMid * 0.9,
+        price_target_high: bullMid * 1.1,
+        expected_market_cap: 0,
+        key_drivers: [],
+      };
+    }
+    if (baseMid !== null) {
+      scenarios.base = {
+        probability: baseProb,
+        description: 'Extracted from research text',
+        price_target_mid: baseMid,
+        price_target_low: baseMid * 0.95,
+        price_target_high: baseMid * 1.05,
+        expected_market_cap: 0,
+        key_drivers: [],
+      };
+    }
+    if (bearMid !== null) {
+      scenarios.bear = {
+        probability: bearProb,
+        description: 'Extracted from research text',
+        price_target_mid: bearMid,
+        price_target_low: bearMid * 0.9,
+        price_target_high: bearMid * 1.1,
+        expected_market_cap: 0,
+        key_drivers: [],
+      };
+    }
+
+    // Helper to extract string arrays from TOON/JSON or text lists
+    const getStringArray = (key: string): string[] => {
+      // Try TOON/JSON format: key: ["item1", "item2"]
+      const jsonPattern = new RegExp(
+        `["']?${key}["']?\\s*:\\s*\\[([^\\]]+)\\]`,
+        'i',
+      );
+      let match = raw.match(jsonPattern);
+      if (match) {
+        // Parse the array content
+        const items = match[1]
+          .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/) // Split by comma not inside quotes
+          .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+          .filter((s) => s.length > 0 && s !== 'null');
+        if (items.length > 0) return items;
+      }
+
+      // Try text bullet format: - item or * item
+      const textPattern = new RegExp(
+        `${key}[:\\s]*(?:\\n|$)([\\s\\S]*?)(?=\\n[a-z_]+:|$)`,
+        'i',
+      );
+      match = raw.match(textPattern);
+      if (match) {
+        const items = match[1]
+          .split(/\n/)
+          .map((line) => line.replace(/^[\s\-*•]+/, '').trim())
+          .filter((s) => s.length > 5); // Filter out short/empty lines
+        if (items.length > 0) return items.slice(0, 5); // Limit to 5 items
+      }
+
+      return [];
+    };
+
+    // Extract qualitative factors
+    const qualitative = {
+      strengths: getStringArray('strengths'),
+      weaknesses: getStringArray('weaknesses'),
+      opportunities: getStringArray('opportunities'),
+      threats: getStringArray('threats'),
+    };
+
+    // Extract catalysts
+    const catalysts = {
+      near_term: getStringArray('near_term'),
+      long_term: getStringArray('long_term'),
+    };
+
+    // Extract red_flags
+    const red_flags = getStringArray('red_flags');
+
+    // Extract key_drivers for scenarios and add to them
+    const extractKeyDrivers = (scenario: string): string[] => {
+      // Look for key_drivers inside the scenario block
+      const patternScoped = new RegExp(
+        `${scenario}[^}]*key_drivers\\s*:\\s*\\[([^\\]]+)\\]`,
+        'i',
+      );
+      const match = raw.match(patternScoped);
+      if (match) {
+        return match[1]
+          .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+          .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+          .filter((s) => s.length > 0);
+      }
+      return [];
+    };
+
+    // Add key_drivers to scenarios
+    if (scenarios.bull) scenarios.bull.key_drivers = extractKeyDrivers('bull');
+    if (scenarios.base) scenarios.base.key_drivers = extractKeyDrivers('base');
+    if (scenarios.bear) scenarios.bear.key_drivers = extractKeyDrivers('bear');
 
     return {
       risk_score: {
@@ -60,7 +258,10 @@ export class RiskRewardService {
         price_target_weighted: priceTarget,
         upside_vs_current_percent: upside,
       },
-      scenarios: {}, // fallback builder will synthesize if empty
+      scenarios,
+      qualitative,
+      catalysts,
+      red_flags,
     };
   }
 
@@ -215,21 +416,34 @@ export class RiskRewardService {
       ${text.substring(0, 25000)} 
       """
       
-      Output MUST be valid JSON matching this structure exactly:
+      Output in TOON format (relaxed JSON: unquoted keys allowed, trailing commas OK).
+      Structure:
       ${schemaStructure}
 
-      If exact numbers are missing in the text, infer reasonable estimates based on the text's sentiment and context provided.
-      Probabilities must sum to approx 1.0.
+      TOON Example:
+      {
+        ticker: "${symbol}",
+        company_name: "Example Corp",
+        risk_score: { overall: 5, financial_risk: 4, execution_risk: 6, dilution_risk: 3, competitive_risk: 5, regulatory_risk: 2 },
+        scenarios: {
+          bull: { probability: 0.25, description: "Strong growth", price_target_low: 100, price_target_high: 120, price_target_mid: 110, expected_market_cap: 50000000000, key_drivers: ["AI adoption", "Market expansion"] },
+          base: { probability: 0.50, description: "Moderate growth", price_target_low: 80, price_target_high: 95, price_target_mid: 87, expected_market_cap: 40000000000, key_drivers: ["Stable revenue"] },
+          bear: { probability: 0.25, description: "Challenges ahead", price_target_low: 50, price_target_high: 70, price_target_mid: 60, expected_market_cap: 28000000000, key_drivers: ["Competition", "Margin pressure"] },
+        },
+        expected_value: { price_target_weighted: 85, upside_vs_current_percent: 15 },
+      }
 
-      IMPORTANT: Risk Scores (overall, financial, execution, etc.) are on a scale of 0 to 10.
-      - 0 = NO RISK / EXTREMELY SAFE
-      - 10 = EXTREME RISK / BANKRUPTCY IMMINENT
-      - 5 = MARKET AVERAGE RISK
+      CRITICAL RULES:
+      1. Extract ACTUAL price targets from the research if present - do NOT invent numbers.
+      2. If specific Bull/Base/Bear targets are mentioned, use those EXACT values.
+      3. If exact numbers are missing, infer reasonable estimates based on sentiment.
+      4. Probabilities must sum to approx 1.0.
+      5. Risk Scores are 0-10 (0=safe, 10=extreme risk, 5=average).
       `,
       tickers: [symbol],
       numericContext: context,
-      provider: 'openai' as const, // Use a smart model for extraction to ensure valid JSON
-      quality: 'low' as QualityTier, // 'Low' typically maps to gpt-4o-mini or flash, which might be enough, but 'high' is safer for complex JSON. Let's start with low/medium.
+      provider: 'openai' as const,
+      quality: 'low' as QualityTier,
     };
 
     this.logger.log(
@@ -247,24 +461,25 @@ export class RiskRewardService {
         const result = await this.llmService.generateResearch(prompt);
         const raw = result.answerMarkdown || '';
         lastRaw = raw;
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
+        const toonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!toonMatch) {
           this.logger.warn(
-            'LLM response did not contain a JSON object, retrying...',
+            'LLM response did not contain a TOON/JSON object, retrying...',
           );
-          throw new Error('No JSON object found');
+          throw new Error('No TOON object found');
         }
-        const cleanJson = jsonMatch[0];
+        const toonContent = toonMatch[0];
 
+        // Primary: Use toonToJson since we requested TOON format
         try {
-          parsed = JSON.parse(cleanJson);
+          parsed = toonToJson(toonContent, { strict: false }) as any;
         } catch {
-          // Attempt toon-parser first for lenient JSON (handles trailing commas/unquoted keys)
+          // Fallback: Try standard JSON.parse for valid JSON
           try {
-            parsed = toonToJson(cleanJson, { strict: false }) as any;
+            parsed = JSON.parse(toonContent);
           } catch {
-            // Attempt a tolerant repair: quote bare keys and strip trailing commas
-            const repaired = cleanJson
+            // Last resort: manual repair (quote bare keys, strip trailing commas)
+            const repaired = toonContent
               .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')
               .replace(/,(\s*[}\]])/g, '$1');
             parsed = JSON.parse(repaired);
@@ -301,6 +516,46 @@ export class RiskRewardService {
         // Optional: Wait a bit? Or just retry immediately.
       }
     }
+
+    // === DEBUG LOGGING: Show what was extracted ===
+    this.logger.log(`[${symbol}] === EXTRACTION RESULTS ===`);
+    this.logger.log(
+      `[${symbol}] Risk Score: overall=${parsed.risk_score?.overall}`,
+    );
+    this.logger.log(
+      `[${symbol}] Scenarios: bull=$${parsed.scenarios?.bull?.price_target_mid}, base=$${parsed.scenarios?.base?.price_target_mid}, bear=$${parsed.scenarios?.bear?.price_target_mid}`,
+    );
+    this.logger.log(
+      `[${symbol}] Bull key_drivers: ${JSON.stringify(parsed.scenarios?.bull?.key_drivers || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Base key_drivers: ${JSON.stringify(parsed.scenarios?.base?.key_drivers || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Bear key_drivers: ${JSON.stringify(parsed.scenarios?.bear?.key_drivers || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Qualitative strengths: ${JSON.stringify(parsed.qualitative?.strengths || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Qualitative weaknesses: ${JSON.stringify(parsed.qualitative?.weaknesses || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Qualitative opportunities: ${JSON.stringify(parsed.qualitative?.opportunities || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Qualitative threats: ${JSON.stringify(parsed.qualitative?.threats || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Catalysts near_term: ${JSON.stringify(parsed.catalysts?.near_term || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Catalysts long_term: ${JSON.stringify(parsed.catalysts?.long_term || [])}`,
+    );
+    this.logger.log(
+      `[${symbol}] Red flags: ${JSON.stringify(parsed.red_flags || [])}`,
+    );
+    this.logger.log(`[${symbol}] === END EXTRACTION ===`);
 
     // Map to Entities
     const analysis = new RiskAnalysis();

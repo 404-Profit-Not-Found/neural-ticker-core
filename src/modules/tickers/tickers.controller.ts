@@ -44,6 +44,21 @@ export class TickersController {
   }
 
   @ApiOperation({
+    summary: 'Get total ticker count',
+    description: 'Returns the total number of tickers in the database.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Total ticker count.',
+    schema: { example: { count: 150 } },
+  })
+  @Get('count')
+  async getCount() {
+    const count = await this.tickersService.getCount();
+    return { count };
+  }
+
+  @ApiOperation({
     summary: 'Ensure ticker exists and fetch profile',
     description:
       'Checks if ticker exists in DB. If not, fetches profile from Finnhub and saves it.',

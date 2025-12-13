@@ -224,4 +224,172 @@ describe('RiskRewardService', () => {
       expect(result).toBeDefined(); // Should still return first successful result
     });
   });
+
+  describe('salvageFromRaw', () => {
+    // Exposed via reflection for testing
+    let salvageFromRaw: (raw: string) => any;
+
+    beforeEach(() => {
+      // Access private method via prototype
+      salvageFromRaw = (service as any).salvageFromRaw.bind(service);
+    });
+
+    it('should return null if raw is empty', () => {
+      expect(salvageFromRaw('')).toBeNull();
+      expect(salvageFromRaw(null as any)).toBeNull();
+    });
+
+    it('should return null if overall score is not found', () => {
+      const raw = 'some random text without scores';
+      expect(salvageFromRaw(raw)).toBeNull();
+    });
+
+    it('should extract overall risk score from TOON format', () => {
+      const raw = `{
+        risk_score: { overall: 7 },
+        expected_value: { price_target_weighted: 100 }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result).not.toBeNull();
+      expect(result.risk_score.overall).toBe(7);
+    });
+
+    it('should extract scenario prices from TOON format', () => {
+      const raw = `{
+        risk_score: { overall: 5 },
+        scenarios: {
+          bull: { price_target_mid: 150 },
+          base: { price_target_mid: 100 },
+          bear: { price_target_mid: 50 }
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.price_target_mid).toBe(150);
+      expect(result.scenarios.base.price_target_mid).toBe(100);
+      expect(result.scenarios.bear.price_target_mid).toBe(50);
+    });
+
+    it('should extract probabilities from TOON format', () => {
+      const raw = `{
+        risk_score: { overall: 5 },
+        scenarios: {
+          bull: { probability: 0.30, price_target_mid: 150 },
+          base: { probability: 0.45, price_target_mid: 100 },
+          bear: { probability: 0.25, price_target_mid: 50 }
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.probability).toBe(0.3);
+      expect(result.scenarios.base.probability).toBe(0.45);
+      expect(result.scenarios.bear.probability).toBe(0.25);
+    });
+
+    it('should extract qualitative factors from TOON/JSON arrays', () => {
+      const raw = `{
+        risk_score: { overall: 6 },
+        qualitative: {
+          strengths: ["strong pipeline", "good management"],
+          weaknesses: ["cash burn", "competition"],
+          opportunities: ["new market expansion"],
+          threats: ["regulatory risk"]
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.qualitative.strengths).toContain('strong pipeline');
+      expect(result.qualitative.strengths).toContain('good management');
+      expect(result.qualitative.weaknesses).toContain('cash burn');
+      expect(result.qualitative.opportunities).toContain(
+        'new market expansion',
+      );
+      expect(result.qualitative.threats).toContain('regulatory risk');
+    });
+
+    it('should extract catalysts from TOON/JSON arrays', () => {
+      const raw = `{
+        risk_score: { overall: 4 },
+        catalysts: {
+          near_term: ["FDA decision in Q1", "earnings report"],
+          long_term: ["pipeline expansion", "market growth"]
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.catalysts.near_term).toContain('FDA decision in Q1');
+      expect(result.catalysts.near_term).toContain('earnings report');
+      expect(result.catalysts.long_term).toContain('pipeline expansion');
+    });
+
+    it('should extract red_flags from TOON/JSON arrays', () => {
+      const raw = `{
+        risk_score: { overall: 8 },
+        red_flags: ["high debt levels", "management turnover", "SEC investigation"]
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.red_flags).toContain('high debt levels');
+      expect(result.red_flags).toContain('management turnover');
+      expect(result.red_flags).toContain('SEC investigation');
+    });
+
+    it('should extract key_drivers for scenarios', () => {
+      const raw = `{
+        risk_score: { overall: 5 },
+        scenarios: {
+          bull: { price_target_mid: 200, key_drivers: ["AI growth", "market expansion"] },
+          base: { price_target_mid: 150, key_drivers: ["steady growth"] },
+          bear: { price_target_mid: 100, key_drivers: ["competition", "margin pressure"] }
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.key_drivers).toContain('AI growth');
+      expect(result.scenarios.base.key_drivers).toContain('steady growth');
+      expect(result.scenarios.bear.key_drivers).toContain('margin pressure');
+    });
+
+    it('should use default probabilities (25/50/25) when not specified', () => {
+      const raw = `{
+        risk_score: { overall: 5 },
+        scenarios: {
+          bull: { price_target_mid: 150 },
+          base: { price_target_mid: 100 },
+          bear: { price_target_mid: 50 }
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.probability).toBe(0.25);
+      expect(result.scenarios.base.probability).toBe(0.5);
+      expect(result.scenarios.bear.probability).toBe(0.25);
+    });
+
+    it('should handle text pattern extraction for scenarios', () => {
+      const raw = `
+        risk_score: { overall: 6 }
+        Bull Case: $120
+        Base Case: $90
+        Bear Case: $60
+      `;
+      const result = salvageFromRaw(raw);
+      expect(result.scenarios.bull.price_target_mid).toBe(120);
+      expect(result.scenarios.base.price_target_mid).toBe(90);
+      expect(result.scenarios.bear.price_target_mid).toBe(60);
+    });
+
+    it('should extract all sub-risk scores', () => {
+      const raw = `{
+        risk_score: {
+          overall: 7,
+          financial_risk: 8,
+          execution_risk: 6,
+          dilution_risk: 5,
+          competitive_risk: 7,
+          regulatory_risk: 4
+        }
+      }`;
+      const result = salvageFromRaw(raw);
+      expect(result.risk_score.overall).toBe(7);
+      expect(result.risk_score.financial_risk).toBe(8);
+      expect(result.risk_score.execution_risk).toBe(6);
+      expect(result.risk_score.dilution_risk).toBe(5);
+      expect(result.risk_score.competitive_risk).toBe(7);
+      expect(result.risk_score.regulatory_risk).toBe(4);
+    });
+  });
 });

@@ -163,6 +163,10 @@ export class TickersService {
     return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }
 
+  async getCount(): Promise<number> {
+    return this.tickerRepo.count();
+  }
+
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
       select: ['symbol', 'name', 'exchange'],

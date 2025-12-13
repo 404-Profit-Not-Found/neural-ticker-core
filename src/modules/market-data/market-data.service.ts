@@ -457,4 +457,80 @@ export class MarketDataService {
 
     return unique;
   }
+
+  /**
+   * Get count of tickers where both analyst consensus = "Strong Buy" AND AI rating is bullish.
+   * AI bullish = overall_score <= 3 (low risk) AND upside_percent > 20%
+   */
+  async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
+    // Query fundamentals with Strong Buy consensus
+    const strongBuyFundamentals = await this.fundamentalsRepo.find({
+      where: { consensus_rating: 'Strong Buy' },
+      select: ['symbol_id'],
+    });
+
+    if (strongBuyFundamentals.length === 0) {
+      return { count: 0, symbols: [] };
+    }
+
+    const symbolIds = strongBuyFundamentals.map((f) => f.symbol_id);
+
+    // For each, check if AI analysis also signals bullish (low risk + high upside)
+    const matchingSymbols: string[] = [];
+
+    for (const symbolId of symbolIds) {
+      const aiAnalysis = await this.riskAnalysisRepo.findOne({
+        where: { ticker_id: symbolId },
+        order: { created_at: 'DESC' },
+        relations: ['ticker'],
+      });
+
+      // AI Strong Buy: low risk (≤ 3) AND positive upside (> 20%)
+      if (
+        aiAnalysis &&
+        aiAnalysis.overall_score <= 3 &&
+        aiAnalysis.upside_percent > 20
+      ) {
+        matchingSymbols.push(aiAnalysis.ticker?.symbol || symbolId);
+      }
+    }
+
+    return { count: matchingSymbols.length, symbols: matchingSymbols };
+  }
+
+  /**
+   * Get count of tickers where both analyst consensus = "Sell" AND AI rating is bearish.
+   * AI bearish = overall_score >= 7 (high risk) OR upside_percent < -10%
+   */
+  async getSellCount(): Promise<{ count: number; symbols: string[] }> {
+    const sellFundamentals = await this.fundamentalsRepo.find({
+      where: { consensus_rating: 'Sell' },
+      select: ['symbol_id'],
+    });
+
+    if (sellFundamentals.length === 0) {
+      return { count: 0, symbols: [] };
+    }
+
+    const symbolIds = sellFundamentals.map((f) => f.symbol_id);
+    const matchingSymbols: string[] = [];
+
+    for (const symbolId of symbolIds) {
+      const aiAnalysis = await this.riskAnalysisRepo.findOne({
+        where: { ticker_id: symbolId },
+        order: { created_at: 'DESC' },
+        relations: ['ticker'],
+      });
+
+      // AI Sell: high risk (≥ 7) OR negative upside (< -10%)
+      if (
+        aiAnalysis &&
+        (aiAnalysis.overall_score >= 7 || aiAnalysis.upside_percent < -10)
+      ) {
+        matchingSymbols.push(aiAnalysis.ticker?.symbol || symbolId);
+      }
+    }
+
+    return { count: matchingSymbols.length, symbols: matchingSymbols };
+  }
 }

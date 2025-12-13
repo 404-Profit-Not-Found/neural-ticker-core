@@ -1,71 +1,105 @@
+import { useEffect, useState } from 'react';
 import {
     TrendingUp,
     Newspaper,
     BrainCircuit,
-    AlertTriangle,
+    BarChart3,
     Calendar
 } from 'lucide-react';
-import { cn } from '../../lib/api';
+import { cn, api } from '../../lib/api';
 import { Card, CardContent } from '../ui/card';
 
-const KPI_DATA = [
-    {
-        title: "Strong Buy",
-        value: "12",
-        subtext: "Sell: 12",
-        icon: TrendingUp,
-        color: "green", // Success
-        glow: "shadow-[0_0_20px_-10px_rgba(34,197,94,0.5)]"
-    },
-    {
-        title: "News",
-        value: "25",
-        subtext: "New: 25 / Overall: 200",
-        icon: Newspaper,
-        color: "blue", // Primary Blue
-        glow: "shadow-[0_0_20px_-10px_rgba(59,130,246,0.5)]"
-    },
-    {
-        title: "Research",
-        value: "5",
-        subtext: "Completed",
-        icon: BrainCircuit,
-        color: "purple", // Purple
-        glow: "shadow-[0_0_20px_-10px_rgba(168,85,247,0.5)]"
-    },
-    {
-        title: "Problems",
-        value: "3",
-        subtext: "Alerts",
-        icon: AlertTriangle,
-        color: "red", // Danger
-        glow: "shadow-[0_0_20px_-10px_rgba(239,68,68,0.5)]"
-    },
-    {
-        title: "Events",
-        value: "2",
-        subtext: "This Week",
-        icon: Calendar,
-        color: "yellow", // Warning
-        glow: "shadow-[0_0_20px_-10px_rgba(234,179,8,0.5)]"
-    }
-];
+interface KPIItem {
+    title: string;
+    value: string;
+    subtext: string;
+    subtextColor?: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    color: string;
+    glow: string;
+}
 
 const COLORS: Record<string, string> = {
     green: "text-green-500",
     blue: "text-blue-500",
     purple: "text-purple-500",
-    red: "text-red-500",
-    yellow: "text-yellow-500"
+    cyan: "text-cyan-500",
+    yellow: "text-yellow-500",
+    red: "text-red-500"
 };
 
 export function KPIGrid() {
+    const [tickerCount, setTickerCount] = useState<number | null>(null);
+    const [strongBuyCount, setStrongBuyCount] = useState<number | null>(null);
+    const [sellCount, setSellCount] = useState<number | null>(null);
+
+    useEffect(() => {
+        // Fetch all stats in parallel
+        Promise.all([
+            api.get<{ count: number }>('/tickers/count'),
+            api.get<{ count: number; symbols: string[] }>('/stats/strong-buy'),
+            api.get<{ count: number; symbols: string[] }>('/stats/sell'),
+        ]).then(([tickersRes, strongBuyRes, sellRes]) => {
+            setTickerCount(tickersRes.data.count);
+            setStrongBuyCount(strongBuyRes.data.count);
+            setSellCount(sellRes.data.count);
+        }).catch(() => {
+            setTickerCount(0);
+            setStrongBuyCount(0);
+            setSellCount(0);
+        });
+    }, []);
+
+    const KPI_DATA: KPIItem[] = [
+        {
+            title: "Strong Buy",
+            value: strongBuyCount !== null ? String(strongBuyCount) : "...",
+            subtext: `Sell: ${sellCount !== null ? sellCount : "..."}`,
+            subtextColor: "text-red-400",
+            icon: TrendingUp,
+            color: "green",
+            glow: "shadow-[0_0_20px_-10px_rgba(34,197,94,0.5)]"
+        },
+        {
+            title: "News",
+            value: "25",
+            subtext: "New: 25 / Overall: 200",
+            icon: Newspaper,
+            color: "blue",
+            glow: "shadow-[0_0_20px_-10px_rgba(59,130,246,0.5)]"
+        },
+        {
+            title: "Research",
+            value: "5",
+            subtext: "Completed",
+            icon: BrainCircuit,
+            color: "purple",
+            glow: "shadow-[0_0_20px_-10px_rgba(168,85,247,0.5)]"
+        },
+        {
+            title: "Tickers",
+            value: tickerCount !== null ? String(tickerCount) : "...",
+            subtext: "In Database",
+            icon: BarChart3,
+            color: "cyan",
+            glow: "shadow-[0_0_20px_-10px_rgba(6,182,212,0.5)]"
+        },
+        {
+            title: "Events",
+            value: "2",
+            subtext: "This Week",
+            icon: Calendar,
+            color: "yellow",
+            glow: "shadow-[0_0_20px_-10px_rgba(234,179,8,0.5)]"
+        }
+    ];
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             {KPI_DATA.map((kpi, index) => (
                 <Card
                     key={index}
-                    rgb={true} // Enable RGB border for KPI cards if theme active
+                    rgb={true}
                     className={cn(
                         "relative overflow-hidden group hover:border-accent transition-colors",
                         kpi.glow
@@ -91,7 +125,7 @@ export function KPIGrid() {
                             {kpi.value}
                         </div>
 
-                        <div className="text-xs text-muted-foreground">
+                        <div className={cn("text-xs text-muted-foreground", kpi.subtextColor)}>
                             {kpi.subtext}
                         </div>
                     </CardContent>

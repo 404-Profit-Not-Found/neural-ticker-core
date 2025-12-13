@@ -240,7 +240,10 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
     );
 
     for (const note of sortedNotes) {
+      // Extract financial metrics
       await this.extractFinancialsFromResearch([ticker], note.answer_markdown);
+      // Also regenerate risk analysis (qualitative factors, catalysts, etc.)
+      await this.riskRewardService.evaluateFromResearch(note);
     }
 
     this.logger.log(`Completed reprocessing for ${ticker}`);

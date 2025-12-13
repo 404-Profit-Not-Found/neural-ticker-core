@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketDataController } from './market-data.controller';
 import { MarketDataBulkController } from './market-data-bulk.controller';
+import { StatsController } from './stats.controller';
 import { MarketDataService } from './market-data.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -26,7 +27,12 @@ import { NewsController } from './news.controller';
     FinnhubModule,
     forwardRef(() => TickersModule),
   ],
-  controllers: [MarketDataController, MarketDataBulkController, NewsController],
+  controllers: [
+    MarketDataController,
+    MarketDataBulkController,
+    NewsController,
+    StatsController,
+  ],
   providers: [MarketDataService],
   exports: [MarketDataService],
 })
