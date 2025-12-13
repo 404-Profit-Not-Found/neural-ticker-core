@@ -263,7 +263,7 @@ Detailed API documentation enabled in development at `/api` (or `/swagger`).
 Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `src/config/configuration.ts`.
 
 > [!IMPORTANT]
-> As of December 2025, only **Gemini 3** and **Gemini 2.5** series are supported. Legacy 1.5/2.0 models are deprecated.
+> These are my benchmarks as of December 2025. 
 
 | Tier | OpenAI | Gemini | Use Case |
 | :--- | :--- | :--- | :--- |
@@ -380,9 +380,6 @@ Extraction results are logged for debugging:
 [RiskRewardService] [AAPL] === END EXTRACTION ===
 ```
 
-## 💻 Frontend Integration
-
-For detailed instructions on connecting a frontend (Web/Mobile), please refer to **[FRONTEND.md](FRONTEND.md)**.
 
 ### Quick Spec
 - **Auth**: Firebase Client SDK -> Exchange for JWT.

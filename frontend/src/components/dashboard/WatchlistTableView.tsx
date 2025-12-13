@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Skeleton } from '../ui/skeleton';
 import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import { useNavigate } from 'react-router-dom';
@@ -329,14 +330,17 @@ export function WatchlistTableView({
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
                         {isLoading ? (
-                            <tr>
-                                <td colSpan={columns.length} className="h-24 text-center">
-                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                        Syncing Market Data...
-                                    </div>
-                                </td>
-                            </tr>
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <tr key={i} className="border-b">
+                                    <td className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-12" /><Skeleton className="h-3 w-20" /></div></div></td>
+                                    {/* Sector (hidden by default) but if visible needs skeleton? table handles visibility, here we act dumb or map columns */}
+                                    {/* Actually simpler to just render generic generic cells matching column count approx or just a few key ones */}
+                                    {/* Iterate columns to match layout */}
+                                    {table.getVisibleFlatColumns().slice(1).map((col) => (
+                                         <td key={col.id} className="p-4"><Skeleton className="h-4 w-full" /></td>
+                                    ))}
+                                </tr>
+                            ))
                         ) : table.getRowModel().rows.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
