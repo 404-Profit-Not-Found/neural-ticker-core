@@ -15,6 +15,7 @@ import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
 import { Comment } from '../social/entities/comment.entity';
 import { NewsController } from './news.controller';
+import { CompanyNews } from './entities/company-news.entity';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { NewsController } from './news.controller';
       RiskAnalysis,
       ResearchNote,
       Comment,
+      CompanyNews,
     ]),
     FinnhubModule,
     forwardRef(() => TickersModule),

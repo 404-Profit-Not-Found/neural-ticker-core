@@ -8,6 +8,7 @@ import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
 import { Comment } from '../social/entities/comment.entity';
+import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { RISK_ALGO } from '../../config/risk-algorithm.config';
@@ -29,6 +30,8 @@ export class MarketDataService {
     private readonly researchNoteRepo: Repository<ResearchNote>,
     @InjectRepository(Comment)
     private readonly commentRepo: Repository<Comment>,
+    @InjectRepository(CompanyNews)
+    private readonly companyNewsRepo: Repository<CompanyNews>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -280,16 +283,71 @@ export class MarketDataService {
   }
 
   async getCompanyNews(symbol: string, from?: string, to?: string) {
-    // Default window: last 7 days if not provided
+    const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+    
+    // Default range: last 7 days if not specified
     const toDate = to ? new Date(to) : new Date();
-    const fromDate = from
-      ? new Date(from)
-      : new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Check DB first
+    // Simplified strategy: If count > 0 in range, return DB. Else fetch API and cache.
+    const count = await this.companyNewsRepo.count({
+        where: {
+            symbol_id: ticker.id,
+            datetime: Between(fromDate, toDate),
+        }
+    });
 
-    const toStr = this.formatDateOnly(toDate);
-    const fromStr = this.formatDateOnly(fromDate);
+    if (count > 0) {
+        return this.companyNewsRepo.find({
+            where: {
+                symbol_id: ticker.id,
+                datetime: Between(fromDate, toDate),
+            },
+            order: { datetime: 'DESC' }
+        });
+    }
 
-    return this.finnhubService.getCompanyNews(symbol, fromStr, toStr);
+    // Fetch from API
+    const news = await this.finnhubService.getCompanyNews(
+      symbol,
+      fromDate.toISOString().split('T')[0],
+      toDate.toISOString().split('T')[0],
+    );
+    
+    // Upsert logic
+    if (news && news.length > 0) {
+        const entities = news.map((n: any) => ({
+            symbol_id: ticker.id,
+            external_id: n.id,
+            datetime: new Date(n.datetime * 1000),
+            headline: n.headline,
+            source: n.source,
+            url: n.url,
+            summary: n.summary,
+            image: n.image,
+            related: n.related
+        }));
+
+        // Insert ignoring duplicates (on conflict do nothing)
+        await this.companyNewsRepo
+            .createQueryBuilder()
+            .insert()
+            .values(entities)
+            .orIgnore() // Based on unique constraint (symbol_id, external_id)
+            .execute();
+            
+        // Return saved entities to ensure correct format
+        return this.companyNewsRepo.find({
+            where: {
+                symbol_id: ticker.id,
+                datetime: Between(fromDate, toDate),
+            },
+            order: { datetime: 'DESC' }
+        });
+    }
+
+    return [];
   }
 
   async getNewsStats(symbols: string[], from?: string, to?: string) {
@@ -580,6 +638,17 @@ export class MarketDataService {
       'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
     );
 
+    // Calculate Price Change %
+    // (close - prevClose) / prevClose * 100. Handle division by zero.
+    qb.addSelect(
+      `CASE 
+        WHEN price.prevClose IS NOT NULL AND price.prevClose != 0 
+        THEN ((price.close - price.prevClose) / price.prevClose) * 100 
+        ELSE 0 
+       END`,
+      'price_change_pct',
+    );
+
     // Join Latest Risk
     qb.leftJoinAndMapOne(
       'ticker.latestRisk',
@@ -596,17 +665,29 @@ export class MarketDataService {
             .where('ar.symbol_id = ticker.id');
     }, 'analyst_count');
 
-    // Research Count Subquery (Approximation using string match on array or jsonb if needed, but here simple count if relation exists)
-    // NOTE: ResearchNotes store tickers in text[] array usually. 
-    // Assuming simple join is hard, we can try a subquery if we know the schema. 
-    // ResearchNoteRepo usage in getSnapshot implies 'tickers' column with ArrayContains.
-    // For SQL subquery on array column: WHERE :symbol = ANY(tickers)
+    // Research Count Subquery
     qb.addSelect((subQuery) => {
         return subQuery
             .select('COUNT(*)', 'count')
             .from('research_notes', 'rn')
             .where('ticker.symbol = ANY(rn.tickers)');
     }, 'research_count');
+
+    // Social Count Subquery
+    qb.addSelect((subQuery) => {
+        return subQuery
+            .select('COUNT(*)', 'count')
+            .from('comments', 'c')
+            .where('c.ticker_symbol = ticker.symbol');
+    }, 'social_count');
+
+    // News Count Subquery
+    qb.addSelect((subQuery) => {
+        return subQuery
+            .select('COUNT(*)', 'count')
+            .from('company_news', 'cn')
+            .where('cn.symbol_id = ticker.id');
+    }, 'news_count');
 
     // Filter
     if (search) {
@@ -618,13 +699,19 @@ export class MarketDataService {
 
     // Sort Mapping
     let sortField = `fund.${sortBy}`; // Default to fundamentals
-    if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
+    
+    if (sortBy === 'change') {
+       // Sort by computed column expression or alias (alias often works in Postgres if selected)
+       // We use the alias 'price_change_pct' which we defined above.
+       // Note: Postgres allows ordering by alias in ORDER BY clause.
+       sortField = '"price_change_pct"'; 
+    } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
     } else if (
       ['overall_score', 'upside_percent', 'financial_risk'].includes(sortBy)
     ) {
       sortField = `risk.${sortBy}`;
-    } else if (['close', 'volume', 'change'].includes(sortBy)) {
+    } else if (['close', 'volume'].includes(sortBy)) {
       sortField = `price.${sortBy}`;
     }
 
@@ -636,23 +723,26 @@ export class MarketDataService {
     qb.skip(skip).take(limit);
 
     // Get Raw Entities (mapped)
-    // getManyAndCount doesn't include raw selections easily (like subquery counts) if we use getMany.
-    // We need getRawAndEntities or map the raw results. 
-    // However, mapOne puts relations on entity. Subqueries usually end up in "raw" part of getRawAndEntities.
     const { entities, raw } = await qb.getRawAndEntities();
-    const total = await qb.getCount(); // Separate count query to be safe with subqueries
+    const total = await qb.getCount();
 
     return {
       items: entities.map((t: any, index) => {
-         // Raw result matching is tricky if sorting/filtering changes order, but getRawAndEntities maintains order.
-         // raw[index] should correspond to entities[index] if 1:1. 
-         // But raw returns flat columns. "analyst_count" should be there.
-         // We need to parse valid number from raw string.
+         // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
+         // but strict matching by ID is safer.
          const rawData = raw.find(r => r.ticker_id === t.id); 
+         
          const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
          const researchCount = rawData ? parseInt(rawData.research_count, 10) : 0;
          const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
+         const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
+         const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
          
+         // Inject change into latestPrice
+         const latestPriceWithChange = t.latestPrice 
+            ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
+            : null;
+
          return {
             ticker: {
               id: t.id,
@@ -664,12 +754,12 @@ export class MarketDataService {
               logo_url: t.logo_url,
             },
             fundamentals: t.fund || {},
-            latestPrice: t.latestPrice || null,
+            latestPrice: latestPriceWithChange,
             aiAnalysis: t.latestRisk || null,
             counts: {
                 analysts: isNaN(analystCount) ? 0 : analystCount,
                 research: isNaN(researchCount) ? 0 : researchCount,
-                news: 0, // Not persisted, expensive to fetch in bulk
+                news: isNaN(newsCount) ? 0 : newsCount, 
                 social: isNaN(socialCount) ? 0 : socialCount,
             }
         };
