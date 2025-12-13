@@ -354,10 +354,17 @@ export class MarketDataService {
     const existing = await this.analystRatingRepo.find({
       where: { symbol_id: tickerEntity.id },
     });
+    const normalizeFirm = (firm?: string) =>
+      (firm || '')
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
     const seen = new Set(
       existing.map(
         (r) =>
-          `${(r.firm || '').toLowerCase().trim()}|${String(r.rating_date).trim()}`,
+          `${normalizeFirm(r.firm)}|${String(r.rating_date).trim()}`,
       ),
     );
 
@@ -369,7 +376,7 @@ export class MarketDataService {
       if (dateStr === 'null' || dateStr === '') continue;
       if (isNaN(new Date(dateStr).getTime())) continue; // skip invalid dates
 
-      const dedupeKey = `${rating.firm.toLowerCase().trim()}|${dateStr}`;
+      const dedupeKey = `${normalizeFirm(rating.firm)}|${dateStr}`;
       if (seen.has(dedupeKey)) continue;
 
       const existing = await this.analystRatingRepo.findOne({
@@ -425,10 +432,30 @@ export class MarketDataService {
     const tickerEntity = await this.tickersService.getTicker(symbol);
     if (!tickerEntity) return [];
 
-    return this.analystRatingRepo.find({
+    const ratings = await this.analystRatingRepo.find({
       where: { symbol_id: tickerEntity.id },
       order: { rating_date: 'DESC' },
       take: 20,
     });
+
+    const normalizeFirm = (firm?: string) =>
+      (firm || '')
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
+    // Deduplicate by normalized firm, keep most recent
+    const seen = new Set<string>();
+    const unique: AnalystRating[] = [];
+    for (const r of ratings) {
+      const key = normalizeFirm(r.firm);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(r);
+      }
+    }
+
+    return unique;
   }
 }

@@ -10,6 +10,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
 import type { ResearchItem } from '../../types/ticker';
 import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { tickerKeys } from '../../hooks/useTicker';
 
 type ModelTier = 'low' | 'medium' | 'high' | 'deep';
 
@@ -25,6 +27,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     const navigate = useNavigate();
     const { user } = useAuth();
     const updateTitleMutation = useUpdateResearchTitle();
+    const queryClient = useQueryClient();
 
     // Local state for editing
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,6 +93,9 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                     try {
                                         setIsSyncing(true);
                                         await api.post(`/research/sync/${defaultTicker}`);
+                                        // Refresh local data after sync
+                                        queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
+                                        queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
                                     } catch (err) {
                                         console.error('Sync failed', err);
                                     } finally {

@@ -15,6 +15,7 @@ import {
 import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
+import { toonToJson } from 'toon-parser';
 
 @Injectable()
 export class RiskRewardService {
@@ -28,6 +29,42 @@ export class RiskRewardService {
     private readonly llmService: LlmService,
     private readonly marketDataService: MarketDataService,
   ) {}
+
+  // Heuristic salvage to keep processing when JSON is malformed but key numbers exist.
+  private salvageFromRaw(raw: string) {
+    if (!raw) return null;
+    const getNum = (key: string) => {
+      const match = raw.match(
+        new RegExp(`"${key}"\\s*:\\s*([-\\d\\.]+)`, 'i'),
+      );
+      if (!match) return null;
+      const n = Number(match[1]);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const overall = getNum('overall');
+    if (overall === null) return null;
+
+    const priceTarget =
+      getNum('price_target_weighted') ?? getNum('price_target_mid') ?? 0;
+    const upside = getNum('upside_vs_current_percent') ?? 0;
+
+    return {
+      risk_score: {
+        overall,
+        financial_risk: getNum('financial_risk') ?? overall,
+        execution_risk: getNum('execution_risk') ?? overall,
+        dilution_risk: getNum('dilution_risk') ?? overall,
+        competitive_risk: getNum('competitive_risk') ?? overall,
+        regulatory_risk: getNum('regulatory_risk') ?? overall,
+      },
+      expected_value: {
+        price_target_weighted: priceTarget,
+        upside_vs_current_percent: upside,
+      },
+      scenarios: {}, // fallback builder will synthesize if empty
+    };
+  }
 
   async getLatestScore(symbol: string) {
     const snapshot = await this.marketDataService.getSnapshot(symbol);
@@ -224,11 +261,16 @@ export class RiskRewardService {
         try {
           parsed = JSON.parse(cleanJson);
         } catch (_err) {
-          // Attempt a tolerant repair: quote bare keys and strip trailing commas
-          const repaired = cleanJson
-            .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')
-            .replace(/,(\s*[}\]])/g, '$1');
-          parsed = JSON.parse(repaired);
+          // Attempt toon-parser first for lenient JSON (handles trailing commas/unquoted keys)
+          try {
+            parsed = toonToJson(cleanJson, { strict: false }) as any;
+          } catch (_toonErr) {
+            // Attempt a tolerant repair: quote bare keys and strip trailing commas
+            const repaired = cleanJson
+              .replace(/(['"])?([A-Za-z0-9_]+)(['"])?:/g, '"$2":')
+              .replace(/,(\s*[}\]])/g, '$1');
+            parsed = JSON.parse(repaired);
+          }
         }
 
         // Basic validation: Check if key fields exist
@@ -242,6 +284,14 @@ export class RiskRewardService {
           `Attempt ${attempts}/${maxRetries} failed to parse JSON for ${symbol}: ${e.message}`,
         );
         if (attempts === maxRetries) {
+          const salvaged = this.salvageFromRaw(lastRaw);
+          if (salvaged) {
+            this.logger.warn(
+              `Using salvaged risk payload for ${symbol} after parse failures.`,
+            );
+            parsed = salvaged;
+            break;
+          }
           this.logger.error(`Final attempt failed for ${symbol}.`);
           this.logger.error(
             `Failed payload (truncated): ${String(lastRaw).slice(0, 500)}`,
