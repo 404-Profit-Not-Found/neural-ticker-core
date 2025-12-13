@@ -288,9 +288,9 @@ export function Dashboard() {
                             <div className="flex items-center gap-3">
                                 <Brain className="w-10 h-10 text-primary" />
                                 <div>
-                                    <h1 className="text-3xl font-semibold tracking-tight">Market Intelligence</h1>
+                                    <h1 className="text-3xl font-semibold tracking-tight">AI assisted stock analyzer</h1>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Real-time neural analysis of financial markets, news, and risks.
+                                        Stocks, risks, news, chat ...
                                     </p>
                                 </div>
                             </div>
