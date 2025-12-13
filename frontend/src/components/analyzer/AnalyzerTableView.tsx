@@ -10,7 +10,8 @@ import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
 
 interface AnalyzerTableViewProps {
     data: StockSnapshot[];
-    columns: ColumnDef<StockSnapshot, Record<string, unknown>>[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    columns: ColumnDef<StockSnapshot, any>[];
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
     navigate: (path: string) => void;
