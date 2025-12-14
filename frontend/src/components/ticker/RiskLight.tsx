@@ -86,7 +86,7 @@ export const RiskLight: React.FC<RiskLightProps> = ({
 
 
 
-    const FactorContentNode = ({ factor, safeVal, colorClass }: any) => (
+    const FactorContentNode = ({ factor, safeVal, colorClass }: { factor: { icon: React.ElementType; label: string }; safeVal: number; colorClass: string }) => (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <p className={`font-bold text-sm flex items-center gap-2 ${colorClass}`}>

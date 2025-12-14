@@ -189,8 +189,8 @@ export function NewsFeed() {
                 </CardContent>
             </Card>
 
-            {/* GENERAL NEWS FEED (Right - 2/5 width) */}
-            <Card className="lg:col-span-2 flex flex-col border-border/50 shadow-sm overflow-hidden bg-transparent">
+            {/* GENERAL NEWS FEED (Right - 2/5 width - Hidden on mobile) */}
+            <Card className="hidden lg:flex lg:col-span-2 flex-col border-border/50 shadow-sm overflow-hidden bg-transparent">
                 <CardHeader className="py-4 border-b border-border/50 bg-transparent">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Newspaper className="w-4 h-4 text-primary" />

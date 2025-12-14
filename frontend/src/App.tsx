@@ -12,6 +12,7 @@ import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
+import { NewsPage } from './pages/NewsPage';
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
@@ -82,6 +83,7 @@ function App() {
             <Route path="/portfolio" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
+            <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
 
 
             <Route path="/admin" element={

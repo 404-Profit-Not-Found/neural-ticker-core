@@ -307,6 +307,9 @@ export function Header() {
           <Link to="/analyzer" className={mobileLinkClass('/analyzer')}>
             Tickers
           </Link>
+          <Link to="/news" className={mobileLinkClass('/news')}>
+            News
+          </Link>
           <div className="h-px bg-border my-2" />
           <button
             type="button"
