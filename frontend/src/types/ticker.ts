@@ -62,6 +62,9 @@ export interface TickerData {
         symbol: string;
         exchange: string;
         name: string;
+        sector?: string;
+        industry?: string;
+        web_url?: string;
     };
     market_data: {
         price: number;

@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-    Activity,
     DollarSign,
     Zap,
     PieChart,
@@ -36,7 +35,6 @@ export interface RiskLightProps {
 export const RiskLight: React.FC<RiskLightProps> = ({
     score,
     className = '',
-    reasoning,
     breakdown
 }) => {
     // User defined ranges: 1-4 Green, 5-6 Yellow, 7-10 Red
@@ -85,34 +83,8 @@ export const RiskLight: React.FC<RiskLightProps> = ({
         },
     ];
 
-    const overallScore = Number(score) || 0;
-    const overallColor = getColor(overallScore);
 
-    // --- REUSABLE CONTENT COMPONENTS ---
-    // Defined outside the map simply for clarity, but using closures for props
 
-    const OverallContentNode = () => (
-        <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <p className={`font-bold text-sm ${overallColor}`}>Overall Risk</p>
-                    <p className="text-[10px] text-muted-foreground">Composite Assessment</p>
-                </div>
-            </div>
-
-            <div className={`flex items-center gap-2 p-2 rounded bg-muted/30`}>
-                <Activity className={`w-4 h-4 ${overallColor}`} />
-                <span className="text-xs font-medium">Score:</span>
-                <span className={`font-mono font-bold ml-auto ${overallColor}`}>
-                    {overallScore.toFixed(1)}/10
-                </span>
-            </div>
-
-            <p className="text-xs text-foreground/80 leading-relaxed border-t pt-2 mt-2">
-                {reasoning || "Aggregated risk score based on all analyzed factors."}
-            </p>
-        </div>
-    );
 
     const FactorContentNode = ({ factor, safeVal, colorClass }: any) => (
         <div className="space-y-3">
@@ -139,45 +111,6 @@ export const RiskLight: React.FC<RiskLightProps> = ({
     return (
         <TooltipProvider delayDuration={0}>
             <div className={`flex flex-row items-center gap-6 ${className}`}>
-
-                {/* --- OVERALL INDICATOR --- */}
-                {/* Mobile: Popover */}
-                <div className="md:hidden">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <button type="button" className="group flex flex-col items-center justify-center p-1.5 rounded-md transition-colors active:bg-muted/50 focus:outline-none">
-                                <Activity className={`w-5 h-5 mb-0.5 ${overallColor}`} />
-                                <span className={`text-sm font-bold font-mono ${overallColor}`}>
-                                    {overallScore.toFixed(1)}
-                                </span>
-                            </button>
-                        </PopoverTrigger>
-                        <PopoverContent side="bottom" align="center" collisionPadding={10} className="w-[280px]">
-                            <OverallContentNode />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                {/* Desktop: Tooltip */}
-                <div className="hidden md:block">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button type="button" className="group flex flex-col items-center justify-center p-1.5 rounded-md transition-colors hover:bg-muted/50 cursor-help focus:outline-none">
-                                <Activity className={`w-5 h-5 mb-0.5 ${overallColor}`} />
-                                <span className={`text-sm font-bold font-mono ${overallColor}`}>
-                                    {overallScore.toFixed(1)}
-                                </span>
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" align="center" collisionPadding={10} className="max-w-[300px] p-4">
-                            <OverallContentNode />
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
-
-
-                {/* Vertical Divider */}
-                <div className="h-6 w-px bg-border/20" />
-
 
                 {/* --- INDIVIDUAL FACTORS --- */}
                 <div className="flex flex-row gap-5">

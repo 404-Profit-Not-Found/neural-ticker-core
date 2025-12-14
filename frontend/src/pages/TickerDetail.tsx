@@ -94,104 +94,107 @@ export function TickerDetail() {
             <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6">
 
                 {/* --- 1. HERO HEADER --- */}
-                {/* --- 1. HERO HEADER --- */}
-                <div className="relative z-[999] flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 pb-4 md:pb-6">
-                    <div className="flex items-start md:items-center gap-3 md:gap-4 w-full">
-                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0">
+                <div className="relative z-[999] space-y-4 pb-4 md:pb-6">
+                    {/* Top Row: Back + Logo + Symbol/Name + Price + Risk (Desktop: all left-aligned) */}
+                    <div className="flex items-start md:items-center gap-3 md:gap-4">
+                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 md:mt-0">
                             <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                         </Button>
 
-                        <div className="flex-1 min-w-0 grid grid-cols-[auto_1fr] md:flex md:items-center gap-x-3 gap-y-1">
-                            {/* Logo */}
-                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 md:w-12 md:h-12 row-span-2 md:row-span-1" />
+                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 md:w-12 md:h-12 shrink-0" />
 
-                            {/* Top Row: Symbol + Exchange + Price (Mobile Right) */}
-                            <div className="flex items-center justify-between md:justify-start gap-2 col-start-2">
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                    <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide hidden md:inline-block">{profile?.exchange}</span>
-
-                                    {/* Watch & Share */}
-                                    <div className="hidden md:flex items-center gap-2 ml-2 pl-2 border-l border-border/50">
-                                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-default" title="Watchers">
-                                            <Eye size={12} />
-                                            <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
-                                            <Share2 size={12} className="text-muted-foreground" />
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Mobile Price Display */}
-                                <div className="md:hidden flex items-center gap-2">
-                                    <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                        {isPriceUp ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
-                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
-                                    </span>
+                        <div className="flex-1 min-w-0">
+                            {/* Symbol + Exchange (desktop) / Symbol + Price (mobile) */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                {/* Desktop: Exchange Badge */}
+                                <span className="hidden md:inline-block bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{profile?.exchange}</span>
+                                {/* Mobile: Price + Change */}
+                                <div className="md:hidden flex items-baseline gap-1.5">
                                     <span className="text-lg font-mono font-bold tracking-tight">
                                         ${market_data?.price?.toFixed(2)}
                                     </span>
+                                    <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                        {isPriceUp ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
+                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                    </span>
+                                </div>
+                            </div>
+                            {/* Company Name + Industry */}
+                            <div className="text-xs md:text-sm text-muted-foreground font-medium truncate mt-0.5">
+                                {profile?.name}
+                                {profile?.industry && (
+                                    <span className="text-muted-foreground/60"> · {profile.industry}</span>
+                                )}
+                            </div>
+
+                            {/* Mobile: Risk + Watchers/Share Row */}
+                            <div className="md:hidden flex items-center justify-between mt-3">
+                                {/* Risk Indicators (Left) */}
+                                {risk_analysis && (
+                                    <RiskLight
+                                        score={risk_analysis.overall_score}
+                                        reasoning={risk_analysis.summary}
+                                        sentiment={risk_analysis.sentiment}
+                                        breakdown={{
+                                            financial: risk_analysis.financial_risk,
+                                            execution: risk_analysis.execution_risk,
+                                            dilution: risk_analysis.dilution_risk,
+                                            competitive: risk_analysis.competitive_risk,
+                                            regulatory: risk_analysis.regulatory_risk
+                                        }}
+                                    />
+                                )}
+                                {/* Watchers/Share (Right) */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground" title="Watchers">
+                                        <Eye size={12} />
+                                        <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
+                                        <Share2 size={12} className="text-muted-foreground" />
+                                    </Button>
                                 </div>
                             </div>
 
-                            {/* Bottom Row: Name + Divider + Regular Price (Desktop) */}
-                            <div className="flex items-center justify-between md:justify-start gap-4 col-start-2 md:col-auto w-full md:w-auto">
-                                <div className="text-xs md:text-sm text-muted-foreground font-medium truncate">{profile?.name}</div>
-
-                                {/* Desktop Price Display */}
-                                <div className="hidden md:flex items-center gap-4">
-                                    <div className="h-4 w-px bg-border hidden md:block" />
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-2xl font-mono font-semibold tracking-tight">
-                                            ${market_data?.price?.toFixed(2)}
-                                        </span>
-                                        <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                            {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                                            {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
-                                        </span>
-                                    </div>
+                            {/* Desktop: Price + Risk Indicators */}
+                            <div className="hidden md:flex items-center gap-6 mt-3">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl font-mono font-semibold tracking-tight">
+                                        ${market_data?.price?.toFixed(2)}
+                                    </span>
+                                    <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                        {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                    </span>
                                 </div>
+                                <div className="h-6 w-px bg-border/30" />
+                                {risk_analysis && (
+                                    <RiskLight
+                                        score={risk_analysis.overall_score}
+                                        reasoning={risk_analysis.summary}
+                                        sentiment={risk_analysis.sentiment}
+                                        breakdown={{
+                                            financial: risk_analysis.financial_risk,
+                                            execution: risk_analysis.execution_risk,
+                                            dilution: risk_analysis.dilution_risk,
+                                            competitive: risk_analysis.competitive_risk,
+                                            regulatory: risk_analysis.regulatory_risk
+                                        }}
+                                    />
+                                )}
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-                        <div className="flex items-center gap-3">
-                            {risk_analysis && (
-                                <>
-                                    {/* Desktop Risk */}
-                                    <div className="hidden md:block">
-                                        <RiskLight
-                                            score={risk_analysis.overall_score}
-                                            reasoning={risk_analysis.summary}
-                                            sentiment={risk_analysis.sentiment}
-                                            breakdown={{
-                                                financial: risk_analysis.financial_risk,
-                                                execution: risk_analysis.execution_risk,
-                                                dilution: risk_analysis.dilution_risk,
-                                                competitive: risk_analysis.competitive_risk,
-                                                regulatory: risk_analysis.regulatory_risk
-                                            }}
-                                        />
-                                    </div>
-                                    {/* Mobile Risk */}
-                                    <div className="md:hidden block">
-                                        <RiskLight
-                                            score={risk_analysis.overall_score}
-                                            reasoning={risk_analysis.summary}
-                                            sentiment={risk_analysis.sentiment}
-                                            breakdown={{
-                                                financial: risk_analysis.financial_risk,
-                                                execution: risk_analysis.execution_risk,
-                                                dilution: risk_analysis.dilution_risk,
-                                                competitive: risk_analysis.competitive_risk,
-                                                regulatory: risk_analysis.regulatory_risk
-                                            }}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                        {/* Desktop: Watchers/Share (Far Right) */}
+                        <div className="hidden md:flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-default" title="Watchers">
+                                <Eye size={12} />
+                                <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
+                                <Share2 size={12} className="text-muted-foreground" />
+                            </Button>
                         </div>
                     </div>
                 </div>

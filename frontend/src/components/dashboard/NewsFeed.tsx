@@ -124,7 +124,7 @@ export function NewsFeed() {
                         )}
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto p-6">
+                <CardContent className="flex-1 overflow-y-auto p-6 min-h-[80vh] md:min-h-0">
                     {loadingDigest ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="w-3 h-3 animate-spin" /> Generated just now...

@@ -107,7 +107,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
         symbol: item.ticker.symbol,
         company: item.ticker.name,
         logo: item.ticker.logo_url,
-        sector: item.ticker.sector || 'Unknown',
+        sector: item.ticker.industry || item.ticker.sector || 'Unknown',
         price: Number(item.latestPrice?.close ?? 0),
         change: Number(item.latestPrice?.change ?? 0),
         pe: Number(item.fundamentals.pe_ratio ?? 0) || null,

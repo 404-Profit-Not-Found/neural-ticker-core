@@ -118,7 +118,7 @@ export class TickerDetailController {
             competitive_risk: riskAnalysis.competitive_risk,
             regulatory_risk: riskAnalysis.regulatory_risk,
             sentiment: riskAnalysis.sentiment,
-            
+
             dimensions: {
               financial: riskAnalysis.financial_risk,
               execution: riskAnalysis.execution_risk,
