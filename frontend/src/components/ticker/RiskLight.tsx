@@ -1,80 +1,163 @@
-
-import { ShieldCheck, Info } from 'lucide-react';
+import React from 'react';
+import {
+    DollarSign,
+    Zap,
+    PieChart,
+    Swords,
+    Scale
+} from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "../ui/tooltip";
+} from '../ui/tooltip';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '../ui/popover';
 
-interface RiskLightProps {
+export interface RiskLightProps {
     score: number;
+    className?: string;
+    sentiment?: string;
     reasoning?: string;
-    compact?: boolean;
+    breakdown?: {
+        financial: number;
+        execution: number;
+        dilution: number;
+        competitive: number;
+        regulatory: number;
+    };
 }
 
-export function RiskLight({ score, reasoning, compact = false }: RiskLightProps) {
-    const roundedScore = Math.round(score);
-    // Force cache invalidation
-    const getColor = (s: number) => {
-        if (s >= 7) return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
-        if (s >= 4) return 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]';
-        return 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+export const RiskLight: React.FC<RiskLightProps> = ({
+    score,
+    className = '',
+    breakdown
+}) => {
+    // User defined ranges: 1-4 Green, 5-6 Yellow, 7-10 Red
+    const getColor = (val: number) => {
+        if (val >= 7) return 'text-red-500'; // High Risk
+        if (val > 4) return 'text-yellow-500'; // Med Risk (5-6)
+        return 'text-green-500'; // Low Risk (1-4)
     };
 
-    const getLabel = (s: number) => {
-        if (s >= 7) return 'High Risk';
-        if (s >= 4) return 'Med Risk';
-        return 'Low Risk';
-    };
+    // Risk Factors Configuration
+    const riskFactors = [
+        {
+            key: 'financial',
+            label: 'Financial',
+            icon: DollarSign,
+            val: breakdown?.financial ?? score,
+            description: 'Balance sheet health, cash burn, and solvency.'
+        },
+        {
+            key: 'execution',
+            label: 'Execution',
+            icon: Zap,
+            val: breakdown?.execution ?? score,
+            description: 'Management track record and operational efficiency.'
+        },
+        {
+            key: 'dilution',
+            label: 'Dilution',
+            icon: PieChart,
+            val: breakdown?.dilution ?? score,
+            description: 'Risk of share issuance and value erosion.'
+        },
+        {
+            key: 'competitive',
+            label: 'Competitive',
+            icon: Swords,
+            val: breakdown?.competitive ?? score,
+            description: 'Market position and moat durability.'
+        },
+        {
+            key: 'regulatory',
+            label: 'Regulatory',
+            icon: Scale,
+            val: breakdown?.regulatory ?? score,
+            description: 'Legal compliance and governmental risks.'
+        },
+    ];
 
-    if (compact) {
-        return (
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger>
-                        <div className="flex items-center gap-1.5 bg-muted/40 px-2 py-1 rounded border border-border/50">
-                            <span className={`w-2 h-2 rounded-full ${getColor(score)}`} />
-                            <span className="text-xs font-bold font-mono">{roundedScore}/10</span>
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[300px] p-4 text-xs leading-relaxed border-border bg-card shadow-xl">
-                        <div className="font-bold mb-2 flex items-center gap-2">
-                            <ShieldCheck size={14} className="text-primary" /> Risk Assessment ({getLabel(score)})
-                        </div>
-                        {reasoning || "Analysis pending..."}
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        );
-    }
 
-    return (
-        <div className="flex items-center gap-3 bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
-            <div className="flex flex-col items-start mr-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Risk Level</span>
-                <div className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${getColor(score)} animate-pulse`} />
-                    <span className="text-sm font-bold font-mono">{roundedScore}/10</span>
-                </div>
+
+
+    const FactorContentNode = ({ factor, safeVal, colorClass }: { factor: { icon: React.ElementType; label: string }; safeVal: number; colorClass: string }) => (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <p className={`font-bold text-sm flex items-center gap-2 ${colorClass}`}>
+                    <factor.icon className="w-4 h-4" />
+                    {factor.label} Risk
+                </p>
             </div>
 
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger>
-                        <div className="cursor-help flex items-center gap-1 bg-background border border-border px-2 py-1 rounded text-xs hover:bg-muted transition-colors">
-                            <span className="font-semibold">{getLabel(score)}</span>
-                            <Info size={10} className="text-muted-foreground" />
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[300px] p-4 text-xs leading-relaxed border-border bg-card shadow-xl">
-                        <div className="font-bold mb-2 flex items-center gap-2">
-                            <ShieldCheck size={14} className="text-primary" /> Risk Assessment
-                        </div>
-                        {reasoning || "Analysis pending..."}
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <div className="flex items-center justify-between text-xs bg-muted/30 p-2 rounded">
+                <span className="text-muted-foreground font-medium">Impact Score</span>
+                <span className={`font-mono font-bold ml-auto ${colorClass}`}>
+                    {safeVal.toFixed(1)}/10
+                </span>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+                {factor.description}
+            </p>
         </div>
     );
-}
+
+    return (
+        <TooltipProvider delayDuration={0}>
+            <div className={`flex flex-row items-center gap-6 ${className}`}>
+
+                {/* --- INDIVIDUAL FACTORS --- */}
+                <div className="flex flex-row gap-5">
+                    {riskFactors.map((factor) => {
+                        const safeVal = Number(factor.val ?? 0);
+                        const colorClass = getColor(safeVal);
+
+                        return (
+                            <React.Fragment key={factor.key}>
+                                {/* Mobile: Popover */}
+                                <div className="md:hidden">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <button type="button" className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95 focus:outline-none">
+                                                <factor.icon className={`w-5 h-5 ${colorClass}`} />
+                                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                    {factor.label.slice(0, 3)}
+                                                </span>
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent side="bottom" align="center" collisionPadding={10} className="w-[240px]">
+                                            <FactorContentNode factor={factor} safeVal={safeVal} colorClass={colorClass} />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+
+                                {/* Desktop: Tooltip */}
+                                <div className="hidden md:block">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button type="button" className="group flex flex-col items-center gap-1.5 cursor-help transition-transform hover:scale-110 focus:outline-none rounded-md p-0.5">
+                                                <factor.icon className={`w-5 h-5 ${colorClass}`} />
+                                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                    {factor.label.slice(0, 3)}
+                                                </span>
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" align="center" collisionPadding={10} className="p-3 w-[220px]">
+                                            <FactorContentNode factor={factor} safeVal={safeVal} colorClass={colorClass} />
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            </div>
+        </TooltipProvider>
+    );
+};

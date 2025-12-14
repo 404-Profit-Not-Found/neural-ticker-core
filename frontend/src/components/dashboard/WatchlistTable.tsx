@@ -44,7 +44,7 @@ interface TickerSearchResult {
 }
 
 interface MarketSnapshot {
-    ticker: { symbol: string; logo_url?: string; name?: string; id: string };
+    ticker: { symbol: string; logo_url?: string; name?: string; id: string; industry?: string; sector?: string };
     latestPrice?: { close: number; prevClose?: number };
     fundamentals?: {
         sector?: string;
@@ -175,7 +175,7 @@ export function WatchlistTable() {
                     symbol: s.ticker?.symbol || 'UNKNOWN',
                     logo: s.ticker?.logo_url,
                     company: s.ticker?.name || 'Unknown',
-                    sector: fundamentals.sector || 'Others',
+                    sector: s.ticker?.industry || s.ticker?.sector || fundamentals.sector || 'Others',
                     price: price,
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,

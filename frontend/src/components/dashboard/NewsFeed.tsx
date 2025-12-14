@@ -101,7 +101,7 @@ export function NewsFeed() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
             {/* AI DIGEST CARD (Left - 3/5 width - PROMINENT BUT CLEAN) */}
-            <Card className="lg:col-span-3 flex flex-col overflow-hidden border-border/50 shadow-sm bg-transparent">
+            <Card className="lg:col-span-3 flex flex-col overflow-hidden border-border/50 shadow-sm bg-transparent min-h-[50vh] md:min-h-0">
                 <CardHeader className="py-4 border-b border-border/50 bg-transparent">
                     <CardTitle className="text-base font-bold flex items-center justify-between w-full">
                         <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export function NewsFeed() {
                         )}
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto p-6">
+                <CardContent className="flex-1 overflow-y-auto p-6 min-h-[80vh] md:min-h-0">
                     {loadingDigest ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="w-3 h-3 animate-spin" /> Generated just now...
@@ -189,8 +189,8 @@ export function NewsFeed() {
                 </CardContent>
             </Card>
 
-            {/* GENERAL NEWS FEED (Right - 2/5 width) */}
-            <Card className="lg:col-span-2 flex flex-col border-border/50 shadow-sm overflow-hidden bg-transparent">
+            {/* GENERAL NEWS FEED (Right - 2/5 width - Hidden on mobile) */}
+            <Card className="hidden lg:flex lg:col-span-2 flex-col border-border/50 shadow-sm overflow-hidden bg-transparent">
                 <CardHeader className="py-4 border-b border-border/50 bg-transparent">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Newspaper className="w-4 h-4 text-primary" />

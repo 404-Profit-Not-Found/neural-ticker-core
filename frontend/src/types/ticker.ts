@@ -62,6 +62,9 @@ export interface TickerData {
         symbol: string;
         exchange: string;
         name: string;
+        sector?: string;
+        industry?: string;
+        web_url?: string;
     };
     market_data: {
         price: number;
@@ -74,6 +77,13 @@ export interface TickerData {
         scenarios: Scenario[];
         catalysts: { description: string }[];
         red_flags: string[];
+        // Detailed Risk Breakdown
+        financial_risk: number;
+        execution_risk: number;
+        dilution_risk: number;
+        competitive_risk: number;
+        regulatory_risk: number;
+        sentiment?: string;
     };
     fundamentals: {
         // Valuation & Size
