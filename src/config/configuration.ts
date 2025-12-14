@@ -47,7 +47,7 @@ export default () => {
         low: 'gemini-2.5-flash-lite',
         medium: 'gemini-2.5-flash',
         deep: 'gemini-2.5-pro',
-        extraction: 'gemini-2.5-flash',
+        extraction: 'gemini-2.5-flash-lite',
       },
     },
     riskReward: {

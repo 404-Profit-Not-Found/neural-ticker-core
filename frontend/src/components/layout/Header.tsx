@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Bell, User as UserIcon, Shield, Menu, X } from 'lucide-react';
 import { api } from '../../lib/api';
-import { GlobalSearch } from './GlobalSearch';
+
 
 interface Notification {
   id: string;
@@ -150,7 +150,7 @@ export function Header() {
 
 
         {/* Center: Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
           <Link to="/watchlist" className={linkClass('/watchlist')}>
             Watchlist
           </Link>
@@ -158,11 +158,6 @@ export function Header() {
             Tickers
           </Link>
         </nav>
-
-        {/* Search Bar - Push to right or center */}
-        <div className="hidden md:block ml-auto mr-4 w-64 lg:w-80">
-          <GlobalSearch />
-        </div>
 
         {/* Right: alerts + profile */}
         <div className="flex items-center gap-4">

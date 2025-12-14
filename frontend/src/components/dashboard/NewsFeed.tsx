@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Sparkles, Newspaper, Calendar, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import { MiniTickerTile } from './MiniTickerTile';
 
@@ -143,10 +144,11 @@ export function NewsFeed() {
                                                 <strong className="text-white font-bold">
                                                     {content.map((child, i) => {
                                                         if (typeof child === 'string') {
-                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\))/g);
+                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\)|\(MIXED\))/g);
                                                             return parts.map((part, j) => {
                                                                 if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500">{part}</span>;
                                                                 if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500">{part}</span>;
+                                                                if (part === '(MIXED)') return <span key={`${i}-${j}`} className="text-yellow-500">{part}</span>;
                                                                 return part;
                                                             });
                                                         }
@@ -158,13 +160,14 @@ export function NewsFeed() {
                                         p: ({ ...props }) => {
                                             const content = Array.isArray(props.children) ? props.children : [props.children];
                                             return (
-                                                <p className="text-muted-foreground leading-relaxed mb-4">
+                                                <p className="text-muted-foreground leading-relaxed mb-4 whitespace-pre-line">
                                                     {content.map((child, i) => {
                                                         if (typeof child === 'string') {
-                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\))/g);
+                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\)|\(MIXED\))/g);
                                                             return parts.map((part, j) => {
                                                                 if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500 font-bold">{part}</span>;
                                                                 if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500 font-bold">{part}</span>;
+                                                                if (part === '(MIXED)') return <span key={`${i}-${j}`} className="text-yellow-500 font-bold">{part}</span>;
                                                                 return part;
                                                             });
                                                         }
@@ -178,7 +181,9 @@ export function NewsFeed() {
                                         h1: ({ ...props }) => <h3 {...props} className="text-lg font-bold text-foreground mt-6 mb-3" />,
                                         h2: ({ ...props }) => <h4 {...props} className="text-base font-bold text-foreground mt-5 mb-2" />,
                                         h3: ({ ...props }) => <h5 {...props} className="text-sm font-bold text-foreground mt-4 mb-2" />,
+                                        hr: ({ ...props }) => <hr {...props} className="my-6 border-border" />,
                                     }}
+                                    remarkPlugins={[remarkGfm]}
                                 >
                                     {digest.answer_markdown || "No content available."}
                                 </ReactMarkdown>

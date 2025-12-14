@@ -18,7 +18,7 @@ export class GeminiProvider implements ILlmProvider {
     deep: 'gemini-2.5-pro',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
-    extraction: 'gemini-2.5-flash',
+    extraction: 'gemini-2.5-flash-lite',
   };
 
   constructor(private readonly configService: ConfigService) {

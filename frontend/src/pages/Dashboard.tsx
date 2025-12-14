@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -8,7 +8,8 @@ import {
     Zap,
     TrendingUp,
     Newspaper,
-    ArrowRight
+    ArrowRight,
+    Loader2
 } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
@@ -18,7 +19,15 @@ import { cn, api } from '../lib/api';
 import { useStockAnalyzer, type StockSnapshot } from '../hooks/useStockAnalyzer';
 import { WatchlistGridView } from '../components/dashboard/WatchlistGridView';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
+import { TickerLogo } from '../components/dashboard/TickerLogo';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
+
+interface TickerResult {
+    symbol: string;
+    name: string;
+    exchange: string;
+    logo_url?: string;
+}
 
 // --- Components based on StyleGuidePage ---
 
@@ -52,7 +61,7 @@ function StatPill({
     return (
         <div
             className={cn(
-                'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
+                'style-kpi relative overflow-hidden rounded-md border px-3 py-2 sm:px-4 sm:py-3',
             )}
             style={{
                 background:
@@ -68,17 +77,16 @@ function StatPill({
                 }}
                 aria-hidden
             />
-            <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-                    <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+            <div className="relative z-10 flex items-start justify-between gap-2 sm:gap-3">
+                <div className="space-y-0.5 sm:space-y-1">
+                    <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-foreground leading-tight">{value}</p>
                 </div>
-                <Icon className={cn('w-5 h-5', iconColors[tone])} />
+                <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5', iconColors[tone])} />
             </div>
         </div>
     );
 }
-
 
 
 
@@ -119,10 +127,17 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
 export function Dashboard() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [results, setResults] = useState<TickerResult[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const searchRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const { data: stats } = useQuery({
         queryKey: ['dashboard-stats'],
         queryFn: async () => {
+            // ... logic
             const [tickers, strongBuy, research] = await Promise.all([
                 api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
                 api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
@@ -136,10 +151,81 @@ export function Dashboard() {
         }
     });
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            navigate(`/ticker/${searchQuery.toUpperCase()}`);
+    // CMD+K Shortcut
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+        document.addEventListener('keydown', handleGlobalKeyDown);
+        return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
+
+    // Click Outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowResults(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Debounced Search
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (searchQuery.trim().length === 0) {
+                setResults([]);
+                setShowResults(false);
+                return;
+            }
+
+            setIsLoading(true);
+            try {
+                const { data } = await api.get<TickerResult[]>('/tickers', {
+                    params: { search: searchQuery },
+                });
+                setResults(data);
+                setShowResults(true);
+                setHighlightedIndex(-1);
+            } catch (error) {
+                console.error('Search failed', error);
+            } finally {
+                setIsLoading(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    const selectTicker = (ticker: TickerResult) => {
+        navigate(`/ticker/${ticker.symbol}`);
+        setSearchQuery('');
+        setShowResults(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex((prev) =>
+                prev < results.length - 1 ? prev + 1 : prev
+            );
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightedIndex >= 0 && results[highlightedIndex]) {
+                selectTicker(results[highlightedIndex]);
+            } else if (searchQuery.trim()) {
+                navigate(`/ticker/${searchQuery.toUpperCase()}`);
+            }
+        } else if (e.key === 'Escape') {
+            setShowResults(false);
+            (e.target as HTMLInputElement).blur();
         }
     };
 
@@ -157,7 +243,7 @@ export function Dashboard() {
                     />
                     <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
-                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
+                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-50">
                         <div className="space-y-4 max-w-3xl">
                             <div className="flex items-center gap-3">
                                 <Brain className="w-10 h-10 text-primary" />
@@ -170,7 +256,7 @@ export function Dashboard() {
                             </div>
                         </div>
 
-                        <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+                        <div ref={searchRef} className="relative w-full max-w-sm">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                                 <Input
@@ -178,17 +264,49 @@ export function Dashboard() {
                                     placeholder="Search ticker (e.g. NVDA)..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    onFocus={() => {
+                                        if (results.length > 0) setShowResults(true);
+                                    }}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none">
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none items-center gap-2">
+                                    {isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                                     <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
                                         <span className="text-xs">⌘</span>K
                                     </kbd>
                                 </div>
                             </div>
-                        </form>
+
+                            {showResults && results.length > 0 && (
+                                <div className="absolute top-full mt-2 w-full border border-border rounded-lg shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ backgroundColor: '#09090b' }}>
+                                    <div className="py-1 max-h-[300px] overflow-y-auto">
+                                        {results.map((ticker, index) => (
+                                            <button
+                                                key={ticker.symbol}
+                                                className={cn(
+                                                    "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                                                    index === highlightedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"
+                                                )}
+                                                onClick={() => selectTicker(ticker)}
+                                                onMouseEnter={() => setHighlightedIndex(index)}
+                                            >
+                                                <TickerLogo symbol={ticker.symbol} url={ticker.logo_url} className="w-8 h-8 rounded-full border border-border flex-shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-sm">{ticker.symbol}</span>
+                                                        <span className="text-[10px] text-muted-foreground border border-border px-1.5 rounded bg-background/50">{ticker.exchange}</span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground truncate opacity-80">{ticker.name}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="relative mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="relative mt-6 grid grid-cols-2 gap-2 sm:gap-4 sm:mt-8 lg:grid-cols-4">
                         <StatPill
                             icon={Activity}
                             label="Tickers Tracked"

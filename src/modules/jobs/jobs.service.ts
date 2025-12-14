@@ -177,6 +177,6 @@ export class JobsService {
     // The current requirement was "personalized per user".
     // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
     // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
-    await this.researchService.generateDailyDigest('system-cron');
+    await this.researchService.getOrGenerateDailyDigest('system-cron');
   }
 }

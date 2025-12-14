@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan } from 'typeorm';
+import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -646,13 +646,12 @@ Title:`;
     const today = new Date().toISOString().split('T')[0];
     const titlePattern = `Smart News Briefing (${today}%`;
 
-    // 1. Check DB for today's digest for THIS user
-    // We treat user_id = null as System/Global fallback if we wanted, but here we want specific.
+    // 1. Check DB for today's digest for THIS user (Completed OR Pending)
     const existing = await this.noteRepo.findOne({
       where: {
         user_id: userId,
         title: Like(titlePattern),
-        status: ResearchStatus.COMPLETED,
+        status: Not(ResearchStatus.FAILED),
       },
       order: { created_at: 'DESC' },
     });
@@ -662,13 +661,23 @@ Title:`;
     }
 
     // 2. Not found? Generate it.
-    return this.generateDailyDigest(userId);
-  }
+    // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
+    const pendingNote = this.noteRepo.create({
+        user_id: userId,
+        request_id: crypto.randomUUID(),
+        question: 'Smart News Briefing', // Placeholder
+        title: `Smart News Briefing (${today}) - Generating...`,
+        provider: LlmProvider.GEMINI, // Required field
+        tickers: [],
+        status: ResearchStatus.PENDING,
+        created_at: new Date(),
+        updated_at: new Date()
+    });
 
-  // Renamed for clarity: This forces generation and persistence
-  async generateDailyDigest(userId: string): Promise<ResearchNote | null> {
+    const savedPending = await this.noteRepo.save(pendingNote);
+    
+    // 3. Generate content and update the pending record
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
     const timeString = now.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -677,9 +686,7 @@ Title:`;
 
     this.logger.log(`Generating Personalized Digest for ${userId}...`);
 
-    try {
-      let symbols: string[] = [];
-      let relatedData: any[] = [];
+    let symbols: string[] = [];
 
     try {
       // 1. Fetch Candidates (User Watchlist)
@@ -705,7 +712,6 @@ Title:`;
         });
 
         // Scoring Logic: Impact Score
-        // Score = (Abs(Change%) * 2) + (NewsCount * 10)
         const scored = richData.items.map((item) => {
           const change = Math.abs(
             item.latestPrice?.changePercent || item.latestPrice?.change || 0,
@@ -715,97 +721,91 @@ Title:`;
           return { symbol: item.ticker.symbol, score, data: item };
         });
 
-        // Sort by Score DESC (always needed for fallback)
         scored.sort((a, b) => b.score - a.score);
-
-        // Filter: Must have some activity (Score > 2)
         let active = scored.filter((s) => s.score > 2);
 
-        // Fallback: If strict filter killed everything, take top 3 "best of the boring"
         if (active.length === 0 && scored.length > 0) {
-          this.logger.log(
-            'Strict filter returned 0. Relaxing to top 3 watchlist items.',
-          );
+          this.logger.log('Strict filter returned 0. Relaxing to top 3 watchlist items.');
           active = scored.slice(0, 3);
         }
 
-        // Take Top 3-5
         const topPicks = active.slice(0, 5);
         symbols = topPicks.map((s) => s.symbol);
-        relatedData = topPicks.map((s) => s.data);
-
-        this.logger.log(
-          `High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`,
-        );
+        
+        this.logger.log(`High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`);
       }
     } catch (e) {
       this.logger.warn('Failed to fetch user watchlist tickers', e);
     }
 
       if (symbols.length === 0) {
-        return null; // No tickers found or all filtered out and fallback failed
+        // No symbols found, fail gracefully and clear the pending lock
+        savedPending.status = ResearchStatus.FAILED;
+        savedPending.answer_markdown = 'No active tickers found in watchlist.';
+        await this.noteRepo.save(savedPending);
+        return null; 
       }
 
-      // 2. Generate Prompt
-      const prompt = `
-        You are an elite Wall Street Analyst.
-        Generate a "Daily Smart News Digest" for these tickers: ${symbols.join(', ')}.
-        Date: ${today}.
+      try {
+        // 2. Generate Prompt
+        const prompt = `
+            You are an elite Wall Street Analyst.
+            Generate a "Daily Smart News Digest" for these tickers: ${symbols.join(', ')}.
+            Date: ${today}.
+            
+            Using available news, identify Top Market Movers or Thematic Stories.
+            
+            STRICT RULES:
+            1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
+            2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
+            3. Label Sentiment as **BULLISH**, **BEARISH**, or **MIXED**.
+            4. SORT stories by Impact Index (Descending).
+            5. Use **Markdown** formatting for the digest use --- to separate sections.
+
+            Style Guide:
+            - Headlines: **[SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]**
+            - ** Headline text**
+            - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
+            - Tone: Bloomberg/Terminal. Concise. No fluff.
+            - **DO NOT** include a main title/header (e.g., 'Daily Smart News Digest'). Start directly with the Market Pulse.
+            - Structure:
+              1. Market Pulse (1-2 sentences).
+              2. Sections for each Key Story.
+                 - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
+        `;
+
+        // 3. Call LLM
+        const result = await this.llmService.generateResearch({
+            question: prompt,
+            tickers: symbols,
+            numericContext: {},
+            quality: 'medium', 
+            provider: 'gemini',
+        });
+
+        // 4. Update Pending Note
+        savedPending.request_id = crypto.randomUUID();
+        savedPending.title = `Smart News Briefing (${today} ${timeString})`; 
+        savedPending.question = `Daily Smart News Digest for: ${symbols.join(', ')}`;
+        savedPending.answer_markdown = result.answerMarkdown;
+        savedPending.tickers = symbols as any; 
+        savedPending.quality = 'medium';
+        savedPending.provider = LlmProvider.GEMINI;
+        savedPending.status = ResearchStatus.COMPLETED;
+        savedPending.models_used = result.models || ['gemini-2.5-flash'];
+        savedPending.tokens_in = result.tokensIn ?? 0;
+        savedPending.tokens_out = result.tokensOut ?? 0;
         
-        Using available news, identify Top Market Movers or Thematic Stories.
-        
-        STRICT RULES:
-        1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
-        2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
-        3. Label Sentiment as **BULLISH** or **BEARISH**.
-        4. SORT stories by Impact Index (Descending).
+        const saved = await this.noteRepo.save(savedPending);
+        this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+        return saved;
 
-        Style Guide:
-        - Headlines: **(SENTIMENT) [Impact: X/10] 
-        ---
-        [SYMBOL](/ticker/SYMBOL): Headline**
-        - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
-        - Tone: Bloomberg/Terminal. Concise. No fluff.
-        - Structure:
-          1. "Smart News Briefing (${today})"
-          2. Market Pulse (1-2 sentences).
-          3. Sections for each Key Story.
-             - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
-        ---
-      `;
-
-      // 3. Call LLM
-      const result = await this.llmService.generateResearch({
-        question: prompt,
-        tickers: symbols,
-        numericContext: {}, // We could pass detailed context here if needed
-        quality: 'low', // User requested 'light' model (mapped to low tier)
-        provider: 'gemini',
-      });
-
-      // 4. Save to DB (With User ID)
-      const note = this.noteRepo.create({
-        request_id: crypto.randomUUID(),
-        title: `Smart News Briefing (${today} ${timeString})`,
-        question: `Daily Smart News Digest for: ${symbols.join(', ')}`, // Satisfy NOT NULL
-        answer_markdown: result.answerMarkdown,
-        tickers: symbols,
-        quality: 'low',
-        provider: LlmProvider.GEMINI,
-        status: ResearchStatus.COMPLETED,
-        models_used: result.models || ['gemini-2.5-flash'],
-        tokens_in: result.tokensIn ?? 0,
-        tokens_out: result.tokensOut ?? 0,
-        user_id: userId, // Personal ownership
-      });
-
-      const saved = await this.noteRepo.save(note);
-      this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
-      return saved;
-    } catch (e) {
-      this.logger.error('Failed to generate personalized digest', e);
-      return null;
-    }
+      } catch (e) {
+        this.logger.error('Failed to generate personalized digest', e);
+        savedPending.status = ResearchStatus.FAILED;
+        await this.noteRepo.save(savedPending);
+        return null;
+      }
   }
 
   // Helper alias

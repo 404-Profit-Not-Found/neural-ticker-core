@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -115,8 +115,8 @@ export function GlobalSearch() {
                             <button
                                 key={ticker.symbol}
                                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${index === highlightedIndex
-                                        ? 'bg-primary/10 text-primary'
-                                        : 'hover:bg-muted/50 text-foreground'
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'hover:bg-muted/50 text-foreground'
                                     }`}
                                 onClick={() => selectTicker(ticker)}
                                 onMouseEnter={() => setHighlightedIndex(index)}

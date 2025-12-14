@@ -77,7 +77,7 @@ export class NewsController {
   @Public()
   async triggerDigest() {
     // Forcing generation for a 'system' user or similar.
-    return this.researchService.generateDailyDigest('system-trigger');
+    return this.researchService.getOrGenerateDailyDigest('system-trigger');
   }
 
   @ApiOperation({
