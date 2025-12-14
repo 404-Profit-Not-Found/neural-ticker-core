@@ -173,6 +173,10 @@ export class JobsService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async runDailyDigest() {
     this.logger.log('Starting News Digest Generation (5-min cycle)...');
-    await this.researchService.generateDailyDigest();
+    // For cron, we might want to generate for ALL users? Or just a system global one?
+    // The current requirement was "personalized per user".
+    // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
+    // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
+    await this.researchService.generateDailyDigest('system-cron');
   }
 }

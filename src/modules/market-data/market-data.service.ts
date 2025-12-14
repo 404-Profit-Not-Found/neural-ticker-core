@@ -636,6 +636,7 @@ export class MarketDataService {
     const sortBy = options.sortBy || 'market_cap';
     const sortDir = options.sortDir || 'DESC';
     const search = options.search ? options.search.toUpperCase() : null;
+    const symbols = options.symbols;
 
     const qb = this.tickersService.getRepo().createQueryBuilder('ticker');
 
@@ -712,6 +713,10 @@ export class MarketDataService {
         '(UPPER(ticker.symbol) LIKE :search OR UPPER(ticker.name) LIKE :search)',
         { search: `%${search}%` },
       );
+    }
+
+    if (symbols && symbols.length > 0) {
+      qb.andWhere('ticker.symbol IN (:...symbols)', { symbols });
     }
 
     // Sort Mapping
@@ -871,4 +876,5 @@ export interface AnalyzerOptions {
   sortBy?: string;
   sortDir?: 'ASC' | 'DESC';
   search?: string;
+  symbols?: string[];
 }

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, Like, LessThan } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -412,9 +412,7 @@ Title:`;
   }
 
   async getResearchNote(id: string): Promise<ResearchNote | null> {
-    if (id === 'daily-digest-latest') {
-      return this.cachedDailyDigest?.content || null;
-    }
+    // if (id === 'daily-digest-latest') { return ... } // Legacy legacy
     return this.noteRepo.findOne({ where: { id }, relations: ['user'] });
   }
 
@@ -637,11 +635,38 @@ Title:`;
     `;
   }
 
-  // --- SINGLETON CACHE FOR DAILY DIGEST ---
-  private cachedDailyDigest: { date: string; content: ResearchNote } | null =
-    null;
+  // --- DAILY DIGEST PERSISTENCE (PERSONALIZED) ---
 
-  async generateDailyDigest(): Promise<ResearchNote | null> {
+  async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
+    if (!userId) {
+      this.logger.warn('Attempted to generate digest without User ID. Blocking.');
+      return null;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const titlePattern = `Smart News Briefing (${today}%`;
+
+    // 1. Check DB for today's digest for THIS user
+    // We treat user_id = null as System/Global fallback if we wanted, but here we want specific.
+    const existing = await this.noteRepo.findOne({
+      where: {
+        user_id: userId,
+        title: Like(titlePattern),
+        status: ResearchStatus.COMPLETED,
+      },
+      order: { created_at: 'DESC' },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    // 2. Not found? Generate it.
+    return this.generateDailyDigest(userId);
+  }
+
+  // Renamed for clarity: This forces generation and persistence
+  async generateDailyDigest(userId: string): Promise<ResearchNote | null> {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const timeString = now.toLocaleTimeString('en-US', {
@@ -650,135 +675,142 @@ Title:`;
       hour12: false,
     });
 
-    // REMOVED cache check to allow force-refresh by Cron
-    this.logger.log('Generating New News Digest...');
+    this.logger.log(`Generating Personalized Digest for ${userId}...`);
 
     try {
-      // 2. Fetch Candidates
-      // PRIORITY 1: Tickers from User Watchlists (Most popular)
       let symbols: string[] = [];
-      try {
-        const watchedTickers =
-          await this.watchlistService.getAllWatchedTickers(5);
-        if (watchedTickers.length > 0) {
-          symbols = watchedTickers;
-          this.logger.log(
-            `Generating digest for top watched tickers: ${symbols.join(', ')}`,
-          );
-        }
-      } catch (e) {
-        this.logger.warn('Failed to fetch watchlist tickers', e);
-      }
+      let relatedData: any[] = [];
 
-      // PRIORITY 2: Top Opportunities (Fallback)
-      if (symbols.length === 0) {
-        this.logger.log(
-          'No watchlist tickers found, falling back to Market Opportunities.',
-        );
-        const topOpps = await this.marketDataService.getAnalyzerTickers({
-          page: 1,
-          limit: 5,
-          sortBy: 'upside_percent',
-          sortDir: 'DESC',
+    try {
+      // 1. Fetch Candidates (User Watchlist)
+      const watchlists = await this.watchlistService.getUserWatchlists(userId);
+
+      // Flatten and dedup
+      const allTickers = new Set<string>();
+      watchlists.forEach((list) => {
+        list.items.forEach((item) => {
+          if (item.ticker?.symbol) {
+            allTickers.add(item.ticker.symbol);
+          }
         });
-        const validTickers = topOpps.items.filter(
-          (i) => (i.latestPrice?.close || 0) > 1,
-        );
+      });
 
-        // If even strict filter fails, just take whatever we have
-        if (validTickers.length === 0 && topOpps.items.length > 0) {
-          symbols = topOpps.items.map((t) => t.ticker.symbol);
-        } else {
-          symbols = validTickers.map((t) => t.ticker.symbol);
+      const distinctSymbols = Array.from(allTickers);
+
+      if (distinctSymbols.length > 0) {
+        // Fetch Rich Data for Scoring
+        const richData = await this.marketDataService.getAnalyzerTickers({
+          symbols: distinctSymbols,
+          limit: 50,
+        });
+
+        // Scoring Logic: Impact Score
+        // Score = (Abs(Change%) * 2) + (NewsCount * 10)
+        const scored = richData.items.map((item) => {
+          const change = Math.abs(
+            item.latestPrice?.changePercent || item.latestPrice?.change || 0,
+          );
+          const news = item.counts?.news || 0;
+          const score = change * 2 + news * 10;
+          return { symbol: item.ticker.symbol, score, data: item };
+        });
+
+        // Sort by Score DESC (always needed for fallback)
+        scored.sort((a, b) => b.score - a.score);
+
+        // Filter: Must have some activity (Score > 2)
+        let active = scored.filter((s) => s.score > 2);
+
+        // Fallback: If strict filter killed everything, take top 3 "best of the boring"
+        if (active.length === 0 && scored.length > 0) {
+          this.logger.log(
+            'Strict filter returned 0. Relaxing to top 3 watchlist items.',
+          );
+          active = scored.slice(0, 3);
         }
+
+        // Take Top 3-5
+        const topPicks = active.slice(0, 5);
+        symbols = topPicks.map((s) => s.symbol);
+        relatedData = topPicks.map((s) => s.data);
+
+        this.logger.log(
+          `High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`,
+        );
       }
+    } catch (e) {
+      this.logger.warn('Failed to fetch user watchlist tickers', e);
+    }
 
       if (symbols.length === 0) {
-        this.logger.warn(
-          'No valid tickers found for digest (even after fallback).',
-        );
-        return null;
+        return null; // No tickers found or all filtered out and fallback failed
       }
 
-      // 2. Fetch News for context
-      // const articles = await this.companyNewsRepo.find({ ... }) ... using existing logic logic?
-      // Actually, previous code didn't use newsContext variable explicitly in the view I saw?
-      // Let's assume I need to construct it from 'articles' which I should fetch or might be there.
-      // Wait, the previous code block I replaced had "Create a Daily Smart News Digest for: ${symbols.join(', ')}".
-      // It didn't have ${newsContext}.
-      // I should stick to the simple prompt if I don't have articles fetched, OR fetch them.
-      // Given I want a Digest based on symbols, I'll pass symbols again.
-
+      // 2. Generate Prompt
       const prompt = `
         You are an elite Wall Street Analyst.
         Generate a "Daily Smart News Digest" for these tickers: ${symbols.join(', ')}.
-        You are an elite Wall Street Analyst.
-        Generate a "Daily Smart News Digest" for ${today}.
+        Date: ${today}.
         
-        Using the provided news articles, identify the Top 5 Market Movers or Thematic Stories.
+        Using available news, identify Top Market Movers or Thematic Stories.
         
-        Style Guide:
-        - Use bolding for **Key Concepts**.
-        - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
-        - Tone: Professional, Insightful, Concise (Bloomberg/Terminal style).
-        - Structure:
-          1. "Smart News Briefing (YYYY-MM-DD)" Title
-          2. Brief Market Pulse (1-2 sentences).
-          3. List of 3-5 Key Stories/Movers as bullet points.
-          4. For each story, explain the "Why" and the "Risk/Catalyst".
-        
-        Tickers to Focus On: ${symbols.join(', ')}
-        `;
+        STRICT RULES:
+        1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
+        2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
+        3. Label Sentiment as **BULLISH** or **BEARISH**.
+        4. SORT stories by Impact Index (Descending).
 
-      // 4. Call LLM (Fast Tier)
+        Style Guide:
+        - Headlines: **(SENTIMENT) [Impact: X/10] 
+        ---
+        [SYMBOL](/ticker/SYMBOL): Headline**
+        - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
+        - Tone: Bloomberg/Terminal. Concise. No fluff.
+        - Structure:
+          1. "Smart News Briefing (${today})"
+          2. Market Pulse (1-2 sentences).
+          3. Sections for each Key Story.
+             - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
+        ---
+      `;
+
+      // 3. Call LLM
       const result = await this.llmService.generateResearch({
         question: prompt,
         tickers: symbols,
-        numericContext: {},
-        quality: 'low', // gemini-2.5-flash
+        numericContext: {}, // We could pass detailed context here if needed
+        quality: 'low', // User requested 'light' model (mapped to low tier)
         provider: 'gemini',
-        // System key is used implicitly by provider if no key passed, perfect for background jobs
       });
 
-      // 5. Create In-Memory Note Object (Not saved to DB per user request)
-      const note = new ResearchNote();
-      note.id = 'daily-digest-latest'; // Virtual ID
-      note.title = `Smart News Briefing (${today} ${timeString})`; // Keep existing title logic
-      note.answer_markdown = result.answerMarkdown;
-      note.created_at = now;
-      note.tickers = symbols;
-      note.quality = 'low';
-      note.models_used = result.models || ['gemini-1.5-flash'];
-      note.tokens_in = result.tokensIn ?? null;
-      note.tokens_out = result.tokensOut ?? null;
+      // 4. Save to DB (With User ID)
+      const note = this.noteRepo.create({
+        request_id: crypto.randomUUID(),
+        title: `Smart News Briefing (${today} ${timeString})`,
+        question: `Daily Smart News Digest for: ${symbols.join(', ')}`, // Satisfy NOT NULL
+        answer_markdown: result.answerMarkdown,
+        tickers: symbols,
+        quality: 'low',
+        provider: LlmProvider.GEMINI,
+        status: ResearchStatus.COMPLETED,
+        models_used: result.models || ['gemini-2.5-flash'],
+        tokens_in: result.tokensIn ?? 0,
+        tokens_out: result.tokensOut ?? 0,
+        user_id: userId, // Personal ownership
+      });
 
-      // 6. Cache it
-      this.cachedDailyDigest = {
-        date: today,
-        content: note,
-      };
-
-      this.logger.log(
-        `Daily Digest Generated and Cached. Tickers: ${symbols.join(', ')}`,
-      );
-      return note;
+      const saved = await this.noteRepo.save(note);
+      this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+      return saved;
     } catch (e) {
-      this.logger.error('Failed to generate daily digest', e);
+      this.logger.error('Failed to generate personalized digest', e);
       return null;
     }
   }
 
-  async getCachedDigest(): Promise<ResearchNote | null> {
-    if (!this.cachedDailyDigest) {
-      // Lazy generation: If cache is empty, try to generate it now.
-      this.logger.log('Digest cache miss. Triggering generation...');
-      // We await it here so the first user gets the content (might be slow)
-      // or we could return null and let it generate in background?
-      // User wants content "comming soon" is annoying. Let's await.
-      const note = await this.generateDailyDigest();
-      return note;
-    }
-    return this.cachedDailyDigest?.content || null;
+  // Helper alias
+  async getCachedDigest(userId: string): Promise<ResearchNote | null> {
+    return this.getOrGenerateDailyDigest(userId);
   }
 
   private async processMarketNewsTicket(note: ResearchNote): Promise<void> {

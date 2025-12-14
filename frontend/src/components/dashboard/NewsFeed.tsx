@@ -91,7 +91,7 @@ export function NewsFeed() {
                         {digest && digest.models_used && (
                             <div className="flex items-center gap-2">
                                 {digest.models_used.map(model => (
-                                    <Badge key={model} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                                    <Badge key={model} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
                                         {model}
                                     </Badge>
                                 ))}
@@ -137,8 +137,42 @@ export function NewsFeed() {
                                 <ReactMarkdown
                                     components={{
                                         a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors" />,
-                                        strong: ({ ...props }) => <strong {...props} className="text-white font-bold" />,
-                                        p: ({ ...props }) => <p {...props} className="text-muted-foreground leading-relaxed mb-4" />,
+                                        strong: ({ ...props }) => {
+                                            const content = Array.isArray(props.children) ? props.children : [props.children];
+                                            return (
+                                                <strong className="text-white font-bold">
+                                                    {content.map((child, i) => {
+                                                        if (typeof child === 'string') {
+                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\))/g);
+                                                            return parts.map((part, j) => {
+                                                                if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500">{part}</span>;
+                                                                if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500">{part}</span>;
+                                                                return part;
+                                                            });
+                                                        }
+                                                        return child;
+                                                    })}
+                                                </strong>
+                                            );
+                                        },
+                                        p: ({ ...props }) => {
+                                            const content = Array.isArray(props.children) ? props.children : [props.children];
+                                            return (
+                                                <p className="text-muted-foreground leading-relaxed mb-4">
+                                                    {content.map((child, i) => {
+                                                        if (typeof child === 'string') {
+                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\))/g);
+                                                            return parts.map((part, j) => {
+                                                                if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500 font-bold">{part}</span>;
+                                                                if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500 font-bold">{part}</span>;
+                                                                return part;
+                                                            });
+                                                        }
+                                                        return child;
+                                                    })}
+                                                </p>
+                                            );
+                                        },
                                         ul: ({ ...props }) => <ul {...props} className="list-disc pl-5 space-y-2 mb-4 text-muted-foreground" />,
                                         li: ({ ...props }) => <li {...props} className="pl-1" />,
                                         h1: ({ ...props }) => <h3 {...props} className="text-lg font-bold text-foreground mt-6 mb-3" />,

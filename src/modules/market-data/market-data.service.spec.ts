@@ -390,8 +390,8 @@ describe('MarketDataService', () => {
 
       expect(tickersService.getRepo).toHaveBeenCalled();
       expect(mockQueryBuilder.leftJoinAndMapOne).toHaveBeenCalledTimes(3); // Fund, Price, Risk
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.offset).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
       expect(result.items[0].ticker.symbol).toBe('AAPL');
       expect(result.items[0].fundamentals.market_cap).toBe(1000);
       expect(result.meta.total).toBe(1);

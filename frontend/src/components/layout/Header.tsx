@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Bell, User as UserIcon, Shield, Menu, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { GlobalSearch } from './GlobalSearch';
 
 interface Notification {
   id: string;
@@ -16,32 +18,22 @@ interface Notification {
 }
 
 
-// Simple hook to poll notifications
+// React Query for smart polling
 function useUnreadNotifications(isAuthenticated: boolean) {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const check = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
+  const { data: unreadCount, refetch } = useQuery({
+    queryKey: ['notifications', 'count'],
+    queryFn: async () => {
       const { data } = await api.get('/notifications/count');
-      setUnreadCount(data.count || 0);
-    } catch (e) {
-      console.error('Failed to fetch notifications', e);
-    }
-  }, [isAuthenticated]);
+      return data.count || 0;
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 120000, // Poll every 2 minutes
+    staleTime: 60000, // Consider fresh for 60s
+    refetchOnWindowFocus: false, // Disable focus refetching to reduce noise
+    refetchOnMount: false, // Don't refetch on component remount if data is fresh
+  });
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    // Move initial check to next tick to avoid synchronous update warning
-    const timer = setTimeout(check, 0);
-    const interval = setInterval(check, 30000);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, check]);
-
-  return { unreadCount, check };
+  return { unreadCount: unreadCount || 0, check: refetch };
 }
 
 export function Header() {
@@ -155,6 +147,8 @@ export function Header() {
           </Link>
         </div>
 
+
+
         {/* Center: Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8">
           <Link to="/watchlist" className={linkClass('/watchlist')}>
@@ -164,6 +158,11 @@ export function Header() {
             Tickers
           </Link>
         </nav>
+
+        {/* Search Bar - Push to right or center */}
+        <div className="hidden md:block ml-auto mr-4 w-64 lg:w-80">
+          <GlobalSearch />
+        </div>
 
         {/* Right: alerts + profile */}
         <div className="flex items-center gap-4">
