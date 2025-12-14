@@ -74,6 +74,13 @@ export interface TickerData {
         scenarios: Scenario[];
         catalysts: { description: string }[];
         red_flags: string[];
+        // Detailed Risk Breakdown
+        financial_risk: number;
+        execution_risk: number;
+        dilution_risk: number;
+        competitive_risk: number;
+        regulatory_risk: number;
+        sentiment?: string;
     };
     fundamentals: {
         // Valuation & Size

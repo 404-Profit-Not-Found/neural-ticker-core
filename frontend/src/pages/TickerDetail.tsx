@@ -95,7 +95,7 @@ export function TickerDetail() {
 
                 {/* --- 1. HERO HEADER --- */}
                 {/* --- 1. HERO HEADER --- */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 border-b border-border pb-4 md:pb-6">
+                <div className="relative z-[999] flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 pb-4 md:pb-6">
                     <div className="flex items-start md:items-center gap-3 md:gap-4 w-full">
                         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0">
                             <ArrowLeft className="w-4 h-4 text-muted-foreground" />
@@ -110,8 +110,19 @@ export function TickerDetail() {
                                 <div className="flex items-center gap-2">
                                     <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
                                     <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide hidden md:inline-block">{profile?.exchange}</span>
+
+                                    {/* Watch & Share */}
+                                    <div className="hidden md:flex items-center gap-2 ml-2 pl-2 border-l border-border/50">
+                                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-default" title="Watchers">
+                                            <Eye size={12} />
+                                            <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
+                                            <Share2 size={12} className="text-muted-foreground" />
+                                        </Button>
+                                    </div>
                                 </div>
-                                
+
                                 {/* Mobile Price Display */}
                                 <div className="md:hidden flex items-center gap-2">
                                     <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
@@ -130,8 +141,8 @@ export function TickerDetail() {
 
                                 {/* Desktop Price Display */}
                                 <div className="hidden md:flex items-center gap-4">
-                                     <div className="h-4 w-px bg-border hidden md:block" />
-                                     <div className="flex items-baseline gap-2">
+                                    <div className="h-4 w-px bg-border hidden md:block" />
+                                    <div className="flex items-baseline gap-2">
                                         <span className="text-2xl font-mono font-semibold tracking-tight">
                                             ${market_data?.price?.toFixed(2)}
                                         </span>
@@ -154,36 +165,44 @@ export function TickerDetail() {
                                         <RiskLight
                                             score={risk_analysis.overall_score}
                                             reasoning={risk_analysis.summary}
+                                            sentiment={risk_analysis.sentiment}
+                                            breakdown={{
+                                                financial: risk_analysis.financial_risk,
+                                                execution: risk_analysis.execution_risk,
+                                                dilution: risk_analysis.dilution_risk,
+                                                competitive: risk_analysis.competitive_risk,
+                                                regulatory: risk_analysis.regulatory_risk
+                                            }}
                                         />
                                     </div>
-                                    {/* Mobile Compact Risk */}
+                                    {/* Mobile Risk */}
                                     <div className="md:hidden block">
                                         <RiskLight
                                             score={risk_analysis.overall_score}
                                             reasoning={risk_analysis.summary}
-                                            compact={true}
+                                            sentiment={risk_analysis.sentiment}
+                                            breakdown={{
+                                                financial: risk_analysis.financial_risk,
+                                                execution: risk_analysis.execution_risk,
+                                                dilution: risk_analysis.dilution_risk,
+                                                competitive: risk_analysis.competitive_risk,
+                                                regulatory: risk_analysis.regulatory_risk
+                                            }}
                                         />
                                     </div>
                                 </>
                             )}
-                            <div className="h-4 w-px bg-border mx-1 hidden md:block" />
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1.5 rounded-md border border-border/50">
-                                <Eye size={14} className="md:w-3 md:h-3" />
-                                <span className="font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
-                            </div>
                         </div>
-                        
-                        <Button variant="outline" size="sm" className="gap-2 h-8 md:h-9 text-xs ml-auto md:ml-0">
-                            <Share2 size={12} /> <span className="hidden md:inline">Share</span>
-                        </Button>
                     </div>
                 </div>
+
+
 
                 {/* --- 2. TABS LAYOUT --- */}
                 <Tabs
                     value={currentTab}
                     onValueChange={(value) => navigate(`/ticker/${symbol}/${value}`)}
-                    className="w-full"
+                    className="w-full relative z-0"
                 >
                     <TabsList className="mb-6">
                         <TabsTrigger value="overview">Overview</TabsTrigger>

@@ -498,6 +498,10 @@ Title:`;
 
     if (ticker) {
       query.andWhere(':ticker = ANY(note.tickers)', { ticker });
+      // Exclude generic Daily Digests from the specific ticker's research feed
+      query.andWhere('note.title NOT LIKE :excludeTitle', {
+        excludeTitle: 'Smart News Briefing%',
+      });
     }
 
     query.orderBy('note.created_at', 'DESC');

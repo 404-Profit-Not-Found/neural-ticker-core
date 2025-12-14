@@ -111,6 +111,14 @@ export class TickerDetailController {
       risk_analysis: riskAnalysis
         ? {
             overall_score: riskAnalysis.overall_score,
+            // Flattened Risk Dimensions for UI
+            financial_risk: riskAnalysis.financial_risk,
+            execution_risk: riskAnalysis.execution_risk,
+            dilution_risk: riskAnalysis.dilution_risk,
+            competitive_risk: riskAnalysis.competitive_risk,
+            regulatory_risk: riskAnalysis.regulatory_risk,
+            sentiment: riskAnalysis.sentiment,
+            
             dimensions: {
               financial: riskAnalysis.financial_risk,
               execution: riskAnalysis.execution_risk,
