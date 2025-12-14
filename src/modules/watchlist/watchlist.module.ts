@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WatchlistService } from './watchlist.service';
 import { WatchlistController } from './watchlist.controller';
@@ -9,7 +9,7 @@ import { TickersModule } from '../tickers/tickers.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Watchlist, WatchlistItem]),
-    TickersModule,
+    forwardRef(() => TickersModule),
   ],
   controllers: [WatchlistController],
   providers: [WatchlistService],

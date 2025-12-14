@@ -16,9 +16,13 @@ import { ResearchNote } from '../research/entities/research-note.entity';
 import { Comment } from '../social/entities/comment.entity';
 import { NewsController } from './news.controller';
 import { CompanyNews } from './entities/company-news.entity';
+import { TickerEntity } from '../tickers/entities/ticker.entity';
+
+import { ResearchModule } from '../research/research.module';
 
 @Module({
   imports: [
+    forwardRef(() => ResearchModule),
     TypeOrmModule.forFeature([
       PriceOhlcv,
       Fundamentals,
@@ -28,6 +32,7 @@ import { CompanyNews } from './entities/company-news.entity';
       ResearchNote,
       Comment,
       CompanyNews,
+      TickerEntity,
     ]),
     FinnhubModule,
     forwardRef(() => TickersModule),

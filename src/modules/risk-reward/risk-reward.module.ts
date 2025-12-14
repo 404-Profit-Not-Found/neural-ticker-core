@@ -23,7 +23,7 @@ import { LlmModule } from '../llm/llm.module';
       RiskQualitativeFactor,
     ]),
     forwardRef(() => ResearchModule),
-    MarketDataModule,
+    forwardRef(() => MarketDataModule),
     LlmModule,
   ],
   controllers: [RiskRewardController],

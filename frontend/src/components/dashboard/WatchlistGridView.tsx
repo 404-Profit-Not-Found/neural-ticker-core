@@ -64,7 +64,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                 return (
                     <div
                         key={symbol}
-                        className="watchlist-tile group flex flex-col p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
+                        className="watchlist-tile group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
                     >
                         {/* Remove Action (Absolute Top Right) - Only if onRemove is provided */}
                         {onRemove && (
@@ -88,22 +88,22 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                             {/* Header: Logo, Symbol, Badges */}
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3 w-full">
-                                    <TickerLogo url={logo} symbol={symbol} className="w-10 h-10 shrink-0" />
+                                    <TickerLogo url={logo} symbol={symbol} className="w-12 h-12 shrink-0" />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-2">
-                                            <div className="font-bold text-lg leading-none">{symbol}</div>
+                                            <div className="font-bold text-xl leading-none">{symbol}</div>
                                             {/* AI Badge (Aligned Right) */}
                                             {aiRating && aiRating !== '-' && (
-                                                <Badge variant={variant} className="text-[10px] h-5 px-1.5 whitespace-nowrap gap-1 ml-auto">
-                                                    <Bot size={10} className="opacity-80" />
+                                                <Badge variant={variant} className="text-xs h-6 px-2 whitespace-nowrap gap-1 ml-auto">
+                                                    <Bot size={12} className="opacity-80" />
                                                     {aiRating}
                                                 </Badge>
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-0.5 mt-1">
-                                            <div className="text-xs text-muted-foreground line-clamp-1">{company}</div>
+                                            <div className="text-sm text-muted-foreground line-clamp-1">{company}</div>
                                             <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                <div className="text-[10px] text-muted-foreground/70 truncate">{item.sector}</div>
+                                                <div className="text-xs text-muted-foreground/70 truncate">{item.sector}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -114,7 +114,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                             <div className="mt-auto space-y-3">
                                 <div className="flex items-end justify-between border-b border-border pb-3">
                                     <div className="flex flex-col items-start gap-1">
-                                        <span className="text-2xl font-mono font-medium">
+                                        <span className="text-lg font-mono font-medium">
                                             ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
                                         </span>
                                         {/* Analyst Badge (Under Price) */}
@@ -134,9 +134,9 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                         })()}
                                     </div>
                                     <div className="flex flex-col items-end">
-                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Today</span>
-                                        <div className={cn("flex items-center gap-0.5 text-sm font-mono font-bold", change >= 0 ? "text-emerald-500" : "text-red-500")}>
-                                            {change >= 0 ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Today</span>
+                                        <div className={cn("flex items-center gap-0.5 text-lg font-mono font-bold", change >= 0 ? "text-emerald-500" : "text-red-500")}>
+                                            {change >= 0 ? <ArrowUp size={20} /> : <ArrowDown size={20} />}
                                             {typeof change === 'number' ? Math.abs(change).toFixed(2) : '0.00'}%
                                         </div>
                                     </div>
@@ -148,7 +148,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                         <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
                                         <span className="text-muted-foreground">Risk:</span>
                                         <span className={riskColorClass}>
-                                            {typeof risk === 'number' ? risk.toFixed(1) : '0.0'}
+                                            {typeof risk === 'number' ? Math.round(risk) : '0'}
                                         </span>
                                     </div>
 

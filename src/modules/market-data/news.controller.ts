@@ -8,12 +8,63 @@ import {
 import { MarketDataService } from './market-data.service';
 import { Public } from '../auth/public.decorator';
 
+import { ResearchService } from '../research/research.service';
+
 @ApiTags('News')
 @ApiBearerAuth()
 @Controller('v1/news')
 @Public()
 export class NewsController {
-  constructor(private readonly service: MarketDataService) {}
+  constructor(
+    private readonly service: MarketDataService,
+    private readonly researchService: ResearchService,
+  ) {}
+
+  @ApiOperation({ summary: 'Get Daily AI News Digest' })
+  @Get('digest')
+  async getDailyDigest() {
+    const digest = await this.researchService.getCachedDigest();
+    if (!digest) {
+      return {
+        status: 'pending',
+        message: 'Digest generation in progress or scheduled.',
+      };
+    }
+
+    // Enrich with live data for the mentioned tickers
+    let relatedTickers: any[] = [];
+    try {
+      if (digest.tickers && digest.tickers.length > 0) {
+        // Enrich with live data for the mentioned tickers
+        if (digest.tickers && digest.tickers.length > 0) {
+          relatedTickers = await this.service.getTickerSnapshots(
+            digest.tickers,
+          );
+        }
+      }
+    } catch (e) {
+      console.error('Failed to enrich digest', e);
+    }
+
+    return {
+      ...digest,
+      relatedTickers,
+    };
+  }
+
+  @ApiOperation({ summary: 'Get General Market News' })
+  @Get('general')
+  async getGeneralNews() {
+    return this.service.getGeneralNews();
+  }
+
+  // Temporary: Force trigger digest generation
+  @Get('digest/trigger')
+  async triggerDigest() {
+    // CLEAR CACHE hack: accessing private via any or just relying on overwrite logic
+    // Actually generateDailyDigest overwrites the cache.
+    return this.researchService.generateDailyDigest();
+  }
 
   @ApiOperation({
     summary: 'News stats across tickers',

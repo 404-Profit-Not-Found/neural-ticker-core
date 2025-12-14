@@ -14,6 +14,7 @@ interface RiskLightProps {
 }
 
 export function RiskLight({ score, reasoning, compact = false }: RiskLightProps) {
+    const roundedScore = Math.round(score);
     // Force cache invalidation
     const getColor = (s: number) => {
         if (s >= 7) return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
@@ -34,7 +35,7 @@ export function RiskLight({ score, reasoning, compact = false }: RiskLightProps)
                     <TooltipTrigger>
                         <div className="flex items-center gap-1.5 bg-muted/40 px-2 py-1 rounded border border-border/50">
                             <span className={`w-2 h-2 rounded-full ${getColor(score)}`} />
-                            <span className="text-xs font-bold font-mono">{score}/10</span>
+                            <span className="text-xs font-bold font-mono">{roundedScore}/10</span>
                         </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[300px] p-4 text-xs leading-relaxed border-border bg-card shadow-xl">
@@ -54,7 +55,7 @@ export function RiskLight({ score, reasoning, compact = false }: RiskLightProps)
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Risk Level</span>
                 <div className="flex items-center gap-2">
                     <span className={`w-3 h-3 rounded-full ${getColor(score)} animate-pulse`} />
-                    <span className="text-sm font-bold font-mono">{score}/10</span>
+                    <span className="text-sm font-bold font-mono">{roundedScore}/10</span>
                 </div>
             </div>
 

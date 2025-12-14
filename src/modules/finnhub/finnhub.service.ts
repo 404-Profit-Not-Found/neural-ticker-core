@@ -48,6 +48,19 @@ export class FinnhubService {
     }
   }
 
+  async getGeneralNews(category = 'general', minId?: number): Promise<any> {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.get('/news', {
+          params: { category, minId },
+        }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error, 'general-news');
+    }
+  }
+
   async getBasicFinancials(symbol: string): Promise<any> {
     try {
       const { data } = await firstValueFrom(

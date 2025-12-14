@@ -8,19 +8,17 @@ import {
     Zap,
     TrendingUp,
     Newspaper,
-    ArrowRight,
-    Loader2
+    ArrowRight
 } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { cn, api } from '../lib/api';
-import { useTickerResearch, useTriggerResearch } from '../hooks/useTicker';
+// Removed: useTickerResearch (ResearchFeedWidget removed)
 import { useStockAnalyzer, type StockSnapshot } from '../hooks/useStockAnalyzer';
 import { WatchlistGridView } from '../components/dashboard/WatchlistGridView';
+import { NewsFeed } from '../components/dashboard/NewsFeed';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
-import { Sparkles } from 'lucide-react';
 
 // --- Components based on StyleGuidePage ---
 
@@ -81,130 +79,6 @@ function StatPill({
     );
 }
 
-interface ResearchNote {
-    id: string;
-    title?: string;
-    question?: string;
-    status: string;
-    tickers: string[];
-    created_at: string;
-    models_used?: string[];
-}
-
-function ResearchFeedWidget() {
-    const navigate = useNavigate();
-    const { data: research, isLoading } = useTickerResearch();
-    const recentResearch = research?.slice(0, 5) || [];
-
-    if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
-
-    return (
-        <div className="divide-y divide-border/50">
-            {recentResearch.map((item: ResearchNote) => (
-                <div
-                    key={item.id}
-                    className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/research/${item.id}`)}
-                >
-                    <div className="flex items-center gap-4 min-w-0">
-                        <div className={cn("w-2 h-2 rounded-full shrink-0", item.status === 'completed' ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
-                        <div className="space-y-0.5 min-w-0">
-                            <div className="text-sm font-semibold group-hover:text-primary transition-colors truncate">
-                                {item.title || item.question || "Analysis Request"}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {item.tickers && item.tickers[0] && (
-                                    <>
-                                        <span className="font-medium text-foreground">{item.tickers[0]}</span>
-                                        <span>•</span>
-                                    </>
-                                )}
-                                <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                                {item.models_used && item.models_used[0] && (
-                                    <span className="px-1.5 py-0.5 rounded-sm bg-muted text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">
-                                        {item.models_used[0]}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <ArrowRight size={14} />
-                    </Button>
-                </div>
-            ))}
-            {recentResearch.length === 0 && (
-                <div className="py-8 text-center text-muted-foreground text-sm">
-                    No recent analysis found.
-                </div>
-            )}
-        </div>
-    );
-}
-
-function AiNewsWidget() {
-    const navigate = useNavigate();
-    const { data: research } = useTickerResearch();
-    const typedResearch = research as ResearchNote[] | undefined;
-    const { mutate: triggerResearch, isPending } = useTriggerResearch();
-
-    // Find a recent "News Digest" or similar generic report
-    // Check purely against created_at string if possible or move date calc outside render if strictly needed,
-    // but typically filter inside useMemo or safe block is fine.
-    // The lint error `Cannot call impure function...` suggests Date.now() should not be in render.
-    // We can use a stable reference time or just suppress if we accept minor hydration mismatch risk, 
-    // but better to just use a fixed "yesterday" ref or similar.
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-    const oneDayAgoMs = oneDayAgo.getTime();
-
-    const newsDigest = typedResearch?.find((r) =>
-        (r.title?.includes('News') || r.question?.includes('news')) &&
-        new Date(r.created_at).getTime() > oneDayAgoMs
-    );
-
-    const handleGenerate = () => {
-        triggerResearch({
-            symbol: 'MARKET_NEWS', // Special symbol or generic
-            question: "Generate a daily news digest for the top active stocks in the market. Focus on high impact events.",
-            quality: 'deep',
-            provider: 'gemini'
-        });
-    };
-
-    if (newsDigest) {
-        return (
-            <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h3 className="font-semibold text-sm">Today's AI News Digest</h3>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
-                    {newsDigest.title || "Daily market analysis and news summary."}
-                </p>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(`/research/${newsDigest.id}`)}>
-                    Read Full Digest
-                </Button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="p-4 bg-muted/30 rounded-lg border border-border text-center">
-            <h3 className="font-semibold text-sm mb-1">AI News Digest</h3>
-            <p className="text-xs text-muted-foreground mb-3">No digest generated for today.</p>
-            <Button
-                size="sm"
-                className="w-full gap-2"
-                onClick={handleGenerate}
-                disabled={isPending}
-            >
-                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                Generate Digest
-            </Button>
-        </div>
-    );
-}
 
 
 
@@ -361,42 +235,8 @@ export function Dashboard() {
                     <TopOpportunitiesSection />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* LEFT COLUMN: Research & News */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <Card className="h-full flex flex-col overflow-hidden">
-                            <CardHeader className="py-4 border-b border-border bg-muted/10">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                        <Brain className="w-4 h-4 text-primary" />
-                                        Latest Research Notes
-                                    </CardTitle>
-                                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate('/research')}>
-                                        View All <ArrowRight size={12} />
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <ResearchFeedWidget />
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* RIGHT COLUMN: AI News & Quick Actions */}
-                    <div className="space-y-6">
-                        <Card className="overflow-hidden border-primary/20 shadow-md">
-                            <CardHeader className="py-4 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent">
-                                <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                    <Newspaper className="w-4 h-4 text-emerald-500" />
-                                    Smart News
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-4">
-                                <AiNewsWidget />
-                            </CardContent>
-                        </Card>
-                    </div>
+                <div className="h-[950px]">
+                    <NewsFeed />
                 </div>
 
             </main>

@@ -11,6 +11,7 @@ import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
+import { TickerEntity } from '../tickers/entities/ticker.entity';
 
 import { ConfigService } from '@nestjs/config';
 
@@ -32,9 +33,13 @@ describe('MarketDataService', () => {
     create: jest.fn().mockImplementation((dto) => dto),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      distinctOn: jest.fn().mockReturnThis(),
       getOne: jest.fn(),
+      getMany: jest.fn().mockResolvedValue([]),
     })),
   };
 
@@ -54,6 +59,14 @@ describe('MarketDataService', () => {
 
   const mockRiskAnalysisRepo = {
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      distinctOn: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    })),
   };
 
   const mockResearchNoteRepo = {
@@ -137,6 +150,15 @@ describe('MarketDataService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: getRepositoryToken(TickerEntity),
+          useValue: {
+            createQueryBuilder: jest.fn(() => ({
+               where: jest.fn().mockReturnThis(),
+               getMany: jest.fn().mockResolvedValue([]),
+            })),
+          },
         },
       ],
     }).compile();

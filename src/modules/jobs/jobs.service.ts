@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
@@ -154,5 +155,24 @@ export class JobsService {
       this.logger.error(`Sync failed for ${symbol}: ${e.message}`);
       throw e;
     }
+  }
+
+  // --- DAILY DIGEST CRON ---
+  // Runs every day at 6:00 AM UTC (Pre-market)
+  // @Cron('0 6 * * *') or uses NestJS CronExpression if available, checking imports.
+  // We need to import Cron logic. But @nestjs/schedule might need @Cron decorator.
+  // Since I cannot change imports easily with replace_file (I need to see top of file),
+  // I will check if @Cron is imported.
+  // File view showed no Cron imports. I need to add imports to the top first?
+  // Limitation: I can only replace blocks.
+  // Strategy: Add imports in one tool call, then add method in another?
+  // Or just replace the whole file content? It is small enough (159 lines).
+  // No, `replace_file_content` is better.
+  // I will use `replace_file_content` to add imports at top, then method at bottom.
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async runDailyDigest() {
+    this.logger.log('Starting News Digest Generation (5-min cycle)...');
+    await this.researchService.generateDailyDigest();
   }
 }
