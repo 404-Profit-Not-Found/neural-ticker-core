@@ -158,19 +158,21 @@ describe('MarketDataService', () => {
           provide: getRepositoryToken(TickerEntity),
           useValue: {
             createQueryBuilder: jest.fn(() => ({
-               where: jest.fn().mockReturnThis(),
-               leftJoinAndMapOne: jest.fn().mockReturnThis(),
-               leftJoinAndSelect: jest.fn().mockReturnThis(),
-               orderBy: jest.fn().mockReturnThis(),
-               addOrderBy: jest.fn().mockReturnThis(),
-               addSelect: jest.fn().mockReturnThis(),
-               skip: jest.fn().mockReturnThis(),
-               take: jest.fn().mockReturnThis(),
-               offset: jest.fn().mockReturnThis(),
-               limit: jest.fn().mockReturnThis(),
-               getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
-               getCount: jest.fn().mockResolvedValue(0),
-               getMany: jest.fn().mockResolvedValue([]),
+              where: jest.fn().mockReturnThis(),
+              leftJoinAndMapOne: jest.fn().mockReturnThis(),
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              addOrderBy: jest.fn().mockReturnThis(),
+              addSelect: jest.fn().mockReturnThis(),
+              skip: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              offset: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockReturnThis(),
+              getRawAndEntities: jest
+                .fn()
+                .mockResolvedValue({ entities: [], raw: [] }),
+              getCount: jest.fn().mockResolvedValue(0),
+              getMany: jest.fn().mockResolvedValue([]),
             })),
           },
         },
@@ -351,6 +353,8 @@ describe('MarketDataService', () => {
         addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(), // Added
+        limit: jest.fn().mockReturnThis(), // Added
         getRawAndEntities: jest.fn().mockResolvedValue({
           entities: [
             {
@@ -373,8 +377,9 @@ describe('MarketDataService', () => {
       const repo = {
         createQueryBuilder: jest.fn(() => mockQueryBuilder),
       };
-      // We need to spy on the tickersService instance we have in closure
-      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      // Override the global mockTickersService.getRepo for this test
+      mockTickersService.getRepo.mockReturnValue(repo);
 
       const result = await service.getAnalyzerTickers({
         page: 1,
@@ -401,6 +406,8 @@ describe('MarketDataService', () => {
         addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(), // Added
+        limit: jest.fn().mockReturnThis(), // Added
         getRawAndEntities: jest
           .fn()
           .mockResolvedValue({ entities: [], raw: [] }),

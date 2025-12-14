@@ -24,7 +24,13 @@ interface ResearchNote {
     title?: string;
     answer_markdown?: string;
     created_at: string;
-    relatedTickers?: any[];
+    relatedTickers?: {
+        id: string;
+        symbol: string;
+        name: string;
+        latestPrice?: { close: number; changePercent?: number };
+        riskAnalysis?: { overall_score: number };
+    }[];
     models_used?: string[];
     tokens_in?: number;
     tokens_out?: number;
