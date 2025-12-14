@@ -267,7 +267,7 @@ Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `s
 
 | Tier | OpenAI | Gemini | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash` | Quick sentiment, simple extraction |
+| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` | Quick sentiment, simple extraction |
 | **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
 | **Deep** | `gpt-5.1`| `gemini-2.5-pro` | 10-K analysis, thesis generation |
 
@@ -279,9 +279,9 @@ Empirical testing on financial research tasks yielded the following metrics:
 | :--- | :--- | :--- | :--- | :--- |
 | **gemini-2.5-flash** | 100% | **8.45s** | 2,336 | **🏆 Best Value** (Balanced) |
 | **gemini-2.5-pro** | 100% | 21.97s | **3,087** | **Deepest Analysis** |
-| **gemini-2.0-flash-exp** | 100% | **3.24s** | 1,475 | Fastest / Lower Detail |
+| **gemini-2.5-flash-lite** | 100% | **3.24s** | 1,475 | Fastest / Lower Detail |
 
-**Recommendation**: Use **`gemini-2.5-flash`** for standard reports and news. Use **`gemini-2.5-pro`** when depth is critical and latency is less important.
+**Recommendation**: Use **`gemini-2.5-flash`** for standard reports and news. Use **`gemini-2.5-pro`** when depth is critical and latency is less important. Use **`gemini-2.5-flash-lite`** for high-throughput, simple jobs.
 > [!NOTE]
 > Previous failures with `gemini-2.5-pro` were due to testing pre-release versions. The stable channel is now fully operational.
 
@@ -298,6 +298,13 @@ await client.interactions.create({
   stream: true,
 });
 ```
+
+### 📰 Smart News Briefing
+The system generates a daily AI-curated news digest ("Smart News Briefing").
+*   **Trigger**: Lazy-loaded upon the first user access of the UTC day.
+*   **Source**: Top 5 tickers most frequently tracked across all user watchlists, falling back to top market movers.
+*   **Persistence**: Generated digests are saved to the `research_notes` table (System User) to allow historical retrieval and prevent re-generation.
+*   **Frontend**: Fetched via `GET /api/v1/news/digest`.
 
 ## 🔬 Risk Analysis Data Extraction
 

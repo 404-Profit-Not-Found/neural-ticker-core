@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -13,14 +13,21 @@ import {
 } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { cn, api } from '../lib/api';
-import { useTickerResearch, useTriggerResearch } from '../hooks/useTicker';
+// Removed: useTickerResearch (ResearchFeedWidget removed)
 import { useStockAnalyzer, type StockSnapshot } from '../hooks/useStockAnalyzer';
 import { WatchlistGridView } from '../components/dashboard/WatchlistGridView';
+import { NewsFeed } from '../components/dashboard/NewsFeed';
+import { TickerLogo } from '../components/dashboard/TickerLogo';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
-import { Sparkles } from 'lucide-react';
+
+interface TickerResult {
+    symbol: string;
+    name: string;
+    exchange: string;
+    logo_url?: string;
+}
 
 // --- Components based on StyleGuidePage ---
 
@@ -54,7 +61,7 @@ function StatPill({
     return (
         <div
             className={cn(
-                'style-kpi relative overflow-hidden rounded-md border px-4 py-3',
+                'style-kpi relative overflow-hidden rounded-md border px-3 py-2 sm:px-4 sm:py-3',
             )}
             style={{
                 background:
@@ -70,138 +77,13 @@ function StatPill({
                 }}
                 aria-hidden
             />
-            <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-                    <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+            <div className="relative z-10 flex items-start justify-between gap-2 sm:gap-3">
+                <div className="space-y-0.5 sm:space-y-1">
+                    <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-foreground leading-tight">{value}</p>
                 </div>
-                <Icon className={cn('w-5 h-5', iconColors[tone])} />
+                <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5', iconColors[tone])} />
             </div>
-        </div>
-    );
-}
-
-interface ResearchNote {
-    id: string;
-    title?: string;
-    question?: string;
-    status: string;
-    tickers: string[];
-    created_at: string;
-    models_used?: string[];
-}
-
-function ResearchFeedWidget() {
-    const navigate = useNavigate();
-    const { data: research, isLoading } = useTickerResearch();
-    const recentResearch = research?.slice(0, 5) || [];
-
-    if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
-
-    return (
-        <div className="divide-y divide-border/50">
-            {recentResearch.map((item: ResearchNote) => (
-                <div
-                    key={item.id}
-                    className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/research/${item.id}`)}
-                >
-                    <div className="flex items-center gap-4 min-w-0">
-                        <div className={cn("w-2 h-2 rounded-full shrink-0", item.status === 'completed' ? "bg-green-500" : "bg-yellow-500 animate-pulse")} />
-                        <div className="space-y-0.5 min-w-0">
-                            <div className="text-sm font-semibold group-hover:text-primary transition-colors truncate">
-                                {item.title || item.question || "Analysis Request"}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {item.tickers && item.tickers[0] && (
-                                    <>
-                                        <span className="font-medium text-foreground">{item.tickers[0]}</span>
-                                        <span>•</span>
-                                    </>
-                                )}
-                                <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                                {item.models_used && item.models_used[0] && (
-                                    <span className="px-1.5 py-0.5 rounded-sm bg-muted text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline-block">
-                                        {item.models_used[0]}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <ArrowRight size={14} />
-                    </Button>
-                </div>
-            ))}
-            {recentResearch.length === 0 && (
-                <div className="py-8 text-center text-muted-foreground text-sm">
-                    No recent analysis found.
-                </div>
-            )}
-        </div>
-    );
-}
-
-function AiNewsWidget() {
-    const navigate = useNavigate();
-    const { data: research } = useTickerResearch();
-    const typedResearch = research as ResearchNote[] | undefined;
-    const { mutate: triggerResearch, isPending } = useTriggerResearch();
-
-    // Find a recent "News Digest" or similar generic report
-    // Check purely against created_at string if possible or move date calc outside render if strictly needed,
-    // but typically filter inside useMemo or safe block is fine.
-    // The lint error `Cannot call impure function...` suggests Date.now() should not be in render.
-    // We can use a stable reference time or just suppress if we accept minor hydration mismatch risk, 
-    // but better to just use a fixed "yesterday" ref or similar.
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-    const oneDayAgoMs = oneDayAgo.getTime();
-
-    const newsDigest = typedResearch?.find((r) =>
-        (r.title?.includes('News') || r.question?.includes('news')) &&
-        new Date(r.created_at).getTime() > oneDayAgoMs
-    );
-
-    const handleGenerate = () => {
-        triggerResearch({
-            symbol: 'MARKET_NEWS', // Special symbol or generic
-            question: "Generate a daily news digest for the top active stocks in the market. Focus on high impact events.",
-            quality: 'deep',
-            provider: 'gemini'
-        });
-    };
-
-    if (newsDigest) {
-        return (
-            <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h3 className="font-semibold text-sm">Today's AI News Digest</h3>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
-                    {newsDigest.title || "Daily market analysis and news summary."}
-                </p>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(`/research/${newsDigest.id}`)}>
-                    Read Full Digest
-                </Button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="p-4 bg-muted/30 rounded-lg border border-border text-center">
-            <h3 className="font-semibold text-sm mb-1">AI News Digest</h3>
-            <p className="text-xs text-muted-foreground mb-3">No digest generated for today.</p>
-            <Button
-                size="sm"
-                className="w-full gap-2"
-                onClick={handleGenerate}
-                disabled={isPending}
-            >
-                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                Generate Digest
-            </Button>
         </div>
     );
 }
@@ -245,10 +127,17 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
 export function Dashboard() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [results, setResults] = useState<TickerResult[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const searchRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const { data: stats } = useQuery({
         queryKey: ['dashboard-stats'],
         queryFn: async () => {
+            // ... logic
             const [tickers, strongBuy, research] = await Promise.all([
                 api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
                 api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
@@ -262,10 +151,81 @@ export function Dashboard() {
         }
     });
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            navigate(`/ticker/${searchQuery.toUpperCase()}`);
+    // CMD+K Shortcut
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+        document.addEventListener('keydown', handleGlobalKeyDown);
+        return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
+
+    // Click Outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowResults(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Debounced Search
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (searchQuery.trim().length === 0) {
+                setResults([]);
+                setShowResults(false);
+                return;
+            }
+
+            setIsLoading(true);
+            try {
+                const { data } = await api.get<TickerResult[]>('/tickers', {
+                    params: { search: searchQuery },
+                });
+                setResults(data);
+                setShowResults(true);
+                setHighlightedIndex(-1);
+            } catch (error) {
+                console.error('Search failed', error);
+            } finally {
+                setIsLoading(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    const selectTicker = (ticker: TickerResult) => {
+        navigate(`/ticker/${ticker.symbol}`);
+        setSearchQuery('');
+        setShowResults(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex((prev) =>
+                prev < results.length - 1 ? prev + 1 : prev
+            );
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightedIndex >= 0 && results[highlightedIndex]) {
+                selectTicker(results[highlightedIndex]);
+            } else if (searchQuery.trim()) {
+                navigate(`/ticker/${searchQuery.toUpperCase()}`);
+            }
+        } else if (e.key === 'Escape') {
+            setShowResults(false);
+            (e.target as HTMLInputElement).blur();
         }
     };
 
@@ -283,7 +243,7 @@ export function Dashboard() {
                     />
                     <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
-                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
+                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-50">
                         <div className="space-y-4 max-w-3xl">
                             <div className="flex items-center gap-3">
                                 <Brain className="w-10 h-10 text-primary" />
@@ -296,7 +256,7 @@ export function Dashboard() {
                             </div>
                         </div>
 
-                        <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+                        <div ref={searchRef} className="relative w-full max-w-sm">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                                 <Input
@@ -304,17 +264,49 @@ export function Dashboard() {
                                     placeholder="Search ticker (e.g. NVDA)..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    onFocus={() => {
+                                        if (results.length > 0) setShowResults(true);
+                                    }}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none">
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none items-center gap-2">
+                                    {isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                                     <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
                                         <span className="text-xs">⌘</span>K
                                     </kbd>
                                 </div>
                             </div>
-                        </form>
+
+                            {showResults && results.length > 0 && (
+                                <div className="absolute top-full mt-2 w-full border border-border rounded-lg shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ backgroundColor: '#09090b' }}>
+                                    <div className="py-1 max-h-[300px] overflow-y-auto">
+                                        {results.map((ticker, index) => (
+                                            <button
+                                                key={ticker.symbol}
+                                                className={cn(
+                                                    "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                                                    index === highlightedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"
+                                                )}
+                                                onClick={() => selectTicker(ticker)}
+                                                onMouseEnter={() => setHighlightedIndex(index)}
+                                            >
+                                                <TickerLogo symbol={ticker.symbol} url={ticker.logo_url} className="w-8 h-8 rounded-full border border-border flex-shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-sm">{ticker.symbol}</span>
+                                                        <span className="text-[10px] text-muted-foreground border border-border px-1.5 rounded bg-background/50">{ticker.exchange}</span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground truncate opacity-80">{ticker.name}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="relative mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="relative mt-6 grid grid-cols-2 gap-2 sm:gap-4 sm:mt-8 lg:grid-cols-4">
                         <StatPill
                             icon={Activity}
                             label="Tickers Tracked"
@@ -361,42 +353,8 @@ export function Dashboard() {
                     <TopOpportunitiesSection />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* LEFT COLUMN: Research & News */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <Card className="h-full flex flex-col overflow-hidden">
-                            <CardHeader className="py-4 border-b border-border bg-muted/10">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                        <Brain className="w-4 h-4 text-primary" />
-                                        Latest Research Notes
-                                    </CardTitle>
-                                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate('/research')}>
-                                        View All <ArrowRight size={12} />
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <ResearchFeedWidget />
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* RIGHT COLUMN: AI News & Quick Actions */}
-                    <div className="space-y-6">
-                        <Card className="overflow-hidden border-primary/20 shadow-md">
-                            <CardHeader className="py-4 border-b border-border bg-gradient-to-r from-emerald-500/10 to-transparent">
-                                <CardTitle className="font-bold text-sm flex items-center gap-2">
-                                    <Newspaper className="w-4 h-4 text-emerald-500" />
-                                    Smart News
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-4">
-                                <AiNewsWidget />
-                            </CardContent>
-                        </Card>
-                    </div>
+                <div className="h-[950px]">
+                    <NewsFeed />
                 </div>
 
             </main>

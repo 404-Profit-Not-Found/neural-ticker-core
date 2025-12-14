@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -11,6 +11,7 @@ import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
+import { WatchlistService } from '../watchlist/watchlist.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
@@ -40,6 +41,7 @@ export class ResearchService {
     private readonly riskRewardService: RiskRewardService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly watchlistService: WatchlistService,
   ) {
     const apiKey = this.config.get<string>('gemini.apiKey');
     if (apiKey) {
@@ -102,6 +104,12 @@ export class ResearchService {
     try {
       note.status = ResearchStatus.PROCESSING;
       await this.noteRepo.save(note);
+
+      // --- SPECIAL HANDLER: MARKET_NEWS ---
+      if (note.tickers.includes('MARKET_NEWS')) {
+        await this.processMarketNewsTicket(note);
+        return;
+      }
 
       // 1. Gather Context
       const context: Record<string, any> = {};
@@ -404,6 +412,7 @@ Title:`;
   }
 
   async getResearchNote(id: string): Promise<ResearchNote | null> {
+    // if (id === 'daily-digest-latest') { return ... } // Legacy legacy
     return this.noteRepo.findOne({ where: { id }, relations: ['user'] });
   }
 
@@ -624,5 +633,195 @@ Title:`;
       4. Cite every numerical claim.
       5. MANDATORY: End with a "Risk/Reward Profile" section containing: Overall Score (0-10), Financial/Execution Risk scores, Price Targets, and Bull/Base/Bear Scenarios.
     `;
+  }
+
+  // --- DAILY DIGEST PERSISTENCE (PERSONALIZED) ---
+
+  async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
+    if (!userId) {
+      this.logger.warn(
+        'Attempted to generate digest without User ID. Blocking.',
+      );
+      return null;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const titlePattern = `Smart News Briefing (${today}%`;
+
+    // 1. Check DB for today's digest for THIS user (Completed OR Pending)
+    const existing = await this.noteRepo.findOne({
+      where: {
+        user_id: userId,
+        title: Like(titlePattern),
+        status: Not(ResearchStatus.FAILED),
+      },
+      order: { created_at: 'DESC' },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    // 2. Not found? Generate it.
+    // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
+    const pendingNote = this.noteRepo.create({
+      user_id: userId,
+      request_id: crypto.randomUUID(),
+      question: 'Smart News Briefing', // Placeholder
+      title: `Smart News Briefing (${today}) - Generating...`,
+      provider: LlmProvider.GEMINI, // Required field
+      tickers: [],
+      status: ResearchStatus.PENDING,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    const savedPending = await this.noteRepo.save(pendingNote);
+
+    // 3. Generate content and update the pending record
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    this.logger.log(`Generating Personalized Digest for ${userId}...`);
+
+    let symbols: string[] = [];
+
+    try {
+      // 1. Fetch Candidates (User Watchlist)
+      const watchlists = await this.watchlistService.getUserWatchlists(userId);
+
+      // Flatten and dedup
+      const allTickers = new Set<string>();
+      watchlists.forEach((list) => {
+        list.items.forEach((item) => {
+          if (item.ticker?.symbol) {
+            allTickers.add(item.ticker.symbol);
+          }
+        });
+      });
+
+      const distinctSymbols = Array.from(allTickers);
+
+      if (distinctSymbols.length > 0) {
+        // Fetch Rich Data for Scoring
+        const richData = await this.marketDataService.getAnalyzerTickers({
+          symbols: distinctSymbols,
+          limit: 50,
+        });
+
+        // Scoring Logic: Impact Score
+        const scored = richData.items.map((item) => {
+          const change = Math.abs(
+            item.latestPrice?.changePercent || item.latestPrice?.change || 0,
+          );
+          const news = item.counts?.news || 0;
+          const score = change * 2 + news * 10;
+          return { symbol: item.ticker.symbol, score, data: item };
+        });
+
+        scored.sort((a, b) => b.score - a.score);
+        let active = scored.filter((s) => s.score > 2);
+
+        if (active.length === 0 && scored.length > 0) {
+          this.logger.log(
+            'Strict filter returned 0. Relaxing to top 3 watchlist items.',
+          );
+          active = scored.slice(0, 3);
+        }
+
+        const topPicks = active.slice(0, 5);
+        symbols = topPicks.map((s) => s.symbol);
+
+        this.logger.log(
+          `High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn('Failed to fetch user watchlist tickers', e);
+    }
+
+    if (symbols.length === 0) {
+      // No symbols found, fail gracefully and clear the pending lock
+      savedPending.status = ResearchStatus.FAILED;
+      savedPending.answer_markdown = 'No active tickers found in watchlist.';
+      await this.noteRepo.save(savedPending);
+      return null;
+    }
+
+    try {
+      // 2. Generate Prompt
+      const prompt = `
+            You are an elite Wall Street Analyst.
+            Generate a "Daily Smart News Digest" for these tickers: ${symbols.join(', ')}.
+            Date: ${today}.
+            
+            Using available news, identify Top Market Movers or Thematic Stories.
+            
+            STRICT RULES:
+            1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
+            2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
+            3. Label Sentiment as **BULLISH**, **BEARISH**, or **MIXED**.
+            4. SORT stories by Impact Index (Descending).
+            5. Use **Markdown** formatting for the digest use --- to separate sections.
+
+            Style Guide:
+            - Headlines: **[SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]**
+            - ** Headline text**
+            - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
+            - Tone: Bloomberg/Terminal. Concise. No fluff.
+            - **DO NOT** include a main title/header (e.g., 'Daily Smart News Digest'). Start directly with the Market Pulse.
+            - Structure:
+              1. Market Pulse (1-2 sentences).
+              2. Sections for each Key Story.
+                 - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
+        `;
+
+      // 3. Call LLM
+      const result = await this.llmService.generateResearch({
+        question: prompt,
+        tickers: symbols,
+        numericContext: {},
+        quality: 'medium',
+        provider: 'gemini',
+      });
+
+      // 4. Update Pending Note
+      savedPending.request_id = crypto.randomUUID();
+      savedPending.title = `Smart News Briefing (${today} ${timeString})`;
+      savedPending.question = `Daily Smart News Digest for: ${symbols.join(', ')}`;
+      savedPending.answer_markdown = result.answerMarkdown;
+      savedPending.tickers = symbols as any;
+      savedPending.quality = 'medium';
+      savedPending.provider = LlmProvider.GEMINI;
+      savedPending.status = ResearchStatus.COMPLETED;
+      savedPending.models_used = result.models || ['gemini-2.5-flash'];
+      savedPending.tokens_in = result.tokensIn ?? 0;
+      savedPending.tokens_out = result.tokensOut ?? 0;
+
+      const saved = await this.noteRepo.save(savedPending);
+      this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+      return saved;
+    } catch (e) {
+      this.logger.error('Failed to generate personalized digest', e);
+      savedPending.status = ResearchStatus.FAILED;
+      await this.noteRepo.save(savedPending);
+      return null;
+    }
+  }
+
+  // Helper alias
+  async getCachedDigest(userId: string): Promise<ResearchNote | null> {
+    return this.getOrGenerateDailyDigest(userId);
+  }
+
+  private async processMarketNewsTicket(note: ResearchNote): Promise<void> {
+    // Deprecated. Just mark complete to unblock queue if any exist.
+    note.status = ResearchStatus.COMPLETED;
+    note.answer_markdown = 'Deprecated: Please use the Daily Digest widget.';
+    await this.noteRepo.save(note);
   }
 }

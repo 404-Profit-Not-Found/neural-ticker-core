@@ -104,7 +104,7 @@ export function WatchlistTableView({
             columnHelper.accessor('sector', {
                 id: 'sector',
                 header: 'Sector',
-                enableHiding: true, 
+                enableHiding: true,
             }),
             columnHelper.accessor('price', {
                 header: 'Price',
@@ -121,7 +121,7 @@ export function WatchlistTableView({
                     const isPositive = val >= 0;
                     return (
                         <div className={cn("flex items-center font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                             {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
+                            {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
                             {Math.abs(val).toFixed(2)}%
                         </div>
                     );
@@ -191,7 +191,7 @@ export function WatchlistTableView({
                     const val = info.getValue();
                     const numericVal = typeof val === 'number' ? val : Number(val);
                     if (!Number.isFinite(numericVal)) return <span className="text-muted-foreground">-</span>;
-                    
+
                     let colorClass = "text-muted-foreground";
                     let Icon = ShieldCheck;
                     if (numericVal <= 3.5) {
@@ -208,7 +208,7 @@ export function WatchlistTableView({
                     return (
                         <span className={cn("flex items-center gap-1.5", colorClass)}>
                             <Icon size={14} />
-                            {numericVal.toFixed(1)}
+                            {Math.round(numericVal)}
                         </span>
                     );
                 },
@@ -295,7 +295,7 @@ export function WatchlistTableView({
         onColumnFiltersChange: setColumnFilters,
         state: { sorting, globalFilter, columnFilters },
         initialState: {
-            columnVisibility: { sector: false }, 
+            columnVisibility: { sector: false },
         }
     });
 
@@ -337,7 +337,7 @@ export function WatchlistTableView({
                                     {/* Actually simpler to just render generic generic cells matching column count approx or just a few key ones */}
                                     {/* Iterate columns to match layout */}
                                     {table.getVisibleFlatColumns().slice(1).map((col) => (
-                                         <td key={col.id} className="p-4"><Skeleton className="h-4 w-full" /></td>
+                                        <td key={col.id} className="p-4"><Skeleton className="h-4 w-full" /></td>
                                     ))}
                                 </tr>
                             ))
@@ -345,7 +345,7 @@ export function WatchlistTableView({
                             <tr>
                                 <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                                     <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
-                                         <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                                        <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
                                             <Search className="w-6 h-6 text-muted-foreground/50" />
                                         </div>
                                         <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>

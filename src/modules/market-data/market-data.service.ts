@@ -7,6 +7,7 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
+import { TickerEntity as Ticker } from '../tickers/entities/ticker.entity';
 import { Comment } from '../social/entities/comment.entity';
 import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
@@ -27,11 +28,14 @@ export class MarketDataService {
     @InjectRepository(RiskAnalysis)
     private readonly riskAnalysisRepo: Repository<RiskAnalysis>,
     @InjectRepository(ResearchNote)
+    @InjectRepository(ResearchNote)
     private readonly researchNoteRepo: Repository<ResearchNote>,
     @InjectRepository(Comment)
     private readonly commentRepo: Repository<Comment>,
     @InjectRepository(CompanyNews)
     private readonly companyNewsRepo: Repository<CompanyNews>,
+    @InjectRepository(Ticker)
+    private readonly tickerRepo: Repository<Ticker>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
@@ -351,6 +355,18 @@ export class MarketDataService {
     return [];
   }
 
+  async getGeneralNews() {
+    // For now, fetch live. We can add caching later if needed.
+    // Finnhub '/news?category=general' returns latest market news.
+    try {
+      const news = await this.finnhubService.getGeneralNews('general');
+      return news || [];
+    } catch (e) {
+      this.logger.error(`Failed to fetch general news: ${e.message}`);
+      return [];
+    }
+  }
+
   async getNewsStats(symbols: string[], from?: string, to?: string) {
     if (!symbols || symbols.length === 0) {
       return { total: 0, from, to, breakdown: [] };
@@ -620,6 +636,7 @@ export class MarketDataService {
     const sortBy = options.sortBy || 'market_cap';
     const sortDir = options.sortDir || 'DESC';
     const search = options.search ? options.search.toUpperCase() : null;
+    const symbols = options.symbols;
 
     const qb = this.tickersService.getRepo().createQueryBuilder('ticker');
 
@@ -698,6 +715,10 @@ export class MarketDataService {
       );
     }
 
+    if (symbols && symbols.length > 0) {
+      qb.andWhere('ticker.symbol IN (:...symbols)', { symbols });
+    }
+
     // Sort Mapping
     let sortField = `fund.${sortBy}`; // Default to fundamentals
 
@@ -714,6 +735,8 @@ export class MarketDataService {
       sortField = `risk.${sortBy}`;
     } else if (['close', 'volume'].includes(sortBy)) {
       sortField = `price.${sortBy}`;
+    } else if (sortBy === 'research') {
+      sortField = '"research_count"';
     }
 
     qb.orderBy(sortField, sortDir);
@@ -721,7 +744,10 @@ export class MarketDataService {
     // Add secondary sort for stability
     qb.addOrderBy('ticker.symbol', 'ASC');
 
-    qb.skip(skip).take(limit);
+    // Use limit/offset instead of take/skip to avoid TypeORM generating a broken
+    // "SELECT DISTINCT" query when sorting by computed columns (like price_change_pct).
+    // Since our joins are effectively 1:1 (mapOne with subqueries), this is safe.
+    qb.offset(skip).limit(limit);
 
     // Get Raw Entities (mapped)
     const { entities, raw } = await qb.getRawAndEntities();
@@ -775,6 +801,73 @@ export class MarketDataService {
       },
     };
   }
+  async getTickerSnapshots(symbols: string[]) {
+    if (!symbols || symbols.length === 0) return [];
+
+    // 1. Fetch Tickers
+    const tickers = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .where('ticker.symbol IN (:...symbols)', { symbols })
+      .getMany();
+
+    if (tickers.length === 0) return [];
+
+    const tickerIds = tickers.map((t) => t.id);
+
+    // 2. Fetch Latest Prices (Daily)
+    // Using a subquery approach or just fetching latest 2 per ticker if volume is low,
+    // but distinct on symbol_id is best for Postgres.
+    const latestPrices = await this.ohlcvRepo
+      .createQueryBuilder('price')
+      .distinctOn(['price.symbol_id'])
+      .where('price.symbol_id IN (:...tickerIds)', { tickerIds })
+      .andWhere("price.timeframe = '1d'")
+      .orderBy('price.symbol_id')
+      .addOrderBy('price.ts', 'DESC')
+      .getMany();
+
+    // 3. Fetch Latest Risk Analysis
+    // Similarly, distinct on ticker_id
+    const risks = await this.riskAnalysisRepo
+      .createQueryBuilder('risk')
+      .distinctOn(['risk.ticker_id'])
+      .where('risk.ticker_id IN (:...tickerIds)', { tickerIds })
+      .orderBy('risk.ticker_id')
+      .addOrderBy('risk.created_at', 'DESC')
+      .getMany();
+
+    // 4. Map Data
+    const priceMap = new Map(latestPrices.map((p) => [p.symbol_id, p]));
+    const riskMap = new Map(risks.map((r) => [r.ticker_id, r]));
+
+    return tickers.map((ticker) => {
+      const price = priceMap.get(ticker.id);
+      const risk = riskMap.get(ticker.id);
+
+      // Calculate change percent if possible
+      let changePercent = 0;
+      if (price && price.prevClose && price.prevClose > 0) {
+        changePercent =
+          ((price.close - price.prevClose) / price.prevClose) * 100;
+      }
+
+      return {
+        ...ticker,
+        latestPrice: price
+          ? {
+              close: price.close,
+              changePercent: changePercent, // Map calculated change
+              prevClose: price.prevClose,
+            }
+          : null,
+        riskAnalysis: risk
+          ? {
+              overall_score: risk.overall_score,
+            }
+          : null,
+      };
+    });
+  }
 }
 
 export interface AnalyzerOptions {
@@ -783,4 +876,5 @@ export interface AnalyzerOptions {
   sortBy?: string;
   sortDir?: 'ASC' | 'DESC';
   search?: string;
+  symbols?: string[];
 }

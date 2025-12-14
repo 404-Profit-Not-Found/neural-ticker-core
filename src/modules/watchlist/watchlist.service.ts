@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +18,7 @@ export class WatchlistService {
     private readonly watchlistRepo: Repository<Watchlist>,
     @InjectRepository(WatchlistItem)
     private readonly itemRepo: Repository<WatchlistItem>,
+    @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
   ) {}
 
@@ -144,5 +147,20 @@ export class WatchlistService {
     // Remove associated items first to avoid orphans in soft-delete scenarios
     await this.itemRepo.delete({ watchlist_id: watchlistId });
     await this.watchlistRepo.softRemove(watchlist);
+  }
+
+  async getAllWatchedTickers(limit: number = 20): Promise<string[]> {
+    const result = await this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.ticker', 'ticker')
+      .select('ticker.symbol', 'symbol')
+      .addSelect('COUNT(item.id)', 'count')
+      .groupBy('ticker.id')
+      .addGroupBy('ticker.symbol')
+      .orderBy('count', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return result.map((r) => r.symbol);
   }
 }

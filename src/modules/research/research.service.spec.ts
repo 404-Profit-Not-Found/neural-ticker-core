@@ -7,6 +7,7 @@ import {
   LlmProvider,
 } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
+import { WatchlistService } from '../watchlist/watchlist.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
@@ -56,6 +57,11 @@ describe('ResearchService', () => {
     create: jest.fn(),
   };
 
+  const mockWatchlistService = {
+    // Add any methods used by ResearchService, likely related to notifying watchlist users
+    findAll: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +72,7 @@ describe('ResearchService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: WatchlistService, useValue: mockWatchlistService },
         {
           provide: ConfigService,
           useValue: {

@@ -7,6 +7,7 @@ import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { UsersModule } from '../users/users.module';
+import { WatchlistModule } from '../watchlist/watchlist.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -16,9 +17,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     TypeOrmModule.forFeature([ResearchNote]),
     LlmModule,
     forwardRef(() => TickersModule),
-    MarketDataModule,
+    forwardRef(() => MarketDataModule),
     UsersModule,
     forwardRef(() => RiskRewardModule),
+    forwardRef(() => WatchlistModule),
     NotificationsModule,
   ],
   controllers: [ResearchController],

@@ -54,7 +54,7 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                         />
 
                         {/* Probability Badge */}
-                        <div className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-background/50 backdrop-blur-sm border z-10 shadow-sm">
+                        <div className="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border z-10 shadow-sm">
                             {(Number(scenario.probability) * 100).toFixed(0)}% Prob
                         </div>
 
@@ -68,13 +68,13 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                                         scenario.scenario_type === 'base' && "bg-blue-500"
                                     )} />
                                     <div>
-                                        <h3 className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground leading-none">
+                                        <h3 className="uppercase tracking-wider text-xs font-bold text-muted-foreground leading-none">
                                             {scenario.scenario_type} CASE
                                         </h3>
                                         <div className="text-lg font-bold flex items-center gap-1.5 leading-tight mt-0.5">
                                             ${Number(scenario.price_mid).toFixed(2)}
                                             <span className={cn(
-                                                "text-xs font-medium flex items-center",
+                                                "text-sm font-medium flex items-center",
                                                 isPositive ? "text-green-500" : "text-red-500"
                                             )}>
                                                 {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
@@ -85,11 +85,11 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                                 </div>
                             </div>
 
-                            <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                            <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
                                 {scenario.description}
                             </p>
 
-                            <div className="mt-auto pt-2 border-t border-dashed border-border flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+                            <div className="mt-auto pt-2 border-t border-dashed border-border flex items-center justify-between text-xs text-muted-foreground font-medium">
                                 <div className="flex gap-2">
                                     <span className="opacity-70">Range:</span>
                                     <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>

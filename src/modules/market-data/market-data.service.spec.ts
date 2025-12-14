@@ -11,6 +11,7 @@ import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
+import { TickerEntity } from '../tickers/entities/ticker.entity';
 
 import { ConfigService } from '@nestjs/config';
 
@@ -32,9 +33,16 @@ describe('MarketDataService', () => {
     create: jest.fn().mockImplementation((dto) => dto),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(), // Added
+      take: jest.fn().mockReturnThis(), // Added for completeness
+      skip: jest.fn().mockReturnThis(), // Added for completeness
+      distinctOn: jest.fn().mockReturnThis(),
       getOne: jest.fn(),
+      getMany: jest.fn().mockResolvedValue([]),
     })),
   };
 
@@ -54,6 +62,14 @@ describe('MarketDataService', () => {
 
   const mockRiskAnalysisRepo = {
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      distinctOn: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    })),
   };
 
   const mockResearchNoteRepo = {
@@ -137,6 +153,28 @@ describe('MarketDataService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: getRepositoryToken(TickerEntity),
+          useValue: {
+            createQueryBuilder: jest.fn(() => ({
+              where: jest.fn().mockReturnThis(),
+              leftJoinAndMapOne: jest.fn().mockReturnThis(),
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              addOrderBy: jest.fn().mockReturnThis(),
+              addSelect: jest.fn().mockReturnThis(),
+              skip: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              offset: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockReturnThis(),
+              getRawAndEntities: jest
+                .fn()
+                .mockResolvedValue({ entities: [], raw: [] }),
+              getCount: jest.fn().mockResolvedValue(0),
+              getMany: jest.fn().mockResolvedValue([]),
+            })),
+          },
         },
       ],
     }).compile();
@@ -315,6 +353,8 @@ describe('MarketDataService', () => {
         addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(), // Added
+        limit: jest.fn().mockReturnThis(), // Added
         getRawAndEntities: jest.fn().mockResolvedValue({
           entities: [
             {
@@ -337,8 +377,9 @@ describe('MarketDataService', () => {
       const repo = {
         createQueryBuilder: jest.fn(() => mockQueryBuilder),
       };
-      // We need to spy on the tickersService instance we have in closure
-      jest.spyOn(tickersService, 'getRepo').mockReturnValue(repo as any);
+
+      // Override the global mockTickersService.getRepo for this test
+      mockTickersService.getRepo.mockReturnValue(repo);
 
       const result = await service.getAnalyzerTickers({
         page: 1,
@@ -349,8 +390,8 @@ describe('MarketDataService', () => {
 
       expect(tickersService.getRepo).toHaveBeenCalled();
       expect(mockQueryBuilder.leftJoinAndMapOne).toHaveBeenCalledTimes(3); // Fund, Price, Risk
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.offset).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
       expect(result.items[0].ticker.symbol).toBe('AAPL');
       expect(result.items[0].fundamentals.market_cap).toBe(1000);
       expect(result.meta.total).toBe(1);
@@ -365,6 +406,8 @@ describe('MarketDataService', () => {
         addSelect: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(), // Added
+        limit: jest.fn().mockReturnThis(), // Added
         getRawAndEntities: jest
           .fn()
           .mockResolvedValue({ entities: [], raw: [] }),
