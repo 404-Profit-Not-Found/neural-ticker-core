@@ -101,7 +101,7 @@ export function NewsFeed() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
             {/* AI DIGEST CARD (Left - 3/5 width - PROMINENT BUT CLEAN) */}
-            <Card className="lg:col-span-3 flex flex-col overflow-hidden border-border/50 shadow-sm bg-transparent min-h-[400px] md:min-h-0">
+            <Card className="lg:col-span-3 flex flex-col overflow-hidden border-border/50 shadow-sm bg-transparent min-h-[50vh] md:min-h-0">
                 <CardHeader className="py-4 border-b border-border/50 bg-transparent">
                     <CardTitle className="text-base font-bold flex items-center justify-between w-full">
                         <div className="flex items-center gap-2">
