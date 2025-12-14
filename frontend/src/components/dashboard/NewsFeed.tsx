@@ -79,6 +79,25 @@ export function NewsFeed() {
         });
     };
 
+    // Helper to colorize sentiment tags in any text
+    const renderWithSentiment = (children: React.ReactNode): React.ReactNode[] => {
+        const content = Array.isArray(children) ? children : [children];
+        return content.map((child: React.ReactNode, i: number) => {
+            if (typeof child === 'string') {
+                // Split by sentiment tags (case-insensitive)
+                const parts = child.split(/(\((?:BULLISH|BEARISH|MIXED|NEUTRAL)\))/gi);
+                return parts.map((part, j) => {
+                    const upper = part.toUpperCase();
+                    if (upper === '(BULLISH)') return <span key={`s-${i}-${j}`} className="text-green-500 dark:text-green-400 font-bold">{part}</span>;
+                    if (upper === '(BEARISH)') return <span key={`s-${i}-${j}`} className="text-red-500 dark:text-red-400 font-bold">{part}</span>;
+                    if (upper === '(MIXED)' || upper === '(NEUTRAL)') return <span key={`s-${i}-${j}`} className="text-yellow-500 dark:text-yellow-400 font-bold">{part}</span>;
+                    return part;
+                });
+            }
+            return child;
+        });
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
             {/* AI DIGEST CARD (Left - 3/5 width - PROMINENT BUT CLEAN) */}
@@ -138,49 +157,13 @@ export function NewsFeed() {
                                 <ReactMarkdown
                                     components={{
                                         a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors" />,
-                                        strong: ({ ...props }) => {
-                                            const content = Array.isArray(props.children) ? props.children : [props.children];
-                                            return (
-                                                <strong className="text-white font-bold">
-                                                    {content.map((child, i) => {
-                                                        if (typeof child === 'string') {
-                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\)|\(MIXED\))/g);
-                                                            return parts.map((part, j) => {
-                                                                if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500">{part}</span>;
-                                                                if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500">{part}</span>;
-                                                                if (part === '(MIXED)') return <span key={`${i}-${j}`} className="text-yellow-500">{part}</span>;
-                                                                return part;
-                                                            });
-                                                        }
-                                                        return child;
-                                                    })}
-                                                </strong>
-                                            );
-                                        },
-                                        p: ({ ...props }) => {
-                                            const content = Array.isArray(props.children) ? props.children : [props.children];
-                                            return (
-                                                <p className="text-muted-foreground leading-relaxed mb-4 whitespace-pre-line">
-                                                    {content.map((child, i) => {
-                                                        if (typeof child === 'string') {
-                                                            const parts = child.split(/(\(BULLISH\)|\(BEARISH\)|\(MIXED\))/g);
-                                                            return parts.map((part, j) => {
-                                                                if (part === '(BULLISH)') return <span key={`${i}-${j}`} className="text-green-500 font-bold">{part}</span>;
-                                                                if (part === '(BEARISH)') return <span key={`${i}-${j}`} className="text-red-500 font-bold">{part}</span>;
-                                                                if (part === '(MIXED)') return <span key={`${i}-${j}`} className="text-yellow-500 font-bold">{part}</span>;
-                                                                return part;
-                                                            });
-                                                        }
-                                                        return child;
-                                                    })}
-                                                </p>
-                                            );
-                                        },
+                                        strong: ({ ...props }) => <strong className="font-bold text-foreground">{renderWithSentiment(props.children)}</strong>,
+                                        p: ({ ...props }) => <p className="text-muted-foreground leading-relaxed mb-4 whitespace-pre-line">{renderWithSentiment(props.children)}</p>,
+                                        li: ({ ...props }) => <li className="pl-1 mb-2">{renderWithSentiment(props.children)}</li>,
+                                        h3: ({ ...props }) => <h3 className="text-lg font-bold text-foreground mt-6 mb-3">{renderWithSentiment(props.children)}</h3>,
+                                        h4: ({ ...props }) => <h4 className="text-base font-bold text-foreground mt-5 mb-2">{renderWithSentiment(props.children)}</h4>,
+                                        h5: ({ ...props }) => <h5 className="text-sm font-bold text-foreground mt-4 mb-2">{renderWithSentiment(props.children)}</h5>,
                                         ul: ({ ...props }) => <ul {...props} className="list-disc pl-5 space-y-2 mb-4 text-muted-foreground" />,
-                                        li: ({ ...props }) => <li {...props} className="pl-1" />,
-                                        h1: ({ ...props }) => <h3 {...props} className="text-lg font-bold text-foreground mt-6 mb-3" />,
-                                        h2: ({ ...props }) => <h4 {...props} className="text-base font-bold text-foreground mt-5 mb-2" />,
-                                        h3: ({ ...props }) => <h5 {...props} className="text-sm font-bold text-foreground mt-4 mb-2" />,
                                         hr: ({ ...props }) => <hr {...props} className="my-6 border-border" />,
                                     }}
                                     remarkPlugins={[remarkGfm]}

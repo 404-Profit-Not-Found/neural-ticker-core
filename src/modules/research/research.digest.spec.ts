@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResearchService } from './research.service';
-import {
-  ResearchNote,
-  ResearchStatus,
-} from './entities/research-note.entity';
+import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { MarketDataService } from '../market-data/market-data.service';
@@ -20,7 +17,11 @@ describe('ResearchService - Digest', () => {
 
   const mockRepo = {
     create: jest.fn().mockImplementation((dto) => dto),
-    save: jest.fn().mockImplementation((entity) => Promise.resolve({ ...entity, id: 'saved-id' })),
+    save: jest
+      .fn()
+      .mockImplementation((entity) =>
+        Promise.resolve({ ...entity, id: 'saved-id' }),
+      ),
     findOne: jest.fn(),
   };
 
@@ -90,18 +91,42 @@ describe('ResearchService - Digest', () => {
     // 2. Mock Market Data to return rich data with varying changes/news
     mockMarketDataService.getAnalyzerTickers.mockResolvedValue({
       items: [
-        { ticker: { symbol: 'NVDA' }, latestPrice: { changePercent: 5.0 }, counts: { news: 2 } }, // Score: 10 + 20 = 30 (Top 1)
-        { ticker: { symbol: 'TSLA' }, latestPrice: { changePercent: 3.0 }, counts: { news: 1 } }, // Score: 6 + 10 = 16 (Top 2)
-        { ticker: { symbol: 'MSFT' }, latestPrice: { changePercent: 0.1 }, counts: { news: 10 } }, // Score: 0.2 + 100 = 100.2 (Wait, news weighting is 10. So 0.2 + 100 = 100.2. Top 1 actually)
-        { ticker: { symbol: 'AAPL' }, latestPrice: { changePercent: -2.0 }, counts: { news: 0 } }, // Score: 4 + 0 = 4 (Passes > 2)
-        { ticker: { symbol: 'GOOGL' }, latestPrice: { changePercent: 0.5 }, counts: { news: 0 } }, // Score: 1 + 0 = 1 (Filtered out)
-        { ticker: { symbol: 'AMZN' }, latestPrice: { changePercent: 0.0 }, counts: { news: 0 } }, // Score: 0 (Filtered out)
+        {
+          ticker: { symbol: 'NVDA' },
+          latestPrice: { changePercent: 5.0 },
+          counts: { news: 2 },
+        }, // Score: 10 + 20 = 30 (Top 1)
+        {
+          ticker: { symbol: 'TSLA' },
+          latestPrice: { changePercent: 3.0 },
+          counts: { news: 1 },
+        }, // Score: 6 + 10 = 16 (Top 2)
+        {
+          ticker: { symbol: 'MSFT' },
+          latestPrice: { changePercent: 0.1 },
+          counts: { news: 10 },
+        }, // Score: 0.2 + 100 = 100.2 (Wait, news weighting is 10. So 0.2 + 100 = 100.2. Top 1 actually)
+        {
+          ticker: { symbol: 'AAPL' },
+          latestPrice: { changePercent: -2.0 },
+          counts: { news: 0 },
+        }, // Score: 4 + 0 = 4 (Passes > 2)
+        {
+          ticker: { symbol: 'GOOGL' },
+          latestPrice: { changePercent: 0.5 },
+          counts: { news: 0 },
+        }, // Score: 1 + 0 = 1 (Filtered out)
+        {
+          ticker: { symbol: 'AMZN' },
+          latestPrice: { changePercent: 0.0 },
+          counts: { news: 0 },
+        }, // Score: 0 (Filtered out)
         // Others not returned by analyzer mock (simulating they were boring or not found)
       ],
     });
 
     // 3. Run Digest
-    await service.generateDailyDigest('user-1');
+    await service.getOrGenerateDailyDigest('user-1');
 
     // 4. Verify Filtering
     // Scores:
@@ -111,12 +136,12 @@ describe('ResearchService - Digest', () => {
     // AAPL: 4
     // GOOGL: 1 (Filtered < 2)
     // Top 5 slice should include MSFT, NVDA, TSLA, AAPL.
-    
+
     // Verify LLM call
     expect(mockLlmService.generateResearch).toHaveBeenCalledWith(
       expect.objectContaining({
         tickers: expect.arrayContaining(['MSFT', 'NVDA', 'TSLA', 'AAPL']),
-      })
+      }),
     );
 
     // Verify it did NOT include GOOGL or AMZN
@@ -132,41 +157,57 @@ describe('ResearchService - Digest', () => {
 
   it('should return null if user has no watchlist tickers (strict mode)', async () => {
     mockWatchlistService.getUserWatchlists.mockResolvedValue([]);
-    
+
     // Even if market data has global opportunities, we should NOT use them
     mockMarketDataService.getAnalyzerTickers.mockResolvedValue({
-      items: [
-        { ticker: { symbol: 'HOT1' }, latestPrice: { close: 10 } },
-      ]
+      items: [{ ticker: { symbol: 'HOT1' }, latestPrice: { close: 10 } }],
     });
 
-    const result = await service.generateDailyDigest('user-1');
+    const result = await service.getOrGenerateDailyDigest('user-1');
 
     expect(result).toBeNull();
     expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
   });
 
   it('should relax filter to top 3 watchlist items if all are boring', async () => {
-     mockWatchlistService.getUserWatchlists.mockResolvedValue([
-      { items: [{ ticker: { symbol: 'BORING1' } }, { ticker: { symbol: 'BORING2' } }, { ticker: { symbol: 'BORING3' } }] },
+    mockWatchlistService.getUserWatchlists.mockResolvedValue([
+      {
+        items: [
+          { ticker: { symbol: 'BORING1' } },
+          { ticker: { symbol: 'BORING2' } },
+          { ticker: { symbol: 'BORING3' } },
+        ],
+      },
     ]);
-    
+
     // All scores < 2
     mockMarketDataService.getAnalyzerTickers.mockResolvedValue({
       items: [
-        { ticker: { symbol: 'BORING1' }, latestPrice: { changePercent: 0.1 }, counts: { news: 0 } }, // Score 0.2
-        { ticker: { symbol: 'BORING2' }, latestPrice: { changePercent: 0.0 }, counts: { news: 0 } }, // Score 0
-        { ticker: { symbol: 'BORING3' }, latestPrice: { changePercent: 0.0 }, counts: { news: 0 } }, // Score 0
-      ]
+        {
+          ticker: { symbol: 'BORING1' },
+          latestPrice: { changePercent: 0.1 },
+          counts: { news: 0 },
+        }, // Score 0.2
+        {
+          ticker: { symbol: 'BORING2' },
+          latestPrice: { changePercent: 0.0 },
+          counts: { news: 0 },
+        }, // Score 0
+        {
+          ticker: { symbol: 'BORING3' },
+          latestPrice: { changePercent: 0.0 },
+          counts: { news: 0 },
+        }, // Score 0
+      ],
     });
 
-    await service.generateDailyDigest('user-1');
+    await service.getOrGenerateDailyDigest('user-1');
 
     // Should included all 3 because it relaxed
     expect(mockLlmService.generateResearch).toHaveBeenCalledWith(
       expect.objectContaining({
         tickers: expect.arrayContaining(['BORING1', 'BORING2', 'BORING3']),
-      })
+      }),
     );
   });
 });

@@ -35,14 +35,14 @@ describe('NewsController', () => {
     it('should pass user ID from request to research service', async () => {
       const mockReq = { user: { id: 'user-123' } };
       await controller.getDailyDigest(mockReq);
-      
+
       expect(researchService.getCachedDigest).toHaveBeenCalledWith('user-123');
     });
 
     it('should pass null if user is missing (though guard usually prevents this)', async () => {
       const mockReq = {};
       await controller.getDailyDigest(mockReq);
-      
+
       expect(researchService.getCachedDigest).toHaveBeenCalledWith(null);
     });
   });

@@ -639,7 +639,9 @@ Title:`;
 
   async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
     if (!userId) {
-      this.logger.warn('Attempted to generate digest without User ID. Blocking.');
+      this.logger.warn(
+        'Attempted to generate digest without User ID. Blocking.',
+      );
       return null;
     }
 
@@ -663,19 +665,19 @@ Title:`;
     // 2. Not found? Generate it.
     // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
     const pendingNote = this.noteRepo.create({
-        user_id: userId,
-        request_id: crypto.randomUUID(),
-        question: 'Smart News Briefing', // Placeholder
-        title: `Smart News Briefing (${today}) - Generating...`,
-        provider: LlmProvider.GEMINI, // Required field
-        tickers: [],
-        status: ResearchStatus.PENDING,
-        created_at: new Date(),
-        updated_at: new Date()
+      user_id: userId,
+      request_id: crypto.randomUUID(),
+      question: 'Smart News Briefing', // Placeholder
+      title: `Smart News Briefing (${today}) - Generating...`,
+      provider: LlmProvider.GEMINI, // Required field
+      tickers: [],
+      status: ResearchStatus.PENDING,
+      created_at: new Date(),
+      updated_at: new Date(),
     });
 
     const savedPending = await this.noteRepo.save(pendingNote);
-    
+
     // 3. Generate content and update the pending record
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', {
@@ -725,30 +727,34 @@ Title:`;
         let active = scored.filter((s) => s.score > 2);
 
         if (active.length === 0 && scored.length > 0) {
-          this.logger.log('Strict filter returned 0. Relaxing to top 3 watchlist items.');
+          this.logger.log(
+            'Strict filter returned 0. Relaxing to top 3 watchlist items.',
+          );
           active = scored.slice(0, 3);
         }
 
         const topPicks = active.slice(0, 5);
         symbols = topPicks.map((s) => s.symbol);
-        
-        this.logger.log(`High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`);
+
+        this.logger.log(
+          `High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`,
+        );
       }
     } catch (e) {
       this.logger.warn('Failed to fetch user watchlist tickers', e);
     }
 
-      if (symbols.length === 0) {
-        // No symbols found, fail gracefully and clear the pending lock
-        savedPending.status = ResearchStatus.FAILED;
-        savedPending.answer_markdown = 'No active tickers found in watchlist.';
-        await this.noteRepo.save(savedPending);
-        return null; 
-      }
+    if (symbols.length === 0) {
+      // No symbols found, fail gracefully and clear the pending lock
+      savedPending.status = ResearchStatus.FAILED;
+      savedPending.answer_markdown = 'No active tickers found in watchlist.';
+      await this.noteRepo.save(savedPending);
+      return null;
+    }
 
-      try {
-        // 2. Generate Prompt
-        const prompt = `
+    try {
+      // 2. Generate Prompt
+      const prompt = `
             You are an elite Wall Street Analyst.
             Generate a "Daily Smart News Digest" for these tickers: ${symbols.join(', ')}.
             Date: ${today}.
@@ -774,38 +780,37 @@ Title:`;
                  - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
         `;
 
-        // 3. Call LLM
-        const result = await this.llmService.generateResearch({
-            question: prompt,
-            tickers: symbols,
-            numericContext: {},
-            quality: 'medium', 
-            provider: 'gemini',
-        });
+      // 3. Call LLM
+      const result = await this.llmService.generateResearch({
+        question: prompt,
+        tickers: symbols,
+        numericContext: {},
+        quality: 'medium',
+        provider: 'gemini',
+      });
 
-        // 4. Update Pending Note
-        savedPending.request_id = crypto.randomUUID();
-        savedPending.title = `Smart News Briefing (${today} ${timeString})`; 
-        savedPending.question = `Daily Smart News Digest for: ${symbols.join(', ')}`;
-        savedPending.answer_markdown = result.answerMarkdown;
-        savedPending.tickers = symbols as any; 
-        savedPending.quality = 'medium';
-        savedPending.provider = LlmProvider.GEMINI;
-        savedPending.status = ResearchStatus.COMPLETED;
-        savedPending.models_used = result.models || ['gemini-2.5-flash'];
-        savedPending.tokens_in = result.tokensIn ?? 0;
-        savedPending.tokens_out = result.tokensOut ?? 0;
-        
-        const saved = await this.noteRepo.save(savedPending);
-        this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
-        return saved;
+      // 4. Update Pending Note
+      savedPending.request_id = crypto.randomUUID();
+      savedPending.title = `Smart News Briefing (${today} ${timeString})`;
+      savedPending.question = `Daily Smart News Digest for: ${symbols.join(', ')}`;
+      savedPending.answer_markdown = result.answerMarkdown;
+      savedPending.tickers = symbols as any;
+      savedPending.quality = 'medium';
+      savedPending.provider = LlmProvider.GEMINI;
+      savedPending.status = ResearchStatus.COMPLETED;
+      savedPending.models_used = result.models || ['gemini-2.5-flash'];
+      savedPending.tokens_in = result.tokensIn ?? 0;
+      savedPending.tokens_out = result.tokensOut ?? 0;
 
-      } catch (e) {
-        this.logger.error('Failed to generate personalized digest', e);
-        savedPending.status = ResearchStatus.FAILED;
-        await this.noteRepo.save(savedPending);
-        return null;
-      }
+      const saved = await this.noteRepo.save(savedPending);
+      this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+      return saved;
+    } catch (e) {
+      this.logger.error('Failed to generate personalized digest', e);
+      savedPending.status = ResearchStatus.FAILED;
+      await this.noteRepo.save(savedPending);
+      return null;
+    }
   }
 
   // Helper alias

@@ -1,11 +1,6 @@
-import {
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import passport from 'passport';
 
 @Injectable()
 export class GoogleAuthGuard extends AuthGuard('google') {
@@ -15,7 +10,7 @@ export class GoogleAuthGuard extends AuthGuard('google') {
 
   // Removed manual canActivate override to rely on standard NestJS AuthGuard behavior.
   // The parent AuthGuard automatically calls getAuthenticateOptions() and handles the passport flow.
-  
+
   // Note: If we need logging, we can call super.canActivate() and log before/after,
   // but let's try strict standard behavior first to fix the 401.
 
