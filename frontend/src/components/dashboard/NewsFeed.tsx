@@ -109,7 +109,7 @@ export function NewsFeed() {
                             {digest.relatedTickers && digest.relatedTickers.length > 0 && (
                                 <div className="mb-6 pb-4 border-b border-border/50">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                                        {digest.relatedTickers.map((t: any) => (
+                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number }; riskAnalysis?: { overall_score: number } }) => (
                                             <MiniTickerTile
                                                 key={t.id}
                                                 symbol={t.symbol}
@@ -130,14 +130,14 @@ export function NewsFeed() {
                             <div className="text-sm">
                                 <ReactMarkdown
                                     components={{
-                                        a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors" />,
-                                        strong: ({ node, ...props }) => <strong {...props} className="text-white font-bold" />,
-                                        p: ({ node, ...props }) => <p {...props} className="text-muted-foreground leading-relaxed mb-4" />,
-                                        ul: ({ node, ...props }) => <ul {...props} className="list-disc pl-5 space-y-2 mb-4 text-muted-foreground" />,
-                                        li: ({ node, ...props }) => <li {...props} className="pl-1" />,
-                                        h1: ({ node, ...props }) => <h3 {...props} className="text-lg font-bold text-foreground mt-6 mb-3" />,
-                                        h2: ({ node, ...props }) => <h4 {...props} className="text-base font-bold text-foreground mt-5 mb-2" />,
-                                        h3: ({ node, ...props }) => <h5 {...props} className="text-sm font-bold text-foreground mt-4 mb-2" />,
+                                        a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors" />,
+                                        strong: ({ ...props }) => <strong {...props} className="text-white font-bold" />,
+                                        p: ({ ...props }) => <p {...props} className="text-muted-foreground leading-relaxed mb-4" />,
+                                        ul: ({ ...props }) => <ul {...props} className="list-disc pl-5 space-y-2 mb-4 text-muted-foreground" />,
+                                        li: ({ ...props }) => <li {...props} className="pl-1" />,
+                                        h1: ({ ...props }) => <h3 {...props} className="text-lg font-bold text-foreground mt-6 mb-3" />,
+                                        h2: ({ ...props }) => <h4 {...props} className="text-base font-bold text-foreground mt-5 mb-2" />,
+                                        h3: ({ ...props }) => <h5 {...props} className="text-sm font-bold text-foreground mt-4 mb-2" />,
                                     }}
                                 >
                                     {digest.answer_markdown || "No content available."}

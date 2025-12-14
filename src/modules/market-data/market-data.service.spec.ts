@@ -37,6 +37,9 @@ describe('MarketDataService', () => {
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(), // Added
+      take: jest.fn().mockReturnThis(), // Added for completeness
+      skip: jest.fn().mockReturnThis(), // Added for completeness
       distinctOn: jest.fn().mockReturnThis(),
       getOne: jest.fn(),
       getMany: jest.fn().mockResolvedValue([]),
@@ -156,6 +159,17 @@ describe('MarketDataService', () => {
           useValue: {
             createQueryBuilder: jest.fn(() => ({
                where: jest.fn().mockReturnThis(),
+               leftJoinAndMapOne: jest.fn().mockReturnThis(),
+               leftJoinAndSelect: jest.fn().mockReturnThis(),
+               orderBy: jest.fn().mockReturnThis(),
+               addOrderBy: jest.fn().mockReturnThis(),
+               addSelect: jest.fn().mockReturnThis(),
+               skip: jest.fn().mockReturnThis(),
+               take: jest.fn().mockReturnThis(),
+               offset: jest.fn().mockReturnThis(),
+               limit: jest.fn().mockReturnThis(),
+               getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+               getCount: jest.fn().mockResolvedValue(0),
                getMany: jest.fn().mockResolvedValue([]),
             })),
           },
