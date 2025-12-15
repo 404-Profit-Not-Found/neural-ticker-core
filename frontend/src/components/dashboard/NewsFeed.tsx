@@ -74,9 +74,17 @@ export function NewsFeed() {
     }, []);
 
     const formatDate = (ts: number) => {
-        return new Date(ts * 1000).toLocaleDateString(undefined, {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
+        if (!ts) return 'Just now';
+        try {
+            // Finnhub returns seconds, but check if it's ms (huge number)
+            const date = new Date(ts > 10000000000 ? ts : ts * 1000);
+            if (isNaN(date.getTime())) return 'Recently';
+            return date.toLocaleDateString(undefined, {
+                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        } catch (e) {
+            return 'Recently';
+        }
     };
 
     // Helper to colorize sentiment tags in any text

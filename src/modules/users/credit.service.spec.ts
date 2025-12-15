@@ -117,10 +117,12 @@ describe('CreditService', () => {
       const mockQb = {
         setLock: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue({ ...mockUser, credits_balance: 10 }),
+        getOne: jest
+          .fn()
+          .mockResolvedValue({ ...mockUser, credits_balance: 10 }),
       };
       mockUserRepo.createQueryBuilder.mockReturnValue(mockQb);
-      
+
       mockTxRepo.create.mockReturnValue({});
 
       await service.deductCredits('user-1', 5, 'research_spend');
@@ -141,7 +143,9 @@ describe('CreditService', () => {
       const mockQb = {
         setLock: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue({ ...mockUser, credits_balance: 0 }),
+        getOne: jest
+          .fn()
+          .mockResolvedValue({ ...mockUser, credits_balance: 0 }),
       };
       mockUserRepo.createQueryBuilder.mockReturnValue(mockQb);
 

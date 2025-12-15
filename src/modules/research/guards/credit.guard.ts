@@ -3,7 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CreditService } from '../../users/credit.service';
 import { UsersService } from '../../users/users.service';
@@ -33,18 +33,20 @@ export class CreditGuard implements CanActivate {
     if (!freshUser) throw new ForbiddenException('User not found');
 
     if (cost > 1 && freshUser.tier === 'free') {
-       throw new ForbiddenException('Pro models require a Pro subscription.');
+      throw new ForbiddenException('Pro models require a Pro subscription.');
     }
 
     // Check balance ONLY - Deduction moved to Controller
     if (freshUser.role === 'admin') {
-         // Admins bypass check
-         return true;
+      // Admins bypass check
+      return true;
     }
 
     const balance = freshUser.credits_balance ?? 0;
     if (balance < cost) {
-         throw new ForbiddenException(`Insufficient credits. You need ${cost} but have ${balance}.`);
+      throw new ForbiddenException(
+        `Insufficient credits. You need ${cost} but have ${balance}.`,
+      );
     }
 
     return true;

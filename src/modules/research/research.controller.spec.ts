@@ -4,6 +4,7 @@ import { ResearchController } from './research.controller';
 import { ResearchService } from './research.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { CreditService } from '../users/credit.service';
+import { CreditGuard } from './guards/credit.guard';
 
 describe('ResearchController', () => {
   let controller: ResearchController;
@@ -24,8 +25,8 @@ describe('ResearchController', () => {
     dedupeAnalystRatings: jest.fn(),
   };
   const mockCreditService = {
-      getModelCost: jest.fn(),
-      deductCredits: jest.fn(),
+    getModelCost: jest.fn(),
+    deductCredits: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -41,11 +42,14 @@ describe('ResearchController', () => {
           useValue: mockMarketDataService,
         },
         {
-            provide: CreditService,
-            useValue: mockCreditService,
+          provide: CreditService,
+          useValue: mockCreditService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(CreditGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .compile();
 
     controller = module.get<ResearchController>(ResearchController);
     jest.clearAllMocks();
@@ -92,27 +96,28 @@ describe('ResearchController', () => {
         ['AAPL'],
         'Test',
         '# Content',
+        undefined,
       );
     });
   });
 
   describe('contribute', () => {
     it('should contribute research', async () => {
-        const note = { id: '1', tickers: ['AAPL'], title: '# Content' };
-        mockResearchService.contribute.mockResolvedValue(note);
-        const req = { user: { id: 'user1' } };
+      const note = { id: '1', tickers: ['AAPL'], title: '# Content' };
+      mockResearchService.contribute.mockResolvedValue(note);
+      const req = { user: { id: 'user1' } };
 
-        const result = await controller.contribute(req, {
-            tickers: ['AAPL'],
-            content: '# Content',
-        });
+      const result = await controller.contribute(req, {
+        tickers: ['AAPL'],
+        content: '# Content',
+      });
 
-        expect(result).toEqual(note);
-        expect(mockResearchService.contribute).toHaveBeenCalledWith(
-            'user1',
-            ['AAPL'],
-            '# Content',
-        );
+      expect(result).toEqual(note);
+      expect(mockResearchService.contribute).toHaveBeenCalledWith(
+        'user1',
+        ['AAPL'],
+        '# Content',
+      );
     });
   });
 

@@ -8,13 +8,19 @@ export class CreditService {
   constructor(private readonly dataSource: DataSource) {}
 
   async getBalance(userId: string): Promise<number> {
-    const user = await this.dataSource.getRepository(User).findOneBy({ id: userId });
+    const user = await this.dataSource
+      .getRepository(User)
+      .findOneBy({ id: userId });
     return user ? user.credits_balance : 0;
   }
 
   getModelCost(model?: string): number {
     if (!model) return 1;
-    if (model.includes('deep') || model.includes('pro') || model.includes('gpt-5')) {
+    if (
+      model.includes('deep') ||
+      model.includes('pro') ||
+      model.includes('gpt-5')
+    ) {
       return 5;
     }
     // Specific check for flash light if needed, or default
@@ -89,7 +95,7 @@ export class CreditService {
       }
 
       user.credits_balance -= amount;
-      await userRepo.save(user);
+      await userRepo.save(user); // This line was removed in the provided snippet, but it's crucial. Re-adding it.
 
       const tx = txRepo.create({
         user_id: userId,

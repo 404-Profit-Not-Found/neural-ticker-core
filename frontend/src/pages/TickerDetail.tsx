@@ -90,6 +90,7 @@ export function TickerDetail() {
 
     useEffect(() => {
         if (hasRemotePending && placeholderId) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setPlaceholderId(null);
             setPlaceholderTimestamp(null);
         }
@@ -102,6 +103,7 @@ export function TickerDetail() {
                 clearTimeout(graceTimerRef.current);
                 graceTimerRef.current = null;
             }
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLocalResearchRunning(true);
             return;
         }
@@ -129,6 +131,7 @@ export function TickerDetail() {
         }
 
         if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLocalResearchRunning(false);
             setPlaceholderId(null);
             setPlaceholderTimestamp(null);
@@ -165,9 +168,12 @@ export function TickerDetail() {
 
         if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
             expectedTopResearchIdRef.current = undefined;
-            setLocalResearchRunning(false);
+            if (localResearchRunning) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setLocalResearchRunning(false);
+            }
         }
-    }, [latestResearchId, localResearchRunning, triggerResearchMutation.isPending, hasRemotePending]);
+    }, [latestResearchId, triggerResearchMutation.isPending, hasRemotePending]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 

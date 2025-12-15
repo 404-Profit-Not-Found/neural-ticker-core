@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,28 +108,34 @@ export class ResearchService implements OnModuleInit {
       const judgment = await this.qualityScoringService.score(content);
       note.quality_score = judgment.score;
       note.rarity = judgment.rarity;
-      note.grounding_metadata = { judgment_reasoning: judgment.details.reasoning };
+      note.grounding_metadata = {
+        judgment_reasoning: judgment.details.reasoning,
+      };
 
       // 3. Reward Credits if applicable
       const rewardMap: Record<string, number> = {
-        'Common': 1,
-        'Uncommon': 3,
-        'Rare': 5,
-        'Epic': 10,
-        'Legendary': 25,
+        Common: 1,
+        Uncommon: 3,
+        Rare: 5,
+        Epic: 10,
+        Legendary: 25,
       };
 
       // Store the actual tier name (e.g. "Rare") not the color "Blue"
       // Frontend expects: Common, Uncommon, Rare, Epic, Legendary
-      note.rarity = judgment.rarity; 
-      
+      note.rarity = judgment.rarity;
+
       const reward = rewardMap[judgment.rarity] || 0;
       if (reward > 0) {
         await this.creditService.addCredits(
           userId,
           reward,
           'manual_contribution',
-          { noteId: note.request_id, rarity: judgment.rarity, score: judgment.score }
+          {
+            noteId: note.request_id,
+            rarity: judgment.rarity,
+            score: judgment.score,
+          },
         );
       }
     } catch (e) {
@@ -136,11 +147,16 @@ export class ResearchService implements OnModuleInit {
   }
 
   // REMOVED: judgeResearchQuality - replaced by QualityScoringService
-  async contribute(userId: string, tickers: string[], content: string): Promise<ResearchNote> {
-     // Alias for createManualNote with intended semantics
-     // Extract title from first line or generic
-     const titleLine = content.split('\n')[0].substring(0, 50) || 'Community Contribution';
-     return this.createManualNote(userId, tickers, titleLine, content);
+  async contribute(
+    userId: string,
+    tickers: string[],
+    content: string,
+  ): Promise<ResearchNote> {
+    // Alias for createManualNote with intended semantics
+    // Extract title from first line or generic
+    const titleLine =
+      content.split('\n')[0].substring(0, 50) || 'Community Contribution';
+    return this.createManualNote(userId, tickers, titleLine, content);
   }
 
   // Legacy method kept for compatibility if needed, but forwarded to new flow?
@@ -262,15 +278,17 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
       // 5.5 Judge Quality (Universal Judge) for AI Notes too
       try {
-        const judgment = await this.qualityScoringService.score(result.answerMarkdown);
+        const judgment = await this.qualityScoringService.score(
+          result.answerMarkdown,
+        );
         note.quality_score = judgment.score;
         note.rarity = judgment.rarity;
-        note.grounding_metadata = { 
-            ...note.grounding_metadata,
-            judgment_reasoning: judgment.details.reasoning 
+        note.grounding_metadata = {
+          ...note.grounding_metadata,
+          judgment_reasoning: judgment.details.reasoning,
         };
         await this.noteRepo.save(note);
-        
+
         // Reward if high quality (AI getting credits? why not, the user paid for it or triggered it)
         // Actually, maybe we only reward MANUAL uploads?
         // User asked: "are the non manual researches also rated with tag?"
@@ -279,7 +297,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         // So I will apply the tag, but maybe skip the credit reward for AI generated stuff to prevent infinite loop of credits.
         // I'll leave the credit part out for AI, just save the metadata.
       } catch (e) {
-         this.logger.warn(`Failed to judge AI note ${id}`, e);
+        this.logger.warn(`Failed to judge AI note ${id}`, e);
       }
 
       // 6. Post-Process: Generate "Deep Tier" Risk Score from the analysis
@@ -598,7 +616,7 @@ Title:`;
 
   async failStuckTickets(staleMinutes: number = 20): Promise<number> {
     const threshold = new Date(Date.now() - staleMinutes * 60 * 1000);
-    
+
     // If staleMinutes is 0, we want to clear ALL processing tickets (e.g. on startup)
     const where: any = {
       status: ResearchStatus.PROCESSING,

@@ -58,9 +58,10 @@ export function TickerDiscussion({ comments, onPostComment, isPosting }: TickerD
                                                 </span>
                                                 <Badge
                                                     variant="outline"
+                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     className={`text-[9px] h-4 px-1 ${(comment.user?.tier === 'pro' || (comment.user as any)?.role === 'admin')
-                                                            ? 'border-purple-500 text-purple-500 uppercase'
-                                                            : 'border-emerald-500 text-emerald-500 uppercase'
+                                                        ? 'border-purple-500 text-purple-500 uppercase'
+                                                        : 'border-emerald-500 text-emerald-500 uppercase'
                                                         }`}
                                                 >
                                                     {(comment.user?.tier || 'free').toUpperCase()}

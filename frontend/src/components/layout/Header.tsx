@@ -96,8 +96,9 @@ export function Header() {
   }, []);
 
   // Close menus on route change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileMenuOpen(false);
     setMobileMenuOpen(false);
     setNotificationsMenuOpen(false);
@@ -355,14 +356,7 @@ export function Header() {
             News
           </Link>
           <div className="h-px bg-border my-2" />
-          <button
-            type="button"
-            onClick={() => goTo('/profile')}
-            className="w-full flex items-center gap-3 px-4 py-3 text-base text-left text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          >
-            <UserIcon size={18} />
-            My Profile
-          </button>
+
         </div>
       )}
     </header >

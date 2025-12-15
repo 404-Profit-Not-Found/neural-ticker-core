@@ -157,6 +157,7 @@ export function AdminConsole() {
         }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openCreditModal = (user: any) => {
         setSelectedUserForCredits(user);
         setIsCreditModalOpen(true);

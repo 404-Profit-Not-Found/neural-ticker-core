@@ -14,6 +14,7 @@ import { CreditService } from '../users/credit.service'; // Added
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QualityScoringService } from './quality-scoring.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
@@ -67,6 +68,11 @@ describe('ResearchService', () => {
     addCredits: jest.fn(),
   };
 
+  const mockQualityScoringService = {
+    score: jest.fn(),
+  };
+
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,8 +83,9 @@ describe('ResearchService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: QualityScoringService, useValue: mockQualityScoringService }, // Added
         { provide: WatchlistService, useValue: mockWatchlistService },
-        { provide: CreditService, useValue: mockCreditService }, // Added
+        { provide: CreditService, useValue: mockCreditService },
         {
           provide: ConfigService,
           useValue: {
@@ -135,8 +142,10 @@ describe('ResearchService', () => {
       const content = '# Analysis';
 
       // Mock Judge result
-      mockLlmService.generateResearch.mockResolvedValueOnce({
-        answerMarkdown: '```json\n{"score": 85, "rarity": "Purple", "reasoning": "Great"}\n```',
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        score: 85,
+        rarity: 'Epic',
+        details: { reasoning: 'Great' },
       });
 
       await service.createManualNote(userId, tickers, title, content);
@@ -144,59 +153,42 @@ describe('ResearchService', () => {
       expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: LlmProvider.MANUAL,
-          quality_score: 85,
-          rarity: 'Purple',
+          question: 'Manual Upload',
         }),
       );
-      
+
+      // Verify enriched data is SAVED
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quality_score: 85,
+          rarity: 'Epic',
+        }),
+      );
+
       // Verify Credit Reward for Purple (10 credits)
       expect(mockCreditService.addCredits).toHaveBeenCalledWith(
         userId,
         10, // Purple reward
         'manual_contribution',
-        expect.anything()
+        expect.anything(),
       );
 
       expect(mockRepo.save).toHaveBeenCalled();
     });
 
     it('should not reward credits for Gray quality', async () => {
-       const userId = 'user-1'; 
-       mockLlmService.generateResearch.mockResolvedValueOnce({
-         answerMarkdown: '{"score": 10, "rarity": "Gray", "reasoning": "Bad"}'
-       });
+      const userId = 'user-1';
+      mockLlmService.generateResearch.mockResolvedValueOnce({
+        answerMarkdown: '{"score": 10, "rarity": "Gray", "reasoning": "Bad"}',
+      });
 
-       await service.createManualNote(userId, ['AAPL'], 'Title', 'Content');
+      await service.createManualNote(userId, ['AAPL'], 'Title', 'Content');
 
-       expect(mockCreditService.addCredits).not.toHaveBeenCalled();
+      expect(mockCreditService.addCredits).not.toHaveBeenCalled();
     });
   });
 
-  describe('judgeResearchQuality', () => {
-     it('should parse LLM JSON response', async () => {
-        mockLlmService.generateResearch.mockResolvedValueOnce({
-          answerMarkdown: '{"score": 50, "rarity": "Green", "reasoning": "Good"}',
-        });
 
-        const result = await service.judgeResearchQuality('Text', ['AAPL']);
-
-        expect(result).toEqual({ score: 50, rarity: 'Green', reasoning: 'Good' });
-        expect(mockLlmService.generateResearch).toHaveBeenCalledWith(
-          expect.objectContaining({ quality: 'low' }) // Flash-lite check
-        );
-     });
-
-     it('should handle JSON parsing errors gracefully', async () => {
-        mockLlmService.generateResearch.mockResolvedValueOnce({
-           answerMarkdown: 'Not JSON',
-        });
-
-        const result = await service.judgeResearchQuality('Text', ['AAPL']);
-        
-        // Expect fallback/error response
-        expect(result.rarity).toBe('Gray'); 
-     });
-  });
 
   describe('getResearchNote', () => {
     it('should return a note by id', async () => {
@@ -299,7 +291,7 @@ describe('ResearchService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           status: ResearchStatus.FAILED,
-          error: expect.stringContaining('Timeout'),
+          error: expect.stringContaining('System Restart'),
         }),
       );
     });

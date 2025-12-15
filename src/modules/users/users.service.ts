@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  Inject,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -124,7 +123,8 @@ export class UsersService {
     // For now, if googleId not found but email exists, we link them.
     if (!user) {
       // Use case-insensitive lookup to avoid duplicates
-      user = await this.userRepo.createQueryBuilder('user')
+      user = await this.userRepo
+        .createQueryBuilder('user')
         .where('LOWER(user.email) = LOWER(:email)', { email: profile.email })
         .getOne();
     }
@@ -143,7 +143,7 @@ export class UsersService {
         user.nickname = this.nicknameGenerator.generate();
       }
       if (role) user.role = role; // Enforce admin if email matches
-      
+
       // FIX: Ensure Admins have 'pro' tier benefits by default (KISS)
       if (user.role === 'admin' && user.tier === 'free') {
         user.tier = 'pro';
@@ -165,7 +165,7 @@ export class UsersService {
       avatar_url: profile.avatarUrl,
       last_login: new Date(),
       role: role || roleOverride || 'user',
-      tier: (role === 'admin' || roleOverride === 'admin') ? 'pro' : 'free', // Admins get PRO tier
+      tier: role === 'admin' || roleOverride === 'admin' ? 'pro' : 'free', // Admins get PRO tier
       nickname: this.nicknameGenerator.generate(),
       view_mode: 'PRO', // Default
       theme: 'dark', // Default
@@ -176,17 +176,20 @@ export class UsersService {
     } catch (error) {
       // Handle Unique Constraint Violation (Race condition or missed lookup)
       if (error.code === '23505') {
-        this.logger.warn(`Duplicate user detected on create: ${profile.email}. Recovering...`);
+        this.logger.warn(
+          `Duplicate user detected on create: ${profile.email}. Recovering...`,
+        );
         // Try to fetch one last time (the race winner)
-         const existing = await this.userRepo.createQueryBuilder('user')
+        const existing = await this.userRepo
+          .createQueryBuilder('user')
           .where('LOWER(user.email) = LOWER(:email)', { email: profile.email })
           .getOne();
-         
-         if (existing) {
-             existing.google_id = profile.googleId;
-             existing.last_login = new Date();
-             return this.userRepo.save(existing);
-         }
+
+        if (existing) {
+          existing.google_id = profile.googleId;
+          existing.last_login = new Date();
+          return this.userRepo.save(existing);
+        }
       }
       throw error;
     }

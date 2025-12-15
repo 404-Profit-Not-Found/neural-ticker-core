@@ -63,7 +63,7 @@ export class QualityScoringService {
         question: prompt,
         quality: 'low', // Reverted to 'low' (Flash-Lite) per user request for cost efficiency
         provider: 'gemini',
-        tickers: [], 
+        tickers: [],
         numericContext: {},
       });
 
@@ -73,14 +73,13 @@ export class QualityScoringService {
       }
 
       const scoreData = JSON.parse(jsonMatch[0]);
-      
+
       // Validate schema loosely
       if (typeof scoreData.score !== 'number' || !scoreData.rarity) {
-         throw new Error('Invalid JSON schema from scoring service');
+        throw new Error('Invalid JSON schema from scoring service');
       }
 
       return scoreData as QualityScore;
-
     } catch (error) {
       this.logger.error(`Failed to score note: ${error.message}`);
       // Fallback for failure

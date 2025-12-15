@@ -179,7 +179,7 @@ export function ProfilePage() {
                                                             {isResearch ? (
                                                                 <div className="flex items-center gap-2">
                                                                     <Badge variant="outline" className="px-1 py-0 h-5 font-mono text-[10px] text-muted-foreground border-border group-hover:border-primary/50 transition-colors">
-                                                                        ID: {researchId.slice(0, 5)}
+                                                                        ID: {(researchId as string).slice(0, 5)}
                                                                     </Badge>
                                                                     <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Research Analysis</span>
                                                                 </div>

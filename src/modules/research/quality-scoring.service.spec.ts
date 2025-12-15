@@ -27,19 +27,19 @@ describe('QualityScoringService', () => {
 
   it('should return a score and rarity for valid input', async () => {
     const mockReponse = {
-       answerMarkdown: JSON.stringify({
-         score: 85,
-         rarity: 'Rare',
-         details: {
-           riskRewardAnalysis: 8,
-           hallucinationCheck: 9,
-           insightDensity: 8,
-           comprehensive: 9,
-           reasoning: 'Good note.'
-         }
-       }),
-       models: ['gemini-2.5-flash-lite'],
-       provider: 'gemini', 
+      answerMarkdown: JSON.stringify({
+        score: 85,
+        rarity: 'Rare',
+        details: {
+          riskRewardAnalysis: 8,
+          hallucinationCheck: 9,
+          insightDensity: 8,
+          comprehensive: 9,
+          reasoning: 'Good note.',
+        },
+      }),
+      models: ['gemini-2.5-flash-lite'],
+      provider: 'gemini',
     };
 
     (llmService.generateResearch as jest.Mock).mockResolvedValue(mockReponse);
@@ -51,19 +51,19 @@ describe('QualityScoringService', () => {
 
   it('should handle Epic rarity', async () => {
     const mockReponse = {
-       answerMarkdown: JSON.stringify({
-         score: 90,
-         rarity: 'Epic',
-         details: {
-           riskRewardAnalysis: 9,
-           hallucinationCheck: 9,
-           insightDensity: 9,
-           comprehensive: 9,
-           reasoning: 'Epic note.'
-         }
-       }),
-       models: ['gemini-2.5-flash-lite'],
-       provider: 'gemini', 
+      answerMarkdown: JSON.stringify({
+        score: 90,
+        rarity: 'Epic',
+        details: {
+          riskRewardAnalysis: 9,
+          hallucinationCheck: 9,
+          insightDensity: 9,
+          comprehensive: 9,
+          reasoning: 'Epic note.',
+        },
+      }),
+      models: ['gemini-2.5-flash-lite'],
+      provider: 'gemini',
     };
 
     (llmService.generateResearch as jest.Mock).mockResolvedValue(mockReponse);
@@ -75,9 +75,10 @@ describe('QualityScoringService', () => {
 
   it('should handle loose JSON parsing from LLM', async () => {
     const mockReponse = {
-       answerMarkdown: "Here is the JSON: ```json\n{ \"score\": 40, \"rarity\": \"Common\", \"details\": { \"reasoning\": \"ok\" } }\n```",
-       models: [],
-       provider: 'gemini',
+      answerMarkdown:
+        'Here is the JSON: ```json\n{ "score": 40, "rarity": "Common", "details": { "reasoning": "ok" } }\n```',
+      models: [],
+      provider: 'gemini',
     };
 
     (llmService.generateResearch as jest.Mock).mockResolvedValue(mockReponse);
@@ -89,7 +90,9 @@ describe('QualityScoringService', () => {
   });
 
   it('should return fallback on error', async () => {
-    (llmService.generateResearch as jest.Mock).mockRejectedValue(new Error('LLM Failed'));
+    (llmService.generateResearch as jest.Mock).mockRejectedValue(
+      new Error('LLM Failed'),
+    );
 
     const result = await service.score('Fail me');
     expect(result.score).toBe(0);
