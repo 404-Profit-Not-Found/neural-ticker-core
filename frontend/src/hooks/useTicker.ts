@@ -213,7 +213,7 @@ export function useActiveResearchCount() {
             // Ideally backend supports status filtering, but we can fetch recent 20 and check.
             const res = await api.get('/research', { params: { limit: 20 } });
             const items = (res.data?.data || []) as { status: string }[];
-            return items.filter(i => i.status === 'processing' || i.status === 'pending').length;
+            return items.filter(i => i.status !== 'completed' && i.status !== 'failed').length;
         },
         refetchInterval: (query) => {
             const count = query.state.data as number | undefined;
