@@ -51,8 +51,8 @@ export function NewsFeed() {
                 if (res.data && res.data.id) {
                     setDigest(res.data);
                 }
-            } catch (e) {
-                console.error("Failed to fetch digest", e);
+            } catch {
+                console.error("Failed to load news");
             } finally {
                 setLoadingDigest(false);
             }
@@ -82,7 +82,7 @@ export function NewsFeed() {
             return date.toLocaleDateString(undefined, {
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
-        } catch (e) {
+        } catch {
             return 'Recently';
         }
     };
