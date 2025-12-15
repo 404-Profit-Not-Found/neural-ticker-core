@@ -31,6 +31,7 @@ export interface ResearchEvent {
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
+import { toonToJson } from 'toon-parser';
 
 @Injectable()
 export class ResearchService implements OnModuleInit {
@@ -397,7 +398,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
              Each object: { "firm": string, "analyst_name": string | null, "rating": "Buy"|"Hold"|"Sell", "price_target": number | null, "rating_date": "YYYY-MM-DD" }
              Extract only recent ratings mentioned.
 
-          Return a SINGLE JSON OBJECT structure:
+          Return a SINGLE JSON OBJECT structure (TOON format supported):
           {
             "financials": { ... },
             "ratings": [ ... ]
@@ -406,7 +407,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           Text:
           ${text.substring(0, 15000)}
           
-          JSON:`;
+          Output:`;
 
         const result = await this.llmService.generateResearch({
           question: extractionPrompt,
@@ -417,13 +418,28 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           maxTokens: 1000,
         });
 
-        let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
-        const start = jsonStr.indexOf('{');
-        const end = jsonStr.lastIndexOf('}');
+        try {
+          // Extract JSON-like block if wrapped in markdown or embedded
+          const jsonMatch = result.answerMarkdown.match(/\{[\s\S]*\}/);
+          const contentToParse = jsonMatch
+            ? jsonMatch[0]
+            : result.answerMarkdown;
 
-        if (start !== -1 && end !== -1) {
-          jsonStr = jsonStr.substring(start, end + 1);
-          const data = JSON.parse(jsonStr);
+          let data: any;
+          try {
+            data = toonToJson(contentToParse, { strict: false });
+          } catch (e) {
+            // Fallback to standard JSON parse if TOON fails
+            try {
+              data = JSON.parse(contentToParse);
+            } catch {
+              this.logger.warn(
+                `Failed to parse extracted data for ${ticker} via TOON or JSON`,
+                e,
+              );
+              continue; // Skip to next ticker or exit block
+            }
+          }
 
           if (data.financials) {
             await this.marketDataService.upsertFundamentals(
@@ -441,6 +457,8 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           }
 
           this.logger.log(`Extracted financials & ratings for ${ticker}`);
+        } catch (e) {
+          this.logger.warn(`Failed to parse extracted data for ${ticker}`, e);
         }
       } catch (e) {
         this.logger.warn(`Failed to extract financials for ${ticker}`, e);

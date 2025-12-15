@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
+import { toonToJson } from 'toon-parser';
 
 export interface QualityScore {
   score: number;
@@ -41,7 +42,7 @@ export class QualityScoringService {
       - Epic: 86-95 (Exceptional depth)
       - Legendary: 96-100 (World-class, actionable alpha)
 
-      RETURN JSON ONLY:
+      RETURN JSON object (TOON syntax allowed):
       {
         "score": number, // Weighted average, 1 decimal place allowed
         "rarity": "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary",
@@ -67,12 +68,23 @@ export class QualityScoringService {
         numericContext: {},
       });
 
+      // Extract JSON-like block if embedded in text
       const jsonMatch = result.answerMarkdown.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in scoring response');
-      }
+      const contentToParse = jsonMatch ? jsonMatch[0] : result.answerMarkdown;
 
-      const scoreData = JSON.parse(jsonMatch[0]);
+      let scoreData: any;
+      try {
+        scoreData = toonToJson(contentToParse, { strict: false });
+      } catch (e) {
+        // Fallback to standard JSON parse if TOON fails
+        try {
+          scoreData = JSON.parse(contentToParse);
+        } catch {
+          throw new Error(
+            `Failed to parse response as TOON or JSON: ${e.message}`,
+          );
+        }
+      }
 
       // Validate schema loosely
       if (typeof scoreData.score !== 'number' || !scoreData.rarity) {
