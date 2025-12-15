@@ -12,6 +12,15 @@ export class CreditService {
     return user ? user.credits_balance : 0;
   }
 
+  getModelCost(model?: string): number {
+    if (!model) return 1;
+    if (model.includes('deep') || model.includes('pro') || model.includes('gpt-5')) {
+      return 5;
+    }
+    // Specific check for flash light if needed, or default
+    return 1;
+  }
+
   async addCredits(
     userId: string,
     amount: number,

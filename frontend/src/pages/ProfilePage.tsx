@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
@@ -8,19 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
 import { useQuery } from '@tanstack/react-query'; // Added
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '../components/ui/table'; // Assuming Table components exist
 
 
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
+    const navigate = useNavigate();
     const [nickname, setNickname] = useState('');
     const [viewMode, setViewMode] = useState('PRO');
     const [theme, setTheme] = useState('g100');
@@ -109,34 +112,39 @@ export function ProfilePage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                             <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center p-4 bg-muted/30 rounded-lg border border-border">
-                                <div>
-                                    <Label className="text-muted-foreground">Current Tier</Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-2xl font-bold ${profile?.tier === 'pro' || profile?.tier === 'admin' ? 'text-purple-400' : 'text-foreground'}`}>
-                                            {profile?.tier ? profile.tier.toUpperCase() : 'FREE'}
-                                        </span>
-                                        {profile?.tier === 'free' && (
-                                            <Button variant="outline" size="sm" className="h-6 text-xs text-primary border-primary/50 hover:bg-primary/10">
-                                                Upgrade to PRO
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                                
-                                <div className="min-w-[150px]">
-                                    <Label className="text-muted-foreground">Credits Balance</Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                         <span className="text-3xl font-mono font-bold text-primary">
+                            <div className="flex flex-col gap-2 p-4 bg-muted/30 rounded-lg border border-border">
+                                <div className="flex items-center gap-4">
+                                    <Badge
+                                        variant="outline"
+                                        className={`text-lg px-3 py-1 font-bold ${profile?.tier === 'pro' || profile?.tier === 'admin'
+                                            ? 'border-purple-500 text-purple-500 uppercase'
+                                            : 'border-emerald-500 text-emerald-500 uppercase'
+                                            }`}
+                                    >
+                                        {profile?.tier ? profile.tier.toUpperCase() : 'FREE'}
+                                    </Badge>
+
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-3xl font-mono font-bold text-primary">
                                             {profile?.credits_balance ?? 0}
-                                         </span>
-                                         <span className="text-sm text-muted-foreground self-end mb-1">credits</span>
+                                        </span>
+                                        <span className="text-sm text-muted-foreground self-end mb-1">credits</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Refills monthly. Earn more by contributing.
-                                    </p>
+
+                                    {profile?.tier === 'free' && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs font-semibold text-purple-400 border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-300 ml-auto transition-all shadow-sm shadow-purple-500/10"
+                                        >
+                                            Upgrade to Pro
+                                        </Button>
+                                    )}
                                 </div>
-                             </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Refills monthly. Earn more by contributing.
+                                </p>
+                            </div>
 
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
@@ -152,20 +160,39 @@ export function ProfilePage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {profile?.credit_transactions?.slice(0, 10).map((tx) => (
-                                                <TableRow key={tx.id}>
-                                                    <TableCell className="text-xs tabular-nums text-muted-foreground">
-                                                        {new Date(tx.created_at).toLocaleDateString()}
-                                                    </TableCell>
-                                                    <TableCell className="text-sm">
-                                                        {tx.reason.replace('_', ' ')}
-                                                        {tx.metadata?.noteId && <span className="ml-2 text-xs opacity-50 text-sky-400">(Researcher)</span>}
-                                                    </TableCell>
-                                                    <TableCell className={`text-right font-mono font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                        {tx.amount > 0 ? '+' : ''}{tx.amount}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                            {profile?.credit_transactions?.slice(0, 10).map((tx) => {
+                                                const researchId = tx.metadata?.research_id || tx.metadata?.noteId;
+                                                const isResearch = (tx.reason === 'research_spend' || tx.metadata?.noteId) && !!researchId;
+
+                                                return (
+                                                    <TableRow
+                                                        key={tx.id}
+                                                        className={isResearch ? "cursor-pointer hover:bg-muted/50 transition-colors group" : ""}
+                                                        onClick={() => isResearch && navigate(`/research/${researchId}`)}
+                                                    >
+                                                        <TableCell className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                                                            {new Date(tx.created_at).toLocaleString(undefined, {
+                                                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm">
+                                                            {isResearch ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Badge variant="outline" className="px-1 py-0 h-5 font-mono text-[10px] text-muted-foreground border-border group-hover:border-primary/50 transition-colors">
+                                                                        ID: {researchId.slice(0, 5)}
+                                                                    </Badge>
+                                                                    <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Research Analysis</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="capitalize">{tx.reason.replace(/_/g, ' ')}</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className={`text-right font-mono font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {tx.amount > 0 ? '+' : ''}{tx.amount}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                             {(!profile?.credit_transactions || profile.credit_transactions.length === 0) && (
                                                 <TableRow>
                                                     <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">

@@ -30,7 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
 
-const RESEARCH_PENDING_GRACE_MS = 5000;
+const RESEARCH_PENDING_GRACE_MS = 45000;
 export function TickerDetail() {
     const { symbol, tab } = useParams();
     const navigate = useNavigate();
@@ -139,17 +139,17 @@ export function TickerDetail() {
     const shouldShowPlaceholder = localResearchRunning && !hasRemotePending && placeholderId && placeholderTimestamp;
     const placeholderEntry: ResearchItem | null = shouldShowPlaceholder
         ? {
-              id: placeholderId!,
-              created_at: placeholderTimestamp!,
-              status: 'processing',
-              title: 'Preparing research...',
-              user: { nickname: user?.nickname || user?.email || 'You' },
-              user_id: user?.id || undefined,
-              provider: 'gemini',
-              models_used: ['preparing'],
-              tokens_in: 0,
-              tokens_out: 0,
-          }
+            id: placeholderId!,
+            created_at: placeholderTimestamp!,
+            status: 'processing',
+            title: 'Preparing research...',
+            user: { nickname: user?.nickname || user?.email || 'You' },
+            user_id: user?.id || undefined,
+            provider: 'gemini',
+            models_used: ['preparing'],
+            tokens_in: 0,
+            tokens_out: 0,
+        }
         : null;
     const researchWithPlaceholder = placeholderEntry ? [placeholderEntry, ...researchList] : researchList;
 

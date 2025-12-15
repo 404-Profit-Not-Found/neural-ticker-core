@@ -13,6 +13,16 @@ export interface ModelOption {
 
 export const MODEL_OPTIONS: ModelOption[] = [
     {
+        key: 'gemini-2.5-flash-light',
+        label: 'Gemini 2.5 Flash Light',
+        provider: 'gemini',
+        quality: 'low',
+        speed: '≈4s',
+        accuracy: 'Efficient',
+        description: 'Ultra-fast and cost-effective for quick summaries.',
+        defaultQuestion: 'Give me a quick summary for {ticker}',
+    },
+    {
         key: 'gemini-2.5-flash',
         label: 'Gemini 2.5 Flash',
         provider: 'gemini',

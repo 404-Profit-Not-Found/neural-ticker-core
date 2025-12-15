@@ -47,7 +47,12 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
     const { user } = useAuth();
     const isPro = user?.tier === 'pro' || user?.role === 'admin';
 
-    const getModelCost = (quality: ModelTier) => quality === 'deep' ? 5 : 1;
+    const getModelCost = (key: string, quality: ModelTier) => {
+        if (key === 'gemini-2.5-flash-light') return 1;
+        if (key === 'gemini-2.5-flash') return 2;
+        if (key === 'gpt-4.1-mini') return 3;
+        return quality === 'deep' ? 5 : 1;
+    };
 
     // Reset selection if locked model was selected
     const handleModelSelect = (key: string) => {
@@ -82,7 +87,7 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {MODEL_OPTIONS.map((model) => {
                             const isLocked = model.quality === 'deep' && !isPro;
-                            const cost = getModelCost(model.quality);
+                            const cost = getModelCost(model.key, model.quality);
                             return (
                                 <div
                                     key={model.key}
@@ -125,13 +130,13 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
                                             ⚡ {cost} Credit{cost > 1 ? 's' : ''}
                                         </Badge>
                                     </div>
-                                    
+
                                     {isLocked && (
-                                         <div className="absolute inset-x-0 bottom-2 text-center">
+                                        <div className="absolute inset-x-0 bottom-2 text-center">
                                             <span className="text-[10px] font-bold text-purple-400 bg-background/80 px-2 py-0.5 rounded shadow-sm border border-purple-500/20">
                                                 Upgrade to Unlock
                                             </span>
-                                         </div>
+                                        </div>
                                     )}
                                 </div>
                             );
@@ -168,11 +173,11 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleRun} disabled={isAnalyzing} 
+                    <Button onClick={handleRun} disabled={isAnalyzing}
                         className={cn(
                             "min-w-[140px] gap-2 shadow-md transition-all hover:scale-105 active:scale-95",
-                            selectedModel.quality === 'deep' 
-                                ? "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/20" 
+                            selectedModel.quality === 'deep'
+                                ? "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/20"
                                 : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
                         )}
                     >

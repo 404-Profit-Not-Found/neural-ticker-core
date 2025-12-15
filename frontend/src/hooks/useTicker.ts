@@ -147,7 +147,9 @@ export function useTickerResearch(symbol?: string) {
         enabled: !!symbol,
         staleTime: 0, 
         refetchInterval: (query) => {
-            const data = query.state.data as Array<{ status: string }>;
+            const data = query.state.data as Array<{ status: string }> | undefined;
+            // If data is not yet available (initial load), we might want to poll briefly or wait.
+            // But if we have data, check statuses.
             if (data?.some((item) => item.status === 'processing' || item.status === 'pending')) {
                 return 3000; // Poll every 3s if analysis is in progress
             }
@@ -172,6 +174,8 @@ export function useTriggerResearch() {
             // We might want to invalidate, but polling is usually manual or requires specialized logic.
             // For now, simpler to just return the ticket ID.
             queryClient.invalidateQueries({ queryKey: tickerKeys.research(variables.symbol) });
+            // FORCE UPDATE GLOBAL INDICATOR
+            queryClient.invalidateQueries({ queryKey: ['research', 'active-count'] });
         }
     });
 }
@@ -198,5 +202,26 @@ export function useUpdateResearchTitle() {
         onSuccess: () => {
              queryClient.invalidateQueries({ queryKey: tickerKeys.all });
         }
+    });
+}
+
+export function useActiveResearchCount() {
+    return useQuery({
+        queryKey: ['research', 'active-count'],
+        queryFn: async () => {
+            // Fetch recent research to check status
+            // Ideally backend supports status filtering, but we can fetch recent 20 and check.
+            const res = await api.get('/research', { params: { limit: 20 } });
+            const items = (res.data?.data || []) as { status: string }[];
+            return items.filter(i => i.status === 'processing' || i.status === 'pending').length;
+        },
+        refetchInterval: (query) => {
+            const count = query.state.data as number | undefined;
+            if (count && count > 0) {
+                return 3000; // Poll actively if we have active items
+            }
+            return 10000; // Poll less frequently if idle, to catch new starts from other tabs
+        },
+        staleTime: 0,
     });
 }

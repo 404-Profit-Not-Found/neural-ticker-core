@@ -152,8 +152,8 @@ export function AdminConsole() {
             setCreditAmount(1);
             await loadData();
         } catch (err: unknown) {
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             alert((err as any).response?.data?.message || 'Failed to gift credits');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert((err as any).response?.data?.message || 'Failed to gift credits');
         }
     };
 
@@ -342,13 +342,13 @@ export function AdminConsole() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={item.role === 'admin' ? 'outline' : 'secondary'} className={item.role === 'admin' ? 'border-amber-400 text-amber-400' : 'text-emerald-500 bg-emerald-500/10'}>
-                                                            {item.role || 'GUEST'}
+                                                        <Badge variant="outline" className={item.role === 'admin' ? 'border-amber-400 text-amber-400 lowercase' : 'border-emerald-500 text-emerald-500 lowercase'}>
+                                                            {(item.role || 'guest').toLowerCase()}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={item.tier === 'pro' ? 'outline' : 'secondary'} className={item.tier === 'pro' ? 'border-purple-500 text-purple-500 uppercase' : 'text-emerald-500 bg-emerald-500/10 uppercase'}>
-                                                            {item.tier || 'FREE'}
+                                                        <Badge variant="outline" className={item.tier === 'pro' ? 'border-purple-500 text-purple-500 uppercase' : 'border-emerald-500 text-emerald-500 uppercase'}>
+                                                            {(item.tier || 'free').toUpperCase()}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="font-mono text-sm">
@@ -445,8 +445,8 @@ export function AdminConsole() {
                                                         <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
                                                     </div>
                                                 </div>
-                                                <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px] h-5">
-                                                    {item.role || 'GUEST'}
+                                                <Badge variant="outline" className={`lowercase text-[10px] h-5 ${item.role === 'admin' ? 'border-amber-400 text-amber-400' : 'border-emerald-500 text-emerald-500'}`}>
+                                                    {(item.role || 'guest').toLowerCase()}
                                                 </Badge>
                                             </div>
 
@@ -469,7 +469,7 @@ export function AdminConsole() {
 
                                             {/* Actions */}
                                             {(item.status === 'WAITLIST' || !isTargetAdmin) && (
-                                                 <div className="flex items-center justify-end gap-2 pt-1">
+                                                <div className="flex items-center justify-end gap-2 pt-1">
                                                     {item.status === 'WAITLIST' && (
                                                         <Button
                                                             onClick={() => handleApprove(item.email)}
@@ -568,8 +568,8 @@ export function AdminConsole() {
                 </div>
             </Dialog>
 
-             {/* Credit Gift Modal */}
-             <Dialog open={isCreditModalOpen} onOpenChange={setIsCreditModalOpen}>
+            {/* Credit Gift Modal */}
+            <Dialog open={isCreditModalOpen} onOpenChange={setIsCreditModalOpen}>
                 <div className="flex flex-col gap-4">
                     <DialogHeader>
                         <DialogTitle>Gift Credits</DialogTitle>
@@ -589,7 +589,7 @@ export function AdminConsole() {
                                 required
                             />
                         </div>
-                         <div className="space-y-2">
+                        <div className="space-y-2">
                             <label className="text-sm font-medium">Reason</label>
                             <Input
                                 type="text"

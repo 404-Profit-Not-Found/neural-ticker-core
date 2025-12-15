@@ -25,6 +25,7 @@ export interface SocialComment {
         nickname?: string;
         name?: string;
         avatar_url?: string;
+        tier?: string; // Added tier
     };
     created_at: string;
     content: string;

@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, User as UserIcon, Shield, Menu, X } from 'lucide-react';
+import { Bell, User as UserIcon, Shield, Menu, X, Brain } from 'lucide-react';
 import { api } from '../../lib/api';
+import { Badge } from '../ui/badge';
+import { useActiveResearchCount } from '../../hooks/useTicker';
 
 
 interface Notification {
@@ -36,6 +38,24 @@ function useUnreadNotifications(isAuthenticated: boolean) {
   return { unreadCount: unreadCount || 0, check: refetch };
 }
 
+interface ActiveResearchIndicatorProps {
+  count: number;
+}
+
+function ActiveResearchIndicator({ count }: ActiveResearchIndicatorProps) {
+  if (count <= 0) return null;
+
+  return (
+    <div className="relative flex items-center justify-center w-8 h-8">
+      <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
+      <Brain className="w-5 h-5 text-purple-500 animate-pulse" />
+      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background z-10">
+        {count}
+      </span>
+    </div>
+  );
+}
+
 export function Header() {
   const { user, logout } = useAuth();
   // const isAuthenticated = !!user; // Unused
@@ -46,7 +66,19 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  // Lifted state to synchronize notifications
+  const { data: researchCount = 0 } = useActiveResearchCount();
+  const prevResearchCount = useRef(researchCount);
+
   const { unreadCount, check: refreshNotifications } = useUnreadNotifications(!!user);
+
+  // Sync: When research finishes (count drops to 0), immediately check for new notifications (e.g. "Research Complete")
+  useEffect(() => {
+    if (prevResearchCount.current > 0 && researchCount === 0) {
+      refreshNotifications();
+    }
+    prevResearchCount.current = researchCount;
+  }, [researchCount, refreshNotifications]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -162,15 +194,18 @@ export function Header() {
         {/* Right: alerts + profile */}
         <div className="flex items-center gap-4">
 
+          {/* Active Research Indicator */}
+          <ActiveResearchIndicator count={researchCount} />
+
           {/* Notifications Trigger */}
           <div className="relative">
             <button
-              className={`text-muted-foreground hover:text-foreground transition-colors relative ${notificationsMenuOpen ? 'text-foreground' : ''}`}
+              className={`flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors relative ${notificationsMenuOpen ? 'text-foreground' : ''}`}
               onClick={toggleNotifications}
             >
               <Bell size={20} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background">
                   {unreadCount}
                 </span>
               )}
@@ -257,8 +292,17 @@ export function Header() {
                 }`}
             >
               <div className="p-4 border-b border-border">
-                <p className="font-semibold text-foreground">
+                <p className="font-semibold text-foreground flex items-center gap-2">
                   {user?.nickname || 'Trader'}
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] h-5 px-1.5 ${(user?.tier === 'pro' || user?.tier === 'admin')
+                      ? 'border-purple-500 text-purple-500 uppercase'
+                      : 'border-emerald-500 text-emerald-500 uppercase'
+                      }`}
+                  >
+                    {(user?.tier || 'free').toUpperCase()}
+                  </Badge>
                 </p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
@@ -270,7 +314,7 @@ export function Header() {
                   className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
                 >
                   <UserIcon size={16} />
-              My Profile
+                  My Profile
                 </button>
                 {user && user.role === 'admin' && (
                   <button
@@ -317,7 +361,7 @@ export function Header() {
             className="w-full flex items-center gap-3 px-4 py-3 text-base text-left text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           >
             <UserIcon size={18} />
-          My Profile
+            My Profile
           </button>
         </div>
       )}

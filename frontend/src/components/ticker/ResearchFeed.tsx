@@ -63,70 +63,93 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     return (
         <Card className="h-full flex flex-col overflow-hidden">
             <CardHeader className="py-3 px-3 md:py-4 md:px-4 border-b border-border bg-muted/10">
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
-                            <Brain className="w-4 h-4 text-primary" />
-                            <span className="hidden xs:inline">AI Research History</span>
-                            <span className="xs:hidden">History</span>
-                        </CardTitle>
-                        <div className="flex flex-col gap-2 items-end">
-                            <div className="flex gap-1.5 md:gap-2">
-                                <UploadResearchDialog
-                                    defaultTicker={defaultTicker}
-                                    trigger={
-                                        <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
-                                            <Upload size={16} /> <span className="hidden md:inline">Upload</span>
-                                        </Button>
-                                    }
-                                />
-                                <RunAnalysisDialog
-                                    onTrigger={onTrigger}
-                                    isAnalyzing={isAnalyzing}
-                                    defaultTicker={defaultTicker}
-                                    trigger={
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
+                        <Brain className="w-4 h-4 text-primary" />
+                        <span className="hidden xs:inline">AI Research History</span>
+                        <span className="xs:hidden">History</span>
+                    </CardTitle>
+                    <div className="flex flex-col gap-2 items-end">
+                        <div className="flex gap-1.5 md:gap-2">
+                            <UploadResearchDialog
+                                defaultTicker={defaultTicker}
+                                trigger={
+                                    <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
+                                        <Upload size={16} /> <span className="hidden md:inline">Upload</span>
+                                    </Button>
+                                }
+                            />
+                            {(() => {
+                                const hasCredits = (user?.credits_balance ?? 0) > 0;
+                                const isLocked = !hasCredits;
+
+                                const ResearchButton = (
+                                    <div className="relative group/research-btn">
                                         <Button
                                             size="sm"
-                                            className="gap-2 px-4 text-sm h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border border-transparent"
-                                            disabled={isAnalyzing}
+                                            className={`gap-2 px-4 text-sm h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border border-transparent ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                                                }`}
+                                            disabled={isAnalyzing || isLocked}
+                                            // Prevent click propagation if locked, just in case
+                                            onClick={(e) => isLocked && e.stopPropagation()}
                                         >
                                             <Bot size={16} />
                                             <span className="font-semibold">Research</span>
                                         </Button>
-                                    }
-                                />
-                                {defaultTicker && (
-                                    <Button
-                                        variant="outline"
-                                        className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
-                                        disabled={isSyncing}
-                                        onClick={async () => {
-                                            if (isSyncing) return;
-                                            try {
-                                                setIsSyncing(true);
-                                                await api.post(`/research/sync/${defaultTicker}`);
-                                                // Refresh local data after sync
-                                                queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
-                                                queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
-                                            } catch (err) {
-                                                console.error('Sync failed', err);
-                                            } finally {
-                                                setIsSyncing(false);
-                                            }
-                                        }}
-                                    >
-                                        {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
-                                        <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-                                    </Button>
-                                )}
-                            </div>
-                            {isAnalyzing && (
-                                <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Research in progress · Avg time ~{AVERAGE_RESEARCH_DURATION_LABEL}</span>
-                                </div>
+                                        {isLocked && (
+                                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-lg border hidden group-hover/research-btn:block whitespace-nowrap z-50">
+                                                Insufficient Credits
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+
+                                if (isLocked) {
+                                    return ResearchButton;
+                                }
+
+                                return (
+                                    <RunAnalysisDialog
+                                        onTrigger={onTrigger}
+                                        isAnalyzing={isAnalyzing}
+                                        defaultTicker={defaultTicker}
+                                        trigger={ResearchButton}
+                                    />
+                                );
+                            })()}
+                            {defaultTicker && (
+                                <Button
+                                    variant="outline"
+                                    className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
+                                    disabled={isSyncing}
+                                    onClick={async () => {
+                                        if (isSyncing) return;
+                                        try {
+                                            setIsSyncing(true);
+                                            await api.post(`/research/sync/${defaultTicker}`);
+                                            // Refresh local data after sync
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
+                                        } catch (err) {
+                                            console.error('Sync failed', err);
+                                        } finally {
+                                            setIsSyncing(false);
+                                        }
+                                    }}
+                                >
+                                    {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
+                                    <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+                                </Button>
                             )}
                         </div>
+                        {isAnalyzing && (
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Research in progress · Avg time ~{AVERAGE_RESEARCH_DURATION_LABEL}</span>
+                            </div>
+                        )}
                     </div>
+                </div>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-y-auto">
                 <div className="divide-y divide-border/50">
@@ -144,11 +167,12 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                             const hasTokens = tokensTotal > 0;
                             const completionLabel = formatTimestamp(completionTimestamp);
 
+                            const isPending = item.status === 'processing' || item.status === 'pending';
                             return (
                                 <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                                     <div
-                                        className="p-3 md:p-4 cursor-pointer flex items-center justify-between group"
-                                        onClick={() => navigate(`/research/${item.id}`)}
+                                        className={`p-3 md:p-4 flex items-center justify-between group ${isPending ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                        onClick={() => !isPending && navigate(`/research/${item.id}`)}
                                     >
                                         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                                             <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
@@ -252,7 +276,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                     <Trash2 size={14} />
                                                 </Button>
                                             )}
-                                            {!editingId && (
+                                            {!editingId && !isPending && (
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground group-hover:text-foreground hidden md:inline-flex">
                                                     <ChevronRight size={16} />
                                                 </Button>

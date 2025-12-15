@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -27,7 +27,7 @@ export interface ResearchEvent {
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
-export class ResearchService {
+export class ResearchService implements OnModuleInit {
   private readonly logger = new Logger(ResearchService.name);
   private client: GoogleGenAI;
   // Using the model user requested, note: this model ID might change
@@ -619,21 +619,31 @@ Title:`;
     };
   }
 
+  async onModuleInit() {
+    // On startup, any ticket still "processing" is a zombie from a previous crash/restart.
+    // In a single-instance environment, we should fail them to clear the UI.
+    await this.failStuckTickets(0);
+  }
+
   async failStuckTickets(staleMinutes: number = 20): Promise<number> {
     const threshold = new Date(Date.now() - staleMinutes * 60 * 1000);
+    
+    // If staleMinutes is 0, we want to clear ALL processing tickets (e.g. on startup)
+    const where: any = {
+      status: ResearchStatus.PROCESSING,
+    };
 
-    const stuckNotes = await this.noteRepo.find({
-      where: {
-        status: ResearchStatus.PROCESSING,
-        updated_at: LessThan(threshold),
-      },
-    });
+    if (staleMinutes > 0) {
+      where.updated_at = LessThan(threshold);
+    }
+
+    const stuckNotes = await this.noteRepo.find({ where });
 
     if (stuckNotes.length === 0) return 0;
 
     for (const note of stuckNotes) {
       note.status = ResearchStatus.FAILED;
-      note.error = 'Timeout: Research stuck in processing state.';
+      note.error = 'System Restart: Research interrupted.';
       await this.noteRepo.save(note);
     }
 

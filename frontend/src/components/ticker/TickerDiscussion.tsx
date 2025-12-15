@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '../ui/badge';
 import { useAuth } from '../../context/AuthContext';
 import type { SocialComment } from '../../types/ticker';
 
@@ -55,6 +56,15 @@ export function TickerDiscussion({ comments, onPostComment, isPosting }: TickerD
                                                 <span className="font-semibold text-sm text-foreground">
                                                     {comment.user?.nickname || comment.user?.email?.split('@')[0] || 'Anonymous'}
                                                 </span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`text-[9px] h-4 px-1 ${(comment.user?.tier === 'pro' || (comment.user as any)?.role === 'admin')
+                                                            ? 'border-purple-500 text-purple-500 uppercase'
+                                                            : 'border-emerald-500 text-emerald-500 uppercase'
+                                                        }`}
+                                                >
+                                                    {(comment.user?.tier || 'free').toUpperCase()}
+                                                </Badge>
                                                 <span className="text-xs text-muted-foreground">•</span>
                                                 <span className="text-xs text-muted-foreground">
                                                     {new Date(comment.created_at).toLocaleDateString()}
