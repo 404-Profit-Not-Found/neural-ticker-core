@@ -4,9 +4,10 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany, // Added
+  OneToMany,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { CreditTransaction } from './credit-transaction.entity';
 
 @Entity('users')
 export class User {
@@ -29,6 +30,21 @@ export class User {
   @ApiProperty({ enum: ['user', 'admin', 'waitlist'], default: 'user' })
   @Column({ default: 'user' })
   role: string;
+
+  @ApiProperty({ enum: ['free', 'pro'], default: 'free' })
+  @Column({ type: 'text', default: 'free' })
+  tier: 'free' | 'pro';
+
+  @ApiProperty({ default: 10 })
+  @Column({ type: 'int', default: 10 })
+  credits_balance: number;
+
+  @ApiProperty()
+  @Column({ type: 'timestamptz', nullable: true })
+  credits_reset_at: Date;
+
+  @OneToMany(() => CreditTransaction, (tx) => tx.user)
+  credit_transactions: CreditTransaction[];
 
   @ApiProperty({ example: 'https://lh3.googleusercontent.com/...' })
   @Column({ nullable: true })

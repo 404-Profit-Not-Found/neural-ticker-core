@@ -94,7 +94,7 @@ export function TickerDetail() {
             <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6">
 
                 {/* --- 1. HERO HEADER --- */}
-                <div className="relative z-[999] space-y-4 pb-4 md:pb-6">
+                <div className="relative z-30 space-y-4 pb-4 md:pb-6">
                     {/* Top Row: Back + Logo + Symbol/Name + Price + Risk (Desktop: all left-aligned) */}
                     <div className="flex items-start md:items-center gap-3 md:gap-4">
                         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 md:mt-0">

@@ -22,7 +22,7 @@ import { api, httpClient } from './lib/api';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading Neural Terminal...</div>;
+  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading NeuralTicker...</div>;
 
   if (!user) {
     // Redirect to internal login page instead of auto-redirecting to Google

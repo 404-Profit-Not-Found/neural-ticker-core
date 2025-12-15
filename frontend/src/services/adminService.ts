@@ -97,4 +97,29 @@ export const AdminService = {
       throw error;
     }
   },
+
+  updateTier: async (userId: string, tier: 'free' | 'pro') => {
+    try {
+      const { data } = await api.patch<User>(`/admin/users/${userId}/tier`, {
+        tier,
+      });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
+  giftCredits: async (userId: string, amount: number, reason: string) => {
+    try {
+      const { data } = await api.post<User>(`/admin/users/${userId}/credits`, {
+        amount,
+        reason,
+      });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
 };

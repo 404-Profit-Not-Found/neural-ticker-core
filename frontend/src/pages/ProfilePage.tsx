@@ -2,11 +2,22 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
-import { Settings, User, Save, Shield, Eye } from 'lucide-react';
+import { UserService } from '../services/userService'; // Added
+import { Settings, User, Save, Shield, Eye, CreditCard, History } from 'lucide-react'; // Added icons
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { useQuery } from '@tanstack/react-query'; // Added
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table'; // Assuming Table components exist
+
 
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
@@ -39,6 +50,14 @@ export function ProfilePage() {
             setTheme(user.theme || 'g100');
         }
     }, [user]);
+
+    // Fetch Full Profile including credits
+    const { data: profile } = useQuery({
+        queryKey: ['userProfile', user?.id],
+        queryFn: UserService.getProfile,
+        enabled: !!user?.id,
+    });
+
 
     const handleSave = async () => {
         setSaving(true);
@@ -78,6 +97,89 @@ export function ProfilePage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Membership & Credits (Full Width on Desktop or 1st in Grid?) Let's put it on top if grid-cols-1 */}
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <CreditCard className="text-primary" size={20} />
+                                Membership & Credits
+                            </CardTitle>
+                            <CardDescription>
+                                Your Pro status and research credits
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                             <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center p-4 bg-muted/30 rounded-lg border border-border">
+                                <div>
+                                    <Label className="text-muted-foreground">Current Tier</Label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-2xl font-bold ${profile?.tier === 'pro' || profile?.tier === 'admin' ? 'text-purple-400' : 'text-foreground'}`}>
+                                            {profile?.tier ? profile.tier.toUpperCase() : 'FREE'}
+                                        </span>
+                                        {profile?.tier === 'free' && (
+                                            <Button variant="outline" size="sm" className="h-6 text-xs text-primary border-primary/50 hover:bg-primary/10">
+                                                Upgrade to PRO
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="min-w-[150px]">
+                                    <Label className="text-muted-foreground">Credits Balance</Label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                         <span className="text-3xl font-mono font-bold text-primary">
+                                            {profile?.credits_balance ?? 0}
+                                         </span>
+                                         <span className="text-sm text-muted-foreground self-end mb-1">credits</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Refills monthly. Earn more by contributing.
+                                    </p>
+                                </div>
+                             </div>
+
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <History size={16} /> Transaction History
+                                </Label>
+                                <div className="border rounded-md overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Action</TableHead>
+                                                <TableHead className="text-right">Amount</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {profile?.credit_transactions?.slice(0, 10).map((tx) => (
+                                                <TableRow key={tx.id}>
+                                                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                                                        {new Date(tx.created_at).toLocaleDateString()}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">
+                                                        {tx.reason.replace('_', ' ')}
+                                                        {tx.metadata?.noteId && <span className="ml-2 text-xs opacity-50 text-sky-400">(Researcher)</span>}
+                                                    </TableCell>
+                                                    <TableCell className={`text-right font-mono font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                        {tx.amount > 0 ? '+' : ''}{tx.amount}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {(!profile?.credit_transactions || profile.credit_transactions.length === 0) && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                                                        No transactions yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Public Profile Settings */}
                     <Card>
                         <CardHeader>

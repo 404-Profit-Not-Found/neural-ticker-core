@@ -109,6 +109,14 @@ export class ResearchNote {
   @Column({ type: 'uuid', nullable: true })
   user_id: string;
 
+  @ApiProperty({ example: 85, description: 'Universal Quality Score (0-100)' })
+  @Column({ type: 'integer', nullable: true })
+  quality_score: number | null;
+
+  @ApiProperty({ example: 'Purple', description: 'Rarity Tier based on score' })
+  @Column({ type: 'text', nullable: true })
+  rarity: string | null;
+
   @ManyToOne('User', 'research_notes', { eager: true, nullable: true }) // eager: true to always fetch author
   @JoinColumn({ name: 'user_id' })
   user: any;

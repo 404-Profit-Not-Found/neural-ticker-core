@@ -23,6 +23,16 @@ export const MODEL_OPTIONS: ModelOption[] = [
         defaultQuestion: 'Give me a concise but detailed analysis for {ticker}',
     },
     {
+        key: 'gpt-4.1-mini',
+        label: 'GPT-4.1 Mini',
+        provider: 'openai',
+        quality: 'medium',
+        speed: '≈11s',
+        accuracy: 'Balanced',
+        description: 'Balanced speed vs. thoroughness for routine updates.',
+        defaultQuestion: 'Summarize the latest investment view on {ticker}.',
+    },
+    {
         key: 'gemini-2.5-pro',
         label: 'Gemini 2.5 Pro',
         provider: 'gemini',
@@ -41,15 +51,5 @@ export const MODEL_OPTIONS: ModelOption[] = [
         accuracy: 'High precision',
         description: 'OpenAI flagship for detailed thesis generation.',
         defaultQuestion: 'Generate a high-precision research brief for {ticker}.',
-    },
-    {
-        key: 'gpt-4.1-mini',
-        label: 'GPT-4.1 Mini',
-        provider: 'openai',
-        quality: 'medium',
-        speed: '≈11s',
-        accuracy: 'Balanced',
-        description: 'Balanced speed vs. thoroughness for routine updates.',
-        defaultQuestion: 'Summarize the latest investment view on {ticker}.',
     },
 ];

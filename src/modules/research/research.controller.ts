@@ -10,9 +10,11 @@ import {
   Delete,
   Sse,
   MessageEvent,
+  UseGuards, // Added
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { CreditGuard } from './guards/credit.guard'; // Added
 import {
   ApiTags,
   ApiOperation,
@@ -185,6 +187,7 @@ export class ResearchController {
     status: 401,
     description: 'Unauthorized. Bearer token missing or invalid.',
   })
+  @UseGuards(CreditGuard)
   @Post('ask')
   async ask(@Request() req: any, @Body() dto: AskResearchDto) {
     const userId = req.user.id;

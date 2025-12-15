@@ -5,14 +5,14 @@ The `Neural-Ticker` project implements a sophisticated multi-stage research pipe
 
 ## Core Components
 
-### 1. Research Orchestrator ([ResearchService](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/src/modules/research/research.service.ts#28-832))
+### 1. Research Orchestrator (`ResearchService`)
 The central hub for all research activities. It is responsible for:
 - **Context Gathering**: Fetching real-time market data, risk scores, and technical indicators before calling the LLM.
 - **Prompt Engineering**: Dynamic construction of prompts based on the task (Deep Dive, News Digest, Extraction).
 - **Lifecycle Management**: Handling the state of research tickets (PENDING -> PROCESSING -> COMPLETED/FAILED).
 - **Post-Processing**: Triggering financial extraction and risk scoring updates after the text generation is complete.
 
-### 2. LLM Gateway ([LlmService](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/src/modules/llm/llm.service.ts#8-86))
+### 2. LLM Gateway (`LlmService`)
 An abstraction layer that normalizes interactions with different AI providers.
 - **Providers**: 'openai', 'gemini', 'ensemble'.
 - **Ensemble Mode**: Runs multiple models in parallel and combines their outputs for higher confidence.
@@ -20,7 +20,7 @@ An abstraction layer that normalizes interactions with different AI providers.
 
 ## Research Workflows
 
-### Standard Research Flow ([processTicket](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/src/modules/research/research.service.ts#100-251))
+### Standard Research Flow (`processTicket`)
 This is the primary background job for analyzing tickers.
 
 ```mermaid
@@ -30,11 +30,12 @@ graph TD
     B -->|Risk Model| D[Fetch Risk Scores]
     C --> E[Context Object]
     D --> E
-    E --> F[Construct Prompt]
+    E --> E1[Sanitize & Optimize with toon-parser]
+    E1 --> F[Construct Prompt]
     subgraph Prompt Construction
     F --> F1[User Question]
     F --> F2[Data Requirements]
-    F --> F3[Numeric Context]
+    F --> F3[Optimized Numeric Context]
     end
     F --> G[Call LLM Service]
     G --> H{Provider?}
@@ -118,7 +119,7 @@ graph LR
     B --> C[LLM Generation]
     C --> D[Raw JSON String]
     D --> E[Regex Cleaner]
-    E --> F[JSON.parse()]
+    E --> F["JSON.parse()"]
     F --> G{Valid Structure?}
     G -->|Yes| H[Upsert Database]
     G -->|No| I[Log Warning & Skip]
@@ -130,16 +131,23 @@ Generates a "Bloomberg Terminal" style briefing.
 - **Formatting**: Enforces specific markdown links `[SYMBOL](/ticker/SYMBOL)` for frontend navigation.
 
 ## Validation & resilience
-1.  **Context Sanitization**: [LlmService](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/src/modules/llm/llm.service.ts#8-86) sanitizes the numeric context object (removing functions/Dates) before passing it to `toon-parser` to prevent crashes.
+1.  **Context Sanitization**: `LlmService` sanitizes the numeric context object (removing functions/Dates) before passing it to `toon-parser` to prevent crashes.
 2.  **Ensemble Fallback**: The `ensemble` provider throws an error only if *all* sub-providers fail. If one succeeds, it returns partial results.
-3.  **Stuck Ticket Cleanup**: [failStuckTickets](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/src/modules/research/research.service.ts#521-542) (Cron-like) actively monitors and fails tickets stuck in `PROCESSING` for > 20 minutes.
+3.  **Stuck Ticket Cleanup**: `failStuckTickets` (Cron-like) actively monitors and fails tickets stuck in `PROCESSING` for > 20 minutes.
 4.  **Error Handling**: All major LLM interactions are wrapped in try-catch blocks that log errors and update the ticket status to `FAILED` with a descriptive error message.
 
 ### Models Used
-- **LlmService** abstracts multiple providers:
-  - **OpenAI** – `gpt-4o` (high‑quality), `gpt-3.5-turbo` (fast fallback).
-  - **Gemini** – `gemini-1.5-pro` (Google GenAI).
-  - **Ensemble** – runs both OpenAI and Gemini in parallel and merges results for higher confidence.
+`LlmService` abstracts multiple providers with quality tiers:
+
+| Tier | OpenAI | Gemini | Use Case |
+| :--- | :--- | :--- | :--- |
+| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` | Quick sentiment, simple extraction |
+| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
+| **Deep** | `gpt-5.1` | `gemini-2.5-pro` | 10-K analysis, thesis generation |
+
+**Ensemble Mode**: Runs both OpenAI and Gemini in parallel and merges results for higher confidence.
+
+**Deep Research Agent**: `gemini-2.5-pro` (Google GenAI) for autonomous multi-minute investigations with streaming.
 
 ### Prompt Examples
 #### Research Prompt (primary LLM)
@@ -178,8 +186,8 @@ Return only the JSON object, no extra text.
 - **Coverage** – target >90 % for LLM‑related modules.
 
 ### References
-- [README.md](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/README.md)
-- [Toon Migration Plan (resolved)](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/toon_migration_plan.md.resolved)
-- [Research Analysis Plan](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/plans/research-analysis.md)
-- [Implementation Plan](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/plans/implementation_plan.md)
-- [Toon Migration Plan](file:///c:/Users/brani/Documents/GitHub/neural-ticker-core/plans/toon_migration_plan.md)
+- `README.md`
+- `toon_migration_plan.md.resolved`
+- `plans/research-analysis.md`
+- `plans/implementation_plan.md`
+- `plans/toon_migration_plan.md`

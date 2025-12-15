@@ -2,22 +2,25 @@ import * as React from "react"
 import { X } from "lucide-react"
 import { cn } from "../../lib/utils"
 
+import { createPortal } from "react-dom"
+
 const Dialog = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement> & { open?: boolean; onOpenChange?: (open: boolean) => void }
 >(({ className, children, open, onOpenChange, ...props }, ref) => {
     if (!open) return null
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" {...props}>
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6" {...props}>
             <div
                 className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-all duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in"
                 onClick={() => onOpenChange?.(false)}
             />
             <div
                 ref={ref}
+                style={{ backgroundColor: '#09090b' }}
                 className={cn(
-                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-card p-6 text-left shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-2xl sm:slide-in-from-bottom-0 sm:zoom-in-95 data-[state=open]:fade-in-0",
+                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-zinc-950 p-6 text-left shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-2xl sm:slide-in-from-bottom-0 sm:zoom-in-95 data-[state=open]:fade-in-0",
                     className
                 )}
             >
@@ -30,7 +33,8 @@ const Dialog = React.forwardRef<
                     <span className="sr-only">Close</span>
                 </button>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 })
 Dialog.displayName = "Dialog"

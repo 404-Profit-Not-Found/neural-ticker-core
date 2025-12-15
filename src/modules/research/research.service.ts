@@ -11,6 +11,7 @@ import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
+import { CreditService } from '../users/credit.service'; // Added
 import { WatchlistService } from '../watchlist/watchlist.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
@@ -42,6 +43,7 @@ export class ResearchService {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly watchlistService: WatchlistService,
+    private readonly creditService: CreditService, // Added
   ) {
     const apiKey = this.config.get<string>('gemini.apiKey');
     if (apiKey) {
@@ -77,6 +79,7 @@ export class ResearchService {
     title: string,
     content: string,
   ): Promise<ResearchNote> {
+    // 1. Create Note
     const note = this.noteRepo.create({
       request_id: uuidv4(),
       tickers,
@@ -90,7 +93,105 @@ export class ResearchService {
       numeric_context: {},
       models_used: [],
     });
+
+    // 2. Judge Quality (Universal Judge)
+    try {
+      const judgment = await this.judgeResearchQuality(content, tickers);
+      note.quality_score = judgment.score;
+      note.rarity = judgment.rarity;
+      note.grounding_metadata = { judgment_reasoning: judgment.reasoning };
+
+      // 3. Reward Credits if applicable
+      const rewardMap: Record<string, number> = {
+        White: 1,
+        Green: 3,
+        Blue: 5,
+        Purple: 10,
+        Gold: 25,
+      };
+
+      const reward = rewardMap[judgment.rarity] || 0;
+      if (reward > 0) {
+        await this.creditService.addCredits(
+          userId,
+          reward,
+          'manual_contribution',
+          { noteId: note.request_id, rarity: judgment.rarity, score: judgment.score }
+        );
+      }
+    } catch (e) {
+      this.logger.warn('Failed to judge manual note', e);
+      // Don't fail the upload just because judging failed
+    }
+
     return this.noteRepo.save(note);
+  }
+
+  /**
+   * Universal Judge: Scores research text 0-100 and assigns Rarity Tier.
+   * Model: gemini-2.5-flash-lite (Fast & Cheap)
+   */
+  async judgeResearchQuality(
+    text: string,
+    tickers: string[],
+  ): Promise<{ score: number; rarity: string; reasoning: string }> {
+    const prompt = `
+      ROLE: Research Quality Judge.
+      TASK: Grade the following financial research note on ${tickers.join(', ')}.
+      
+      RUBRIC (0-100):
+      1. Structure (30pts): Headers, clear sections, readable?
+      2. Depth (30pts): Unique insights, specific data points (not just fluff)?
+      3. Accuracy (20pts): Cites numbers, looks plausible?
+      4. Insight (20pts): "A-ha" moment or novel synthesis?
+      
+      RARITY TIERS:
+      - 0-20: Gray (Spam/Low Effort)
+      - 21-40: White (Basic)
+      - 41-60: Green (Good)
+      - 61-80: Blue (Excellent)
+      - 81-95: Purple (Elite)
+      - 96-100: Gold (Legendary)
+      
+      INPUT TEXT:
+      ${text.substring(0, 8000)}
+      
+      OUTPUT JSON ONLY:
+      {
+        "score": number,
+        "rarity": "Gray" | "White" | "Green" | "Blue" | "Purple" | "Gold",
+        "reasoning": "Short explanation of score"
+      }
+    `;
+
+    try {
+      const result = await this.llmService.generateResearch({
+        question: prompt,
+        tickers: [],
+        numericContext: {},
+        quality: 'low' as QualityTier, // Flash-lite
+        provider: 'gemini',
+        maxTokens: 150,
+      });
+
+      let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
+      // Attempt to extract JSON if surrounded by text
+      const firstBrace = jsonStr.indexOf('{');
+      const lastBrace = jsonStr.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace >= 0) {
+        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+      }
+      
+      const parsed = JSON.parse(jsonStr);
+      return {
+        score: parsed.score || 0,
+        rarity: parsed.rarity || 'Gray',
+        reasoning: parsed.reasoning || 'Parsing error',
+      };
+    } catch (e) {
+      this.logger.error('Judge failed', e);
+      return { score: 10, rarity: 'Gray', reasoning: 'Judge failed to execute.' };
+    }
   }
 
   // Legacy method kept for compatibility if needed, but forwarded to new flow?

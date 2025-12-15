@@ -153,24 +153,26 @@ export function NewsFeed() {
                             <h3 className="font-semibold text-xl leading-tight tracking-tight text-foreground">
                                 {digest.title}
                             </h3>
-                            <div className="text-sm">
+                            <article className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-blue-400 prose-img:rounded-lg prose-strong:text-foreground prose-blockquote:border-l-primary/50 prose-blockquote:bg-muted/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-hr:border-border prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-muted prose-pre:border prose-pre:border-border">
                                 <ReactMarkdown
                                     components={{
-                                        a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors" />,
-                                        strong: ({ ...props }) => <strong className="font-bold text-foreground">{renderWithSentiment(props.children)}</strong>,
-                                        p: ({ ...props }) => <p className="text-muted-foreground leading-relaxed mb-4 whitespace-pre-line">{renderWithSentiment(props.children)}</p>,
-                                        li: ({ ...props }) => <li className="pl-1 mb-2">{renderWithSentiment(props.children)}</li>,
-                                        h3: ({ ...props }) => <h3 className="text-lg font-bold text-foreground mt-6 mb-3">{renderWithSentiment(props.children)}</h3>,
-                                        h4: ({ ...props }) => <h4 className="text-base font-bold text-foreground mt-5 mb-2">{renderWithSentiment(props.children)}</h4>,
-                                        h5: ({ ...props }) => <h5 className="text-sm font-bold text-foreground mt-4 mb-2">{renderWithSentiment(props.children)}</h5>,
-                                        ul: ({ ...props }) => <ul {...props} className="list-disc pl-5 space-y-2 mb-4 text-muted-foreground" />,
-                                        hr: ({ ...props }) => <hr {...props} className="my-6 border-border" />,
+                                        a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:text-blue-300 transition-colors" />,
+                                        strong: ({ ...props }) => <strong className="font-bold">{renderWithSentiment(props.children)}</strong>,
+                                        em: ({ ...props }) => <em className="italic">{renderWithSentiment(props.children)}</em>,
+                                        p: ({ ...props }) => <p>{renderWithSentiment(props.children)}</p>,
+                                        li: ({ ...props }) => <li>{renderWithSentiment(props.children)}</li>,
+                                        h1: ({ ...props }) => <h1>{renderWithSentiment(props.children)}</h1>,
+                                        h2: ({ ...props }) => <h2>{renderWithSentiment(props.children)}</h2>,
+                                        h3: ({ ...props }) => <h3>{renderWithSentiment(props.children)}</h3>,
+                                        h4: ({ ...props }) => <h4>{renderWithSentiment(props.children)}</h4>,
+                                        h5: ({ ...props }) => <h5>{renderWithSentiment(props.children)}</h5>,
+                                        h6: ({ ...props }) => <h6>{renderWithSentiment(props.children)}</h6>,
                                     }}
                                     remarkPlugins={[remarkGfm]}
                                 >
                                     {digest.answer_markdown || "No content available."}
                                 </ReactMarkdown>
-                            </div>
+                            </article>
 
                             <div className="pt-4 flex justify-between items-center border-t border-border/50 mt-4">
                                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
