@@ -28,11 +28,18 @@ import {
 } from '../hooks/useTicker';
 import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
+import { useEffect, useState, useRef } from 'react';
 
+const RESEARCH_PENDING_GRACE_MS = 5000;
 export function TickerDetail() {
     const { symbol, tab } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const [localResearchRunning, setLocalResearchRunning] = useState(false);
+    const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [placeholderId, setPlaceholderId] = useState<string | null>(null);
+    const [placeholderTimestamp, setPlaceholderTimestamp] = useState<string | null>(null);
+    const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
 
     // Validate tab or default to overview
     const validTabs = ['overview', 'financials', 'research', 'news'];
@@ -51,6 +58,12 @@ export function TickerDetail() {
 
     const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
         if (!symbol) return;
+        setLocalResearchRunning(true);
+        const newPlaceholderId = `pending-${Date.now()}`;
+        const placeholderTime = new Date().toISOString();
+        setPlaceholderId(newPlaceholderId);
+        setPlaceholderTimestamp(placeholderTime);
+        expectedTopResearchIdRef.current = researchList[0]?.id;
         triggerResearchMutation.mutate({
             symbol,
             provider: opts?.provider,
@@ -64,6 +77,97 @@ export function TickerDetail() {
             deleteResearchMutation.mutate(id);
         }
     };
+
+    const hasRemotePending = researchList.some(item => item.status === 'processing' || item.status === 'pending');
+    useEffect(() => {
+        return () => {
+            if (graceTimerRef.current) {
+                clearTimeout(graceTimerRef.current);
+                graceTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (hasRemotePending && placeholderId) {
+            setPlaceholderId(null);
+            setPlaceholderTimestamp(null);
+        }
+    }, [hasRemotePending, placeholderId]);
+
+    const latestResearchId = researchList[0]?.id;
+    useEffect(() => {
+        if (triggerResearchMutation.isPending || hasRemotePending) {
+            if (graceTimerRef.current) {
+                clearTimeout(graceTimerRef.current);
+                graceTimerRef.current = null;
+            }
+            setLocalResearchRunning(true);
+            return;
+        }
+
+        if (!localResearchRunning || graceTimerRef.current) {
+            return;
+        }
+
+        graceTimerRef.current = setTimeout(() => {
+            graceTimerRef.current = null;
+            setLocalResearchRunning(false);
+        }, RESEARCH_PENDING_GRACE_MS);
+    }, [triggerResearchMutation.isPending, hasRemotePending, localResearchRunning]);
+
+    const isAnalyzing = triggerResearchMutation.isPending || hasRemotePending || localResearchRunning;
+
+    useEffect(() => {
+        if (
+            !localResearchRunning ||
+            !placeholderId ||
+            triggerResearchMutation.isPending ||
+            hasRemotePending
+        ) {
+            return;
+        }
+
+        if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
+            setLocalResearchRunning(false);
+            setPlaceholderId(null);
+            setPlaceholderTimestamp(null);
+            expectedTopResearchIdRef.current = undefined;
+        }
+    }, [latestResearchId, placeholderId, localResearchRunning, triggerResearchMutation.isPending, hasRemotePending]);
+
+    const shouldShowPlaceholder = localResearchRunning && !hasRemotePending && placeholderId && placeholderTimestamp;
+    const placeholderEntry: ResearchItem | null = shouldShowPlaceholder
+        ? {
+              id: placeholderId!,
+              created_at: placeholderTimestamp!,
+              status: 'processing',
+              title: 'Preparing research...',
+              user: { nickname: user?.nickname || user?.email || 'You' },
+              user_id: user?.id || undefined,
+              provider: 'gemini',
+              models_used: ['preparing'],
+              tokens_in: 0,
+              tokens_out: 0,
+          }
+        : null;
+    const researchWithPlaceholder = placeholderEntry ? [placeholderEntry, ...researchList] : researchList;
+
+    useEffect(() => {
+        if (
+            !localResearchRunning ||
+            !expectedTopResearchIdRef.current ||
+            triggerResearchMutation.isPending ||
+            hasRemotePending
+        ) {
+            return;
+        }
+
+        if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
+            expectedTopResearchIdRef.current = undefined;
+            setLocalResearchRunning(false);
+        }
+    }, [latestResearchId, localResearchRunning, triggerResearchMutation.isPending, hasRemotePending]);
 
 
 
@@ -226,9 +330,9 @@ export function TickerDetail() {
                     {/* AI RESEARCH TAB */}
                     <TabsContent value="research">
                         <ResearchFeed
-                            research={researchList}
+                            research={researchWithPlaceholder}
                             onTrigger={handleTriggerResearch}
-                            isAnalyzing={triggerResearchMutation.isPending || researchList.some(item => item.status === 'processing' || item.status === 'pending')}
+                            isAnalyzing={isAnalyzing}
                             onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
                             defaultTicker={symbol}
                         />

@@ -15,6 +15,12 @@ import { tickerKeys } from '../../hooks/useTicker';
 
 type ModelTier = 'low' | 'medium' | 'high' | 'deep';
 
+const AVERAGE_RESEARCH_DURATION_LABEL = '0:45';
+
+const formatTimestamp = (value?: string) => {
+    return value ? new Date(value).toLocaleString() : 'Unknown time';
+};
+
 interface ResearchFeedProps {
     research: ResearchItem[];
     onTrigger: (options: { provider: 'gemini' | 'openai' | 'ensemble'; quality: ModelTier; question?: string; modelKey: string }) => void;
@@ -57,59 +63,70 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     return (
         <Card className="h-full flex flex-col overflow-hidden">
             <CardHeader className="py-3 px-3 md:py-4 md:px-4 border-b border-border bg-muted/10">
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
-                        <Brain className="w-4 h-4 text-primary" />
-                        <span className="hidden xs:inline">AI Research History</span>
-                        <span className="xs:hidden">History</span>
-                    </CardTitle>
-                    <div className="flex gap-1.5 md:gap-2">
-                        <UploadResearchDialog
-                            defaultTicker={defaultTicker}
-                            trigger={
-                                <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
-                                    <Upload size={16} /> <span className="hidden md:inline">Upload</span>
-                                </Button>
-                            }
-                        />
-
-                        {/* New Run Analysis Dialog */}
-                        <RunAnalysisDialog
-                            onTrigger={onTrigger}
-                            isAnalyzing={isAnalyzing}
-                            defaultTicker={defaultTicker}
-                            trigger={
-                                <Button className="h-9 px-4 text-sm gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border-transparent hover:border-purple-500/50 transition-all hover:scale-105">
-                                    <Bot size={16} /> <span>Research</span>
-                                </Button>
-                            }
-                        />
-                        {defaultTicker && (
-                            <Button
-                                variant="outline"
-                                className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
-                                disabled={isSyncing}
-                                onClick={async () => {
-                                    if (isSyncing) return;
-                                    try {
-                                        setIsSyncing(true);
-                                        await api.post(`/research/sync/${defaultTicker}`);
-                                        // Refresh local data after sync
-                                        queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
-                                        queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
-                                    } catch (err) {
-                                        console.error('Sync failed', err);
-                                    } finally {
-                                        setIsSyncing(false);
+                    <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
+                            <Brain className="w-4 h-4 text-primary" />
+                            <span className="hidden xs:inline">AI Research History</span>
+                            <span className="xs:hidden">History</span>
+                        </CardTitle>
+                        <div className="flex flex-col gap-2 items-end">
+                            <div className="flex gap-1.5 md:gap-2">
+                                <UploadResearchDialog
+                                    defaultTicker={defaultTicker}
+                                    trigger={
+                                        <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
+                                            <Upload size={16} /> <span className="hidden md:inline">Upload</span>
+                                        </Button>
                                     }
-                                }}
-                            >
-                                {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
-                                <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-                            </Button>
-                        )}
+                                />
+                                <RunAnalysisDialog
+                                    onTrigger={onTrigger}
+                                    isAnalyzing={isAnalyzing}
+                                    defaultTicker={defaultTicker}
+                                    trigger={
+                                        <Button
+                                            size="sm"
+                                            className="gap-2 px-4 text-sm h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border border-transparent"
+                                            disabled={isAnalyzing}
+                                        >
+                                            <Bot size={16} />
+                                            <span className="font-semibold">Research</span>
+                                        </Button>
+                                    }
+                                />
+                                {defaultTicker && (
+                                    <Button
+                                        variant="outline"
+                                        className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
+                                        disabled={isSyncing}
+                                        onClick={async () => {
+                                            if (isSyncing) return;
+                                            try {
+                                                setIsSyncing(true);
+                                                await api.post(`/research/sync/${defaultTicker}`);
+                                                // Refresh local data after sync
+                                                queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
+                                                queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
+                                            } catch (err) {
+                                                console.error('Sync failed', err);
+                                            } finally {
+                                                setIsSyncing(false);
+                                            }
+                                        }}
+                                    >
+                                        {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
+                                        <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+                                    </Button>
+                                )}
+                            </div>
+                            {isAnalyzing && (
+                                <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Research in progress · Avg time ~{AVERAGE_RESEARCH_DURATION_LABEL}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-y-auto">
                 <div className="divide-y divide-border/50">
@@ -122,6 +139,10 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
 
                             // Author Display Name
                             const authorName = item.user?.nickname || item.user?.email?.split('@')[0] || 'AI';
+                            const completionTimestamp = item.updated_at || item.created_at;
+                            const tokensTotal = (item.tokens_in ?? 0) + (item.tokens_out ?? 0);
+                            const hasTokens = tokensTotal > 0;
+                            const completionLabel = formatTimestamp(completionTimestamp);
 
                             return (
                                 <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
@@ -171,7 +192,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                    <span className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">{new Date(item.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">{completionLabel}</span>
                                                     <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
 
                                                     <div className="flex items-center gap-1.5 min-w-0 max-w-[120px] md:max-w-[200px]">
@@ -207,6 +228,13 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                             </Badge>
                                                         </>
                                                     )}
+                                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                                                        {hasTokens && (
+                                                            <span className="rounded-full bg-muted/30 px-2 py-0.5 text-[10px]">
+                                                                {tokensTotal.toLocaleString()} tokens used
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

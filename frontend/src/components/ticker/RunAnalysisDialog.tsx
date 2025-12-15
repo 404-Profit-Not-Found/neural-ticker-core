@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Badge } from '../ui/badge';
-import { Brain, Zap, Target, Loader2, Lock } from 'lucide-react';
+import { Brain, Zap, Loader2, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { Label } from '../ui/label';

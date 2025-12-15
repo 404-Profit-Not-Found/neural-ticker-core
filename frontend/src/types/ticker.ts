@@ -54,6 +54,9 @@ export interface ResearchItem {
     provider?: string;
     user_id?: string;
     models_used?: string[];
+    tokens_in?: number;
+    tokens_out?: number;
+    updated_at?: string;
 }
 
 export interface TickerData {

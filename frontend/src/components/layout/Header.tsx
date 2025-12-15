@@ -270,7 +270,7 @@ export function Header() {
                   className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
                 >
                   <UserIcon size={16} />
-                  Your Profile
+              My Profile
                 </button>
                 {user && user.role === 'admin' && (
                   <button
@@ -317,7 +317,7 @@ export function Header() {
             className="w-full flex items-center gap-3 px-4 py-3 text-base text-left text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           >
             <UserIcon size={18} />
-            Your Profile
+          My Profile
           </button>
         </div>
       )}
