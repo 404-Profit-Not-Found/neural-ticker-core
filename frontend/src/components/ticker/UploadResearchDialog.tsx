@@ -5,7 +5,7 @@ import { Dialog, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Upload, FileText, Loader2, Terminal, Copy } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -18,6 +18,7 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
     const [isOpen, setIsOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [title, setTitle] = useState('');
+    const [model, setModel] = useState('');
     const [ticker, setTicker] = useState(defaultTicker || '');
     const [content, setContent] = useState('');
     const queryClient = useQueryClient();
@@ -48,7 +49,8 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
                 tickers: [ticker.toUpperCase()], // Standardize to uppercase array
                 title: title || `Manual Upload: ${ticker}`,
                 content,
-                status: 'completed'
+                status: 'completed',
+                model: model || undefined
             });
 
             // Refresh data
@@ -57,6 +59,7 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
             setIsOpen(false);
             // Reset form
             setTitle('');
+            setModel('');
             setContent('');
             if (!defaultTicker) setTicker('');
         } catch (error) {
@@ -79,10 +82,64 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
             </div>
 
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Upload Research Note</DialogTitle>
                     </DialogHeader>
+
+                    {/* PROMPT COPY SECTION */}
+                    <div className="bg-muted/30 p-4 rounded-lg border border-border space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-semibold flex items-center gap-2">
+                                <Terminal size={14} className="text-primary" />
+                                System Prompt
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-6 text-xs gap-1"
+                                onClick={() => {
+                                    const prompt = `ROLE: Senior Equity Research Analyst.
+TASK: Deep dive due diligence on ${ticker || '[TICKER]'}.
+FOCUS: Growth, Moat, Risks, Valuation.
+
+CRITICAL DATA REQUIREMENT:
+You MUST search for and explicitly include the following TTM (Trailing Twelve Month) and MRQ (Most Recent Quarter) data in your report if available:
+- Revenue, Gross Margin, Operating Margin, Net Profit Margin
+- ROE, ROA
+- Debt-to-Equity, Debt-to-Assets, Interest Coverage
+- Current Ratio, Quick Ratio
+- P/E, PEG, Price-to-Book
+- Free Cash Flow
+- Latest Analyst Ratings (Firm, Rating, Price Target)
+
+Present these numbers clearly in the text or a table so they can be parsed for downstream systems.
+
+CRITICAL SECTION REQUIREMENT:
+You MUST include a "Risk/Reward Profile" section at the end of your report with the following specific format:
+- Overall Score: [0-10] (10 = Best Risk/Reward)
+- Financial Risk: [0-10] (10 = High Risk)
+- Execution Risk: [0-10] (10 = High Risk)
+- Reward Target: Estimated 12m price target ($)
+- Upside: % Return to target
+- Scenarios:
+  - Bull: $X.XX (Rationale)
+  - Base: $X.XX (Rationale)
+  - Bear: $X.XX (Rationale)
+`;
+                                    navigator.clipboard.writeText(prompt);
+                                    // ideally show toast here
+                                    alert("Prompt Copied to Clipboard!");
+                                }}
+                            >
+                                <Copy size={12} /> Copy Prompt
+                            </Button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            Use this exact prompt with ChatGPT/Claude/Gemini to ensure your research is scored correctly.
+                        </div>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="ticker">Ticker Symbol</Label>
@@ -103,6 +160,15 @@ export function UploadResearchDialog({ defaultTicker, trigger }: UploadResearchD
                                 value={title}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                                 placeholder="Research Title"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="model">Model Used (Optional)</Label>
+                            <Input
+                                id="model"
+                                value={model}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setModel(e.target.value)}
+                                placeholder="e.g. o1-preview, Claude 3.5 Sonnet"
                             />
                         </div>
                         <div className="space-y-2">

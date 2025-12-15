@@ -12,6 +12,8 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 
 import { NotificationsModule } from '../notifications/notifications.module';
 
+import { QualityScoringService } from './quality-scoring.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResearchNote]),
@@ -24,7 +26,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [ResearchController],
-  providers: [ResearchService],
-  exports: [ResearchService],
+  providers: [ResearchService, QualityScoringService],
+  exports: [ResearchService, QualityScoringService],
 })
 export class ResearchModule {}

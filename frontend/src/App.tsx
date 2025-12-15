@@ -14,6 +14,7 @@ import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
 import { NewsPage } from './pages/NewsPage';
 
+
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
@@ -84,6 +85,7 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+
 
 
             <Route path="/admin" element={

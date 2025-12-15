@@ -58,6 +58,7 @@ export interface ResearchItem {
     tokens_in?: number;
     tokens_out?: number;
     updated_at?: string;
+    rarity?: string; // e.g. 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'
 }
 
 export interface TickerData {

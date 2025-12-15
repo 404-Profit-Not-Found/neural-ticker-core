@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ResearchController } from './research.controller';
 import { ResearchService } from './research.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { CreditService } from '../users/credit.service';
 
 describe('ResearchController', () => {
   let controller: ResearchController;
@@ -17,9 +18,14 @@ describe('ResearchController', () => {
     updateTitle: jest.fn(),
     streamResearch: jest.fn(),
     reprocessFinancials: jest.fn(),
+    contribute: jest.fn(),
   };
   const mockMarketDataService = {
     dedupeAnalystRatings: jest.fn(),
+  };
+  const mockCreditService = {
+      getModelCost: jest.fn(),
+      deductCredits: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -33,6 +39,10 @@ describe('ResearchController', () => {
         {
           provide: MarketDataService,
           useValue: mockMarketDataService,
+        },
+        {
+            provide: CreditService,
+            useValue: mockCreditService,
         },
       ],
     }).compile();
@@ -86,12 +96,35 @@ describe('ResearchController', () => {
     });
   });
 
+  describe('contribute', () => {
+    it('should contribute research', async () => {
+        const note = { id: '1', tickers: ['AAPL'], title: '# Content' };
+        mockResearchService.contribute.mockResolvedValue(note);
+        const req = { user: { id: 'user1' } };
+
+        const result = await controller.contribute(req, {
+            tickers: ['AAPL'],
+            content: '# Content',
+        });
+
+        expect(result).toEqual(note);
+        expect(mockResearchService.contribute).toHaveBeenCalledWith(
+            'user1',
+            ['AAPL'],
+            '# Content',
+        );
+    });
+  });
+
   describe('ask', () => {
     it('should create research ticket and return id', async () => {
       const ticket = { id: 'ticket-1', status: 'pending' };
       mockResearchService.createResearchTicket.mockResolvedValue(ticket);
       mockResearchService.processTicket.mockResolvedValue(undefined);
-      const req = { user: { id: 'user1' } };
+      mockCreditService.getModelCost.mockReturnValue(5);
+      mockCreditService.deductCredits.mockResolvedValue(undefined); // Success
+
+      const req = { user: { id: 'user1', role: 'user' } };
 
       const result = await controller.ask(req, {
         tickers: ['AAPL'],
@@ -108,6 +141,7 @@ describe('ResearchController', () => {
         'gemini',
         'medium',
       );
+      expect(mockCreditService.deductCredits).toHaveBeenCalled();
     });
   });
 
