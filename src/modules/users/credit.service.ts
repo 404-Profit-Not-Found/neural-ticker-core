@@ -119,7 +119,7 @@ export class CreditService {
    * Resets credits to the tier cap if current date > reset_date
    * Logic typically triggered by Cron or Login interceptor
    */
-  async checkAndResetCredits(userId: string): Promise<void> {
+  async checkAndResetCredits(): Promise<void> {
     // Basic implementation placeholder - logic can be complex
     // For now, AdminController will handle manual resets or gifts
   }

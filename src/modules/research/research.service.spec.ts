@@ -72,7 +72,6 @@ describe('ResearchService', () => {
     score: jest.fn(),
   };
 
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -187,8 +186,6 @@ describe('ResearchService', () => {
       expect(mockCreditService.addCredits).not.toHaveBeenCalled();
     });
   });
-
-
 
   describe('getResearchNote', () => {
     it('should return a note by id', async () => {

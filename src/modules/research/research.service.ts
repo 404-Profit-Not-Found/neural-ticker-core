@@ -106,7 +106,7 @@ export class ResearchService implements OnModuleInit {
     // 2. Judge Quality (Universal Judge)
     try {
       const judgment = await this.qualityScoringService.score(content);
-      note.quality_score = judgment.score;
+      note.quality_score = Math.round(judgment.score);
       note.rarity = judgment.rarity;
       note.grounding_metadata = {
         judgment_reasoning: judgment.details.reasoning,
@@ -281,7 +281,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         const judgment = await this.qualityScoringService.score(
           result.answerMarkdown,
         );
-        note.quality_score = judgment.score;
+        note.quality_score = Math.round(judgment.score);
         note.rarity = judgment.rarity;
         note.grounding_metadata = {
           ...note.grounding_metadata,

@@ -63,7 +63,10 @@ describe('ResearchService - Digest', () => {
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QualityScoringService, useValue: { score: jest.fn() } },
-        { provide: CreditService, useValue: { addCredits: jest.fn(), deductCredits: jest.fn() } },
+        {
+          provide: CreditService,
+          useValue: { addCredits: jest.fn(), deductCredits: jest.fn() },
+        },
       ],
     }).compile();
 

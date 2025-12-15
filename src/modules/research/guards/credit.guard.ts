@@ -3,7 +3,6 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
 import { CreditService } from '../../users/credit.service';
 import { UsersService } from '../../users/users.service';
