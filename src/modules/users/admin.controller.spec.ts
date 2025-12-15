@@ -3,6 +3,10 @@ import { UnauthorizedException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { UsersService } from './users.service';
 
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CreditService } from './credit.service';
+
 describe('AdminController', () => {
   let controller: AdminController;
 
@@ -13,6 +17,11 @@ describe('AdminController', () => {
     allowEmail: jest.fn(),
     revokeEmail: jest.fn(),
     deleteWaitlistUser: jest.fn(),
+    updateTier: jest.fn(), // Added
+  };
+
+  const mockCreditService = {
+    addCredits: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -23,8 +32,17 @@ describe('AdminController', () => {
           provide: UsersService,
           useValue: mockUsersService,
         },
+        {
+          provide: CreditService,
+          useValue: mockCreditService,
+        },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .compile();
 
     controller = module.get<AdminController>(AdminController);
     jest.clearAllMocks();

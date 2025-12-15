@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +14,8 @@ const DEFAULT_ADMINS = ['branislavlang@gmail.com', 'juraj.hudak79@gmail.com'];
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly nicknameGenerator: NicknameGeneratorService,
     @InjectRepository(User)
@@ -119,7 +122,11 @@ export class UsersService {
     // Also check by email to merge accounts if needed (optional security choice)
     // For now, if googleId not found but email exists, we link them.
     if (!user) {
-      user = await this.findByEmail(profile.email);
+      // Use case-insensitive lookup to avoid duplicates
+      user = await this.userRepo
+        .createQueryBuilder('user')
+        .where('LOWER(user.email) = LOWER(:email)', { email: profile.email })
+        .getOne();
     }
 
     // Auto-Admin Logic
@@ -136,13 +143,16 @@ export class UsersService {
         user.nickname = this.nicknameGenerator.generate();
       }
       if (role) user.role = role; // Enforce admin if email matches
-      // If roleOverride is provided (e.g. waitlist), and user is NOT an admin/user (maybe they are trying to join waitlist but already exist?),
-      // Actually if they exist they shouldn't trigger waitlist logic unless they were previously deleted or something?
-      // If they exist and are 'user', they can just login.
-      // If they exist and are 'waitlist' already, fine.
-      // If they exist and are 'user', and try to join waitlist, we shouldn't downgrade them.
-      // So only apply roleOverride if creating?
-      // UsersService logic: If user exists, we usually return them.
+
+      // FIX: Ensure Admins have 'pro' tier benefits by default (KISS)
+      if (user.role === 'admin' && user.tier === 'free') {
+        user.tier = 'pro';
+      }
+
+      // SELF-HEAL: Fix legacy 'admin' tier in DB
+      if ((user.tier as string) === 'admin') {
+        user.tier = 'pro';
+      }
 
       return this.userRepo.save(user);
     }
@@ -155,12 +165,34 @@ export class UsersService {
       avatar_url: profile.avatarUrl,
       last_login: new Date(),
       role: role || roleOverride || 'user',
+      tier: role === 'admin' || roleOverride === 'admin' ? 'pro' : 'free', // Admins get PRO tier
       nickname: this.nicknameGenerator.generate(),
       view_mode: 'PRO', // Default
       theme: 'dark', // Default
     });
 
-    return this.userRepo.save(newUser);
+    try {
+      return await this.userRepo.save(newUser);
+    } catch (error) {
+      // Handle Unique Constraint Violation (Race condition or missed lookup)
+      if (error.code === '23505') {
+        this.logger.warn(
+          `Duplicate user detected on create: ${profile.email}. Recovering...`,
+        );
+        // Try to fetch one last time (the race winner)
+        const existing = await this.userRepo
+          .createQueryBuilder('user')
+          .where('LOWER(user.email) = LOWER(:email)', { email: profile.email })
+          .getOne();
+
+        if (existing) {
+          existing.google_id = profile.googleId;
+          existing.last_login = new Date();
+          return this.userRepo.save(existing);
+        }
+      }
+      throw error;
+    }
   }
 
   async updateProfile(
@@ -185,6 +217,19 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
     user.role = role;
+    // Auto-grant Pro tier if promoted to Admin
+    if (role === 'admin') {
+      user.tier = 'pro';
+    }
+    return this.userRepo.save(user);
+  }
+
+  async updateTier(id: string, tier: 'free' | 'pro'): Promise<User> {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    user.tier = tier;
     return this.userRepo.save(user);
   }
 
@@ -202,6 +247,18 @@ export class UsersService {
 
   async findById(id: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { id } });
+  }
+
+  async getProfile(id: string): Promise<User | null> {
+    return this.userRepo.findOne({
+      where: { id },
+      relations: ['credit_transactions'],
+      order: {
+        credit_transactions: {
+          created_at: 'DESC',
+        },
+      },
+    });
   }
 
   async approveUser(id: string): Promise<User> {
@@ -257,6 +314,9 @@ export class UsersService {
         avatar_url: u.avatar_url,
         status: status,
         is_registered: true,
+        // FIX: Handle legacy 'admin' tier in DB by forcing it to 'pro' for API clients
+        tier: (u.tier as string) === 'admin' ? 'pro' : u.tier,
+        credits_balance: u.credits_balance,
       });
     }
 

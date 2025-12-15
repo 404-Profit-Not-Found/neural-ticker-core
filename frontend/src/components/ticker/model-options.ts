@@ -13,6 +13,16 @@ export interface ModelOption {
 
 export const MODEL_OPTIONS: ModelOption[] = [
     {
+        key: 'gemini-2.5-flash-light',
+        label: 'Gemini 2.5 Flash Light',
+        provider: 'gemini',
+        quality: 'low',
+        speed: '≈4s',
+        accuracy: 'Efficient',
+        description: 'Ultra-fast and cost-effective for quick summaries.',
+        defaultQuestion: 'Give me a quick summary for {ticker}',
+    },
+    {
         key: 'gemini-2.5-flash',
         label: 'Gemini 2.5 Flash',
         provider: 'gemini',
@@ -21,6 +31,16 @@ export const MODEL_OPTIONS: ModelOption[] = [
         accuracy: 'Balanced',
         description: 'Blazing fast, ideal for regular updates and news.',
         defaultQuestion: 'Give me a concise but detailed analysis for {ticker}',
+    },
+    {
+        key: 'gpt-4.1-mini',
+        label: 'GPT-4.1 Mini',
+        provider: 'openai',
+        quality: 'medium',
+        speed: '≈11s',
+        accuracy: 'Balanced',
+        description: 'Balanced speed vs. thoroughness for routine updates.',
+        defaultQuestion: 'Summarize the latest investment view on {ticker}.',
     },
     {
         key: 'gemini-2.5-pro',
@@ -41,15 +61,5 @@ export const MODEL_OPTIONS: ModelOption[] = [
         accuracy: 'High precision',
         description: 'OpenAI flagship for detailed thesis generation.',
         defaultQuestion: 'Generate a high-precision research brief for {ticker}.',
-    },
-    {
-        key: 'gpt-4.1-mini',
-        label: 'GPT-4.1 Mini',
-        provider: 'openai',
-        quality: 'medium',
-        speed: '≈11s',
-        accuracy: 'Balanced',
-        description: 'Balanced speed vs. thoroughness for routine updates.',
-        defaultQuestion: 'Summarize the latest investment view on {ticker}.',
     },
 ];

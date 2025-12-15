@@ -10,9 +10,11 @@ import { LlmService } from '../llm/llm.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
+import { CreditService } from '../users/credit.service'; // Added
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QualityScoringService } from './quality-scoring.service';
 
 describe('ResearchService', () => {
   let service: ResearchService;
@@ -62,6 +64,14 @@ describe('ResearchService', () => {
     findAll: jest.fn().mockResolvedValue([]),
   };
 
+  const mockCreditService = {
+    addCredits: jest.fn(),
+  };
+
+  const mockQualityScoringService = {
+    score: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,7 +82,9 @@ describe('ResearchService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: QualityScoringService, useValue: mockQualityScoringService }, // Added
         { provide: WatchlistService, useValue: mockWatchlistService },
+        { provide: CreditService, useValue: mockCreditService },
         {
           provide: ConfigService,
           useValue: {
@@ -122,25 +134,56 @@ describe('ResearchService', () => {
   });
 
   describe('createManualNote', () => {
-    it('should create a manual note with COMPLETED status', async () => {
+    it('should create a manual note and reward credits for high quality', async () => {
       const userId = 'user-1';
       const tickers = ['AAPL'];
       const title = 'My Research';
       const content = '# Analysis';
+
+      // Mock Judge result
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        score: 85,
+        rarity: 'Epic',
+        details: { reasoning: 'Great' },
+      });
 
       await service.createManualNote(userId, tickers, title, content);
 
       expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: LlmProvider.MANUAL,
-          quality: 'manual',
-          title,
-          answer_markdown: content,
-          status: ResearchStatus.COMPLETED,
-          user_id: userId,
+          question: 'Manual Upload',
         }),
       );
+
+      // Verify enriched data is SAVED
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quality_score: 85,
+          rarity: 'Epic',
+        }),
+      );
+
+      // Verify Credit Reward for Purple (10 credits)
+      expect(mockCreditService.addCredits).toHaveBeenCalledWith(
+        userId,
+        10, // Purple reward
+        'manual_contribution',
+        expect.anything(),
+      );
+
       expect(mockRepo.save).toHaveBeenCalled();
+    });
+
+    it('should not reward credits for Gray quality', async () => {
+      const userId = 'user-1';
+      mockLlmService.generateResearch.mockResolvedValueOnce({
+        answerMarkdown: '{"score": 10, "rarity": "Gray", "reasoning": "Bad"}',
+      });
+
+      await service.createManualNote(userId, ['AAPL'], 'Title', 'Content');
+
+      expect(mockCreditService.addCredits).not.toHaveBeenCalled();
     });
   });
 
@@ -245,7 +288,7 @@ describe('ResearchService', () => {
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           status: ResearchStatus.FAILED,
-          error: expect.stringContaining('Timeout'),
+          error: expect.stringContaining('System Restart'),
         }),
       );
     });

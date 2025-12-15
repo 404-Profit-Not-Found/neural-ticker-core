@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Badge } from '../ui/badge';
-import { Brain, Zap, Target, Loader2 } from 'lucide-react';
+import { Brain, Zap, Loader2, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { MODEL_OPTIONS, type ModelTier } from './model-options';
@@ -43,6 +44,23 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
         setIsOpen(false);
     };
 
+    const { user } = useAuth();
+    const isPro = user?.tier === 'pro' || user?.role === 'admin';
+
+    const getModelCost = (key: string, quality: ModelTier) => {
+        if (key === 'gemini-2.5-flash-light') return 1;
+        if (key === 'gemini-2.5-flash') return 2;
+        if (key === 'gpt-4.1-mini') return 3;
+        return quality === 'deep' ? 5 : 1;
+    };
+
+    // Reset selection if locked model was selected
+    const handleModelSelect = (key: string) => {
+        const model = MODEL_OPTIONS.find(m => m.key === key);
+        if (model?.quality === 'deep' && !isPro) return;
+        setSelectedModelKey(key);
+    };
+
     return (
         <>
             <div onClick={() => !isAnalyzing && setIsOpen(true)} className="inline-flex cursor-pointer">
@@ -67,38 +85,62 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
 
                 <div className="grid gap-4 py-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {MODEL_OPTIONS.map((model) => (
-                            <div
-                                key={model.key}
-                                className={cn(
-                                    "relative flex flex-col gap-1.5 rounded-lg border p-3 cursor-pointer transition-all hover:bg-muted/50",
-                                    selectedModelKey === model.key
-                                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                                        : "border-border"
-                                )}
-                                onClick={() => setSelectedModelKey(model.key)}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="font-bold text-xs">{model.label}</div>
-                                    {selectedModelKey === model.key && (
-                                        <div className="h-1.5 w-1.5 rounded-full bg-primary absolute top-3 right-3" />
+                        {MODEL_OPTIONS.map((model) => {
+                            const isLocked = model.quality === 'deep' && !isPro;
+                            const cost = getModelCost(model.key, model.quality);
+                            return (
+                                <div
+                                    key={model.key}
+                                    className={cn(
+                                        "relative flex flex-col gap-1.5 rounded-lg border p-3 cursor-pointer transition-all",
+                                        isLocked ? "opacity-60 bg-muted/20 cursor-not-allowed border-dashed" : "hover:bg-muted/50",
+                                        selectedModelKey === model.key && !isLocked
+                                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                                            : "border-border"
+                                    )}
+                                    onClick={() => handleModelSelect(model.key)}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="font-bold text-xs flex items-center gap-1.5">
+                                            {model.label}
+                                            {model.quality === 'deep' && (
+                                                <Badge variant="default" className="h-4 px-1 text-[9px] bg-purple-600 hover:bg-purple-700 border-purple-500/50 text-white shadow-purple-500/20">
+                                                    PRO
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        {isLocked ? (
+                                            <Lock size={12} className="text-muted-foreground" />
+                                        ) : (
+                                            selectedModelKey === model.key && (
+                                                <div className="h-1.5 w-1.5 rounded-full bg-primary absolute top-3 right-3" />
+                                            )
+                                        )}
+                                    </div>
+
+                                    <div className="text-[10px] text-muted-foreground leading-snug line-clamp-2 min-h-[2.5em]">
+                                        {model.description}
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 mt-auto pt-1">
+                                        <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
+                                            <Zap size={8} /> {model.speed}
+                                        </Badge>
+                                        <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
+                                            ⚡ {cost} Credit{cost > 1 ? 's' : ''}
+                                        </Badge>
+                                    </div>
+
+                                    {isLocked && (
+                                        <div className="absolute inset-x-0 bottom-2 text-center">
+                                            <span className="text-[10px] font-bold text-purple-400 bg-background/80 px-2 py-0.5 rounded shadow-sm border border-purple-500/20">
+                                                Upgrade to Unlock
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
-
-                                <div className="text-[10px] text-muted-foreground leading-snug line-clamp-2 min-h-[2.5em]">
-                                    {model.description}
-                                </div>
-
-                                <div className="flex items-center gap-1.5 mt-auto pt-1">
-                                    <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                                        <Zap size={8} /> {model.speed}
-                                    </Badge>
-                                    <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                                        <Target size={8} /> {model.accuracy}
-                                    </Badge>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="space-y-3">
@@ -131,7 +173,14 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleRun} disabled={isAnalyzing} className="min-w-[140px] gap-2">
+                    <Button onClick={handleRun} disabled={isAnalyzing}
+                        className={cn(
+                            "min-w-[140px] gap-2 shadow-md transition-all hover:scale-105 active:scale-95",
+                            selectedModel.quality === 'deep'
+                                ? "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/20"
+                                : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
+                        )}
+                    >
                         {isAnalyzing ? <Loader2 className="animate-spin w-4 h-4" /> : <Brain size={14} />}
                         Run {selectedModel.label}
                     </Button>

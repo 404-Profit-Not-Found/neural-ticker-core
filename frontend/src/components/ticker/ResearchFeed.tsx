@@ -15,6 +15,26 @@ import { tickerKeys } from '../../hooks/useTicker';
 
 type ModelTier = 'low' | 'medium' | 'high' | 'deep';
 
+const AVERAGE_RESEARCH_DURATION_LABEL = '0:45';
+
+const formatTimestamp = (value?: string) => {
+    return value ? new Date(value).toLocaleString() : 'Unknown time';
+};
+
+const getDisplayRarity = (rarity: string) => {
+    // Legacy Mapping for old data
+    const map: Record<string, string> = {
+        'White': 'Common',
+        'Green': 'Uncommon',
+        'Blue': 'Rare',
+        'Purple': 'Epic',
+        'Gold': 'Legendary'
+    };
+    // Normalize case just in case
+    const normalized = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
+    return map[normalized] || normalized;
+};
+
 interface ResearchFeedProps {
     research: ResearchItem[];
     onTrigger: (options: { provider: 'gemini' | 'openai' | 'ensemble'; quality: ModelTier; question?: string; modelKey: string }) => void;
@@ -63,50 +83,84 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                         <span className="hidden xs:inline">AI Research History</span>
                         <span className="xs:hidden">History</span>
                     </CardTitle>
-                    <div className="flex gap-1.5 md:gap-2">
-                        <UploadResearchDialog
-                            defaultTicker={defaultTicker}
-                            trigger={
-                                <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
-                                    <Upload size={16} /> <span className="hidden md:inline">Upload</span>
-                                </Button>
-                            }
-                        />
+                    <div className="flex flex-col gap-2 items-end">
+                        <div className="flex gap-1.5 md:gap-2">
+                            <UploadResearchDialog
+                                defaultTicker={defaultTicker}
+                                trigger={
+                                    <Button variant="outline" className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted">
+                                        <Upload size={16} /> <span className="hidden md:inline">Upload</span>
+                                    </Button>
+                                }
+                            />
+                            {(() => {
+                                const hasCredits = (user?.credits_balance ?? 0) > 0;
+                                const isLocked = !hasCredits;
 
-                        {/* New Run Analysis Dialog */}
-                        <RunAnalysisDialog
-                            onTrigger={onTrigger}
-                            isAnalyzing={isAnalyzing}
-                            defaultTicker={defaultTicker}
-                            trigger={
-                                <Button className="h-9 px-4 text-sm gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border-transparent hover:border-purple-500/50 transition-all hover:scale-105">
-                                    <Bot size={16} /> <span>Research</span>
+                                const ResearchButton = (
+                                    <div className="relative group/research-btn">
+                                        <Button
+                                            size="sm"
+                                            className={`gap-2 px-4 text-sm h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border border-transparent ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                                                }`}
+                                            disabled={isAnalyzing || isLocked}
+                                            // Prevent click propagation if locked, just in case
+                                            onClick={(e) => isLocked && e.stopPropagation()}
+                                        >
+                                            <Bot size={16} />
+                                            <span className="font-semibold">Research</span>
+                                        </Button>
+                                        {isLocked && (
+                                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-lg border hidden group-hover/research-btn:block whitespace-nowrap z-50">
+                                                Insufficient Credits
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+
+                                if (isLocked) {
+                                    return ResearchButton;
+                                }
+
+                                return (
+                                    <RunAnalysisDialog
+                                        onTrigger={onTrigger}
+                                        isAnalyzing={isAnalyzing}
+                                        defaultTicker={defaultTicker}
+                                        trigger={ResearchButton}
+                                    />
+                                );
+                            })()}
+                            {defaultTicker && (
+                                <Button
+                                    variant="outline"
+                                    className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
+                                    disabled={isSyncing}
+                                    onClick={async () => {
+                                        if (isSyncing) return;
+                                        try {
+                                            setIsSyncing(true);
+                                            await api.post(`/research/sync/${defaultTicker}`);
+                                            // Refresh local data after sync
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
+                                        } catch (err) {
+                                            console.error('Sync failed', err);
+                                        } finally {
+                                            setIsSyncing(false);
+                                        }
+                                    }}
+                                >
+                                    {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
+                                    <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
                                 </Button>
-                            }
-                        />
-                        {defaultTicker && (
-                            <Button
-                                variant="outline"
-                                className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
-                                disabled={isSyncing}
-                                onClick={async () => {
-                                    if (isSyncing) return;
-                                    try {
-                                        setIsSyncing(true);
-                                        await api.post(`/research/sync/${defaultTicker}`);
-                                        // Refresh local data after sync
-                                        queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
-                                        queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
-                                    } catch (err) {
-                                        console.error('Sync failed', err);
-                                    } finally {
-                                        setIsSyncing(false);
-                                    }
-                                }}
-                            >
-                                {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
-                                <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-                            </Button>
+                            )}
+                        </div>
+                        {isAnalyzing && (
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Research in progress · Avg time ~{AVERAGE_RESEARCH_DURATION_LABEL}</span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -122,12 +176,17 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
 
                             // Author Display Name
                             const authorName = item.user?.nickname || item.user?.email?.split('@')[0] || 'AI';
+                            const completionTimestamp = item.updated_at || item.created_at;
+                            const tokensTotal = (item.tokens_in ?? 0) + (item.tokens_out ?? 0);
+                            const hasTokens = tokensTotal > 0;
+                            const completionLabel = formatTimestamp(completionTimestamp);
 
+                            const isPending = item.status === 'processing' || item.status === 'pending';
                             return (
                                 <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                                     <div
-                                        className="p-3 md:p-4 cursor-pointer flex items-center justify-between group"
-                                        onClick={() => navigate(`/research/${item.id}`)}
+                                        className={`p-3 md:p-4 flex items-center justify-between group ${isPending ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                        onClick={() => !isPending && navigate(`/research/${item.id}`)}
                                     >
                                         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                                             <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
@@ -171,7 +230,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                    <span className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">{new Date(item.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">{completionLabel}</span>
                                                     <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
 
                                                     <div className="flex items-center gap-1.5 min-w-0 max-w-[120px] md:max-w-[200px]">
@@ -193,7 +252,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                     {item.provider === 'manual' && (
                                                         <>
                                                             <span className="text-muted-foreground text-[10px] md:text-xs">•</span>
-                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20 whitespace-nowrap">
+                                                            <Badge variant="outline" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-white/5 text-white/90 border-white/20 whitespace-nowrap">
                                                                 Manual
                                                             </Badge>
                                                         </>
@@ -207,6 +266,33 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                             </Badge>
                                                         </>
                                                     )}
+
+                                                    {/* RARITY BADGE */}
+                                                    {item.rarity && (
+                                                        <>
+                                                            <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
+                                                            {(() => {
+                                                                const display = getDisplayRarity(item.rarity);
+                                                                return (
+                                                                    <Badge variant="outline" className={`px-1.5 py-0 h-4 text-[10px] font-bold uppercase border ${display === 'Legendary' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                                                        display === 'Epic' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                                                            display === 'Rare' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                                                display === 'Uncommon' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                                                    'bg-muted text-muted-foreground border-border'
+                                                                        }`}>
+                                                                        {display}
+                                                                    </Badge>
+                                                                );
+                                                            })()}
+                                                        </>
+                                                    )}
+                                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                                                        {hasTokens && (
+                                                            <span className="rounded-full bg-muted/30 px-2 py-0.5 text-[10px]">
+                                                                {tokensTotal.toLocaleString()} tokens used
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -224,7 +310,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                     <Trash2 size={14} />
                                                 </Button>
                                             )}
-                                            {!editingId && (
+                                            {!editingId && !isPending && (
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground group-hover:text-foreground hidden md:inline-flex">
                                                     <ChevronRight size={16} />
                                                 </Button>

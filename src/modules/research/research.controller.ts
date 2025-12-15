@@ -10,9 +10,12 @@ import {
   Delete,
   Sse,
   MessageEvent,
+  UseGuards, // Added
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { CreditGuard } from './guards/credit.guard'; // Added
+import { CreditService } from '../users/credit.service'; // Added
 import {
   ApiTags,
   ApiOperation,
@@ -128,6 +131,32 @@ class UploadResearchDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @ApiProperty({
+    required: false,
+    example: 'o1-preview',
+    description: 'Model used for generation',
+  })
+  @IsString()
+  @IsOptional()
+  model?: string;
+}
+
+class ContributeDto {
+  @ApiProperty({
+    example: ['AAPL'],
+    description: 'Tickers related to this note',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  tickers: string[];
+
+  @ApiProperty({
+    example: '# Bullish case for AAPL...',
+    description: 'Markdown content of the research',
+  })
+  @IsString()
+  content: string;
 }
 
 @ApiTags('Research')
@@ -137,9 +166,10 @@ export class ResearchController {
   constructor(
     private readonly researchService: ResearchService,
     private readonly marketDataService: MarketDataService,
+    private readonly creditService: CreditService,
   ) {}
 
-  @ApiOperation({ summary: 'Upload manual research note' })
+  @ApiOperation({ summary: 'Upload manual research note (Legacy)' })
   @ApiResponse({ status: 201, description: 'Note created.' })
   @Post('upload')
   async upload(@Request() req: any, @Body() dto: UploadResearchDto) {
@@ -149,7 +179,23 @@ export class ResearchController {
       dto.tickers,
       dto.title,
       dto.content,
+      dto.model,
     );
+  }
+
+  @ApiOperation({ summary: 'Contribute research to earn credits' })
+  @ApiResponse({
+    status: 201,
+    description: 'Contribution accepted and scored.',
+  })
+  @Post('contribute')
+  async contribute(@Request() req: any, @Body() dto: ContributeDto) {
+    const userId = req.user.id;
+    // content should be "Research Prompt" compatible or full note?
+    // The UI says "Research Prompt" section with "Copy".
+    // But the textarea is for "content".
+    // I assume user pastes the LLM OUTPUT into the textarea.
+    return this.researchService.contribute(userId, dto.tickers, dto.content);
   }
 
   @ApiOperation({
@@ -185,6 +231,7 @@ export class ResearchController {
     status: 401,
     description: 'Unauthorized. Bearer token missing or invalid.',
   })
+  @UseGuards(CreditGuard)
   @Post('ask')
   async ask(@Request() req: any, @Body() dto: AskResearchDto) {
     const userId = req.user.id;
@@ -197,6 +244,28 @@ export class ResearchController {
       dto.provider,
       dto.quality as QualityTier,
     );
+
+    // DEDUCT CREDITS HERE - AFTER TICKET CREATION TO GET ID
+    const cost = this.creditService.getModelCost(dto.provider); // Or dto.quality logic if more complex
+
+    // Only deduct if not admin? Or deduction logic handles it. Guard already checked balance.
+    // We should safely try/catch deduction? If deduction fails, we might technically have a "free" ticket.
+    // Given the Guard checked balance, it should succeed unless specific race condition.
+    try {
+      if (req.user.role !== 'admin') {
+        await this.creditService.deductCredits(userId, cost, 'research_spend', {
+          research_id: ticket.id,
+          model: dto.provider,
+          quality: dto.quality,
+          ticker: dto.tickers[0],
+        });
+      }
+    } catch (e) {
+      console.error('Failed to deduct credits for ticket ' + ticket.id, e);
+      // We could fail the request here, but ticket is already created.
+      // Ideally we wrap all in transaction, but across services is hard without UnitOfWork/QueryRunner sharing.
+      // For now, allow it but log error.
+    }
 
     // Fire and forget background processing
     this.researchService

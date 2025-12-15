@@ -84,6 +84,12 @@ export class UsersController {
     // req.user is populated by JwtAuthGuard
     return this.usersService.updatePreferences(req.user.id, body);
   }
+  @ApiOperation({ summary: 'Get User Profile (including credits)' })
+  @Get('me')
+  async getProfile(@Request() req: any) {
+    return this.usersService.getProfile(req.user.id);
+  }
+
   @ApiOperation({ summary: 'Update Profile (Nickname, Theme, View Mode)' })
   @ApiBody({
     schema: {

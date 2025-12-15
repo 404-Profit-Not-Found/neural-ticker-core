@@ -14,6 +14,7 @@ import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
 import { NewsPage } from './pages/NewsPage';
 
+
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
 import { api, httpClient } from './lib/api';
@@ -22,7 +23,7 @@ import { api, httpClient } from './lib/api';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading Neural Terminal...</div>;
+  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading NeuralTicker...</div>;
 
   if (!user) {
     // Redirect to internal login page instead of auto-redirecting to Google
@@ -84,6 +85,7 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+
 
 
             <Route path="/admin" element={

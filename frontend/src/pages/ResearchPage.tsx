@@ -26,7 +26,7 @@ import { Header } from '../components/layout/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { InlineAlert } from '../components/ui/inline-alert';
-// Badge removed - not needed in this component
+import { Badge } from '../components/ui/badge';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import { useTickerDetails } from '../hooks/useTicker';
 
@@ -52,7 +52,22 @@ interface ResearchNote {
     tokens_in?: number;
     tokens_out?: number;
     numeric_context?: Record<string, unknown>;
+    rarity?: string;
 }
+
+const getDisplayRarity = (rarity: string) => {
+    // Legacy Mapping for old data
+    const map: Record<string, string> = {
+        'White': 'Common',
+        'Green': 'Uncommon',
+        'Blue': 'Rare',
+        'Purple': 'Epic',
+        'Gold': 'Legendary'
+    };
+    // Normalize case just in case
+    const normalized = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
+    return map[normalized] || normalized;
+};
 
 export function ResearchPage() {
     const { id } = useParams<{ id: string }>();
@@ -211,9 +226,28 @@ export function ResearchPage() {
                         {note.tokens_in && note.tokens_out && (
                             <div className="flex items-center gap-1.5">
                                 <Clock size={10} />
-                                <span>{note.tokens_in + note.tokens_out} tokens</span>
+                                <span className={note.rarity === 'Legendary' ? 'text-yellow-500' : ''}>{note.tokens_in + note.tokens_out} tokens</span>
                             </div>
                         )}
+
+                        {note.rarity && (
+                            <div className="flex items-center gap-1.5">
+                                {(() => {
+                                    const display = getDisplayRarity(note.rarity);
+                                    return (
+                                        <Badge variant="outline" className={`px-1.5 py-0 h-4 text-[10px] font-bold uppercase border ${display === 'Legendary' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                            display === 'Epic' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                                display === 'Rare' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                    display === 'Uncommon' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                        'bg-muted text-muted-foreground border-border'
+                                            }`}>
+                                            {display}
+                                        </Badge>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         <span className="font-mono opacity-30 ml-auto">ID: {note.id}</span>
                     </div>
                 </div>

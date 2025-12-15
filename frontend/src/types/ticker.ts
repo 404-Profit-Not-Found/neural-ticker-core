@@ -25,6 +25,7 @@ export interface SocialComment {
         nickname?: string;
         name?: string;
         avatar_url?: string;
+        tier?: string; // Added tier
     };
     created_at: string;
     content: string;
@@ -54,6 +55,10 @@ export interface ResearchItem {
     provider?: string;
     user_id?: string;
     models_used?: string[];
+    tokens_in?: number;
+    tokens_out?: number;
+    updated_at?: string;
+    rarity?: string; // e.g. 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'
 }
 
 export interface TickerData {

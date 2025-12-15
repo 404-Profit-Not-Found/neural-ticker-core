@@ -9,6 +9,8 @@ import { UsersService } from '../users/users.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QualityScoringService } from './quality-scoring.service';
+import { CreditService } from '../users/credit.service';
 
 describe('ResearchService - Digest', () => {
   let service: ResearchService;
@@ -60,6 +62,11 @@ describe('ResearchService - Digest', () => {
         { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: QualityScoringService, useValue: { score: jest.fn() } },
+        {
+          provide: CreditService,
+          useValue: { addCredits: jest.fn(), deductCredits: jest.fn() },
+        },
       ],
     }).compile();
 

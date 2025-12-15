@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User } from 'lucide-react';
+import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User, Coins, TrendingUp } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -32,6 +32,11 @@ export function AdminConsole() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [selectedUserForCredits, setSelectedUserForCredits] = useState<any | null>(null);
+    const [creditAmount, setCreditAmount] = useState(1);
+    const [creditReason, setCreditReason] = useState('Admin Gift');
 
     // Redirect non-admin users immediately
     useEffect(() => {
@@ -121,6 +126,41 @@ export function AdminConsole() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             alert((err as any).response?.data?.message || 'Failed to approve user');
         }
+    };
+
+    const handleUpdateTier = async (userId: string, tier: 'free' | 'pro' | 'admin') => {
+        if (!globalThis.confirm(`Are you sure you want to change user tier to ${tier}?`)) return;
+        try {
+            // Assuming 'newTier' was meant to be 'tier' and 'adminService' was a typo for 'AdminService'
+            // Also, the instruction implies restricting the tier value to 'free' or 'pro' for the service call.
+            // If 'tier' is 'admin', this cast will allow it but the service might reject it.
+            // For strict 'free' | 'pro', a runtime check would be needed, but the instruction only provides a type cast.
+            await AdminService.updateTier(userId, tier as 'free' | 'pro');
+            setIdentities(identities.map(u => u.id === userId ? { ...u, tier: tier as 'free' | 'pro' } : u));
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert((err as any).response?.data?.message || 'Failed to update tier');
+        }
+    };
+
+    const handleGiftCredits = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUserForCredits) return;
+        try {
+            await AdminService.giftCredits(selectedUserForCredits.id, Number(creditAmount), creditReason);
+            setIsCreditModalOpen(false);
+            setCreditAmount(1);
+            await loadData();
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            alert((err as any).response?.data?.message || 'Failed to gift credits');
+        }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openCreditModal = (user: any) => {
+        setSelectedUserForCredits(user);
+        setIsCreditModalOpen(true);
     };
 
     // --- Data Processing Pipeline ---
@@ -249,6 +289,8 @@ export function AdminConsole() {
                                         {[
                                             { label: 'User', key: 'email' },
                                             { label: 'Role', key: 'role' },
+                                            { label: 'Tier', key: 'tier' },
+                                            { label: 'Credits', key: 'credits_balance' },
                                             { label: 'Status', key: 'status' },
                                             { label: 'Timestamp', key: 'created_at' },
                                             { label: 'Actions', key: 'actions' }
@@ -301,10 +343,19 @@ export function AdminConsole() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px]">
-                                                            {item.role || 'GUEST'}
+                                                        <Badge variant="outline" className={item.role === 'admin' ? 'border-amber-400 text-amber-400 lowercase' : 'border-emerald-500 text-emerald-500 lowercase'}>
+                                                            {(item.role || 'guest').toLowerCase()}
                                                         </Badge>
                                                     </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className={item.tier === 'pro' ? 'border-purple-500 text-purple-500 uppercase' : 'border-emerald-500 text-emerald-500 uppercase'}>
+                                                            {(item.tier || 'free').toUpperCase()}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-sm">
+                                                        {item.credits_balance || 0}
+                                                    </TableCell>
+
                                                     <TableCell>
                                                         {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-xs text-purple-500 font-medium"><ShieldAlert size={14} /> Admin</div>}
                                                         {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><CheckCircle size={14} /> Active</div>}
@@ -338,6 +389,28 @@ export function AdminConsole() {
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </Button>
+                                                            )}
+                                                            {(item.status === 'ACTIVE' || item.status === 'ADMIN') && (
+                                                                <>
+                                                                    <Button
+                                                                        onClick={() => handleUpdateTier(item.id, item.tier === 'pro' ? 'free' : 'pro')}
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-8 w-8 text-purple-500 hover:bg-purple-500/10"
+                                                                        title={item.tier === 'pro' ? 'Downgrade to Free' : 'Upgrade to Pro'}
+                                                                    >
+                                                                        <TrendingUp size={16} />
+                                                                    </Button>
+                                                                    <Button
+                                                                        onClick={() => openCreditModal(item)}
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10"
+                                                                        title="Gift Credits"
+                                                                    >
+                                                                        <Coins size={16} />
+                                                                    </Button>
+                                                                </>
                                                             )}
                                                         </div>
                                                     </TableCell>
@@ -373,8 +446,8 @@ export function AdminConsole() {
                                                         <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
                                                     </div>
                                                 </div>
-                                                <Badge variant={item.role === 'admin' ? 'default' : 'secondary'} className="uppercase text-[10px] h-5">
-                                                    {item.role || 'GUEST'}
+                                                <Badge variant="outline" className={`lowercase text-[10px] h-5 ${item.role === 'admin' ? 'border-amber-400 text-amber-400' : 'border-emerald-500 text-emerald-500'}`}>
+                                                    {(item.role || 'guest').toLowerCase()}
                                                 </Badge>
                                             </div>
 
@@ -397,7 +470,7 @@ export function AdminConsole() {
 
                                             {/* Actions */}
                                             {(item.status === 'WAITLIST' || !isTargetAdmin) && (
-                                                 <div className="flex items-center justify-end gap-2 pt-1">
+                                                <div className="flex items-center justify-end gap-2 pt-1">
                                                     {item.status === 'WAITLIST' && (
                                                         <Button
                                                             onClick={() => handleApprove(item.email)}
@@ -490,6 +563,54 @@ export function AdminConsole() {
                             </Button>
                             <Button type="submit">
                                 Send Invitation
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </Dialog>
+
+            {/* Credit Gift Modal */}
+            <Dialog open={isCreditModalOpen} onOpenChange={setIsCreditModalOpen}>
+                <div className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Gift Credits</DialogTitle>
+                        <DialogDescription>
+                            Grant credits to {selectedUserForCredits?.email}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleGiftCredits} className="flex flex-col gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Amount</label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={creditAmount}
+                                onChange={(e) => setCreditAmount(Number(e.target.value))}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Reason</label>
+                            <Input
+                                type="text"
+                                value={creditReason}
+                                onChange={(e) => setCreditReason(e.target.value)}
+                                placeholder="Bonus, Refund, etc."
+                                required
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setIsCreditModalOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit">
+                                Gift Credits
                             </Button>
                         </div>
                     </form>

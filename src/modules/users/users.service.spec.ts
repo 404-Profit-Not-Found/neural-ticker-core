@@ -16,6 +16,10 @@ describe('UsersService', () => {
     findOne: jest.fn(),
     find: jest.fn(),
     delete: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    })),
   };
 
   const mockAllowedUserRepo = {

@@ -28,6 +28,7 @@ export function AnalyzerTableView({
     isLoading,
 }: AnalyzerTableViewProps) {
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
@@ -67,10 +68,10 @@ export function AnalyzerTableView({
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
                         {isLoading ? (
-                             Array.from({ length: 5 }).map((_, i) => (
+                            Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i} className="border-b">
-                                     {table.getVisibleFlatColumns().map((col) => (
-                                         <td key={col.id} className="p-4">
+                                    {table.getVisibleFlatColumns().map((col) => (
+                                        <td key={col.id} className="p-4">
                                             {col.id === 'ticker_symbol' ? (
                                                 <div className="flex items-center gap-3">
                                                     <Skeleton className="h-8 w-8 rounded-full" />
@@ -82,7 +83,7 @@ export function AnalyzerTableView({
                                             ) : (
                                                 <Skeleton className="h-4 w-full max-w-[100px]" />
                                             )}
-                                         </td>
+                                        </td>
                                     ))}
                                 </tr>
                             ))

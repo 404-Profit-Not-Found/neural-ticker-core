@@ -1,15 +1,29 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
-import { Settings, User, Save, Shield, Eye } from 'lucide-react';
+import { UserService } from '../services/userService'; // Added
+import { Settings, User, Save, Shield, Eye, CreditCard, History } from 'lucide-react'; // Added icons
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
+import { useQuery } from '@tanstack/react-query'; // Added
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '../components/ui/table'; // Assuming Table components exist
+
 
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
+    const navigate = useNavigate();
     const [nickname, setNickname] = useState('');
     const [viewMode, setViewMode] = useState('PRO');
     const [theme, setTheme] = useState('g100');
@@ -39,6 +53,14 @@ export function ProfilePage() {
             setTheme(user.theme || 'g100');
         }
     }, [user]);
+
+    // Fetch Full Profile including credits
+    const { data: profile } = useQuery({
+        queryKey: ['userProfile', user?.id],
+        queryFn: UserService.getProfile,
+        enabled: !!user?.id,
+    });
+
 
     const handleSave = async () => {
         setSaving(true);
@@ -78,6 +100,113 @@ export function ProfilePage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Membership & Credits (Full Width on Desktop or 1st in Grid?) Let's put it on top if grid-cols-1 */}
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <CreditCard className="text-primary" size={20} />
+                                Membership & Credits
+                            </CardTitle>
+                            <CardDescription>
+                                Your Pro status and research credits
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex flex-col gap-2 p-4 bg-muted/30 rounded-lg border border-border">
+                                <div className="flex items-center gap-4">
+                                    <Badge
+                                        variant="outline"
+                                        className={`text-lg px-3 py-1 font-bold ${profile?.tier === 'pro' || profile?.tier === 'admin'
+                                            ? 'border-purple-500 text-purple-500 uppercase'
+                                            : 'border-emerald-500 text-emerald-500 uppercase'
+                                            }`}
+                                    >
+                                        {profile?.tier ? profile.tier.toUpperCase() : 'FREE'}
+                                    </Badge>
+
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-3xl font-mono font-bold text-primary">
+                                            {profile?.credits_balance ?? 0}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground self-end mb-1">credits</span>
+                                    </div>
+
+                                    {profile?.tier === 'free' && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs font-semibold text-purple-400 border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-300 ml-auto transition-all shadow-sm shadow-purple-500/10"
+                                        >
+                                            Upgrade to Pro
+                                        </Button>
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Refills monthly. Earn more by contributing.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <History size={16} /> Transaction History
+                                </Label>
+                                <div className="border rounded-md overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Action</TableHead>
+                                                <TableHead className="text-right">Amount</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {profile?.credit_transactions?.slice(0, 10).map((tx) => {
+                                                const researchId = tx.metadata?.research_id || tx.metadata?.noteId;
+                                                const isResearch = (tx.reason === 'research_spend' || tx.metadata?.noteId) && !!researchId;
+
+                                                return (
+                                                    <TableRow
+                                                        key={tx.id}
+                                                        className={isResearch ? "cursor-pointer hover:bg-muted/50 transition-colors group" : ""}
+                                                        onClick={() => isResearch && navigate(`/research/${researchId}`)}
+                                                    >
+                                                        <TableCell className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                                                            {new Date(tx.created_at).toLocaleString(undefined, {
+                                                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm">
+                                                            {isResearch ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Badge variant="outline" className="px-1 py-0 h-5 font-mono text-[10px] text-muted-foreground border-border group-hover:border-primary/50 transition-colors">
+                                                                        ID: {(researchId as string).slice(0, 5)}
+                                                                    </Badge>
+                                                                    <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Research Analysis</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="capitalize">{tx.reason.replace(/_/g, ' ')}</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className={`text-right font-mono font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {tx.amount > 0 ? '+' : ''}{tx.amount}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                            {(!profile?.credit_transactions || profile.credit_transactions.length === 0) && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                                                        No transactions yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Public Profile Settings */}
                     <Card>
                         <CardHeader>

@@ -81,7 +81,7 @@ export function AccessDenied() {
                 {/* Footer Note */}
                 <div className="pt-8 border-t border-border/30">
                     <p className="text-xs text-muted-foreground">
-                        Neural Terminal &trade; &middot; Institutional Grade Analytics
+                        NeuralTicker.com &trade; &middot;
                     </p>
                 </div>
             </div>

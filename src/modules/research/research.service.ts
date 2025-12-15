@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +16,7 @@ import { LlmService } from '../llm/llm.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
+import { CreditService } from '../users/credit.service'; // Added
 import { WatchlistService } from '../watchlist/watchlist.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
@@ -24,9 +30,11 @@ export interface ResearchEvent {
 }
 
 import { NotificationsService } from '../notifications/notifications.service';
+import { QualityScoringService } from './quality-scoring.service';
+import { toonToJson } from 'toon-parser';
 
 @Injectable()
-export class ResearchService {
+export class ResearchService implements OnModuleInit {
   private readonly logger = new Logger(ResearchService.name);
   private client: GoogleGenAI;
   // Using the model user requested, note: this model ID might change
@@ -42,6 +50,9 @@ export class ResearchService {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly watchlistService: WatchlistService,
+
+    private readonly creditService: CreditService,
+    private readonly qualityScoringService: QualityScoringService,
   ) {
     const apiKey = this.config.get<string>('gemini.apiKey');
     if (apiKey) {
@@ -76,7 +87,9 @@ export class ResearchService {
     tickers: string[],
     title: string,
     content: string,
+    model?: string,
   ): Promise<ResearchNote> {
+    // 1. Create Note
     const note = this.noteRepo.create({
       request_id: uuidv4(),
       tickers,
@@ -88,9 +101,63 @@ export class ResearchService {
       status: ResearchStatus.COMPLETED,
       user_id: userId,
       numeric_context: {},
-      models_used: [],
+      models_used: model ? [model] : [],
     });
+
+    // 2. Judge Quality (Universal Judge)
+    try {
+      const judgment = await this.qualityScoringService.score(content);
+      note.quality_score = Math.round(judgment.score);
+      note.rarity = judgment.rarity;
+      note.grounding_metadata = {
+        judgment_reasoning: judgment.details.reasoning,
+      };
+
+      // 3. Reward Credits if applicable
+      const rewardMap: Record<string, number> = {
+        Common: 1,
+        Uncommon: 3,
+        Rare: 5,
+        Epic: 10,
+        Legendary: 25,
+      };
+
+      // Store the actual tier name (e.g. "Rare") not the color "Blue"
+      // Frontend expects: Common, Uncommon, Rare, Epic, Legendary
+      note.rarity = judgment.rarity;
+
+      const reward = rewardMap[judgment.rarity] || 0;
+      if (reward > 0) {
+        await this.creditService.addCredits(
+          userId,
+          reward,
+          'manual_contribution',
+          {
+            noteId: note.request_id,
+            rarity: judgment.rarity,
+            score: judgment.score,
+          },
+        );
+      }
+    } catch (e) {
+      this.logger.warn('Failed to judge manual note', e);
+      // Don't fail the upload just because judging failed
+    }
+
     return this.noteRepo.save(note);
+  }
+
+  // REMOVED: judgeResearchQuality - replaced by QualityScoringService
+  async contribute(
+    userId: string,
+    tickers: string[],
+    content: string,
+  ): Promise<ResearchNote> {
+    // Alias for createManualNote with intended semantics
+    // Extract title from first line or generic
+    const titleLine =
+      content.split('\n')[0].substring(0, 50) || 'Community Contribution';
+    return this.createManualNote(userId, tickers, titleLine, content);
   }
 
   // Legacy method kept for compatibility if needed, but forwarded to new flow?
@@ -210,6 +277,30 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       note.models_used = result.models;
       await this.noteRepo.save(note);
 
+      // 5.5 Judge Quality (Universal Judge) for AI Notes too
+      try {
+        const judgment = await this.qualityScoringService.score(
+          result.answerMarkdown,
+        );
+        note.quality_score = Math.round(judgment.score);
+        note.rarity = judgment.rarity;
+        note.grounding_metadata = {
+          ...note.grounding_metadata,
+          judgment_reasoning: judgment.details.reasoning,
+        };
+        await this.noteRepo.save(note);
+
+        // Reward if high quality (AI getting credits? why not, the user paid for it or triggered it)
+        // Actually, maybe we only reward MANUAL uploads?
+        // User asked: "are the non manual researches also rated with tag?"
+        // Usually, you don't earn credits for consuming AI credits.
+        // BUT, we DO want the TAG.
+        // So I will apply the tag, but maybe skip the credit reward for AI generated stuff to prevent infinite loop of credits.
+        // I'll leave the credit part out for AI, just save the metadata.
+      } catch (e) {
+        this.logger.warn(`Failed to judge AI note ${id}`, e);
+      }
+
       // 6. Post-Process: Generate "Deep Tier" Risk Score from the analysis
       this.logger.log(`Triggering Deep Verification Score for ticket ${id}`);
       await this.riskRewardService.evaluateFromResearch(note);
@@ -307,7 +398,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
              Each object: { "firm": string, "analyst_name": string | null, "rating": "Buy"|"Hold"|"Sell", "price_target": number | null, "rating_date": "YYYY-MM-DD" }
              Extract only recent ratings mentioned.
 
-          Return a SINGLE JSON OBJECT structure:
+          Return a SINGLE JSON OBJECT structure (TOON format supported):
           {
             "financials": { ... },
             "ratings": [ ... ]
@@ -316,7 +407,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           Text:
           ${text.substring(0, 15000)}
           
-          JSON:`;
+          Output:`;
 
         const result = await this.llmService.generateResearch({
           question: extractionPrompt,
@@ -327,13 +418,28 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           maxTokens: 1000,
         });
 
-        let jsonStr = result.answerMarkdown.replace(/```json|```/g, '').trim();
-        const start = jsonStr.indexOf('{');
-        const end = jsonStr.lastIndexOf('}');
+        try {
+          // Extract JSON-like block if wrapped in markdown or embedded
+          const jsonMatch = result.answerMarkdown.match(/\{[\s\S]*\}/);
+          const contentToParse = jsonMatch
+            ? jsonMatch[0]
+            : result.answerMarkdown;
 
-        if (start !== -1 && end !== -1) {
-          jsonStr = jsonStr.substring(start, end + 1);
-          const data = JSON.parse(jsonStr);
+          let data: any;
+          try {
+            data = toonToJson(contentToParse, { strict: false });
+          } catch (e) {
+            // Fallback to standard JSON parse if TOON fails
+            try {
+              data = JSON.parse(contentToParse);
+            } catch {
+              this.logger.warn(
+                `Failed to parse extracted data for ${ticker} via TOON or JSON`,
+                e,
+              );
+              continue; // Skip to next ticker or exit block
+            }
+          }
 
           if (data.financials) {
             await this.marketDataService.upsertFundamentals(
@@ -351,6 +457,8 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           }
 
           this.logger.log(`Extracted financials & ratings for ${ticker}`);
+        } catch (e) {
+          this.logger.warn(`Failed to parse extracted data for ${ticker}`, e);
         }
       } catch (e) {
         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
@@ -518,21 +626,31 @@ Title:`;
     };
   }
 
+  async onModuleInit() {
+    // On startup, any ticket still "processing" is a zombie from a previous crash/restart.
+    // In a single-instance environment, we should fail them to clear the UI.
+    await this.failStuckTickets(0);
+  }
+
   async failStuckTickets(staleMinutes: number = 20): Promise<number> {
     const threshold = new Date(Date.now() - staleMinutes * 60 * 1000);
 
-    const stuckNotes = await this.noteRepo.find({
-      where: {
-        status: ResearchStatus.PROCESSING,
-        updated_at: LessThan(threshold),
-      },
-    });
+    // If staleMinutes is 0, we want to clear ALL processing tickets (e.g. on startup)
+    const where: any = {
+      status: ResearchStatus.PROCESSING,
+    };
+
+    if (staleMinutes > 0) {
+      where.updated_at = LessThan(threshold);
+    }
+
+    const stuckNotes = await this.noteRepo.find({ where });
 
     if (stuckNotes.length === 0) return 0;
 
     for (const note of stuckNotes) {
       note.status = ResearchStatus.FAILED;
-      note.error = 'Timeout: Research stuck in processing state.';
+      note.error = 'System Restart: Research interrupted.';
       await this.noteRepo.save(note);
     }
 
