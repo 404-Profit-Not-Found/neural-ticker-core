@@ -128,7 +128,7 @@ export function NewsFeed() {
                         {digest && digest.models_used && (
                             <div className="flex items-center gap-2">
                                 {digest.models_used.map(model => (
-                                    <Badge key={model} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
+                                    <Badge key={model} variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-white/5 text-white/90 border-white/20 hover:bg-white/10">
                                         {model}
                                     </Badge>
                                 ))}

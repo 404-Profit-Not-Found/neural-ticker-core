@@ -25,7 +25,7 @@ import {
   useStockAnalyzer,
   type StockSnapshot,
 } from '../hooks/useStockAnalyzer';
-import { WatchlistGridView } from '../components/dashboard/WatchlistGridView';
+import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
@@ -416,21 +416,7 @@ export function Dashboard() {
 
         {/* Top Opportunities Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
-              Top Opportunities
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/analyzer')}
-            >
-              View Analyzer <ArrowRight className="ml-1 w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Using Analyzer Hook directly for top items */}
+           {/* Section is now self-contained in TopOpportunitiesSection */}
           <TopOpportunitiesSection />
         </div>
 
@@ -443,22 +429,90 @@ export function Dashboard() {
 }
 
 function TopOpportunitiesSection() {
-  const { data, isLoading } = useStockAnalyzer({
-    page: 1,
-    limit: 4,
-    sortBy: 'upside_percent',
-    sortDir: 'DESC',
-    search: '',
-  });
+  const [category, setCategory] = useState<'yolo' | 'conservative' | 'shorts'>('yolo');
+  const navigate = useNavigate();
 
+  // Determine params based on category
+  const analyzerParams: any = {
+      page: 1,
+      limit: 10, // Fetch more for carousel
+      search: '',
+  };
+
+  if (category === 'yolo') {
+      // Highest Upside
+      analyzerParams.sortBy = 'upside_percent';
+      analyzerParams.sortDir = 'DESC';
+  } else if (category === 'conservative') {
+      // Big Market Cap
+      analyzerParams.sortBy = 'market_cap';
+      analyzerParams.sortDir = 'DESC';
+  } else if (category === 'shorts') {
+      // Sell Ratings
+      analyzerParams.aiRating = ['Sell'];
+      analyzerParams.sortBy = 'upside_percent'; // Usually low/negative upside
+      analyzerParams.sortDir = 'ASC';
+  }
+
+  const { data, isLoading } = useStockAnalyzer(analyzerParams);
   const items = data?.items || [];
   const tickerData: TickerData[] = items.map(mapSnapshotToTickerData);
 
   return (
-    <WatchlistGridView
-      data={tickerData}
-      isLoading={isLoading}
-      // onRemove undefined implies read-only/no-delete
-    />
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <TrendingUp className={cn("w-5 h-5", category === 'shorts' ? "text-red-500" : "text-emerald-500")} />
+              {category === 'yolo' ? 'Top Opportunities' : category === 'conservative' ? 'Conservative Picks' : 'Short Candidates'}
+            </h2>
+            
+            {/* Category Tabs */}
+            <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border/50">
+                <button
+                    onClick={() => setCategory('yolo')}
+                    className={cn(
+                        "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                        category === 'yolo' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    🚀 YOLO
+                </button>
+                <button
+                    onClick={() => setCategory('conservative')}
+                    className={cn(
+                        "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                        category === 'conservative' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    🛡️ Classic
+                </button>
+                <button
+                    onClick={() => setCategory('shorts')}
+                    className={cn(
+                        "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                        category === 'shorts' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    🐻 Shorts
+                </button>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/analyzer')}
+            className="hidden sm:flex"
+          >
+            View Analyzer <ArrowRight className="ml-1 w-4 h-4" />
+          </Button>
+      </div>
+
+      <TickerCarousel 
+        data={tickerData}
+        isLoading={isLoading}
+      />
+    </div>
   );
 }
