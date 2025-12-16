@@ -1,0 +1,10 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\ticker\ResearchFeed.tsx
+  12:10  error  'useQueryClient' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 1 problem (1 error, 0 warnings)
+

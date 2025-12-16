@@ -163,4 +163,42 @@ export class WatchlistService {
 
     return result.map((r) => r.symbol);
   }
+
+  async toggleFavorite(
+    userId: string,
+    symbol: string,
+  ): Promise<{ added: boolean; message: string }> {
+    const FAV_NAME = 'Favourites';
+
+    // 1. Ensure "Favourites" list exists
+    let watchlist = await this.watchlistRepo.findOne({
+      where: { user_id: userId, name: FAV_NAME },
+    });
+
+    if (!watchlist) {
+      watchlist = await this.createWatchlist(userId, FAV_NAME);
+    }
+
+    // 2. Ensure Ticker Exists
+    const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+
+    // 3. Check if exists in list
+    const existingItem = await this.itemRepo.findOne({
+      where: { watchlist_id: watchlist.id, ticker_id: ticker.id },
+    });
+
+    if (existingItem) {
+      // Remove
+      await this.itemRepo.remove(existingItem);
+      return { added: false, message: `${symbol} removed from Favourites` };
+    } else {
+      // Add
+      const newItem = this.itemRepo.create({
+        watchlist_id: watchlist.id,
+        ticker_id: ticker.id,
+      });
+      await this.itemRepo.save(newItem);
+      return { added: true, message: `${symbol} added to Favourites` };
+    }
+  }
 }

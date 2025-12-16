@@ -56,7 +56,7 @@ export class QualityScoringService {
       }
 
       NOTE CONTENT:
-      ${noteContent.substring(0, 15000)} 
+      ${noteContent.substring(0, 500000)} 
     `;
 
     try {

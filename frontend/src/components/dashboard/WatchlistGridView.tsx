@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, Trash2, MessageCircle } from 'lucide-react';
+import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, Trash2, MessageCircle, Star } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import type { TickerData } from './WatchlistTableView';
+import { useToggleFavorite, useWatchlists } from '../../hooks/useTicker';
 
 interface WatchlistGridViewProps {
     data: TickerData[];
@@ -14,6 +15,13 @@ interface WatchlistGridViewProps {
 
 export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridViewProps) {
     const navigate = useNavigate();
+    const { data: watchlists } = useWatchlists();
+    const toggleFavorite = useToggleFavorite();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const favoritesList = watchlists?.find((w: any) => w.name === 'Favourites');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const favoritesSet = new Set(favoritesList?.items?.map((i: any) => i.ticker.symbol) || []);
 
     if (isLoading) {
         return (
@@ -39,6 +47,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                 const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating, itemId } = item;
                 const risk = riskScore || 0;
                 const upside = potentialUpside || 0;
+                const isFavorite = favoritesSet.has(symbol);
 
                 // --- Risk Logic ---
                 let riskColorClass = "text-muted-foreground";
@@ -82,6 +91,28 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </Button>
                             </div>
                         )}
+                        
+                         {/* Favorite Action (Absolute Top Right, left of Remove if exists, or simple absolute if no remove) */}
+                         {!onRemove && (
+                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "h-6 w-6 bg-card/80 backdrop-blur-sm transition-colors",
+                                        isFavorite ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFavorite.mutate(symbol);
+                                    }}
+                                    disabled={toggleFavorite.isPending}
+                                >
+                                    <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
+                                </Button>
+                            </div>
+                         )}
+
 
                         {/* Top Section Clickable */}
                         <div className="cursor-pointer flex-1" onClick={() => navigate(`/ticker/${symbol}`)}>

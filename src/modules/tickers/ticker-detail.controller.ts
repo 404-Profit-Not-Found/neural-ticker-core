@@ -71,6 +71,7 @@ export class TickerDetailController {
         industry: ticker.industry,
         sector: ticker.sector,
         web_url: ticker.web_url,
+        description: ticker.description,
       },
       market_data: {
         price: latestPrice?.close || 0,
