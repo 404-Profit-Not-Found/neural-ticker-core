@@ -29,7 +29,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 @ApiTags('Ticker')
 @ApiBearerAuth()
 @Controller('v1/tickers')
-@Public()
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}
 
@@ -51,6 +50,7 @@ export class TickersController {
       example: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ' }],
     },
   })
+  @Public()
   @Get()
   getAll(@Query('search') search?: string) {
     return this.tickersService.searchTickers(search);
@@ -65,6 +65,7 @@ export class TickersController {
     description: 'Total ticker count.',
     schema: { example: { count: 150 } },
   })
+  @Public()
   @Get('count')
   async getCount() {
     const count = await this.tickersService.getCount();
@@ -118,6 +119,7 @@ export class TickersController {
     type: TickerEntity,
   })
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
+  @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
     return this.tickersService.ensureTicker(symbol);
@@ -181,6 +183,7 @@ export class TickersController {
     type: TickerEntity,
   })
   @ApiResponse({ status: 404, description: 'Ticker not found.' })
+  @Public()
   @Get(':symbol')
   get(@Param('symbol') symbol: string) {
     return this.tickersService.getTicker(symbol);
