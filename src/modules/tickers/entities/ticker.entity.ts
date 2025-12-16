@@ -127,6 +127,14 @@ export class TickerEntity {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @ApiProperty({
+    example: false,
+    description: 'Whether the ticker is hidden from suggestions (shadow ban)',
+    required: false,
+  })
+  @Column({ type: 'boolean', default: false })
+  is_hidden: boolean;
+
   @ApiProperty({ description: 'Raw Finnhub Profile Data', required: false })
   @Column({ type: 'jsonb', nullable: true })
   finnhub_raw: Record<string, any>;

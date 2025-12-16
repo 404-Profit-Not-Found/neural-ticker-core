@@ -63,7 +63,7 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                     return (
                         <div
                             key={symbol}
-                            className="w-full group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md cursor-pointer relative"
+                            className="ticker-card w-full group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md cursor-pointer relative"
                             onClick={() => navigate(`/ticker/${symbol}`)}
                         >
                             {/* Header: Logo, Symbol, Badges */}

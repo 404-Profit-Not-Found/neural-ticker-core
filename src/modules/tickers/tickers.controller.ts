@@ -1,4 +1,14 @@
-import { Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Patch,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -7,16 +17,18 @@ import {
   ApiParam,
   ApiBearerAuth,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Ticker')
 @ApiBearerAuth()
 @Controller('v1/tickers')
-@Public()
 export class TickersController {
   constructor(private readonly tickersService: TickersService) {}
 
@@ -38,6 +50,7 @@ export class TickersController {
       example: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ' }],
     },
   })
+  @Public()
   @Get()
   getAll(@Query('search') search?: string) {
     return this.tickersService.searchTickers(search);
@@ -52,10 +65,42 @@ export class TickersController {
     description: 'Total ticker count.',
     schema: { example: { count: 150 } },
   })
+  @Public()
   @Get('count')
   async getCount() {
     const count = await this.tickersService.getCount();
     return { count };
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Get hidden (shadow banned) tickers',
+    description: 'Returns a list of all hidden tickers. Admin only.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of hidden tickers.',
+  })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Get('admin/hidden')
+  getHiddenTickers() {
+    return this.tickersService.getHiddenTickers();
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Search tickers (includes hidden)',
+    description: 'Returns a list of tickers including hidden ones. Admin only.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Filter by symbol or name prefix',
+  })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Get('admin/search')
+  searchTickersAdmin(@Query('search') search?: string) {
+    return this.tickersService.searchTickersAdmin(search);
   }
 
   @ApiOperation({
@@ -74,9 +119,33 @@ export class TickersController {
     type: TickerEntity,
   })
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
+  @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
     return this.tickersService.ensureTicker(symbol);
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Set ticker hidden status (shadow ban)',
+    description: 'Hides or unhides a ticker from suggestions. Admin only.',
+  })
+  @ApiParam({
+    name: 'symbol',
+    example: 'INTC',
+    description: 'Stock Ticker Symbol',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { hidden: { type: 'boolean', example: true } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Ticker visibility updated.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Patch(':symbol/hidden')
+  setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
+    return this.tickersService.setTickerHidden(symbol, hidden);
   }
 
   @ApiOperation({
@@ -91,9 +160,6 @@ export class TickersController {
   async getLogo(@Param('symbol') symbol: string, @Res() res: Response) {
     const logo = await this.tickersService.getLogo(symbol);
     if (!logo) {
-      // Fallback or 404. Since we have ensureTicker running, it should be there.
-      // Or we can redirect to the finnhub url via proxy if we have the ticker?
-      // For now, strict 404 and let frontend handle default.
       return res.status(404).send('Logo not found');
     }
 
@@ -117,6 +183,7 @@ export class TickersController {
     type: TickerEntity,
   })
   @ApiResponse({ status: 404, description: 'Ticker not found.' })
+  @Public()
   @Get(':symbol')
   get(@Param('symbol') symbol: string) {
     return this.tickersService.getTicker(symbol);

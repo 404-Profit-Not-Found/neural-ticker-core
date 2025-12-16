@@ -314,20 +314,20 @@
   box-shadow: 0 1px 10px rgba(var(--primary), 0.5);
 }
 
-/* Dashboard KPI Tile RGB Hover Effect */
-[data-theme='rgb'] .style-kpi {
+/* Ticker Card RGB Hover Effect (Top Opportunities) */
+[data-theme='rgb'] .ticker-card {
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-[data-theme='rgb'] .style-kpi:hover {
+[data-theme='rgb'] .ticker-card:hover {
   background: transparent !important;
   border-color: transparent !important;
   z-index: 10;
   transform: translateY(-2px);
 }
 
-[data-theme='rgb'] .style-kpi:hover::before {
+[data-theme='rgb'] .ticker-card:hover::before {
   content: "";
   position: absolute;
   top: -1px;
@@ -351,7 +351,7 @@
   pointer-events: none;
 }
 
-[data-theme='rgb'] .style-kpi:hover::after {
+[data-theme='rgb'] .ticker-card:hover::after {
   content: "";
   position: absolute;
   inset: 0;
