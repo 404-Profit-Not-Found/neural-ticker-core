@@ -16,12 +16,14 @@ export function AnalyzerPage() {
   const [filters, setFilters] = useState<AnalyzerFilters>(() => {
     const riskParam = searchParams.getAll('risk');
     const aiRatingParam = searchParams.getAll('aiRating');
+    const sectorParam = searchParams.getAll('sector');
     const upsideParam = searchParams.get('upside');
     const filterParam = searchParams.get('filter');
 
     const initialFilters: AnalyzerFilters = {
       risk: riskParam.length > 0 ? riskParam : [],
       aiRating: aiRatingParam.length > 0 ? aiRatingParam : [],
+      sector: sectorParam.length > 0 ? sectorParam : [],
       upside: upsideParam || null,
     };
 
@@ -61,6 +63,7 @@ export function AnalyzerPage() {
     // Filters
     filters.risk?.forEach((r) => params.append('risk', r));
     filters.aiRating?.forEach((r) => params.append('aiRating', r));
+    filters.sector?.forEach((s) => params.append('sector', s));
     if (filters.upside) params.append('upside', filters.upside);
 
     // View
@@ -77,7 +80,7 @@ export function AnalyzerPage() {
   };
 
   const handleReset = () => {
-    setFilters({ risk: [], aiRating: [], upside: null });
+    setFilters({ risk: [], aiRating: [], sector: [], upside: null });
     // View mode persists on reset usually, or reset to table? Let's persist.
   };
 

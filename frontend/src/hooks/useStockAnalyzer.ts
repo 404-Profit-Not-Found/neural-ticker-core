@@ -61,6 +61,7 @@ export interface AnalyzerParams {
     risk?: string[];
     aiRating?: string[];
     upside?: string | null;
+    sector?: string[];
 }
 
 export function useStockAnalyzer(params: AnalyzerParams) {
@@ -74,9 +75,10 @@ export function useStockAnalyzer(params: AnalyzerParams) {
       queryParams.append('sortDir', params.sortDir);
       if (params.search) queryParams.append('search', params.search);
       
-      // Handle array params manually for 'repeat' format (aiRating=A&aiRating=B)
+    // Handle array params manually for 'repeat' format (aiRating=A&aiRating=B)
       params.risk?.forEach(r => queryParams.append('risk', r));
       params.aiRating?.forEach(r => queryParams.append('aiRating', r));
+      params.sector?.forEach(s => queryParams.append('sector', s));
       if (params.upside) queryParams.append('upside', params.upside);
 
       const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {

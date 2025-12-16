@@ -17,6 +17,7 @@ export interface AnalyzerFilters {
   risk: string[];
   aiRating: string[];
   upside: string | null;
+  sector: string[];
 }
 
 export function FilterBar({
@@ -25,7 +26,7 @@ export function FilterBar({
   onReset,
 }: FilterBarProps) {
   const activeFilterCount =
-    filters.risk.length + filters.aiRating.length + (filters.upside ? 1 : 0);
+    filters.risk.length + filters.aiRating.length + (filters.upside ? 1 : 0) + filters.sector.length;
 
   return (
     <div className="flex flex-wrap items-center gap-2 p-1 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -200,6 +201,61 @@ export function FilterBar({
                     <Check className={cn('h-3 w-3')} />
                   </div>
                   <span>{val}</span>
+                </div>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Sector Filter */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant={filters.sector.length ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-8 border-dashed"
+          >
+            Sector
+            {filters.sector.length > 0 && (
+              <>
+                <span className="mx-2 h-4 w-[1px] bg-border" />
+                <span className="text-xs">{filters.sector.length} selected</span>
+              </>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[200px] p-0">
+          <div className="px-2 py-1.5 text-sm font-semibold border-b">
+            Sectors
+          </div>
+          <div className="p-1 h-[200px] overflow-y-auto custom-scrollbar">
+            {['Technology', 'Healthcare', 'Energy', 'Financials', 'Consumer Discretionary', 'Industrials', 'Communications', 'Consumer Staples', 'Utilities', 'Real Estate', 'Materials', 'Other'].map((sec) => {
+              const isSelected = filters.sector.includes(sec);
+              return (
+                <div
+                  key={sec}
+                  className={cn(
+                    'flex items-center space-x-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer',
+                  )}
+                  onClick={() => {
+                    const newSectors = isSelected
+                      ? filters.sector.filter((s) => s !== sec)
+                      : [...filters.sector, sec];
+                    onFilterChange('sector', newSectors);
+                  }}
+                >
+                  <div
+                    className={cn(
+                      'flex h-4 w-4 items-center justify-center rounded border border-primary',
+                      isSelected
+                        ? 'bg-primary text-primary-foreground'
+                        : 'opacity-50 [&_svg]:invisible',
+                    )}
+                  >
+                    <Check className={cn('h-3 w-3')} />
+                  </div>
+                  <span>{sec}</span>
                 </div>
               );
             })}

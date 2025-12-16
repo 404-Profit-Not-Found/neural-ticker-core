@@ -61,6 +61,7 @@ export function AnalyzerTable({
     risk: filters?.risk,
     aiRating: filters?.aiRating,
     upside: filters?.upside,
+    sector: filters?.sector,
   });
 
   const items = data?.items || [];
@@ -122,9 +123,16 @@ export function AnalyzerTable({
                 )}
               </div>
               
-              <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.ticker.name}>
-                {info.row.original.ticker.name}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.ticker.name}>
+                  {info.row.original.ticker.name}
+                </span>
+                {info.row.original.ticker.sector && (
+                     <span className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">
+                        {info.row.original.ticker.sector}
+                     </span>
+                )}
+              </div>
             </div>
           </div>
         );

@@ -71,7 +71,6 @@ export class MarketDataBulkController {
     @Query('aiRating') aiRating?: string[],
     @Query('upside') upside?: string,
   ) {
-
     return this.service.getAnalyzerTickers({
       page,
       limit,

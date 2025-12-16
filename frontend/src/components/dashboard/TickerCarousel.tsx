@@ -9,15 +9,14 @@ interface TickerCarouselProps {
     data: TickerData[];
     isLoading: boolean;
 }
-
 export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
     const navigate = useNavigate();
 
     if (isLoading) {
         return (
-            <div className="flex gap-4 overflow-hidden mask-scroll-fade">
+            <div className="flex flex-col md:grid md:grid-cols-4 gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="min-w-[280px] h-48 rounded-lg border border-border bg-card animate-pulse" />
+                    <div key={i} className="min-w-[280px] h-48 rounded-lg border border-border bg-card animate-pulse w-full" />
                 ))}
             </div>
         );
@@ -33,10 +32,10 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
 
     return (
         <div className="relative group/carousel">
-            {/* Scroll Container */}
-            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted/20 hover:scrollbar-thumb-muted/50 px-1">
+            {/* Container: Vertical Stack (Mobile) -> Grid (Desktop) */}
+            <div className="flex flex-col md:grid md:grid-cols-4 gap-4 pb-4 px-1">
                 {data.map((item) => {
-                    const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating, itemId } = item;
+                    const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating } = item;
                     const risk = riskScore || 0;
                     const upside = potentialUpside || 0;
 
@@ -64,7 +63,7 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                     return (
                         <div
                             key={symbol}
-                            className="snap-start min-w-[280px] w-[280px] sm:min-w-[320px] sm:w-[320px] group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md cursor-pointer relative"
+                            className="w-full group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md cursor-pointer relative"
                             onClick={() => navigate(`/ticker/${symbol}`)}
                         >
                             {/* Header: Logo, Symbol, Badges */}

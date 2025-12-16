@@ -24,6 +24,7 @@ import { cn, api } from '../lib/api';
 import {
   useStockAnalyzer,
   type StockSnapshot,
+  type AnalyzerParams,
 } from '../hooks/useStockAnalyzer';
 import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
@@ -118,7 +119,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     symbol: item.ticker.symbol,
     company: item.ticker.name,
     logo: item.ticker.logo_url,
-    sector: item.ticker.industry || item.ticker.sector || 'Unknown',
+    sector: item.ticker.industry || item.ticker.sector || (item.fundamentals?.sector as string) || 'Unknown',
     price: Number(item.latestPrice?.close ?? 0),
     change: Number(item.latestPrice?.change ?? 0),
     pe: Number(item.fundamentals.pe_ratio ?? 0) || null,
@@ -433,10 +434,12 @@ function TopOpportunitiesSection() {
   const navigate = useNavigate();
 
   // Determine params based on category
-  const analyzerParams: any = {
+  const analyzerParams: AnalyzerParams = {
       page: 1,
-      limit: 10, // Fetch more for carousel
+      limit: 4, // Fetch max 4 for static grid
       search: '',
+      sortBy: 'upside_percent',
+      sortDir: 'DESC',
   };
 
   if (category === 'yolo') {
