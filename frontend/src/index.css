@@ -313,3 +313,50 @@
   animation: rgb-text-flow 15s linear infinite;
   box-shadow: 0 1px 10px rgba(var(--primary), 0.5);
 }
+
+/* Dashboard KPI Tile RGB Hover Effect */
+[data-theme='rgb'] .style-kpi {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme='rgb'] .style-kpi:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+  z-index: 10;
+  transform: translateY(-2px);
+}
+
+[data-theme='rgb'] .style-kpi:hover::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  z-index: -2;
+  border-radius: inherit;
+  background: linear-gradient(45deg,
+      #ff0000,
+      #ff8800,
+      #ffff00,
+      #00ff00,
+      #00ffff,
+      #0066ff,
+      #8800ff,
+      #ff0088,
+      #ff0000);
+  background-size: 400% 400%;
+  animation: rgb-border-rotate 8s linear infinite;
+  pointer-events: none;
+}
+
+[data-theme='rgb'] .style-kpi:hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgb(var(--card));
+  pointer-events: none;
+}
