@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStockAnalyzer } from './useStockAnalyzer';
 import { api } from '../lib/api';
@@ -40,7 +40,9 @@ describe('useStockAnalyzer', () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(result.current.data).toEqual(mockData);
-        expect(api.get).toHaveBeenCalledWith('/market-data/analyzer', { params });
+        expect(api.get).toHaveBeenCalledWith('/market-data/analyzer', {
+            params: expect.any(URLSearchParams)
+        });
     });
 
     it('fetches stock analysis data with updated filters', async () => {
@@ -61,7 +63,7 @@ describe('useStockAnalyzer', () => {
 
         expect(result.current.data).toEqual(mockData);
         expect(api.get).toHaveBeenCalledWith('/market-data/analyzer', {
-            params
+            params: expect.any(URLSearchParams)
         });
     });
 });

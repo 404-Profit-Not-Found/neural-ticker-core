@@ -94,7 +94,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                     <div className="relative group/research-btn">
                                         <Button
                                             size="sm"
-                                            className={`gap-2 px-4 text-sm h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 border border-transparent ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                                            className={`gap-2 px-4 text-sm h-9 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-purple-500/25 border-0 transition-all duration-300 hover:scale-[1.02] ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''
                                                 }`}
                                             disabled={isAnalyzing || isLocked}
                                             // Prevent click propagation if locked, just in case
@@ -231,7 +231,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                     {item.provider !== 'manual' && item.provider && (
                                                         <>
                                                             <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
-                                                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20 whitespace-nowrap max-w-[100px] truncate">
+                                                            <Badge variant="outline" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-white/5 text-white/90 border-white/20 whitespace-nowrap max-w-[100px] truncate">
                                                                 {item.models_used && item.models_used.length > 0 ? item.models_used[0] : item.provider}
                                                             </Badge>
                                                         </>

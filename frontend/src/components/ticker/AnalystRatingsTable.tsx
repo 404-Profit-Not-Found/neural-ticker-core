@@ -53,7 +53,13 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
                                                     ${!isBuy && !isSell ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/5' : ''}
                                                 `}
                                             >
-                                                {rating.rating}
+                                                {(() => {
+                                                    const rLower = rating.rating.toLowerCase();
+                                                    if (rLower.includes('strong buy')) return 'Strong Buy';
+                                                    if (rLower.includes('buy') || rLower.includes('outperform')) return 'Buy';
+                                                    if (rLower.includes('sell') || rLower.includes('underperform')) return 'Sell';
+                                                    return 'Hold';
+                                                })()}
                                             </Badge>
                                         </td>
                                         <td className="p-2 text-right font-mono font-medium align-top pt-3">

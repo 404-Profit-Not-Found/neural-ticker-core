@@ -651,6 +651,7 @@ Title:`;
     page: number = 1,
     limit: number = 10,
     ticker?: string,
+    sinceHours?: number,
   ): Promise<{
     data: ResearchNote[];
     total: number;
@@ -676,6 +677,12 @@ Title:`;
       query.andWhere('note.title NOT LIKE :excludeTitle', {
         excludeTitle: 'Smart News Briefing%',
       });
+    }
+
+    // Filter by Time (e.g. for "New Reports")
+    if (sinceHours && sinceHours > 0) {
+      const threshold = new Date(Date.now() - sinceHours * 60 * 60 * 1000);
+      query.andWhere('note.created_at >= :threshold', { threshold });
     }
 
     query.orderBy('note.created_at', 'DESC');

@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, ArrayContains } from 'typeorm';
+import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -13,6 +13,7 @@ import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { RISK_ALGO } from '../../config/risk-algorithm.config';
+import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
 
 @Injectable()
 export class MarketDataService {
@@ -565,38 +566,32 @@ export class MarketDataService {
    * Criteria defined in RISK_ALGO config.
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
-    // Query fundamentals with Strong Buy consensus
-    const strongBuyFundamentals = await this.fundamentalsRepo.find({
-      where: { consensus_rating: 'Strong Buy' },
-      select: ['symbol_id'],
+    // AI Only: Tickers where LATEST risk analysis is Strong Buy
+    // We use a robust join to ensure we only check the *latest* analysis, not just *any* analysis that happened to match.
+
+    const qb = this.tickerRepo.createQueryBuilder('ticker');
+
+    // Inner Join Latest Risk
+    // Using simple subquery join pattern matching getAnalyzerTickers logic
+    qb.innerJoin(
+      RiskAnalysis,
+      'risk',
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
+    );
+
+    qb.where('risk.financial_risk <= :maxRisk', {
+      maxRisk: RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE,
     });
 
-    if (strongBuyFundamentals.length === 0) {
-      return { count: 0, symbols: [] };
-    }
+    qb.andWhere('risk.upside_percent > :minUpside', {
+      minUpside: RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT,
+    });
 
-    const symbolIds = strongBuyFundamentals.map((f) => f.symbol_id);
+    // Select symbols
+    qb.select('ticker.symbol');
 
-    // Filter by AI Opinion
-    const matchingRisk = await this.riskAnalysisRepo
-      .createQueryBuilder('risk')
-      .select('risk.ticker_id')
-      .distinctOn(['risk.ticker_id'])
-      .where('risk.ticker_id IN (:...ids)', { ids: symbolIds })
-      .andWhere('risk.overall_score <= :maxRisk', {
-        maxRisk: RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE,
-      })
-      .andWhere('risk.upside_percent > :minUpside', {
-        minUpside: RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT,
-      })
-      .orderBy('risk.ticker_id')
-      .addOrderBy('risk.created_at', 'DESC')
-      .getMany();
-
-    // Get symbols
-    const matchingSymbolIds = matchingRisk.map((r) => r.ticker_id);
-    const symbols =
-      await this.tickersService.getSymbolsByIds(matchingSymbolIds);
+    const results = await qb.getMany();
+    const symbols = results.map((t) => t.symbol);
 
     return { count: symbols.length, symbols };
   }
@@ -606,47 +601,42 @@ export class MarketDataService {
    * Criteria defined in RISK_ALGO config.
    */
   async getSellCount(): Promise<{ count: number; symbols: string[] }> {
-    // For Sell, we can be broader. Any "Sell" consensus OR terrible AI rating.
-    const sellFundamentals = await this.fundamentalsRepo.find({
-      where: { consensus_rating: 'Sell' },
-      select: ['symbol_id'],
-    });
+    // AI Only: Tickers where LATEST risk analysis is Sell
+    const qb = this.tickerRepo.createQueryBuilder('ticker');
 
-    const sellSymbolIds = sellFundamentals.map((f) => f.symbol_id);
+    // Inner Join Latest Risk
+    qb.innerJoin(
+      RiskAnalysis,
+      'risk',
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
+    );
 
-    // AI Bearish
-    const bearishRisk = await this.riskAnalysisRepo
-      .createQueryBuilder('risk')
-      .select('risk.ticker_id')
-      .distinctOn(['risk.ticker_id'])
-      .where('risk.overall_score >= :minRisk', {
-        minRisk: RISK_ALGO.SELL.MIN_RISK_SCORE,
-      })
-      .orWhere('risk.upside_percent < :maxUpside', {
-        maxUpside: RISK_ALGO.SELL.MAX_UPSIDE_PERCENT,
-      })
-      .orderBy('risk.ticker_id')
-      .addOrderBy('risk.created_at', 'DESC')
-      .getMany();
+    // AI Sell Criteria: High Financial Risk OR Low/Negative Upside
+    qb.where(
+      new Brackets((sub) => {
+        sub
+          .where('risk.upside_percent < :maxUpside', {
+            maxUpside: RISK_ALGO.SELL.MAX_UPSIDE_PERCENT,
+          })
+          .orWhere('risk.financial_risk >= :minRisk', {
+            minRisk: RISK_ALGO.SELL.MIN_RISK_SCORE,
+          });
+      }),
+    );
 
-    // Union of IDs
-    const bearishSymbolIds = bearishRisk.map((r) => r.ticker_id);
-    const allIds = Array.from(
-      new Set([...sellSymbolIds, ...bearishSymbolIds]),
-    ).map((id) => Number(id)); // Ensure they are numbers
+    // Select symbols
+    qb.select('ticker.symbol');
 
-    if (allIds.length === 0) {
-      return { count: 0, symbols: [] };
-    }
+    const results = await qb.getMany();
+    const symbols = results.map((t) => t.symbol);
 
-    const symbols = await this.tickersService.getSymbolsByIds(allIds);
     return { count: symbols.length, symbols };
   }
 
   /**
    * Get paginated analyzer data
    */
-  async getAnalyzerTickers(options: AnalyzerOptions) {
+  async getAnalyzerTickers(options: GetAnalyzerTickersOptions) {
     const page = options.page || 1;
     const limit = options.limit || 50;
     const skip = (page - 1) * limit;
@@ -736,14 +726,99 @@ export class MarketDataService {
       qb.andWhere('ticker.symbol IN (:...symbols)', { symbols });
     }
 
+    if (options.sector && options.sector.length > 0) {
+      qb.andWhere(
+        new Brackets((sub) => {
+          sub
+            .where('ticker.sector IN (:...sectors)', {
+              sectors: options.sector,
+            })
+            .orWhere('fund.sector IN (:...sectors)', {
+              sectors: options.sector,
+            });
+        }),
+      );
+    }
+
+    // --- NEW: Filters ---
+
+    // 1. Risk Filter (Updated to Financial Risk)
+    if (options.risk && options.risk.length > 0) {
+      // Map string labels to ranges based on RISK_ALGO or general convention
+      // Low: 0-3.5, Medium: 3.5-6.5, High: 6.5+
+      // (Using a Brackets to OR them together)
+      qb.andWhere(
+        new Brackets((sub) => {
+          options.risk?.forEach((r) => {
+            if (r.includes('Low')) sub.orWhere('risk.financial_risk < 3.5');
+            else if (r.includes('Medium'))
+              sub.orWhere('risk.financial_risk BETWEEN 3.5 AND 6.5');
+            else if (r.includes('High'))
+              sub.orWhere('risk.financial_risk > 6.5');
+          });
+        }),
+      );
+    }
+
+    // 2. Upside Filter
+    if (options.upside) {
+      // Expected format: "> 10%", "> 20%", "> 50%"
+      const match = options.upside.match(/(\d+)/);
+      if (match) {
+        const val = parseInt(match[0], 10);
+        qb.andWhere('risk.upside_percent > :upsideVal', { upsideVal: val });
+      }
+    }
+
+    // 3. AI Rating Filter (Updated to Financial Risk)
+    // Logic matching RISK_ALGO config
+    // Strong Buy: Upside > MIN_UPSIDE and Score <= MAX_RISK
+    if (options.aiRating && options.aiRating.length > 0) {
+      qb.andWhere(
+        new Brackets((sub) => {
+          options.aiRating?.forEach((rating) => {
+            if (rating === 'Strong Buy') {
+              sub.orWhere(
+                `(risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE})`,
+              );
+            } else if (rating === 'Buy') {
+              // Buy is generally strictly better than Hold but less than Strong Buy
+              // Let's assume Upside > 10% and Score <= 7 (Align with frontend strict logic)
+              sub.orWhere(
+                '(risk.upside_percent > 10 AND risk.financial_risk <= 7)',
+              );
+            } else if (rating === 'Sell') {
+              // Sell: Low Upside OR High Risk (> 7 or 8)
+              sub.orWhere(
+                `(risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})`,
+              );
+            } else if (rating === 'Hold') {
+              // Hold = Everything else
+              // NOT (Strong Buy OR Buy OR Sell)
+              sub.orWhere(
+                `NOT (
+                    (risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE}) OR 
+                    (risk.upside_percent > 10 AND risk.financial_risk <= 7) OR 
+                    (risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})
+                 )`,
+              );
+            }
+          });
+        }),
+      );
+    }
+
     // Sort Mapping
     let sortField = `fund.${sortBy}`; // Default to fundamentals
 
-    if (sortBy === 'change') {
+    if (sortBy === 'change' || sortBy === 'price_change') {
       // Sort by computed column expression or alias (alias often works in Postgres if selected)
       // We use the alias 'price_change_pct' which we defined above.
       // Note: Postgres allows ordering by alias in ORDER BY clause.
       sortField = '"price_change_pct"';
+    } else if (sortBy === 'ai_rating') {
+      // Map AI Rating sort to Financial Risk (Proxy for rating quality)
+      sortField = 'risk.financial_risk';
     } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
     } else if (
@@ -766,7 +841,7 @@ export class MarketDataService {
     // Since our joins are effectively 1:1 (mapOne with subqueries), this is safe.
     qb.offset(skip).limit(limit);
 
-    // Get Raw Entities (mapped)
+    // Get Raw Entities ( mapped)
     const { entities, raw } = await qb.getRawAndEntities();
     const total = await qb.getCount();
 
@@ -795,18 +870,20 @@ export class MarketDataService {
             symbol: t.symbol,
             name: t.name,
             exchange: t.exchange,
-            sector: t.sector,
-            industry: t.industry,
             logo_url: t.logo_url,
+            // Fallback strategy for sector/industry
+            sector:
+              t.sector || t.fund?.sector || t.finnhub_industry || 'Unknown',
+            industry: t.industry || t.finnhub_industry,
           },
-          fundamentals: t.fund || {},
           latestPrice: latestPriceWithChange,
+          fundamentals: t.fund || {},
           aiAnalysis: t.latestRisk || null,
           counts: {
-            analysts: isNaN(analystCount) ? 0 : analystCount,
-            research: isNaN(researchCount) ? 0 : researchCount,
-            news: isNaN(newsCount) ? 0 : newsCount,
-            social: isNaN(socialCount) ? 0 : socialCount,
+            analysts: analystCount,
+            research: researchCount,
+            social: socialCount,
+            news: newsCount,
           },
         };
       }),
@@ -880,6 +957,7 @@ export class MarketDataService {
         riskAnalysis: risk
           ? {
               overall_score: risk.overall_score,
+              financial_risk: risk.financial_risk,
             }
           : null,
       };
@@ -894,4 +972,8 @@ export interface AnalyzerOptions {
   sortDir?: 'ASC' | 'DESC';
   search?: string;
   symbols?: string[];
+  // Filters
+  risk?: string[];
+  aiRating?: string[];
+  upside?: string;
 }

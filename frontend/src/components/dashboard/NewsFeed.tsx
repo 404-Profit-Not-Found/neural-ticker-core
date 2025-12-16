@@ -30,7 +30,7 @@ interface ResearchNote {
         symbol: string;
         name: string;
         latestPrice?: { close: number; changePercent?: number };
-        riskAnalysis?: { overall_score: number };
+        riskAnalysis?: { overall_score: number; financial_risk?: number };
     }[];
     models_used?: string[];
     tokens_in?: number;
@@ -73,12 +73,21 @@ export function NewsFeed() {
         fetchData();
     }, []);
 
-    const formatDate = (ts: number) => {
+    const formatDate = (ts: number | string) => {
         if (!ts) return 'Just now';
         try {
-            // Finnhub returns seconds, but check if it's ms (huge number)
-            const date = new Date(ts > 10000000000 ? ts : ts * 1000);
+            let date: Date;
+            // Handle number (unix timestamp)
+            if (typeof ts === 'number') {
+                // Finnhub returns seconds, but check if it's ms (huge number)
+                date = new Date(ts > 10000000000 ? ts : ts * 1000);
+            } else {
+                // Handle string (ISO or other formats)
+                date = new Date(ts);
+            }
+
             if (isNaN(date.getTime())) return 'Recently';
+            
             return date.toLocaleDateString(undefined, {
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
@@ -119,7 +128,7 @@ export function NewsFeed() {
                         {digest && digest.models_used && (
                             <div className="flex items-center gap-2">
                                 {digest.models_used.map(model => (
-                                    <Badge key={model} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
+                                    <Badge key={model} variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-white/5 text-white/90 border-white/20 hover:bg-white/10">
                                         {model}
                                     </Badge>
                                 ))}
@@ -143,17 +152,18 @@ export function NewsFeed() {
                             {digest.relatedTickers && digest.relatedTickers.length > 0 && (
                                 <div className="mb-6 pb-4 border-b border-border/50">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number }; riskAnalysis?: { overall_score: number } }) => (
+                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number }; riskAnalysis?: { overall_score: number; financial_risk?: number } }) => (
                                             <MiniTickerTile
                                                 key={t.id}
                                                 symbol={t.symbol}
                                                 company={t.name}
                                                 price={Number(t.latestPrice?.close || 0)}
                                                 change={Number(t.latestPrice?.changePercent || 0)}
-                                                riskScore={t.riskAnalysis?.overall_score ?? 0}
+                                                riskScore={t.riskAnalysis?.financial_risk ?? t.riskAnalysis?.overall_score ?? 0}
                                                 href={`/ticker/${t.symbol}`}
                                             />
                                         ))}
+
                                     </div>
                                 </div>
                             )}

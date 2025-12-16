@@ -1,33 +1,22 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, Trash2, MessageCircle, Star } from 'lucide-react';
+import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
 import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import type { TickerData } from './WatchlistTableView';
-import { useToggleFavorite, useWatchlists } from '../../hooks/useTicker';
 
-interface WatchlistGridViewProps {
+interface TickerCarouselProps {
     data: TickerData[];
     isLoading: boolean;
-    onRemove?: (itemId: string, symbol: string) => void;
 }
-
-export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridViewProps) {
+export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
     const navigate = useNavigate();
-    const { data: watchlists } = useWatchlists();
-    const toggleFavorite = useToggleFavorite();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const favoritesList = watchlists?.find((w: any) => w.name === 'Favourites');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const favoritesSet = new Set(favoritesList?.items?.map((i: any) => i.ticker.symbol) || []);
 
     if (isLoading) {
         return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-48 rounded-lg border border-border bg-card animate-pulse" />
+            <div className="flex flex-col md:grid md:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="min-w-[280px] h-48 rounded-lg border border-border bg-card animate-pulse w-full" />
                 ))}
             </div>
         );
@@ -36,86 +25,47 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
     if (data.length === 0) {
         return (
             <div className="text-center py-12 text-muted-foreground bg-card/50 rounded-lg border border-border">
-                Watchlist is empty.
+                No opportunities found for this category.
             </div>
         );
     }
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {data.map((item) => {
-                const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating, itemId } = item;
-                const risk = riskScore || 0;
-                const upside = potentialUpside || 0;
-                const isFavorite = favoritesSet.has(symbol);
+        <div className="relative group/carousel">
+            {/* Container: Vertical Stack (Mobile) -> Grid (Desktop) */}
+            <div className="flex flex-col md:grid md:grid-cols-4 gap-4 pb-4 px-1">
+                {data.map((item) => {
+                    const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating } = item;
+                    const risk = riskScore || 0;
+                    const upside = potentialUpside || 0;
 
-                // --- Risk Logic ---
-                let riskColorClass = "text-muted-foreground";
-                let RiskIcon = ShieldCheck;
-                if (risk <= 3.5) {
-                    riskColorClass = "text-emerald-500 font-bold";
-                    RiskIcon = ShieldCheck;
-                } else if (risk <= 6.5) {
-                    riskColorClass = "text-yellow-500 font-bold";
-                    RiskIcon = AlertTriangle;
-                } else {
-                    riskColorClass = "text-red-500 font-bold";
-                    RiskIcon = Flame;
-                }
+                    // --- Risk Logic ---
+                    let riskColorClass = "text-muted-foreground";
+                    let RiskIcon = ShieldCheck;
+                    if (risk <= 3.5) {
+                        riskColorClass = "text-emerald-500 font-bold";
+                        RiskIcon = ShieldCheck;
+                    } else if (risk <= 6.5) {
+                        riskColorClass = "text-yellow-500 font-bold";
+                        RiskIcon = AlertTriangle;
+                    } else {
+                        riskColorClass = "text-red-500 font-bold";
+                        RiskIcon = Flame;
+                    }
 
-                // --- AI Rating Variant ---
-                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
-                if (aiRating === 'Strong Buy') variant = 'strongBuy';
-                else if (aiRating === 'Buy') variant = 'buy';
-                else if (aiRating === 'Hold') variant = 'hold';
-                else if (aiRating === 'Sell') variant = 'sell';
+                    // --- AI Rating Variant ---
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                    if (aiRating === 'Strong Buy') variant = 'strongBuy';
+                    else if (aiRating === 'Buy') variant = 'buy';
+                    else if (aiRating === 'Hold') variant = 'hold';
+                    else if (aiRating === 'Sell') variant = 'sell';
 
-                return (
-                    <div
-                        key={symbol}
-                        className="watchlist-tile group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full relative"
-                    >
-                        {/* Remove Action (Absolute Top Right) - Only if onRemove is provided */}
-                        {onRemove && (
-                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onRemove(itemId || '', symbol);
-                                    }}
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        )}
-                        
-                         {/* Favorite Action (Absolute Top Right, left of Remove if exists, or simple absolute if no remove) */}
-                         {!onRemove && (
-                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={cn(
-                                        "h-6 w-6 bg-card/80 backdrop-blur-sm transition-colors",
-                                        isFavorite ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
-                                    )}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleFavorite.mutate(symbol);
-                                    }}
-                                    disabled={toggleFavorite.isPending}
-                                >
-                                    <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
-                                </Button>
-                            </div>
-                         )}
-
-
-                        {/* Top Section Clickable */}
-                        <div className="cursor-pointer flex-1" onClick={() => navigate(`/ticker/${symbol}`)}>
+                    return (
+                        <div
+                            key={symbol}
+                            className="w-full group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all shadow-sm hover:shadow-md cursor-pointer relative"
+                            onClick={() => navigate(`/ticker/${symbol}`)}
+                        >
                             {/* Header: Logo, Symbol, Badges */}
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3 w-full">
@@ -232,9 +182,13 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </div>
                             </div>
                         </div>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
+            
+            {/* Fade Edges */}
+            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none md:hidden" />
+            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none md:hidden" />
         </div>
     );
 }

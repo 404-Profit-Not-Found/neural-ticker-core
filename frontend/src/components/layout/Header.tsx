@@ -293,7 +293,7 @@ export function Header() {
                 }`}
             >
               <div className="p-4 border-b border-border">
-                <p className="font-semibold text-foreground flex items-center gap-2">
+                <div className="font-semibold text-foreground flex items-center gap-2">
                   {user?.nickname || 'Trader'}
                   <Badge
                     variant="outline"
@@ -304,7 +304,7 @@ export function Header() {
                   >
                     {(user?.tier || 'free').toUpperCase()}
                   </Badge>
-                </p>
+                </div>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
 

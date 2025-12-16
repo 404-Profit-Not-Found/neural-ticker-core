@@ -27,6 +27,7 @@ export function MiniTickerTile({ symbol, company, price, change, riskScore, href
             </div>
             <div className="flex justify-between items-end mt-auto">
                 <span className="text-xs font-semibold font-mono">${price.toFixed(2)}</span>
+                
                 <span className={cn(
                     "text-[10px] font-bold px-1.5 py-0.5 rounded-sm",
                     riskScore <= 3 ? "text-emerald-500 bg-emerald-500/10" :

@@ -199,7 +199,7 @@ export function ResearchPage() {
 
                         {/* Model Badge */}
                         {note.models_used && note.models_used.length > 0 && (
-                            <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
+                            <div className="flex items-center gap-1.5 bg-white/5 text-white/90 border border-white/20 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
                                 <Brain className="w-3 h-3" />
                                 <span>{note.models_used[0]}</span>
                             </div>

@@ -1,7 +1,7 @@
 export const RISK_ALGO = {
   STRONG_BUY: {
     MAX_RISK_SCORE: 6, // User requested <= 6
-    MIN_UPSIDE_PERCENT: 15,
+    MIN_UPSIDE_PERCENT: 20,
   },
   SELL: {
     MIN_RISK_SCORE: 8,

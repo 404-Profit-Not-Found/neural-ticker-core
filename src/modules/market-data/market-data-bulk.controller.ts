@@ -53,6 +53,9 @@ export class MarketDataBulkController {
     enum: ['ASC', 'DESC'],
   })
   @ApiQuery({ name: 'search', required: false, example: 'AAP' })
+  @ApiQuery({ name: 'risk', required: false, isArray: true, type: String })
+  @ApiQuery({ name: 'aiRating', required: false, isArray: true, type: String })
+  @ApiQuery({ name: 'upside', required: false, type: String, example: '> 20%' })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',
@@ -64,6 +67,9 @@ export class MarketDataBulkController {
     @Query('sortBy') sortBy?: string,
     @Query('sortDir') sortDir?: 'ASC' | 'DESC',
     @Query('search') search?: string,
+    @Query('risk') risk?: string[],
+    @Query('aiRating') aiRating?: string[],
+    @Query('upside') upside?: string,
   ) {
     return this.service.getAnalyzerTickers({
       page,
@@ -71,6 +77,9 @@ export class MarketDataBulkController {
       sortBy,
       sortDir,
       search,
+      risk: Array.isArray(risk) ? risk : risk ? [risk] : [],
+      aiRating: Array.isArray(aiRating) ? aiRating : aiRating ? [aiRating] : [],
+      upside,
     });
   }
 }

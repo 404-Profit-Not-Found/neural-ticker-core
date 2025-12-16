@@ -165,6 +165,7 @@ describe('ResearchController', () => {
         1,
         10,
         undefined,
+        undefined,
       );
     });
   });
