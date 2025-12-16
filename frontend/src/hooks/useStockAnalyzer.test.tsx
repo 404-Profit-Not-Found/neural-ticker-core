@@ -62,7 +62,6 @@ describe('useStockAnalyzer', () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(result.current.data).toEqual(mockData);
-        expect(result.current.data).toEqual(mockData);
         expect(api.get).toHaveBeenCalledWith('/market-data/analyzer', {
             params: expect.any(URLSearchParams)
         });

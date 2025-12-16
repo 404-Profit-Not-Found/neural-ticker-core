@@ -19,12 +19,12 @@ vi.mock('./AnalyzerGridView', () => ({
 
 import { useStockAnalyzer } from '../../hooks/useStockAnalyzer';
 
-const mockUseStockAnalyzer = useStockAnalyzer as any;
+const mockUseStockAnalyzer = useStockAnalyzer as ReturnType<typeof vi.fn>;
 
 const defaultProps = {
   viewMode: 'table' as const,
   onViewModeChange: vi.fn(),
-  filters: { risk: [], aiRating: [], upside: null },
+  filters: { risk: [], aiRating: [], upside: null, sector: [] },
 };
 
 const renderWithRouter = (component: React.ReactNode) => {
@@ -77,7 +77,7 @@ describe('AnalyzerTable', () => {
 
   it('passes filters to hook', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
-    const filters = { risk: ['High'], aiRating: ['Buy'], upside: '>20%' };
+    const filters = { risk: ['High'], aiRating: ['Buy'], upside: '>20%', sector: [] };
     
     renderWithRouter(<AnalyzerTable {...defaultProps} filters={filters} />);
     

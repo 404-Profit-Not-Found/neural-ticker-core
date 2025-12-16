@@ -374,7 +374,7 @@ export function Dashboard() {
             >
               <StatPill
                 icon={Brain}
-                label="New Reports (24h)"
+                label="AI Reports (24h)"
                 value={
                   stats?.research !== undefined ? String(stats.research) : '...'
                 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalyzerPage } from './AnalyzerPage';
@@ -11,8 +10,8 @@ vi.mock('../components/layout/Header', () => ({
 
 vi.mock('../components/analyzer/FilterBar', () => ({
   FilterBar: ({ filters, onFilterChange, onReset }: { 
-    filters: { risk: string[], aiRating: string[], upside: string }, 
-    onFilterChange: (key: string, val: string[]) => void, 
+    filters: { risk: string[], aiRating: string[], upside: string | null, sector: string[] }, 
+    onFilterChange: (key: 'risk' | 'aiRating' | 'upside' | 'sector', val: string[] | string | null) => void, 
     onReset: () => void 
   }) => (
     <div data-testid="filter-bar">
