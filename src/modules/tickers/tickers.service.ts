@@ -170,6 +170,7 @@ export class TickersService {
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
       select: ['symbol', 'name', 'exchange'],
+      where: { is_hidden: false },
       order: { symbol: 'ASC' },
     });
   }
@@ -188,10 +189,12 @@ export class TickersService {
         'ticker.exchange',
         'ticker.logo_url',
       ])
-      .where('UPPER(ticker.symbol) LIKE :pattern', { pattern: searchPattern })
-      .orWhere('UPPER(ticker.name) LIKE :pattern', { pattern: searchPattern })
+      .where('ticker.is_hidden = :hidden', { hidden: false })
+      .andWhere(
+        '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
+        { pattern: searchPattern },
+      )
       .orderBy('ticker.symbol', 'ASC')
-      .limit(20)
       .limit(20)
       .getMany();
   }
@@ -210,5 +213,57 @@ export class TickersService {
 
   getRepo(): Repository<TickerEntity> {
     return this.tickerRepo;
+  }
+
+  // Admin: Shadow ban management
+  async setTickerHidden(
+    symbol: string,
+    hidden: boolean,
+  ): Promise<TickerEntity> {
+    const ticker = await this.tickerRepo.findOne({
+      where: { symbol: symbol.toUpperCase() },
+    });
+    if (!ticker) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
+    ticker.is_hidden = hidden;
+    return this.tickerRepo.save(ticker);
+  }
+
+  async getHiddenTickers(): Promise<Partial<TickerEntity>[]> {
+    return this.tickerRepo.find({
+      select: ['id', 'symbol', 'name', 'exchange', 'is_hidden'],
+      where: { is_hidden: true },
+      order: { symbol: 'ASC' },
+    });
+  }
+
+  async searchTickersAdmin(search?: string): Promise<Partial<TickerEntity>[]> {
+    // Admin search includes hidden tickers
+    if (!search || search.trim() === '') {
+      return this.tickerRepo.find({
+        select: ['id', 'symbol', 'name', 'exchange', 'is_hidden'],
+        order: { symbol: 'ASC' },
+        take: 50,
+      });
+    }
+
+    const searchPattern = `${search.toUpperCase()}%`;
+    return this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select([
+        'ticker.id',
+        'ticker.symbol',
+        'ticker.name',
+        'ticker.exchange',
+        'ticker.is_hidden',
+      ])
+      .where(
+        '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
+        { pattern: searchPattern },
+      )
+      .orderBy('ticker.symbol', 'ASC')
+      .limit(50)
+      .getMany();
   }
 }

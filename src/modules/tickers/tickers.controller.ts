@@ -1,4 +1,14 @@
-import { Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Patch,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -7,11 +17,14 @@ import {
   ApiParam,
   ApiBearerAuth,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Ticker')
 @ApiBearerAuth()
@@ -59,6 +72,37 @@ export class TickersController {
   }
 
   @ApiOperation({
+    summary: 'Admin: Get hidden (shadow banned) tickers',
+    description: 'Returns a list of all hidden tickers. Admin only.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of hidden tickers.',
+  })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Get('admin/hidden')
+  getHiddenTickers() {
+    return this.tickersService.getHiddenTickers();
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Search tickers (includes hidden)',
+    description: 'Returns a list of tickers including hidden ones. Admin only.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Filter by symbol or name prefix',
+  })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Get('admin/search')
+  searchTickersAdmin(@Query('search') search?: string) {
+    return this.tickersService.searchTickersAdmin(search);
+  }
+
+  @ApiOperation({
     summary: 'Ensure ticker exists and fetch profile',
     description:
       'Checks if ticker exists in DB. If not, fetches profile from Finnhub and saves it.',
@@ -80,6 +124,29 @@ export class TickersController {
   }
 
   @ApiOperation({
+    summary: 'Admin: Set ticker hidden status (shadow ban)',
+    description: 'Hides or unhides a ticker from suggestions. Admin only.',
+  })
+  @ApiParam({
+    name: 'symbol',
+    example: 'INTC',
+    description: 'Stock Ticker Symbol',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { hidden: { type: 'boolean', example: true } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Ticker visibility updated.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Patch(':symbol/hidden')
+  setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
+    return this.tickersService.setTickerHidden(symbol, hidden);
+  }
+
+  @ApiOperation({
     summary: 'Get ticker logo',
     description: 'Serves the cached logo for a ticker from the database.',
   })
@@ -91,9 +158,6 @@ export class TickersController {
   async getLogo(@Param('symbol') symbol: string, @Res() res: Response) {
     const logo = await this.tickersService.getLogo(symbol);
     if (!logo) {
-      // Fallback or 404. Since we have ensureTicker running, it should be there.
-      // Or we can redirect to the finnhub url via proxy if we have the ticker?
-      // For now, strict 404 and let frontend handle default.
       return res.status(404).send('Logo not found');
     }
 

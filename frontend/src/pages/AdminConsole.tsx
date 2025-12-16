@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User, Coins, TrendingUp } from 'lucide-react';
+import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User, Coins, TrendingUp, EyeOff, Users } from 'lucide-react';
+import { ShadowBanManager } from '../components/admin/ShadowBanManager';
 import { Header } from '../components/layout/Header';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -44,6 +45,9 @@ export function AdminConsole() {
             navigate('/access-denied', { replace: true });
         }
     }, [currentUser, navigate]);
+
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'users' | 'shadowban'>('users');
 
     // Table State
     const [searchTerm, setSearchTerm] = useState('');
@@ -231,20 +235,53 @@ export function AdminConsole() {
                             <Shield className="w-8 h-8 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Access Management</h1>
-                            <p className="text-muted-foreground mt-1">Manage users, invites, and permissions</p>
+                            <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
+                            <p className="text-muted-foreground mt-1">Manage users, invites, and content moderation</p>
                         </div>
                     </div>
 
-                    <Button
-                        onClick={() => setIsInviteOpen(true)}
-                        className="gap-2"
-                    >
-                        <Plus size={18} />
-                        Invite User
-                    </Button>
+                    {activeTab === 'users' && (
+                        <Button
+                            onClick={() => setIsInviteOpen(true)}
+                            className="gap-2"
+                        >
+                            <Plus size={18} />
+                            Invite User
+                        </Button>
+                    )}
                 </div>
 
+                {/* Tab Navigation */}
+                <div className="flex gap-2 mb-6 border-b border-border">
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                            activeTab === 'users'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <Users size={16} />
+                        Users
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('shadowban')}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                            activeTab === 'shadowban'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <EyeOff size={16} />
+                        Shadow Ban
+                    </button>
+                </div>
+
+                {/* Shadow Ban Tab */}
+                {activeTab === 'shadowban' && <ShadowBanManager />}
+
+                {/* Users Tab */}
+                {activeTab === 'users' && (
                 <Card>
                     <CardHeader className="pb-3">
                         <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
@@ -529,6 +566,7 @@ export function AdminConsole() {
                         </div>
                     </div>
                 </Card>
+                )}
             </main>
 
             {/* Invite Dialog */}

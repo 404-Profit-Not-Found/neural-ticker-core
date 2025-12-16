@@ -122,4 +122,35 @@ export const AdminService = {
       throw error;
     }
   },
+
+  // Ticker Shadow Ban Management
+  getHiddenTickers: async () => {
+    try {
+      const { data } = await api.get<{ id: string; symbol: string; name: string; exchange: string; is_hidden: boolean }[]>('/tickers/admin/hidden');
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
+  searchTickersAdmin: async (search?: string) => {
+    try {
+      const { data } = await api.get<{ id: string; symbol: string; name: string; exchange: string; is_hidden: boolean }[]>('/tickers/admin/search', { params: { search } });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
+  setTickerHidden: async (symbol: string, hidden: boolean) => {
+    try {
+      const { data } = await api.patch(`/tickers/${symbol}/hidden`, { hidden });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
 };
