@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, ArrayContains } from 'typeorm';
+import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -736,14 +736,85 @@ export class MarketDataService {
       qb.andWhere('ticker.symbol IN (:...symbols)', { symbols });
     }
 
+    // --- NEW: Filters ---
+
+    // 1. Risk Filter (Updated to Financial Risk)
+    if (options.risk && options.risk.length > 0) {
+      // Map string labels to ranges based on RISK_ALGO or general convention
+      // Low: 0-3.5, Medium: 3.5-6.5, High: 6.5+
+      // (Using a Brackets to OR them together)
+      qb.andWhere(
+        new Brackets((sub) => {
+          options.risk?.forEach((r) => {
+            if (r.includes('Low')) sub.orWhere('risk.financial_risk < 3.5');
+            else if (r.includes('Medium'))
+              sub.orWhere('risk.financial_risk BETWEEN 3.5 AND 6.5');
+            else if (r.includes('High'))
+              sub.orWhere('risk.financial_risk > 6.5');
+          });
+        }),
+      );
+    }
+
+    // 2. Upside Filter
+    if (options.upside) {
+      // Expected format: "> 10%", "> 20%", "> 50%"
+      const match = options.upside.match(/(\d+)/);
+      if (match) {
+        const val = parseInt(match[0], 10);
+        qb.andWhere('risk.upside_percent > :upsideVal', { upsideVal: val });
+      }
+    }
+
+    // 3. AI Rating Filter (Updated to Financial Risk)
+    // Logic matching RISK_ALGO config
+    // Strong Buy: Upside > MIN_UPSIDE and Score <= MAX_RISK
+    if (options.aiRating && options.aiRating.length > 0) {
+      qb.andWhere(
+        new Brackets((sub) => {
+          options.aiRating?.forEach((rating) => {
+            if (rating === 'Strong Buy') {
+              sub.orWhere(
+                `(risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE})`,
+              );
+            } else if (rating === 'Buy') {
+              // Buy is generally strictly better than Hold but less than Strong Buy
+              // Let's assume Upside > 10% and Score <= 7 (Align with frontend strict logic)
+              sub.orWhere(
+                '(risk.upside_percent > 10 AND risk.financial_risk <= 7)',
+              );
+            } else if (rating === 'Sell') {
+                // Sell: Low Upside OR High Risk (> 7 or 8)
+              sub.orWhere(
+                `(risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})`,
+              );
+            } else if (rating === 'Hold') {
+              // Hold = Everything else
+              // NOT (Strong Buy OR Buy OR Sell)
+              sub.orWhere(
+                `NOT (
+                    (risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE}) OR 
+                    (risk.upside_percent > 10 AND risk.financial_risk <= 7) OR 
+                    (risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})
+                 )`,
+              );
+            }
+          });
+        }),
+      );
+    }
+
     // Sort Mapping
     let sortField = `fund.${sortBy}`; // Default to fundamentals
 
-    if (sortBy === 'change') {
+    if (sortBy === 'change' || sortBy === 'price_change') {
       // Sort by computed column expression or alias (alias often works in Postgres if selected)
       // We use the alias 'price_change_pct' which we defined above.
       // Note: Postgres allows ordering by alias in ORDER BY clause.
       sortField = '"price_change_pct"';
+    } else if (sortBy === 'ai_rating') {
+      // Map AI Rating sort to Financial Risk (Proxy for rating quality)
+      sortField = 'risk.financial_risk';
     } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
     } else if (
@@ -766,7 +837,7 @@ export class MarketDataService {
     // Since our joins are effectively 1:1 (mapOne with subqueries), this is safe.
     qb.offset(skip).limit(limit);
 
-    // Get Raw Entities (mapped)
+    // Get Raw Entities ( mapped)
     const { entities, raw } = await qb.getRawAndEntities();
     const total = await qb.getCount();
 
@@ -880,6 +951,7 @@ export class MarketDataService {
         riskAnalysis: risk
           ? {
               overall_score: risk.overall_score,
+              financial_risk: risk.financial_risk,
             }
           : null,
       };
@@ -894,4 +966,8 @@ export interface AnalyzerOptions {
   sortDir?: 'ASC' | 'DESC';
   search?: string;
   symbols?: string[];
+  // Filters
+  risk?: string[];
+  aiRating?: string[];
+  upside?: string;
 }

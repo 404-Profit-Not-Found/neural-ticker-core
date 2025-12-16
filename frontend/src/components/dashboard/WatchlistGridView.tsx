@@ -150,16 +150,28 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                         </span>
                                         {/* Analyst Badge (Under Price) */}
                                         {item.rating && item.rating !== '-' && (() => {
-                                            let analystVariant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
-                                            if (item.rating === 'Strong Buy') analystVariant = 'strongBuy';
-                                            else if (item.rating === 'Buy') analystVariant = 'buy';
-                                            else if (item.rating === 'Hold') analystVariant = 'hold';
-                                            else if (item.rating === 'Sell') analystVariant = 'sell';
+                                            const rLower = item.rating.toLowerCase();
+                                            let displayRating = 'Hold';
+                                            let analystVariant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "hold";
+
+                                            if (rLower.includes('strong buy')) {
+                                               displayRating = 'Strong Buy';
+                                               analystVariant = 'strongBuy';
+                                            } else if (rLower.includes('buy')) {
+                                               displayRating = 'Buy';
+                                               analystVariant = 'buy';
+                                            } else if (rLower.includes('sell')) {
+                                               displayRating = 'Sell';
+                                               analystVariant = 'sell';
+                                            } else {
+                                               displayRating = 'Hold';
+                                               analystVariant = 'hold';
+                                            }
 
                                             return (
-                                                <Badge variant={analystVariant} className="text-[10px] h-4 px-1.5 whitespace-nowrap gap-1">
+                                                <Badge variant={analystVariant} className="h-4 px-1.5 whitespace-nowrap gap-1">
                                                     <span className="opacity-70 font-normal mr-0.5">Consensus:</span>
-                                                    {item.rating} {item.analystCount > 0 ? `(${item.analystCount})` : ''}
+                                                    {displayRating} {item.analystCount > 0 ? `(${item.analystCount})` : ''}
                                                 </Badge>
                                             );
                                         })()}

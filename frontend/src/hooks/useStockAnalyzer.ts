@@ -23,8 +23,7 @@ export interface StockSnapshot {
     } | null;
     fundamentals: {
         market_cap?: number;
-        pe_ratio?: number;
-        market_ap?: number; // fallback mapping
+        pe_ttm?: number;
         // ... loosely typed for now as we map raw
         [key: string]: number | string | null | undefined;
     };
@@ -58,17 +57,33 @@ export interface AnalyzerParams {
     sortBy: string;
     sortDir: 'ASC' | 'DESC';
     search: string;
+    // Filters
+    risk?: string[];
+    aiRating?: string[];
+    upside?: string | null;
 }
 
 export function useStockAnalyzer(params: AnalyzerParams) {
     return useQuery({
         queryKey: ['analyzer', params],
         queryFn: async () => {
-            const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {
-                params,
-            });
-            return data;
-        },
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', String(params.page));
+      queryParams.append('limit', String(params.limit));
+      queryParams.append('sortBy', params.sortBy);
+      queryParams.append('sortDir', params.sortDir);
+      if (params.search) queryParams.append('search', params.search);
+      
+      // Handle array params manually for 'repeat' format (aiRating=A&aiRating=B)
+      params.risk?.forEach(r => queryParams.append('risk', r));
+      params.aiRating?.forEach(r => queryParams.append('aiRating', r));
+      if (params.upside) queryParams.append('upside', params.upside);
+
+      const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {
+        params: queryParams,
+      });
+      return data;
+    },
         placeholderData: (prev) => prev, // Keep previous data while fetching new page
     });
 }

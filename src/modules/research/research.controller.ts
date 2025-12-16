@@ -323,6 +323,7 @@ export class ResearchController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('ticker') ticker?: string,
+    @Query('since') since?: number,
   ) {
     const userId = req.user.id;
     return this.researchService.findAll(
@@ -331,6 +332,7 @@ export class ResearchController {
       Number(page),
       Number(limit),
       ticker,
+      since ? Number(since) : undefined,
     );
   }
 

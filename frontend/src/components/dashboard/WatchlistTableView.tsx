@@ -84,161 +84,173 @@ export function WatchlistTableView({
     const columns = useMemo(() => {
         const columnHelper = createColumnHelper<TickerData>();
         return [
+            // 1. Asset Column (Symbol, Name, Insights Next to Symbol)
             columnHelper.accessor('symbol', {
-                header: 'Ticker',
-                cell: (info) => (
-                    <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/ticker/${info.getValue()}`)}>
-                        <TickerLogo key={info.getValue()} url={info.row.original.logo} symbol={info.getValue()} className="w-8 h-8" />
-                        <div className="flex flex-col">
-                            <span className="text-primary font-bold group-hover:underline">{info.getValue()}</span>
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider max-w-[150px] truncate" title={info.row.original.company}>
-                                {info.row.original.company}
-                            </span>
-                            <span className="text-[9px] text-muted-foreground/70 truncate max-w-[150px]">
-                                {info.row.original.sector}
-                            </span>
-                        </div>
-                    </div>
-                ),
-            }),
-            columnHelper.accessor('sector', {
-                id: 'sector',
-                header: 'Sector',
-                enableHiding: true,
-            }),
-            columnHelper.accessor('price', {
-                header: 'Price',
+                header: 'Asset',
                 cell: (info) => {
-                    const val = Number(info.getValue());
-                    return <span className="text-foreground font-mono font-medium">${Number.isFinite(val) ? val.toFixed(2) : '0.00'}</span>;
-                },
-            }),
-            columnHelper.accessor('change', {
-                header: 'Change %',
-                cell: (info) => {
-                    const val = Number(info.getValue());
-                    if (!Number.isFinite(val)) return <span className="text-muted-foreground">-</span>;
-                    const isPositive = val >= 0;
-                    return (
-                        <div className={cn("flex items-center font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                            {isPositive ? <ArrowUp size={14} className="mr-1" /> : <ArrowDown size={14} className="mr-1" />}
-                            {Math.abs(val).toFixed(2)}%
-                        </div>
-                    );
-                },
-            }),
-            columnHelper.accessor('potentialUpside', {
-                header: 'Potential Upside',
-                cell: (info) => {
-                    const rawVal = info.getValue();
-                    const val = typeof rawVal === 'number' ? rawVal : Number(rawVal);
+                    // Watchlist uses flat counts in TickerData
+                    const research = info.row.original.researchCount;
+                    const news = info.row.original.newsCount;
+                    const social = info.row.original.socialCount;
+                    const hasInsights = (research || 0) + (news || 0) + (social || 0) > 0;
 
-                    if (rawVal === null || rawVal === undefined || !Number.isFinite(val)) {
-                        return <span className="text-muted-foreground">-</span>;
-                    }
+                    return (
+                        <div className="flex items-start gap-3">
+                            <div 
+                                className="cursor-pointer"
+                                onClick={() => navigate(`/ticker/${info.getValue()}`)}
+                            >
+                                <TickerLogo
+                                    url={info.row.original.logo}
+                                    symbol={info.getValue()}
+                                    className="w-10 h-10 rounded-full"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2">
+                                    <span 
+                                        className="text-base font-bold text-foreground hover:underline cursor-pointer"
+                                        onClick={() => navigate(`/ticker/${info.getValue()}`)}
+                                    >
+                                        {info.getValue()}
+                                    </span>
+                                    
+                                    {/* Insight Icons Next to Symbol */}
+                                    {hasInsights && (
+                                        <div className="flex items-center gap-2">
+                                            {research ? (
+                                                <div className="flex items-center gap-0.5 text-purple-400" title={`${research} Reports`}>
+                                                    <Brain size={10} />
+                                                    <span className="text-[9px] font-medium">{research}</span>
+                                                </div>
+                                            ) : null}
+                                            {news ? (
+                                                <div className="flex items-center gap-0.5 text-sky-400" title={`${news} News`}>
+                                                    <Newspaper size={10} />
+                                                    <span className="text-[9px] font-medium">{news}</span>
+                                                </div>
+                                            ) : null}
+                                            {social ? (
+                                                <div className="flex items-center gap-0.5 text-blue-400" title={`${social} Social`}>
+                                                    <MessageCircle size={10} />
+                                                    <span className="text-[9px] font-medium">{social}</span>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.company}>
+                                    {info.row.original.company}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                },
+            }),
 
-                    const isPositive = val > 0;
-                    return (
-                        <div className={cn("flex items-center font-bold", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
-                            {isPositive && <ArrowUp size={14} className="mr-1" />}
-                            {val.toFixed(1)}%
-                        </div>
-                    );
-                },
-            }),
-            columnHelper.accessor('researchCount', {
-                header: 'Research',
+            // 2. Price / Change (Merged)
+            columnHelper.accessor((row) => row.change, {
+                id: 'price_change', // Match sort key if needed, or stick to 'change'
+                header: 'Price / Change',
                 cell: (info) => {
-                    const count = info.getValue();
-                    if (!count) return <span className="text-muted-foreground">-</span>;
+                    const change = info.getValue();
+                    const price = info.row.original.price;
+                    
+                    if (!price) return '-';
+
+                    const isPositive = (change || 0) >= 0;
+                    
                     return (
-                        <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
-                            <Brain size={14} className="text-purple-400" />
-                            {count}
+                        <div className="flex flex-col items-end">
+                            <span className="text-sm font-mono font-medium text-foreground/70">
+                                ${price.toFixed(2)}
+                            </span>
+                            {change !== undefined && change !== null ? (
+                               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                                    {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
+                                    {Math.abs(change).toFixed(2)}%
+                               </div>
+                            ) : <span className="text-xs text-muted-foreground">-</span>}
                         </div>
                     );
                 },
             }),
-            columnHelper.accessor('newsCount', {
-                header: 'News',
-                cell: (info) => {
-                    const count = info.getValue() || 0;
-                    if (!count) return <span className="text-muted-foreground">-</span>;
-                    return (
-                        <div className="flex items-center gap-1.5 text-sky-400 font-semibold">
-                            <Newspaper size={14} className="text-sky-400" />
-                            {count}
-                        </div>
-                    );
-                },
-            }),
-            columnHelper.accessor('socialCount', {
-                header: 'Social',
-                cell: (info) => {
-                    const count = info.getValue() || 0;
-                    if (!count) return <span className="text-muted-foreground">-</span>;
-                    return (
-                        <div className="flex items-center gap-1.5 text-blue-400 font-semibold">
-                            <MessageCircle size={14} className="text-blue-400" />
-                            {count}
-                        </div>
-                    );
-                },
-            }),
-            columnHelper.accessor('riskScore', {
-                header: 'Risk Score',
+
+             // 3. Market Cap
+            columnHelper.accessor((row) => row.marketCap, {
+                id: 'market_cap',
+                header: 'Mkt Cap',
                 cell: (info) => {
                     const val = info.getValue();
-                    const numericVal = typeof val === 'number' ? val : Number(val);
-                    if (!Number.isFinite(numericVal)) return <span className="text-muted-foreground">-</span>;
+                    // Hide if 0 or null/undefined
+                    if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
+                    
+                    const formatCap = (n: number) => {
+                    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+                    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+                    return (n / 1e6).toFixed(2) + 'M';
+                    };
 
-                    let colorClass = "text-muted-foreground";
+                    return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
+                },
+            }),
+
+            // 4. P/E
+            columnHelper.accessor((row) => row.pe, {
+                id: 'pe_ttm',
+                header: 'P/E',
+                cell: (info) => {
+                    const val = info.getValue();
+                    return val ? <span className="font-mono text-muted-foreground text-xs">{Number(val).toFixed(2)}</span> : '-';
+                },
+            }),
+
+            // 5. Financial Risk
+            columnHelper.accessor((row) => row.riskScore, {
+                id: 'financial_risk', // Sort key matching
+                header: 'Risk',
+                cell: (info) => {
+                    const val = info.getValue();
+                    if (val === undefined || val === null) return '-';
+                    
+                    let colorClass = 'text-muted-foreground';
                     let Icon = ShieldCheck;
-                    if (numericVal <= 3.5) {
-                        colorClass = "text-emerald-500 font-bold";
-                        Icon = ShieldCheck;
-                    } else if (numericVal <= 6.5) {
-                        colorClass = "text-yellow-500 font-bold";
-                        Icon = AlertTriangle;
-                    } else {
-                        colorClass = "text-red-500 font-bold";
-                        Icon = Flame;
-                    }
+                    if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
+                    else if (val <= 6.5) { colorClass = 'text-yellow-500'; Icon = AlertTriangle; }
+                    else { colorClass = 'text-red-500'; Icon = Flame; }
 
                     return (
-                        <span className={cn("flex items-center gap-1.5", colorClass)}>
-                            <Icon size={14} />
-                            {Math.round(numericVal)}
-                        </span>
+                    <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
+                        <Icon size={14} />
+                        {Number(val).toFixed(1)}
+                    </span>
                     );
                 },
             }),
-            columnHelper.accessor('rating', {
-                header: 'Rating',
+
+            // 6. Upside
+            columnHelper.accessor((row) => row.potentialUpside, {
+                id: 'upside_percent',
+                header: 'Upside',
                 cell: (info) => {
-                    const rating = info.getValue();
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                    const val = info.getValue();
+                    if (val === undefined || val === null) return '-';
+                    const num = Number(val);
+                    const isPositive = num > 0;
 
-                    if (rating && rating !== '-') {
-                        if (rating === 'Strong Buy') variant = 'strongBuy';
-                        else if (rating === 'Buy') variant = 'buy';
-                        else if (rating === 'Hold') variant = 'hold';
-                        else if (rating === 'Sell') variant = 'sell';
-                        else variant = "default";
-
-                        const count = info.row.original.analystCount;
-                        const label = count > 0 ? `${rating} (${count})` : rating;
-
-                        return (
-                            <div className="flex items-center gap-2">
-                                <Badge variant={variant} className="whitespace-nowrap">{label}</Badge>
-                            </div>
-                        );
-                    }
-                    return <span className="text-muted-foreground">-</span>;
+                    return (
+                    <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                        {isPositive && <ArrowUp size={12} className="mr-0.5" />}
+                        {num.toFixed(1)}%
+                    </div>
+                    );
                 },
             }),
-            columnHelper.accessor('aiRating', {
+
+            // 7. AI Rating
+            columnHelper.accessor((row) => row.aiRating, {
+                id: 'ai_rating',
                 header: 'AI Rating',
                 cell: (info) => {
                     const rating = info.getValue() as string;
@@ -251,13 +263,51 @@ export function WatchlistTableView({
                     else if (rating === 'Sell') variant = 'sell';
 
                     return (
-                        <Badge variant={variant} className="whitespace-nowrap gap-1.5">
+                        <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
                             <Bot size={12} className="opacity-80" />
                             {rating}
                         </Badge>
                     );
                 },
             }),
+
+            // 8. Analyst Rating
+            columnHelper.accessor('rating', {
+                header: 'Analyst',
+                cell: (info) => {
+                    const rawRating = info.getValue();
+                    if (!rawRating || rawRating === '-') return <span className="text-muted-foreground">-</span>;
+
+                    const rLower = rawRating.toLowerCase();
+                    let displayRating = 'Hold';
+                    let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'hold';
+
+                    if (rLower.includes('strong buy')) {
+                        displayRating = 'Strong Buy';
+                        variant = 'strongBuy';
+                    } else if (rLower.includes('buy')) {
+                        displayRating = 'Buy';
+                        variant = 'buy';
+                    } else if (rLower.includes('sell')) {
+                        displayRating = 'Sell';
+                        variant = 'sell';
+                    } else {
+                        displayRating = 'Hold';
+                        variant = 'hold';
+                    }
+
+                    const count = info.row.original.analystCount;
+                    const label = count > 0 ? `${displayRating} (${count})` : displayRating;
+
+                    return (
+                        <Badge variant={variant} className="whitespace-nowrap h-6 px-2">
+                            {label}
+                        </Badge>
+                    );
+                }
+            }),
+
+            // Actions (Keep as is)
             columnHelper.display({
                 id: 'actions',
                 header: '',

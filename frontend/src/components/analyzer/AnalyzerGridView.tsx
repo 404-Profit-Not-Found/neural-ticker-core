@@ -40,7 +40,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                 const change = latestPrice?.change ?? 0;
 
                 // Risk / Upside
-                const rawRisk = aiAnalysis?.overall_score;
+                const rawRisk = aiAnalysis?.financial_risk;
                 const risk = typeof rawRisk === 'number' ? rawRisk : Number(rawRisk || 0);
 
                 const rawUpside = aiAnalysis?.upside_percent;
@@ -111,16 +111,29 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                                     </span>
                                     {/* Analyst Consensus (Under Price) */}
                                     {consensus && consensus !== '-' && (() => {
-                                        let analystVariant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
-                                        if (consensus === 'Strong Buy') analystVariant = 'strongBuy';
-                                        else if (consensus === 'Buy') analystVariant = 'buy';
-                                        else if (consensus === 'Hold') analystVariant = 'hold';
-                                        else if (consensus === 'Sell') analystVariant = 'sell';
+                                        const rStr = String(consensus);
+                                        const rLower = rStr.toLowerCase();
+                                        let displayRating = 'Hold';
+                                        let analystVariant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "hold";
+
+                                        if (rLower.includes('strong buy')) {
+                                           displayRating = 'Strong Buy';
+                                           analystVariant = 'strongBuy';
+                                        } else if (rLower.includes('buy')) {
+                                           displayRating = 'Buy';
+                                           analystVariant = 'buy';
+                                        } else if (rLower.includes('sell')) {
+                                           displayRating = 'Sell';
+                                           analystVariant = 'sell';
+                                        } else {
+                                           displayRating = 'Hold';
+                                           analystVariant = 'hold';
+                                        }
 
                                         return (
-                                            <Badge variant={analystVariant} className="text-[10px] h-4 px-1.5 whitespace-nowrap gap-1">
+                                            <Badge variant={analystVariant} className="h-4 px-1.5 whitespace-nowrap gap-1">
                                                 <span className="opacity-70 font-normal mr-0.5">Consensus:</span>
-                                                {consensus} {item.counts?.analysts ? `(${item.counts.analysts})` : ''}
+                                                {displayRating} {item.counts?.analysts ? `(${item.counts.analysts})` : ''}
                                             </Badge>
                                         );
                                     })()}

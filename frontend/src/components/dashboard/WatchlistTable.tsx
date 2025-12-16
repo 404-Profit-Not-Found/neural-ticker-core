@@ -56,6 +56,7 @@ interface MarketSnapshot {
     };
     aiAnalysis?: {
         overall_score: number;
+        financial_risk?: number; // Added field
         upside_percent: number;
     };
     counts?: {
@@ -154,18 +155,24 @@ export function WatchlistTable() {
                 const prevClose = Number(s.latestPrice?.prevClose || price);
                 const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
                 const fundamentals = s.fundamentals || {};
-                const rawRiskScore = s.aiAnalysis?.overall_score;
-                const parsedRiskScore = typeof rawRiskScore === 'number' ? rawRiskScore : Number(rawRiskScore);
+                
+                // Use financial_risk instead of overall_score if available
+                const riskVal = s.aiAnalysis?.financial_risk;
+                const parsedRiskScore = typeof riskVal === 'number' ? riskVal : Number(riskVal);
                 const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
 
-                // AI Rating Logic
-                let aiRating = '-';
-                if (s.aiAnalysis) {
-                    const { overall_score, upside_percent } = s.aiAnalysis;
-                    if (upside_percent > 10 && overall_score <= 7) aiRating = 'Buy';
-                    if (upside_percent > 20 && overall_score <= 6) aiRating = 'Strong Buy';
-                    if (upside_percent < 0 || overall_score >= 8) aiRating = 'Sell';
-                    if (aiRating === '-') aiRating = 'Hold';
+                // AI Rating Logic (Strict Financial Risk)
+                let aiRating = 'Hold';
+                if (s.aiAnalysis && safeRiskScore !== null) {
+                    const upside = Number(s.aiAnalysis.upside_percent || 0);
+                    
+                    if (upside > 10 && safeRiskScore <= 7) aiRating = 'Buy';
+                    if (upside > 20 && safeRiskScore <= 6) aiRating = 'Strong Buy';
+                    
+                    // Override: High Risk => Sell
+                    if (upside < 0 || safeRiskScore >= 8) aiRating = 'Sell';
+                } else {
+                    aiRating = '-';
                 }
 
                 // Find corresponding watchlist item to get ID
