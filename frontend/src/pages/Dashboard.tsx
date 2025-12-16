@@ -154,7 +154,7 @@ export function Dashboard() {
         api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
         api.get('/stats/sell').catch(() => ({ data: { count: 0 } })),
         api
-          .get('/research', { params: { limit: 1 } })
+          .get('/research', { params: { since: 24, limit: 1 } })
           .catch(() => ({ data: { total: 0 } })),
       ]);
       return {
@@ -367,14 +367,19 @@ export function Dashboard() {
               />
             </div>
             
-            <StatPill
-              icon={Brain}
-              label="AI Reports"
-              value={
-                stats?.research !== undefined ? String(stats.research) : '...'
-              }
-              tone="muted"
-            />
+            <div
+              className="cursor-pointer transition-transform hover:scale-[1.02]"
+              onClick={() => navigate('/research?filter=recent')}
+            >
+              <StatPill
+                icon={Brain}
+                label="New Reports (24h)"
+                value={
+                  stats?.research !== undefined ? String(stats.research) : '...'
+                }
+                tone="muted"
+              />
+            </div>
             
             <div
               className="cursor-pointer transition-transform hover:scale-[1.02]"

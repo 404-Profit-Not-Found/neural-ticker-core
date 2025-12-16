@@ -12,6 +12,7 @@ import { AdminConsole } from './pages/AdminConsole';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { TickerDetail } from './pages/TickerDetail';
 import { ResearchPage } from './pages/ResearchPage';
+import { ResearchListPage } from './pages/ResearchListPage';
 import { NewsPage } from './pages/NewsPage';
 
 
@@ -73,6 +74,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ResearchPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/research"
+              element={
+                <ProtectedRoute>
+                  <ResearchListPage />
                 </ProtectedRoute>
               }
             />
