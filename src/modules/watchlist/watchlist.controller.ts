@@ -166,4 +166,25 @@ export class WatchlistController {
     await this.watchlistService.deleteWatchlist(req.user.id, watchlistId);
     return { success: true };
   }
+
+  @ApiOperation({
+    summary: 'Toggle Favorite',
+    description:
+      'Adds or removes a ticker from the "Favourites" watchlist. Auto-creates list if missing.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['symbol'],
+      properties: {
+        symbol: { type: 'string', example: 'MSFT' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Toggled success.' })
+  @Post('favorites/toggle')
+  @HttpCode(200)
+  async toggleFavorite(@Req() req: any, @Body('symbol') symbol: string) {
+    return this.watchlistService.toggleFavorite(req.user.id, symbol);
+  }
 }

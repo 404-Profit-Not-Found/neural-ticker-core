@@ -70,6 +70,7 @@ export interface TickerData {
         sector?: string;
         industry?: string;
         web_url?: string;
+        description?: string;
     };
     market_data: {
         price: number;

@@ -119,6 +119,14 @@ export class TickerEntity {
   @Column({ type: 'text', nullable: true })
   industry: string;
 
+  @ApiProperty({
+    example: 'Apple Inc. is an American multinational technology company...',
+    description: 'Company Description',
+    required: false,
+  })
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
   @ApiProperty({ description: 'Raw Finnhub Profile Data', required: false })
   @Column({ type: 'jsonb', nullable: true })
   finnhub_raw: Record<string, any>;

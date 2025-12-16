@@ -106,6 +106,7 @@ export class JobsService {
       CRITICAL INSTRUCTION:
       You MUST act as a data gatherer. 
       Check for and explicitly mention the following in your analysis if available or estimate/search for them:
+      - Company Description (2-3 sentences, about the business model and key products)
       - Revenue Growth (YoY)
       - Profit Margins (Gross, Operating, Net)
       - ROE / ROA

@@ -4,11 +4,17 @@ import cookieParser from 'cookie-parser';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
+
+  // Increase Payload Limit
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
+
   app.use(cookieParser());
   console.log('--- NEST APP CREATED ---');
 

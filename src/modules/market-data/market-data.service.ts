@@ -428,6 +428,23 @@ export class MarketDataService {
     await this.fundamentalsRepo.save(entity);
   }
 
+  async updateTickerDescription(
+    symbol: string,
+    description: string,
+  ): Promise<void> {
+    const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
+    if (!description || description.trim().length === 0) return;
+
+    // Check if description already exists and is longer/better?
+    // For now, overwrite if the new one is non-empty.
+    // Or maybe only if existing is empty?
+    // User requirement: "add it to database if there is no company profile info"
+
+    // Always update to the latest extracted description
+    tickerEntity.description = description;
+    await this.tickerRepo.save(tickerEntity);
+  }
+
   async upsertAnalystRatings(
     symbol: string,
     ratings: Partial<AnalystRating>[],

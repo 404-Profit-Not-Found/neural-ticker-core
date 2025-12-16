@@ -357,32 +357,61 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       throw new NotFoundException(`No research found for ${ticker}`);
     }
 
-    // Process from Oldest -> Newest so newer data overwrites older data
-    const sortedNotes = notes.reverse();
+    // Process Newest -> Oldest to prioritize latest data
+    let foundDescription = false;
+    let foundFinancials = false;
+    let foundRatings = false;
 
     this.logger.log(
-      `Reprocessing ${sortedNotes.length} notes for ${ticker}...`,
+      `Reprocessing last ${notes.length} notes for ${ticker} (Newest First)...`,
     );
 
-    for (const note of sortedNotes) {
-      // Extract financial metrics
-      await this.extractFinancialsFromResearch([ticker], note.answer_markdown);
-      // Also regenerate risk analysis (qualitative factors, catalysts, etc.)
-      await this.riskRewardService.evaluateFromResearch(note);
+    for (const note of notes) {
+      if (foundDescription && foundFinancials && foundRatings) {
+        this.logger.log(`All data points found, stopping early.`);
+        break;
+      }
+
+      // We save only what we haven't found yet to avoid overwriting newer data with older data
+      const result = await this.extractFinancialsFromResearch(
+        [ticker],
+        note.answer_markdown,
+        {
+          saveDescription: !foundDescription,
+          saveFinancials: !foundFinancials,
+          saveRatings: !foundRatings,
+        },
+      );
+
+      if (result.description) foundDescription = true;
+      if (result.financials) foundFinancials = true;
+      if (result.ratings) foundRatings = true;
     }
 
     this.logger.log(`Completed reprocessing for ${ticker}`);
   }
 
   /**
-   * Extract key financial metrics from the unstructured research text
-   * using a cheap, fast "Flash" model.
+   * Extract financial metrics from text and Upsert to DB.
+   * Now smarter: returns what it found so caller can manage "gaps".
    */
   private async extractFinancialsFromResearch(
     tickers: string[],
     text: string,
-  ): Promise<void> {
-    if (tickers.length === 0 || !text) return;
+    options: {
+      saveDescription?: boolean;
+      saveFinancials?: boolean;
+      saveRatings?: boolean;
+    } = {}, // Default: save everything
+  ): Promise<{ description: boolean; financials: boolean; ratings: boolean }> {
+    const {
+      saveDescription = true,
+      saveFinancials = true,
+      saveRatings = true,
+    } = options;
+
+    if (tickers.length === 0 || !text)
+      return { description: false, financials: false, ratings: false };
 
     // We process each ticker individually for safety
     for (const ticker of tickers) {
@@ -390,22 +419,26 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         const extractionPrompt = `You are a strict data extraction engine.
           Extract the following for ticker "${ticker}" from the provided text.
           
-          1. Financial Metrics (Return as object "financials"):
+          1. Company Profile (Return as string "description"):
+             Extract the 2-3 sentence company description if present. Use null if not found.
+
+          2. Financial Metrics (Return as object "financials"):
              keys: "pe_ttm", "eps_ttm", "dividend_yield", "beta", "debt_to_equity", "revenue_ttm", "net_income_ttm", "gross_margin", "net_profit_margin", "operating_margin", "roe", "roa", "price_to_book", "book_value_per_share", "free_cash_flow_ttm", "earnings_growth_yoy", "current_ratio", "quick_ratio", "interest_coverage", "debt_to_assets", "total_assets", "total_liabilities", "total_debt", "total_cash", "next_earnings_date", "next_earnings_estimate_eps", "consensus_rating".
              Values must be NUMBERS (except "next_earnings_date" as YYYY-MM-DD and "consensus_rating" as string). If not found, use null.
 
-          2. Analyst Ratings (Return as array "ratings"):
+          3. Analyst Ratings (Return as array "ratings"):
              Each object: { "firm": string, "analyst_name": string | null, "rating": "Buy"|"Hold"|"Sell", "price_target": number | null, "rating_date": "YYYY-MM-DD" }
              Extract only recent ratings mentioned.
 
           Return a SINGLE JSON OBJECT structure (TOON format supported):
           {
+            "description": "...",
             "financials": { ... },
             "ratings": [ ... ]
           }
           
           Text:
-          ${text.substring(0, 15000)}
+          ${text.substring(0, 500000)}
           
           Output:`;
 
@@ -441,22 +474,54 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
             }
           }
 
+          let descriptionFound = false;
+          let financialsFound = false;
+          let ratingsFound = false;
+
           if (data.financials) {
-            await this.marketDataService.upsertFundamentals(
-              ticker,
-              data.financials,
+            if (saveFinancials) {
+              await this.marketDataService.upsertFundamentals(
+                ticker,
+                data.financials,
+              );
+            }
+            financialsFound = true;
+          }
+
+          if (data.description) {
+            this.logger.log(
+              `Found description for ${ticker}: ${data.description.substring(0, 50)}...`,
+            );
+            if (saveDescription) {
+              await this.marketDataService.updateTickerDescription(
+                ticker,
+                data.description,
+              );
+            }
+            descriptionFound = true;
+          } else {
+            this.logger.warn(
+              `No description found in extraction for ${ticker}`,
             );
           }
 
           if (data.ratings && Array.isArray(data.ratings)) {
-            await this.marketDataService.upsertAnalystRatings(
-              ticker,
-              data.ratings,
-            );
-            await this.marketDataService.dedupeAnalystRatings(ticker);
+            if (saveRatings) {
+              await this.marketDataService.upsertAnalystRatings(
+                ticker,
+                data.ratings,
+              );
+              await this.marketDataService.dedupeAnalystRatings(ticker);
+            }
+            ratingsFound = true;
           }
 
           this.logger.log(`Extracted financials & ratings for ${ticker}`);
+          return {
+            description: descriptionFound,
+            financials: financialsFound,
+            ratings: ratingsFound,
+          };
         } catch (e) {
           this.logger.warn(`Failed to parse extracted data for ${ticker}`, e);
         }
@@ -464,6 +529,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
       }
     }
+    return { description: false, financials: false, ratings: false }; // placeholder
   }
 
   /**

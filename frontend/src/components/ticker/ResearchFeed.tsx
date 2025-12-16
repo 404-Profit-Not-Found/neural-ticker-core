@@ -9,10 +9,6 @@ import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
 import type { ResearchItem } from '../../types/ticker';
-import { api } from '../../lib/api';
-import { useQueryClient } from '@tanstack/react-query';
-import { tickerKeys } from '../../hooks/useTicker';
-
 type ModelTier = 'low' | 'medium' | 'high' | 'deep';
 
 const AVERAGE_RESEARCH_DURATION_LABEL = '0:45';
@@ -47,12 +43,9 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     const navigate = useNavigate();
     const { user } = useAuth();
     const updateTitleMutation = useUpdateResearchTitle();
-    const queryClient = useQueryClient();
-
     // Local state for editing
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
-    const [isSyncing, setIsSyncing] = useState(false);
 
     const startEditing = (item: ResearchItem, e: MouseEvent) => {
         e.stopPropagation();
@@ -131,30 +124,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                     />
                                 );
                             })()}
-                            {defaultTicker && (
-                                <Button
-                                    variant="outline"
-                                    className="h-9 w-9 p-0 md:w-auto md:px-4 text-sm gap-2 border-dashed border-muted-foreground/30 hover:bg-muted"
-                                    disabled={isSyncing}
-                                    onClick={async () => {
-                                        if (isSyncing) return;
-                                        try {
-                                            setIsSyncing(true);
-                                            await api.post(`/research/sync/${defaultTicker}`);
-                                            // Refresh local data after sync
-                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(defaultTicker) });
-                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(defaultTicker) });
-                                        } catch (err) {
-                                            console.error('Sync failed', err);
-                                        } finally {
-                                            setIsSyncing(false);
-                                        }
-                                    }}
-                                >
-                                    {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw size={16} />}
-                                    <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-                                </Button>
-                            )}
+
                         </div>
                         {isAnalyzing && (
                             <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">

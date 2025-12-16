@@ -5,9 +5,13 @@ import {
     TrendingDown,
     Eye,
     Share2,
-    ArrowLeft
+    ArrowLeft,
+    RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { api } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { tickerKeys } from '../hooks/useTicker';
 import { Header } from '../components/layout/Header';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { RiskLight } from '../components/ticker/RiskLight';
@@ -24,11 +28,14 @@ import {
     useTickerResearch,
     useTriggerResearch,
     usePostComment,
-    useDeleteResearch
+    useDeleteResearch,
+    useToggleFavorite
 } from '../hooks/useTicker';
+import { useWatchlists } from '../hooks/useWatchlist';
 import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
+import { Star } from 'lucide-react';
 
 const RESEARCH_PENDING_GRACE_MS = 45000;
 export function TickerDetail() {
@@ -40,6 +47,8 @@ export function TickerDetail() {
     const [placeholderId, setPlaceholderId] = useState<string | null>(null);
     const [placeholderTimestamp, setPlaceholderTimestamp] = useState<string | null>(null);
     const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const queryClient = useQueryClient();
 
     // Validate tab or default to overview
     const validTabs = ['overview', 'financials', 'research', 'news'];
@@ -50,11 +59,17 @@ export function TickerDetail() {
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
+    const { data: watchlists = [] } = useWatchlists();
+
+    const isFavorite = watchlists?.some(wl => 
+        wl.items?.some(item => item.ticker.symbol === symbol)
+    ) ?? false;
 
     // -- Mutations --
     const triggerResearchMutation = useTriggerResearch();
     const postCommentMutation = usePostComment();
     const deleteResearchMutation = useDeleteResearch();
+    const favoriteMutation = useToggleFavorite();
 
     const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
         if (!symbol) return;
@@ -90,7 +105,6 @@ export function TickerDetail() {
 
     useEffect(() => {
         if (hasRemotePending && placeholderId) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setPlaceholderId(null);
             setPlaceholderTimestamp(null);
         }
@@ -103,7 +117,6 @@ export function TickerDetail() {
                 clearTimeout(graceTimerRef.current);
                 graceTimerRef.current = null;
             }
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLocalResearchRunning(true);
             return;
         }
@@ -131,7 +144,6 @@ export function TickerDetail() {
         }
 
         if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLocalResearchRunning(false);
             setPlaceholderId(null);
             setPlaceholderTimestamp(null);
@@ -169,7 +181,6 @@ export function TickerDetail() {
         if (latestResearchId && latestResearchId !== expectedTopResearchIdRef.current) {
             expectedTopResearchIdRef.current = undefined;
             if (localResearchRunning) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setLocalResearchRunning(false);
             }
         }
@@ -205,22 +216,172 @@ export function TickerDetail() {
 
                 {/* --- 1. HERO HEADER --- */}
                 <div className="relative z-30 space-y-4 pb-4 md:pb-6">
-                    {/* Top Row: Back + Logo + Symbol/Name + Price + Risk (Desktop: all left-aligned) */}
-                    <div className="flex items-start md:items-center gap-3 md:gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 md:mt-0">
-                            <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                    {/* Mobile Actions (Absolute Top Right) */}
+                    <div className="md:hidden absolute top-0 right-0 flex items-center gap-2 z-40">
+                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
+                            <Eye size={12} />
+                            <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2" 
+                            title="Add to Favourites"
+                            onClick={() => {
+                                if(symbol) favoriteMutation.mutate(symbol);
+                            }}
+                        >
+                            <Star 
+                                size={16} 
+                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""} 
+                            />
                         </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted -mr-2" title="Share">
+                            <Share2 size={16} className="text-muted-foreground" />
+                        </Button>
+                    </div>
 
-                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 md:w-12 md:h-12 shrink-0" />
+                    {/* --- DESKTOP LAYOUT --- */}
+                    <div className="hidden md:block space-y-6">
+                        {/* Row 1: Identity & Actions */}
+                        <div className="flex items-center justify-between">
+                            {/* Left: Identity */}
+                            <div className="flex items-center gap-4">
+                                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
+                                    <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                                </Button>
+                                <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                        <span className="bg-muted px-2 py-0.5 rounded text-[11px] font-bold text-muted-foreground uppercase tracking-wide border border-border/50">
+                                            {profile?.exchange}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                         <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
+                                         {profile?.industry && (
+                                            <>
+                                                <span className="text-muted-foreground/40">•</span>
+                                                <span className="text-sm text-muted-foreground">{profile.industry}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
 
-                        <div className="flex-1 min-w-0">
-                            {/* Symbol + Exchange (desktop) / Symbol + Price (mobile) */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                {/* Desktop: Exchange Badge */}
-                                <span className="hidden md:inline-block bg-muted px-1.5 py-0.5 rounded text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{profile?.exchange}</span>
-                                {/* Mobile: Price + Change */}
-                                <div className="md:hidden flex items-baseline gap-1.5">
+                            {/* Right: Actions */}
+                            <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 mr-2" title="Watchers">
+                                    <Eye size={14} className="text-muted-foreground" />
+                                    <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                                </div>
+
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
+                                    onClick={async () => {
+                                        if (!symbol) return;
+                                        try {
+                                            setIsSyncing(true);
+                                            await api.post(`/research/sync/${symbol}`);
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
+                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
+                                        } catch (err) {
+                                            console.error("Sync failed", err);
+                                        } finally {
+                                            setIsSyncing(false);
+                                        }
+                                    }}
+                                    disabled={isSyncing}
+                                    title="Sync Data"
+                                >
+                                     <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
+                                </Button>
+
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-9 w-9 rounded-full"
+                                    onClick={() => {
+                                        if(symbol) favoriteMutation.mutate(symbol);
+                                    }}
+                                    title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                                >
+                                    <Star 
+                                        size={18} 
+                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"} 
+                                    />
+                                </Button>
+
+                                <Button variant="ghost" size="sm" className="h-9 w-9 rounded-full" title="Share">
+                                    <Share2 size={18} className="text-muted-foreground" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Data & Context */}
+                        <div className="flex items-start gap-12">
+                            {/* Price & Risk Block */}
+                            <div className="shrink-0 min-w-[200px]">
+                                <div className="flex items-baseline gap-3 mb-4">
+                                    <span className="text-4xl font-mono font-semibold tracking-tighter">
+                                        ${market_data?.price?.toFixed(2)}
+                                    </span>
+                                    <div className={`flex items-center text-lg font-medium px-2 py-0.5 rounded ${isPriceUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                        {isPriceUp ? <TrendingUp size={18} className="mr-1.5" /> : <TrendingDown size={18} className="mr-1.5" />}
+                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                    </div>
+                                </div>
+                                
+                                {risk_analysis && (
+                                    <div className="pt-2 border-t border-border/50">
+                                         <RiskLight
+                                            score={risk_analysis.overall_score}
+                                            reasoning={risk_analysis.summary}
+                                            sentiment={risk_analysis.sentiment}
+                                            breakdown={{
+                                                financial: risk_analysis.financial_risk,
+                                                execution: risk_analysis.execution_risk,
+                                                dilution: risk_analysis.dilution_risk,
+                                                competitive: risk_analysis.competitive_risk,
+                                                regulatory: risk_analysis.regulatory_risk
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Description Block */}
+                            {profile?.description && (
+                                <div className="flex-1 pt-1">
+                                    <div className="text-sm text-muted-foreground/80 leading-relaxed max-w-3xl border-l-2 border-primary/20 pl-4 py-1 italic">
+                                        {profile.description}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* --- MOBILE LAYOUT (Unchanged structure, ensuring compatibility) --- */}
+                    <div className="md:hidden">
+                        {/* Top: Back + Logo + Symbol/Name */}
+                        <div className="flex items-start gap-3 pr-24">
+                            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
+                                <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+
+                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
+
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                </div>
+                                <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
+                                    {profile?.name}
+                                </div>
+                                <div className="flex items-baseline gap-2 mt-1">
                                     <span className="text-lg font-mono font-bold tracking-tight">
                                         ${market_data?.price?.toFixed(2)}
                                     </span>
@@ -230,82 +391,32 @@ export function TickerDetail() {
                                     </span>
                                 </div>
                             </div>
-                            {/* Company Name + Industry */}
-                            <div className="text-xs md:text-sm text-muted-foreground font-medium truncate mt-0.5">
-                                {profile?.name}
-                                {profile?.industry && (
-                                    <span className="text-muted-foreground/60"> · {profile.industry}</span>
-                                )}
-                            </div>
-
-                            {/* Mobile: Risk + Watchers/Share Row */}
-                            <div className="md:hidden flex items-center justify-between mt-3">
-                                {/* Risk Indicators (Left) */}
-                                {risk_analysis && (
-                                    <RiskLight
-                                        score={risk_analysis.overall_score}
-                                        reasoning={risk_analysis.summary}
-                                        sentiment={risk_analysis.sentiment}
-                                        breakdown={{
-                                            financial: risk_analysis.financial_risk,
-                                            execution: risk_analysis.execution_risk,
-                                            dilution: risk_analysis.dilution_risk,
-                                            competitive: risk_analysis.competitive_risk,
-                                            regulatory: risk_analysis.regulatory_risk
-                                        }}
-                                    />
-                                )}
-                                {/* Watchers/Share (Right) */}
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground" title="Watchers">
-                                        <Eye size={12} />
-                                        <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
-                                        <Share2 size={12} className="text-muted-foreground" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Desktop: Price + Risk Indicators */}
-                            <div className="hidden md:flex items-center gap-6 mt-3">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-mono font-semibold tracking-tight">
-                                        ${market_data?.price?.toFixed(2)}
-                                    </span>
-                                    <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                        {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
-                                    </span>
-                                </div>
-                                <div className="h-6 w-px bg-border/30" />
-                                {risk_analysis && (
-                                    <RiskLight
-                                        score={risk_analysis.overall_score}
-                                        reasoning={risk_analysis.summary}
-                                        sentiment={risk_analysis.sentiment}
-                                        breakdown={{
-                                            financial: risk_analysis.financial_risk,
-                                            execution: risk_analysis.execution_risk,
-                                            dilution: risk_analysis.dilution_risk,
-                                            competitive: risk_analysis.competitive_risk,
-                                            regulatory: risk_analysis.regulatory_risk
-                                        }}
-                                    />
-                                )}
-                            </div>
                         </div>
 
-                        {/* Desktop: Watchers/Share (Far Right) */}
-                        <div className="hidden md:flex items-center gap-2 shrink-0">
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-default" title="Watchers">
-                                <Eye size={12} />
-                                <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted" title="Share">
-                                <Share2 size={12} className="text-muted-foreground" />
-                            </Button>
+                         {/* Mobile: Risk Row */}
+                         <div className="md:hidden flex items-center justify-center mt-4">
+                            {risk_analysis && (
+                                <RiskLight
+                                    score={risk_analysis.overall_score}
+                                    reasoning={risk_analysis.summary}
+                                    sentiment={risk_analysis.sentiment}
+                                    breakdown={{
+                                        financial: risk_analysis.financial_risk,
+                                        execution: risk_analysis.execution_risk,
+                                        dilution: risk_analysis.dilution_risk,
+                                        competitive: risk_analysis.competitive_risk,
+                                        regulatory: risk_analysis.regulatory_risk
+                                    }}
+                                />
+                            )}
                         </div>
+                        
+                        {/* Mobile: Description */}
+                        {profile?.description && (
+                            <div className="mt-3 text-xs text-muted-foreground/80 leading-relaxed line-clamp-3">
+                                {profile.description}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -346,7 +457,7 @@ export function TickerDetail() {
 
                     {/* FINANCIALS TAB */}
                     <TabsContent value="financials">
-                        <TickerFinancials symbol={symbol!} fundamentals={fundamentals} />
+                        <TickerFinancials fundamentals={fundamentals} />
                     </TabsContent>
 
                     {/* NEWS TAB */}
