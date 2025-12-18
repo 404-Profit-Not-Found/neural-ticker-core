@@ -4,6 +4,7 @@ import { RiskRewardService } from './risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { LlmService } from '../llm/llm.service';
+import { ConfigService } from '@nestjs/config';
 import { RiskRewardScore } from './entities/risk-reward-score.entity';
 import { RiskAnalysis } from './entities/risk-analysis.entity';
 
@@ -46,6 +47,12 @@ describe('RiskRewardService', () => {
         {
           provide: LlmService,
           useValue: mockLlmService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('openai'),
+          },
         },
       ],
     }).compile();
