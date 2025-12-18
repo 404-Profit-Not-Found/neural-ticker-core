@@ -30,7 +30,7 @@ import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
-import { calculateAiRating } from '../lib/rating-utils';
+import { calculateAiRating, calculateUpside } from '../lib/rating-utils';
 
 interface TickerResult {
   symbol: string;
@@ -109,6 +109,11 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
   const riskRaw = item.aiAnalysis?.financial_risk;
   const risk = typeof riskRaw === 'number' ? riskRaw : Number(riskRaw || 0);
 
+  const currentPrice = Number(item.latestPrice?.close ?? 0);
+  let potentialUpside: number | null = null;
+  let potentialDownside: number | null = null;
+
+  if (item.aiAnalysis) {
     const { base_price, overall_score, upside_percent: fallbackUpside } = item.aiAnalysis;
     potentialUpside = calculateUpside(currentPrice, base_price, fallbackUpside);
     const { rating } = calculateAiRating(risk, potentialUpside, overall_score);
@@ -117,9 +122,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
 
   // 2. Calculate Standardized Downside (Bear Case)
   const bearPrice = item.aiAnalysis?.bear_price;
-  let potentialDownside: number | null = null;
 
-  // 2. Calculate Standardized Downside (Bear Case)
   if (typeof bearPrice === 'number' && currentPrice > 0) {
     potentialDownside = ((bearPrice - currentPrice) / currentPrice) * 100;
   } else if (risk >= 8) {
@@ -479,7 +482,17 @@ function TopOpportunitiesSection() {
 
   const { data, isLoading } = useStockAnalyzer(analyzerParams);
   const items = data?.items || [];
-  const tickerData: TickerData[] = items.map(mapSnapshotToTickerData);
+  let tickerData: TickerData[] = items.map(mapSnapshotToTickerData);
+
+  // Post-filter based on recalculated live ratings to ensure consistency
+  if (category === 'conservative') {
+    tickerData = tickerData.filter(t => ['Strong Buy', 'Buy'].includes(t.aiRating));
+  } else if (category === 'shorts') {
+    tickerData = tickerData.filter(t => t.aiRating === 'Sell');
+  } else if (category === 'yolo') {
+    // YOLO shows anything highly rated that's not 'Hold' or 'Sell'
+    tickerData = tickerData.filter(t => ['Strong Buy', 'Buy', 'Speculative Buy'].includes(t.aiRating));
+  }
 
   return (
     <div className="space-y-4">

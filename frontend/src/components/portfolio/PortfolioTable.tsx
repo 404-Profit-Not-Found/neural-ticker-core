@@ -5,7 +5,7 @@ import { DataTable } from '../ui/data-table';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { calculateAiRating, type RatingVariant } from '../../lib/rating-utils';
+import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
 
 export interface Position {
     id: string;
@@ -277,7 +277,6 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: () => <span className="hidden md:inline">AI Rating</span>,
             cell: (info) => {
                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-                const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
                 let rating = 'Hold';
                 let variant: RatingVariant = 'outline';
 

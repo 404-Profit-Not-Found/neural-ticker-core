@@ -26,7 +26,7 @@ import { AnalyzerGridView } from './AnalyzerGridView';
 import { Badge } from '../ui/badge';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
-import { calculateAiRating, type RatingVariant } from '../../lib/rating-utils';
+import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -243,6 +243,12 @@ export function AnalyzerTable({
     }),
 
     // 6. Upside (Base Case)
+    columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
+      id: 'upside_percent',
+      header: 'Upside',
+      cell: (info) => {
+        const basePrice = info.getValue();
+        const price = info.row.original.latestPrice?.close ?? 0;
         const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
         const isPositive = upside > 0;
 
@@ -252,6 +258,8 @@ export function AnalyzerTable({
             {upside.toFixed(1)}%
           </div>
         );
+      },
+    }),
 
     // 6.5 Downside (Bear Case)
     columnHelper.accessor((row) => row.aiAnalysis?.bear_price, {
@@ -288,7 +296,6 @@ export function AnalyzerTable({
       cell: (info) => {
         // Use financial_risk instead of overall_score to align with the visible Risk column
         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-        const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
         let rating = 'Hold';
         let variant: RatingVariant = 'outline';
 
