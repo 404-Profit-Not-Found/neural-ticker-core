@@ -30,10 +30,10 @@ export default () => {
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,
       models: {
-        low: 'gpt-4.1-nano',
-        medium: 'gpt-4.1-mini',
-        high: 'gpt-5-mini',
-        deep: 'gpt-5.1',
+        low: process.env.OPENAI_MODEL_LOW || 'gpt-4.1-mini', // Default to mini for extraction
+        medium: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4.1-mini',
+        high: process.env.OPENAI_MODEL_HIGH || 'gpt-4o',
+        deep: process.env.OPENAI_MODEL_DEEP || 'gpt-5.1',
       },
     },
     google: {
@@ -44,10 +44,10 @@ export default () => {
     gemini: {
       apiKey: process.env.GEMINI_API_KEY,
       models: {
-        low: 'gemini-2.5-flash-lite',
-        medium: 'gemini-3-flash-preview',
-        deep: 'gemini-3-pro-preview',
-        extraction: 'gemini-2.5-flash-lite',
+        low: process.env.GEMINI_MODEL_LOW || 'gemini-2.5-flash-lite',
+        medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
+        deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
+        extraction: process.env.GEMINI_MODEL_EXTRACTION || 'gemini-2.5-flash-lite',
       },
     },
     riskReward: {
@@ -55,7 +55,7 @@ export default () => {
       cron: process.env.RRSCORE_CRON_EXPRESSION || '0 * * * *',
       maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '168', 10),
       batchSize: parseInt(process.env.RRSCORE_BATCH_SIZE || '50', 10),
-      provider: process.env.RRSCORE_PROVIDER || 'openai',
+      provider: process.env.RRSCORE_PROVIDER || 'gemini',
     },
     marketData: {
       stalePriceMinutes: parseInt(

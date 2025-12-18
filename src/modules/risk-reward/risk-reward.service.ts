@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RiskRewardScore } from './entities/risk-reward-score.entity'; // Legacy
@@ -28,6 +29,7 @@ export class RiskRewardService {
     private readonly analysisRepo: Repository<RiskAnalysis>,
     private readonly llmService: LlmService,
     private readonly marketDataService: MarketDataService,
+    private readonly configService: ConfigService,
   ) {}
 
   // Heuristic salvage to keep processing when TOON/JSON is malformed but key numbers exist.
@@ -461,10 +463,13 @@ export class RiskRewardService {
       `,
       tickers: [symbol],
       numericContext: context,
-      provider: 'openai' as const,
-      quality: 'low' as QualityTier,
+      provider: this.configService.get<any>('riskReward.provider', 'gemini'),
+      quality: 'medium' as QualityTier,
     };
 
+    this.logger.log(
+      `[${symbol}] Numeric Context: ${JSON.stringify(context)}`,
+    );
     this.logger.log(
       `Extracting Risk Analysis for ${symbol} from Research Note...`,
     );
@@ -479,6 +484,7 @@ export class RiskRewardService {
       try {
         const result = await this.llmService.generateResearch(prompt);
         const raw = result.answerMarkdown || '';
+        this.logger.log(`[${symbol}] Raw LLM Response: ${raw.substring(0, 1000)}${raw.length > 1000 ? '...' : ''}`);
         lastRaw = raw;
         const toonMatch = raw.match(/\{[\s\S]*\}/);
         if (!toonMatch) {
