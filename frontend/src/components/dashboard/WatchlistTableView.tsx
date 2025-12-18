@@ -279,11 +279,12 @@ export function WatchlistTableView({
                     const rating = info.getValue() as string;
                     if (!rating || rating === '-') return <span className="text-muted-foreground">-</span>;
 
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
                     if (rating === 'Strong Buy') variant = 'strongBuy';
                     else if (rating === 'Buy') variant = 'buy';
                     else if (rating === 'Hold') variant = 'hold';
                     else if (rating === 'Sell') variant = 'sell';
+                    else if (rating === 'Speculative Buy') variant = 'speculativeBuy';
 
                     return (
                         <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">

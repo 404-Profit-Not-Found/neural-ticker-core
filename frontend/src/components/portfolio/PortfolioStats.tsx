@@ -105,7 +105,7 @@ export function PortfolioStats({
       />
       <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-50">
+      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
         <div className="space-y-4 max-w-3xl">
           <div className="flex items-center gap-3">
             <Wallet className="w-10 h-10 text-primary" />

@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
-import { calculateAiRating } from '../../lib/rating-utils';
+import { calculateAiRating, calculateUpside } from '../../lib/rating-utils';
 import { Skeleton } from '../ui/skeleton';
 
 interface PortfolioItem {
@@ -23,6 +23,7 @@ interface PortfolioItem {
     base_price?: number;
     upside_percent?: number;
     financial_risk?: number;
+    overall_score?: number;
   };
 }
 
@@ -98,8 +99,9 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
               {/* AI Rating Badge */}
               {(() => {
                 const risk = Number(item.aiAnalysis?.financial_risk ?? 0);
-                const upsideVal = Number(item.aiAnalysis?.upside_percent ?? 0);
-                const { rating, variant } = calculateAiRating(risk, upsideVal);
+                const currentPrice = Number(item.current_price ?? 0);
+                const upsideVal = calculateUpside(currentPrice, item.aiAnalysis?.base_price, item.aiAnalysis?.upside_percent);
+                const { rating, variant } = calculateAiRating(risk, upsideVal, item.aiAnalysis?.overall_score);
 
                 return (
                   <div className="flex items-center gap-1">

@@ -63,12 +63,13 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                     RiskIcon = Flame;
                 }
 
-                // --- AI Rating Variant ---
-                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                // --- AI Rating Logic ---
+                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
                 if (aiRating === 'Strong Buy') variant = 'strongBuy';
                 else if (aiRating === 'Buy') variant = 'buy';
                 else if (aiRating === 'Hold') variant = 'hold';
                 else if (aiRating === 'Sell') variant = 'sell';
+                else if (aiRating === 'Speculative Buy') variant = 'speculativeBuy';
 
                 return (
                     <div

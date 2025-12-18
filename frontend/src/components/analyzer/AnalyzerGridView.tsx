@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
-import { calculateAiRating } from '../../lib/rating-utils';
+import { calculateAiRating, calculateUpside } from '../../lib/rating-utils';
 
 interface AnalyzerGridViewProps {
     data: StockSnapshot[];
@@ -74,7 +74,8 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                     RiskIcon = Flame;
                 }
 
-                const { rating, variant } = calculateAiRating(risk, upside);
+                const liveUpside = calculateUpside(price, aiAnalysis?.base_price, aiAnalysis?.upside_percent);
+                const { rating, variant } = calculateAiRating(risk, liveUpside, aiAnalysis?.overall_score);
                 
                 // --- Analyst Consensus Logic ---
                 const consensus = fundamentals?.consensus_rating;

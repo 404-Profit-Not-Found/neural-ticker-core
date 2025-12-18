@@ -26,7 +26,7 @@ import { AnalyzerGridView } from './AnalyzerGridView';
 import { Badge } from '../ui/badge';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
-import { calculateAiRating } from '../../lib/rating-utils';
+import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -249,14 +249,7 @@ export function AnalyzerTable({
       cell: (info) => {
         const basePrice = info.getValue();
         const price = info.row.original.latestPrice?.close ?? 0;
-
-        let upside = 0;
-        if (typeof basePrice === 'number' && price > 0) {
-          upside = ((basePrice - price) / price) * 100;
-        } else {
-          upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
-        }
-
+        const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
         const isPositive = upside > 0;
 
         return (
@@ -303,14 +296,15 @@ export function AnalyzerTable({
       cell: (info) => {
         // Use financial_risk instead of overall_score to align with the visible Risk column
         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-        const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
         let rating = 'Hold';
-        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'outline';
+        let variant: RatingVariant = 'outline';
 
-        if (riskRaw !== undefined && upsideRaw !== undefined) {
+        if (riskRaw !== undefined) {
           const risk = Number(riskRaw);
-          const upside = Number(upsideRaw);
-          const result = calculateAiRating(risk, upside);
+          const price = info.row.original.latestPrice?.close ?? 0;
+          const upside = calculateUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+          const overallScore = info.row.original.aiAnalysis?.overall_score;
+          const result = calculateAiRating(risk, upside, overallScore);
           rating = result.rating;
           variant = result.variant;
         }
@@ -334,7 +328,7 @@ export function AnalyzerTable({
 
         const rLower = rawRating.toLowerCase();
         let displayRating = 'Hold';
-        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'hold';
+        let variant: RatingVariant = 'hold';
 
         if (rLower.includes('strong buy')) {
           displayRating = 'Strong Buy';
