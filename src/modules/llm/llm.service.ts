@@ -82,4 +82,15 @@ export class LlmService {
         throw new BadRequestException(`Unknown provider: ${provider as any}`);
     }
   }
+  async generateText(promptText: string): Promise<string> {
+    const result = await this.generateResearch({
+        question: promptText,
+        tickers: [],
+        numericContext: {},
+        style: 'concise',
+        provider: 'gemini',
+        quality: 'medium'
+    });
+    return result.answerMarkdown;
+  }
 }
