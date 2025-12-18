@@ -21,6 +21,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           url: configService.get<string>('database.url'),
           autoLoadEntities: true,
           synchronize: shouldSync,
+          migrationsRun: true,
+          migrations: [__dirname + '/../migrations/*{.ts,.js}'],
         };
       },
       inject: [ConfigService],
