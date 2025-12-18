@@ -37,7 +37,7 @@ export function PortfolioAiWidget({ hasPositions }: PortfolioAiWidgetProps) {
             <div className="bg-card border border-border rounded-xl p-6 relative overflow-hidden group">
                 {/* Background Gradient Effect */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-500" />
-                
+
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="space-y-2">
                         <h3 className="text-xl font-semibold flex items-center gap-2">
@@ -50,20 +50,20 @@ export function PortfolioAiWidget({ hasPositions }: PortfolioAiWidgetProps) {
                     </div>
 
                     <div className="flex items-center gap-3 bg-muted/30 p-1.5 rounded-lg border border-border">
-                         {['low', 'medium', 'high'].map((r) => (
-                             <button
+                        {['low', 'medium', 'high'].map((r) => (
+                            <button
                                 key={r}
                                 onClick={() => setRiskProfile(r)}
                                 className={cn(
                                     "px-4 py-2 text-sm font-medium rounded-md transition-all capitalize",
-                                    riskProfile === r 
-                                        ? "bg-primary text-black shadow-lg shadow-primary/20" 
+                                    riskProfile === r
+                                        ? "bg-primary text-black shadow-lg shadow-primary/20"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                 )}
-                             >
+                            >
                                 {r}
-                             </button>
-                         ))}
+                            </button>
+                        ))}
                     </div>
 
                     <button
@@ -90,8 +90,8 @@ export function PortfolioAiWidget({ hasPositions }: PortfolioAiWidgetProps) {
                     <Sparkles size={18} />
                     AI Insights ({riskProfile} Risk)
                 </h3>
-                <button 
-                    onClick={handleAnalyze} 
+                <button
+                    onClick={handleAnalyze}
                     disabled={loading}
                     className="p-2 hover:bg-muted rounded-md text-muted-foreground transition-colors"
                 >
@@ -109,11 +109,11 @@ export function PortfolioAiWidget({ hasPositions }: PortfolioAiWidgetProps) {
                 <div className="prose prose-invert prose-sm max-w-none">
                     <ReactMarkdown
                         components={{
-                            h1: ({node, ...props}) => <h4 className="text-lg font-bold text-foreground mt-4 mb-2" {...props} />,
-                            h2: ({node, ...props}) => <h5 className="text-base font-semibold text-foreground mt-3 mb-2" {...props} />,
-                            ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1 text-muted-foreground" {...props} />,
-                            li: ({node, ...props}) => <li className="" {...props} />,
-                            strong: ({node, ...props}) => <span className="font-semibold text-white" {...props} />,
+                            h1: ({ ...props }) => <h4 className="text-lg font-bold text-foreground mt-4 mb-2" {...props} />,
+                            h2: ({ ...props }) => <h5 className="text-base font-semibold text-foreground mt-3 mb-2" {...props} />,
+                            ul: ({ ...props }) => <ul className="list-disc pl-5 space-y-1 text-muted-foreground" {...props} />,
+                            li: ({ ...props }) => <li className="" {...props} />,
+                            strong: ({ ...props }) => <span className="font-semibold text-white" {...props} />,
                         }}
                     >
                         {analysis || ''}

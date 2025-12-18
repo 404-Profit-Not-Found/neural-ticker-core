@@ -8,7 +8,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({ user: { id: 'user-123', role: 'admin' } }),
+    useAuth: () => ({ user: { id: 'user-123', role: 'admin', credits_balance: 100 } }),
 }));
 
 vi.mock('../../hooks/useTicker', () => ({

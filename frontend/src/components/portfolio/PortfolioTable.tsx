@@ -8,58 +8,58 @@ import { useNavigate } from 'react-router-dom';
 import { calculateAiRating } from '../../lib/rating-utils';
 
 export interface Position {
-  id: string;
-  symbol: string;
-  shares: string | number;
-  buy_price: string | number;
-  current_price: number;
-  change_percent: number; 
-  current_value: number;
-  cost_basis: number;
-  gain_loss: number;
-  gain_loss_percent: number;
-  
-  // Enriched Backend Data
-  ticker?: { 
-      logo_url?: string;
-      name?: string;
-      sector?: string;
-      industry?: string;
-  };
-  fundamentals?: {
-      market_cap?: number;
-      pe_ttm?: number;
-      consensus_rating?: string;
-      sector?: string;
-  };
-  aiAnalysis?: {
-      financial_risk?: number;
-      overall_score?: number;
-      upside_percent?: number;
-      base_price?: number;
-      bear_price?: number;
-  };
-  counts?: {
-      analysts?: number;
-      news?: number;
-      research?: number;
-      social?: number;
-  }
+    id: string;
+    symbol: string;
+    shares: string | number;
+    buy_price: string | number;
+    current_price: number;
+    change_percent: number;
+    current_value: number;
+    cost_basis: number;
+    gain_loss: number;
+    gain_loss_percent: number;
+
+    // Enriched Backend Data
+    ticker?: {
+        logo_url?: string;
+        name?: string;
+        sector?: string;
+        industry?: string;
+    };
+    fundamentals?: {
+        market_cap?: number;
+        pe_ttm?: number;
+        consensus_rating?: string;
+        sector?: string;
+    };
+    aiAnalysis?: {
+        financial_risk?: number;
+        overall_score?: number;
+        upside_percent?: number;
+        base_price?: number;
+        bear_price?: number;
+    };
+    counts?: {
+        analysts?: number;
+        news?: number;
+        research?: number;
+        social?: number;
+    }
 }
 
 interface PortfolioTableProps {
-  positions: Position[];
-  onDelete: (id: string) => void;
-  onEdit?: (position: Position) => void; // Added Edit Handler
-  loading: boolean;
+    positions: Position[];
+    onDelete: (id: string) => void;
+    onEdit?: (position: Position) => void; // Added Edit Handler
+    loading: boolean;
 }
 
 // Helpers
-const formatCurrency = (val: number) => 
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
-const formatPct = (val: number) => 
-  `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
+const formatPct = (val: number) =>
+    `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
 const formatCap = (n: number) => {
     if (!n) return '-';
@@ -84,20 +84,20 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
                 return (
                     <div className="flex items-start gap-3 min-w-[140px]">
-                        <TickerLogo 
-                            url={ticker?.logo_url} 
-                            symbol={info.getValue()} 
-                            className="w-10 h-10 rounded-full" 
+                        <TickerLogo
+                            url={ticker?.logo_url}
+                            symbol={info.getValue()}
+                            className="w-10 h-10 rounded-full"
                         />
                         <div className="flex flex-col gap-0.5">
-                           <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 <span className="text-base font-bold text-foreground hover:underline cursor-pointer"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         navigate(`/ticker/${info.getValue()}`);
                                     }}
                                 >{info.getValue()}</span>
-                                
+
                                 {showCounts && (
                                     <div className="flex items-center gap-2">
                                         {counts?.research ? (
@@ -120,7 +120,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                                         ) : null}
                                     </div>
                                 )}
-                           </div>
+                            </div>
                             <span className="text-xs text-muted-foreground truncate max-w-[120px]">
                                 {ticker?.name || 'Unknown'}
                             </span>
@@ -143,13 +143,13 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
                 return (
                     <div className="flex flex-col items-start min-w-[90px]">
-                         <span className="text-sm font-mono font-medium text-foreground/90">
+                        <span className="text-sm font-mono font-medium text-foreground/90">
                             {formatCurrency(price)}
-                         </span>
-                         <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
-                            {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
+                        </span>
+                        <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                            {isPositive ? <ArrowUp size={12} className="mr-0.5" /> : <ArrowDown size={12} className="mr-0.5" />}
                             {Math.abs(change).toFixed(2)}%
-                         </div>
+                        </div>
                     </div>
                 );
             }
@@ -181,16 +181,16 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const isProfit = val >= 0;
 
                 return (
-                     <div className={cn("hidden md:flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
+                    <div className={cn("hidden md:flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
                         <div className="flex items-center gap-1">
-                             <span className="font-mono font-bold text-sm">
+                            <span className="font-mono font-bold text-sm">
                                 {val > 0 ? '+' : ''}{formatCurrency(val)}
-                             </span>
+                            </span>
                         </div>
                         <span className="text-xs opacity-80">
                             {formatPct(pct)}
                         </span>
-                     </div>
+                    </div>
                 );
             }
         }),
@@ -221,7 +221,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             cell: (info) => {
                 const val = info.getValue();
                 if (val === undefined || val === null) return <span className="hidden md:inline">-</span>;
-                
+
                 let colorClass = 'text-muted-foreground';
                 let Icon = ShieldCheck;
                 if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
@@ -229,10 +229,10 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 else { colorClass = 'text-red-500'; Icon = Flame; }
 
                 return (
-                  <span className={cn('hidden md:flex items-center gap-1.5 font-bold', colorClass)}>
-                    <Icon size={14} />
-                    {Number(val).toFixed(1)}
-                  </span>
+                    <span className={cn('hidden md:flex items-center gap-1.5 font-bold', colorClass)}>
+                        <Icon size={14} />
+                        {Number(val).toFixed(1)}
+                    </span>
                 );
             }
         }),
@@ -247,16 +247,16 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 let color = 'text-red-500';
                 if (val >= 7.5) color = 'text-emerald-500';
                 else if (val >= 5.0) color = 'text-yellow-500';
-                
+
                 return <span className={cn("hidden md:inline font-bold", color)}>{Number(val).toFixed(1)}</span>
             }
         }),
 
         // 10. Upside
-         columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
-              id: 'upside',
-              header: () => <span className="hidden md:inline">Upside</span>,
-              cell: (info) => {
+        columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
+            id: 'upside',
+            header: () => <span className="hidden md:inline">Upside</span>,
+            cell: (info) => {
                 const basePrice = info.getValue();
                 const price = info.row.original.current_price;
                 let upside = 0;
@@ -267,12 +267,12 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 }
                 const isPositive = upside > 0;
                 return (
-                  <div className={cn('hidden md:flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
-                    {isPositive && <ArrowUp size={12} className="mr-0.5" />}
-                    {upside.toFixed(1)}%
-                  </div>
+                    <div className={cn('hidden md:flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                        {isPositive && <ArrowUp size={12} className="mr-0.5" />}
+                        {upside.toFixed(1)}%
+                    </div>
                 );
-              },
+            },
         }),
 
         // 11. AI Rating
@@ -280,24 +280,24 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             id: 'ai_rating',
             header: () => <span className="hidden md:inline">AI Rating</span>,
             cell: (info) => {
-                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-                 const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
-                 let rating = 'Hold';
-                 let variant: 'default' | 'destructive' | 'outline' | 'secondary' = 'outline';
-         
-                  if (riskRaw !== undefined && upsideRaw !== undefined) {
-                     const risk = Number(riskRaw);
-                     const upside = Number(upsideRaw);
-                     const result = calculateAiRating(risk, upside);
-                     rating = result.rating;
-                     variant = result.variant;
-                  }
-        
+                const riskRaw = info.row.original.aiAnalysis?.financial_risk;
+                const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
+                let rating = 'Hold';
+                let variant: 'default' | 'destructive' | 'outline' | 'secondary' = 'outline';
+
+                if (riskRaw !== undefined && upsideRaw !== undefined) {
+                    const risk = Number(riskRaw);
+                    const upside = Number(upsideRaw);
+                    const result = calculateAiRating(risk, upside);
+                    rating = result.rating;
+                    variant = result.variant as 'default' | 'destructive' | 'outline' | 'secondary';
+                }
+
                 return (
-                     <Badge variant={variant} className="hidden md:flex whitespace-nowrap h-6 px-2 gap-1.5 cursor-default w-fit">
-                          <Bot size={12} />
-                          {rating}
-                     </Badge>
+                    <Badge variant={variant} className="hidden md:flex whitespace-nowrap h-6 px-2 gap-1.5 cursor-default w-fit">
+                        <Bot size={12} />
+                        {rating}
+                    </Badge>
                 );
             }
         }),
@@ -320,7 +320,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                             <Edit2 size={14} />
                         </button>
                     )}
-                    <button 
+                    <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onDelete(info.row.original.id);
@@ -335,30 +335,30 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         })
     ];
 
-  if (loading && positions.length === 0) {
+    if (loading && positions.length === 0) {
+        return (
+            <div className="w-full mt-6">
+                <DataTable columns={columns} data={[]} isLoading={true} />
+            </div>
+        );
+    }
+
+    if (positions.length === 0 && !loading) {
+        return (
+            <div className="mt-8 p-12 text-center border border-dashed border-border rounded-xl bg-muted/20">
+                <h3 className="text-xl font-medium text-foreground">Your portfolio is empty</h3>
+                <p className="text-muted-foreground mt-2">Add your first position to start tracking performance and get AI insights.</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="w-full mt-6">
-             <DataTable columns={columns} data={[]} isLoading={true} />
+        <div>
+            <DataTable
+                columns={columns}
+                data={positions}
+                onRowClick={(row) => navigate(`/ticker/${row.symbol}`)}
+            />
         </div>
     );
-  }
-
-  if (positions.length === 0 && !loading) {
-    return (
-        <div className="mt-8 p-12 text-center border border-dashed border-border rounded-xl bg-muted/20">
-            <h3 className="text-xl font-medium text-foreground">Your portfolio is empty</h3>
-            <p className="text-muted-foreground mt-2">Add your first position to start tracking performance and get AI insights.</p>
-        </div>
-    );
-  }
-
-  return (
-    <div className="mt-6">
-      <DataTable 
-        columns={columns} 
-        data={positions} 
-        onRowClick={(row) => navigate(`/ticker/${row.symbol}`)}
-      />
-    </div>
-  );
 }

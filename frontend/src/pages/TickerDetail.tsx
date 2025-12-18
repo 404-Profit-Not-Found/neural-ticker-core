@@ -61,7 +61,7 @@ export function TickerDetail() {
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
     const { data: watchlists = [] } = useWatchlists();
 
-    const isFavorite = watchlists?.some(wl => 
+    const isFavorite = watchlists?.some(wl =>
         wl.items?.some(item => item.ticker.symbol === symbol)
     ) ?? false;
 
@@ -218,22 +218,22 @@ export function TickerDetail() {
                 <div className="relative z-30 space-y-4 pb-4 md:pb-6">
                     {/* Mobile Actions (Absolute Top Right) */}
                     <div className="md:hidden absolute top-0 right-0 flex items-center gap-2 z-40">
-                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
                             <Eye size={12} />
                             <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
                         </div>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2" 
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2"
                             title="Add to Favourites"
                             onClick={() => {
-                                if(symbol) favoriteMutation.mutate(symbol);
+                                if (symbol) favoriteMutation.mutate(symbol);
                             }}
                         >
-                            <Star 
-                                size={16} 
-                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""} 
+                            <Star
+                                size={16}
+                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""}
                             />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted -mr-2" title="Share">
@@ -247,7 +247,7 @@ export function TickerDetail() {
                         <div className="flex items-center justify-between">
                             {/* Left: Identity */}
                             <div className="flex items-center gap-4">
-                                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
+                                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
                                     <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                                 </Button>
                                 <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
@@ -259,8 +259,8 @@ export function TickerDetail() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
-                                         <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
-                                         {profile?.industry && (
+                                        <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
+                                        {profile?.industry && (
                                             <>
                                                 <span className="text-muted-foreground/40">•</span>
                                                 <span className="text-sm text-muted-foreground">{profile.industry}</span>
@@ -277,9 +277,9 @@ export function TickerDetail() {
                                     <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
                                 </div>
 
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
                                     className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
                                     onClick={async () => {
                                         if (!symbol) return;
@@ -297,21 +297,21 @@ export function TickerDetail() {
                                     disabled={isSyncing}
                                     title="Sync Data"
                                 >
-                                     <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
+                                    <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
                                 </Button>
 
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
                                     className="h-9 w-9 rounded-full"
                                     onClick={() => {
-                                        if(symbol) favoriteMutation.mutate(symbol);
+                                        if (symbol) favoriteMutation.mutate(symbol);
                                     }}
                                     title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                                 >
-                                    <Star 
-                                        size={18} 
-                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"} 
+                                    <Star
+                                        size={18}
+                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
                                     />
                                 </Button>
 
@@ -334,10 +334,10 @@ export function TickerDetail() {
                                         {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
                                     </div>
                                 </div>
-                                
+
                                 {risk_analysis && (
                                     <div className="pt-2 border-t border-border/50">
-                                         <RiskLight
+                                        <RiskLight
                                             score={risk_analysis.overall_score}
                                             reasoning={risk_analysis.summary}
                                             sentiment={risk_analysis.sentiment}
@@ -368,7 +368,7 @@ export function TickerDetail() {
                     <div className="md:hidden">
                         {/* Top: Back + Logo + Symbol/Name */}
                         <div className="flex items-start gap-3 pr-24">
-                            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
+                            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
                                 <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                             </Button>
 
@@ -393,8 +393,8 @@ export function TickerDetail() {
                             </div>
                         </div>
 
-                         {/* Mobile: Risk Row */}
-                         <div className="md:hidden flex items-center justify-center mt-4">
+                        {/* Mobile: Risk Row */}
+                        <div className="md:hidden flex items-center justify-center mt-4">
                             {risk_analysis && (
                                 <RiskLight
                                     score={risk_analysis.overall_score}
@@ -410,7 +410,7 @@ export function TickerDetail() {
                                 />
                             )}
                         </div>
-                        
+
                         {/* Mobile: Description */}
                         {profile?.description && (
                             <div className="mt-3 text-xs text-muted-foreground/80 leading-relaxed line-clamp-3">

@@ -29,6 +29,7 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,
@@ -61,9 +62,9 @@ export function DataTable<TData, TValue>({
                         {header.isPlaceholder
                           ? null
                           : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
                         {{
                           asc: <ArrowUpRight className="ml-1 h-3 w-3" />,
                           desc: <ArrowDownRight className="ml-1 h-3 w-3" />,
@@ -81,18 +82,18 @@ export function DataTable<TData, TValue>({
                 <tr key={i} className="border-b">
                   {columns.map((_, j) => (
                     <td key={j} className="p-4">
-                        {/* Heuristic: First column usually has avatar, others are text */}
-                        {j === 0 ? (
-                           <div className="flex items-center gap-3">
-                                <Skeleton className="h-8 w-8 rounded-full" />
-                                <div className="space-y-1">
-                                    <Skeleton className="h-4 w-12" />
-                                    <Skeleton className="h-3 w-20" />
-                                </div>
-                            </div> 
-                        ) : (
-                            <Skeleton className="h-4 w-full opacity-50" />
-                        )}
+                      {/* Heuristic: First column usually has avatar, others are text */}
+                      {j === 0 ? (
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-8 w-8 rounded-full" />
+                          <div className="space-y-1">
+                            <Skeleton className="h-4 w-12" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                        </div>
+                      ) : (
+                        <Skeleton className="h-4 w-full opacity-50" />
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -102,9 +103,8 @@ export function DataTable<TData, TValue>({
                 <tr
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  className={`group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${
-                    onRowClick ? 'cursor-pointer' : ''
-                  }`}
+                  className={`group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${onRowClick ? 'cursor-pointer' : ''
+                    }`}
                   onClick={() => onRowClick && onRowClick(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

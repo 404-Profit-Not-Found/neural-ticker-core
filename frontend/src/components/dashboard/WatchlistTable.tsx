@@ -158,7 +158,7 @@ export function WatchlistTable() {
                 const prevClose = Number(s.latestPrice?.prevClose || price);
                 const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
                 const fundamentals = s.fundamentals || {};
-                
+
                 // Use financial_risk instead of overall_score if available
                 const riskVal = s.aiAnalysis?.financial_risk;
                 const parsedRiskScore = typeof riskVal === 'number' ? riskVal : Number(riskVal);
@@ -423,23 +423,6 @@ export function WatchlistTable() {
                             )}
                         </div>
 
-                        {/* View Switcher - Placed immediately next to selector group */}
-                        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0">
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                title="Table View"
-                            >
-                                <List size={16} />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                title="Grid View"
-                            >
-                                <LayoutGrid size={16} />
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -491,16 +474,36 @@ export function WatchlistTable() {
                         )}
                     </div>
 
-                    {/* Global Filter */}
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
-                        <input
-                            type="text"
-                            placeholder="Filter watchlist..."
-                            value={globalFilter ?? ''}
-                            onChange={(e) => setGlobalFilter(e.target.value)}
-                            className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
-                        />
+                    {/* Global Filter & View Toggle Row */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
+                            <input
+                                type="text"
+                                placeholder="Filter watchlist..."
+                                value={globalFilter ?? ''}
+                                onChange={(e) => setGlobalFilter(e.target.value)}
+                                className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
+                            />
+                        </div>
+
+                        {/* View Switcher - Moved here for mobile alignment */}
+                        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0 h-9">
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                                title="Table View"
+                            >
+                                <List size={16} />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                                title="Grid View"
+                            >
+                                <LayoutGrid size={16} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Sector Filter - Right Aligned on Desktop */}
@@ -572,41 +575,43 @@ export function WatchlistTable() {
             </div>
 
             {/* Content Area */}
-            {viewMode === 'table' ? (
-                <WatchlistTableView
-                    data={tableData}
-                    isLoading={isGlobalLoading}
-                    onRemove={handleRemoveTicker}
-                    sorting={sorting}
-                    setSorting={setSorting}
-                    columnFilters={columnFilters}
-                    setColumnFilters={setColumnFilters}
-                    globalFilter={globalFilter}
-                    setGlobalFilter={setGlobalFilter}
-                    tableRef={tableInstanceRef}
-                />
-            ) : (
-                <WatchlistGridView
-                    data={tableData.filter(item => {
-                        // Apply Sector Filter
-                        if (activeSectorFilter && item.sector !== activeSectorFilter) return false;
+            {
+                viewMode === 'table' ? (
+                    <WatchlistTableView
+                        data={tableData}
+                        isLoading={isGlobalLoading}
+                        onRemove={handleRemoveTicker}
+                        sorting={sorting}
+                        setSorting={setSorting}
+                        columnFilters={columnFilters}
+                        setColumnFilters={setColumnFilters}
+                        globalFilter={globalFilter}
+                        setGlobalFilter={setGlobalFilter}
+                        tableRef={tableInstanceRef}
+                    />
+                ) : (
+                    <WatchlistGridView
+                        data={tableData.filter(item => {
+                            // Apply Sector Filter
+                            if (activeSectorFilter && item.sector !== activeSectorFilter) return false;
 
-                        // Apply Global Search Filter
-                        if (globalFilter) {
-                            const search = globalFilter.toLowerCase();
-                            return (
-                                item.symbol.toLowerCase().includes(search) ||
-                                item.company.toLowerCase().includes(search) ||
-                                item.sector.toLowerCase().includes(search)
-                            );
-                        }
+                            // Apply Global Search Filter
+                            if (globalFilter) {
+                                const search = globalFilter.toLowerCase();
+                                return (
+                                    item.symbol.toLowerCase().includes(search) ||
+                                    item.company.toLowerCase().includes(search) ||
+                                    item.sector.toLowerCase().includes(search)
+                                );
+                            }
 
-                        return true;
-                    })}
-                    isLoading={isGlobalLoading}
-                    onRemove={handleRemoveTicker}
-                />
-            )}
-        </div>
+                            return true;
+                        })}
+                        isLoading={isGlobalLoading}
+                        onRemove={handleRemoveTicker}
+                    />
+                )
+            }
+        </div >
     );
 }

@@ -366,10 +366,11 @@ describe('MarketDataService', () => {
   });
 
   describe('getAnalyzerTickers', () => {
-    it.skip('should return paginated data with correct structure', async () => {
+    it('should return paginated data with correct structure', async () => {
       const mockQueryBuilder = {
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
