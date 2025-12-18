@@ -126,18 +126,24 @@ export class InitialSync1734560000000 implements MigrationInterface {
     // 8. Ensure quality_score and rarity in research_notes if table exists
     const researchNotesExists = await queryRunner.hasTable('research_notes');
     if (researchNotesExists) {
-        await queryRunner.query(`ALTER TABLE "research_notes" ADD COLUMN IF NOT EXISTS "quality_score" integer`);
-        await queryRunner.query(`ALTER TABLE "research_notes" ADD COLUMN IF NOT EXISTS "rarity" text`);
+      await queryRunner.query(
+        `ALTER TABLE "research_notes" ADD COLUMN IF NOT EXISTS "quality_score" integer`,
+      );
+      await queryRunner.query(
+        `ALTER TABLE "research_notes" ADD COLUMN IF NOT EXISTS "rarity" text`,
+      );
     }
 
     // 9. Foreign Keys (Safe check)
     try {
-        await queryRunner.query(`
+      await queryRunner.query(`
             ALTER TABLE "portfolio_analyses" 
             ADD CONSTRAINT "FK_portfolio_analyses_user" 
             FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
         `);
-    } catch (e) { /* Ignore if exists or users table missing */ }
+    } catch {
+      /* Ignore if exists or users table missing */
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
