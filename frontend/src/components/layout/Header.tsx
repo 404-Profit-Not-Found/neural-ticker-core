@@ -137,6 +137,7 @@ export function Header() {
 
   // Close menus on route change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileMenuOpen(false);
     setMobileMenuOpen(false);
     setNotificationsMenuOpen(false);
