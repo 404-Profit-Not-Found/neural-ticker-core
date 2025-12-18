@@ -281,6 +281,6 @@ export class Fundamentals {
   sector: string;
 
   @ApiProperty()
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 }

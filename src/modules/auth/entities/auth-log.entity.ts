@@ -21,7 +21,7 @@ export class AuthLog {
   @Column({ type: 'text', nullable: true })
   email: string;
 
-  @CreateDateColumn({ name: 'login_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'login_at', type: 'datetime' })
   loginAt: Date;
 
   @Column({ name: 'ip_address', type: 'text', nullable: true })

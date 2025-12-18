@@ -40,7 +40,7 @@ export class User {
   credits_balance: number;
 
   @ApiProperty()
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   credits_reset_at: Date;
 
   @OneToMany(() => CreditTransaction, (tx) => tx.user)
@@ -51,22 +51,22 @@ export class User {
   avatar_url: string;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty()
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 
   @ApiProperty()
-  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   last_login: Date;
 
   @OneToMany('Watchlist', 'user')
   watchlists: any[]; // Using string/any to avoid circular dependency import issues for now, or use forwardRef
 
   @ApiProperty({ example: { gemini_api_key: '...' } })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   preferences: Record<string, any>;
 
   @ApiProperty({ example: 'FunnyPanda123' })

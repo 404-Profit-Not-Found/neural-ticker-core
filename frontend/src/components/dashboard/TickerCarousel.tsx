@@ -54,9 +54,10 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                     }
 
                     // --- AI Rating Variant ---
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
+                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
                     if (aiRating === 'Strong Buy') variant = 'strongBuy';
                     else if (aiRating === 'Buy') variant = 'buy';
+                    else if (aiRating === 'Speculative Buy') variant = 'speculativeBuy';
                     else if (aiRating === 'Hold') variant = 'hold';
                     else if (aiRating === 'Sell') variant = 'sell';
 

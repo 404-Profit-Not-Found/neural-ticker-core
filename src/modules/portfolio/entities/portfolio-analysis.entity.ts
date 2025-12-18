@@ -38,6 +38,6 @@ export class PortfolioAnalysis {
   @Column({ type: 'text' })
   response: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }

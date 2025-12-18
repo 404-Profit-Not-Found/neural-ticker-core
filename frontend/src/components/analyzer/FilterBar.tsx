@@ -64,7 +64,7 @@ export function FilterBar({
             AI Signal
           </div>
           <div className="p-1">
-            {['Strong Buy', 'Buy', 'Hold', 'Sell'].map((status) => (
+            {['Strong Buy', 'Buy', 'Speculative Buy', 'Hold', 'Sell'].map((status) => (
               <Item 
                 key={status} 
                 label={status} 

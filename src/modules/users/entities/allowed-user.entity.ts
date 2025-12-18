@@ -21,6 +21,6 @@ export class AllowedUser {
   added_by: string;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

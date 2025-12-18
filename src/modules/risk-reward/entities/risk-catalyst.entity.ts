@@ -16,7 +16,7 @@ export enum CatalystTimeframe {
 @Entity('risk_catalysts')
 export class RiskCatalyst {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @Column({ type: 'bigint' })
@@ -29,7 +29,7 @@ export class RiskCatalyst {
   analysis: RiskAnalysis;
 
   @ApiProperty({ enum: CatalystTimeframe })
-  @Column({ type: 'enum', enum: CatalystTimeframe })
+  @Column({ type: 'text' })
   timeframe: CatalystTimeframe;
 
   @ApiProperty()

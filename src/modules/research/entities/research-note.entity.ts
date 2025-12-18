@@ -3,6 +3,7 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -25,7 +26,7 @@ export enum ResearchStatus {
 @Entity('research_notes')
 export class ResearchNote {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -33,7 +34,7 @@ export class ResearchNote {
   request_id: string;
 
   @ApiProperty({ example: ['AAPL', 'MSFT'] })
-  @Column({ type: 'text', array: true })
+  @Column({ type: 'simple-array' })
   tickers: string[];
 
   @ApiProperty({ example: 'What is the long term outlook?' })
@@ -41,7 +42,7 @@ export class ResearchNote {
   question: string;
 
   @ApiProperty({ enum: LlmProvider, example: LlmProvider.OPENAI })
-  @Column({ type: 'enum', enum: LlmProvider })
+  @Column({ type: 'text' })
   provider: LlmProvider;
 
   @ApiProperty({ example: 'deep', required: false })
@@ -49,7 +50,7 @@ export class ResearchNote {
   quality: string;
 
   @ApiProperty({ example: ['gpt-4'] })
-  @Column({ type: 'text', array: true, default: '{}' })
+  @Column({ type: 'simple-array', default: '' })
   models_used: string[];
 
   @ApiProperty({
@@ -70,13 +71,13 @@ export class ResearchNote {
   full_response: string;
 
   @ApiProperty()
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'simple-json', default: '{}' })
   numeric_context: Record<string, any>;
 
   @ApiProperty({
     description: 'Google Search grounding metadata from Gemini',
   })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   grounding_metadata: Record<string, any>;
 
   @ApiProperty({
@@ -95,8 +96,7 @@ export class ResearchNote {
 
   @ApiProperty({ enum: ResearchStatus, default: ResearchStatus.PENDING })
   @Column({
-    type: 'enum',
-    enum: ResearchStatus,
+    type: 'text',
     default: ResearchStatus.PENDING,
   })
   status: ResearchStatus;
@@ -122,16 +122,10 @@ export class ResearchNote {
   user: any;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz', onUpdate: 'CURRENT_TIMESTAMP' }) // Using CreateDateColumn logic or UpdateDateColumn
-  // TypeORM has @UpdateDateColumn
-  @Column({
-    type: 'timestamptz',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 }

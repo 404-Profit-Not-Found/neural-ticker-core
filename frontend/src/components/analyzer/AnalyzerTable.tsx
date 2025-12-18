@@ -305,7 +305,7 @@ export function AnalyzerTable({
         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
         const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
         let rating = 'Hold';
-        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'outline';
+        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'speculativeBuy' | 'outline' = 'outline';
 
         if (riskRaw !== undefined && upsideRaw !== undefined) {
           const risk = Number(riskRaw);
@@ -334,7 +334,7 @@ export function AnalyzerTable({
 
         const rLower = rawRating.toLowerCase();
         let displayRating = 'Hold';
-        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'hold';
+        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'speculativeBuy' | 'outline' = 'hold';
 
         if (rLower.includes('strong buy')) {
           displayRating = 'Strong Buy';

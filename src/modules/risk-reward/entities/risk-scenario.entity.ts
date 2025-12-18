@@ -17,7 +17,7 @@ export enum ScenarioType {
 @Entity('risk_scenarios')
 export class RiskScenario {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @Column({ type: 'bigint' })
@@ -30,7 +30,7 @@ export class RiskScenario {
   analysis: RiskAnalysis;
 
   @ApiProperty({ enum: ScenarioType })
-  @Column({ type: 'enum', enum: ScenarioType })
+  @Column({ type: 'text' })
   scenario_type: ScenarioType;
 
   @ApiProperty({ example: 0.275 })
@@ -58,6 +58,6 @@ export class RiskScenario {
   expected_market_cap: number;
 
   @ApiProperty({ type: [String] })
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'json' })
   key_drivers: string[];
 }

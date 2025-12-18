@@ -15,7 +15,7 @@ import { TickerEntity } from '../../tickers/entities/ticker.entity';
 @Unique(['symbol_id', 'external_id']) // Prevent duplicate imports of same news item
 @Index(['symbol_id', 'datetime'])
 export class CompanyNews {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @Column({ type: 'bigint' })
@@ -30,7 +30,7 @@ export class CompanyNews {
   external_id: number;
 
   @ApiProperty()
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'datetime' })
   datetime: Date;
 
   @ApiProperty()
@@ -57,6 +57,6 @@ export class CompanyNews {
   @Column({ type: 'text', nullable: true })
   related: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

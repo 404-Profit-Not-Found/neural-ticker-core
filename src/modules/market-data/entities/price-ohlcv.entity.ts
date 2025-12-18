@@ -16,7 +16,7 @@ export class PriceOhlcv {
   symbol_id: string;
 
   @ApiProperty({ example: '2023-10-27T00:00:00.000Z' })
-  @PrimaryColumn({ type: 'timestamptz' })
+  @PrimaryColumn({ type: 'datetime' })
   ts: Date;
 
   @ApiProperty({ example: '1d' })
@@ -84,6 +84,6 @@ export class PriceOhlcv {
   source: string;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz', name: 'inserted_at' })
+  @CreateDateColumn({ type: 'datetime', name: 'inserted_at' })
   inserted_at: Date;
 }

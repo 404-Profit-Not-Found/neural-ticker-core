@@ -13,7 +13,7 @@ import { TickerEntity } from '../../tickers/entities/ticker.entity';
 @Entity('watchlist_items')
 export class WatchlistItem {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty({ example: '1' })
@@ -33,6 +33,6 @@ export class WatchlistItem {
   ticker: TickerEntity;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   added_at: Date;
 }

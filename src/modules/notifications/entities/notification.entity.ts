@@ -32,7 +32,7 @@ export class Notification {
   @Column({ default: false })
   read: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   data: any; // e.g., { researchId: '...' }
 
   @CreateDateColumn()

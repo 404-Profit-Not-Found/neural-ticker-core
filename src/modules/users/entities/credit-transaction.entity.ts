@@ -44,10 +44,10 @@ export class CreditTransaction {
     | 'admin_gift';
 
   @ApiProperty({ example: { note_id: '...', score: 85 } })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   metadata: Record<string, any>;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

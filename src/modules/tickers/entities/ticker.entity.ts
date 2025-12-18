@@ -11,7 +11,7 @@ import { ColumnNumericTransformer } from '../../../common/transformers/column-nu
 @Entity('tickers')
 export class TickerEntity {
   @ApiProperty({ example: '1', description: 'Unique ID' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string; // BigInt is returned as string in TypeORM by default
 
   @ApiProperty({ example: 'AAPL', description: 'Stock Ticker' })
@@ -136,14 +136,14 @@ export class TickerEntity {
   is_hidden: boolean;
 
   @ApiProperty({ description: 'Raw Finnhub Profile Data', required: false })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   finnhub_raw: Record<string, any>;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty()
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 }

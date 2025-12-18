@@ -27,6 +27,6 @@ export class StockTwitsWatcher {
     description: 'Record timestamp',
   })
   @Index()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   timestamp: Date;
 }

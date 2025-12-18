@@ -13,7 +13,7 @@ import { User } from '../../users/entities/user.entity';
 @Entity('comments')
 export class Comment {
   @ApiProperty({ example: '1', description: 'Unique ID' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty({ example: 'AAPL', description: 'Ticker Symbol' })
@@ -35,10 +35,10 @@ export class Comment {
   user: User;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty()
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 }

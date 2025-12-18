@@ -18,7 +18,7 @@ export enum QualitativeFactorType {
 @Entity('risk_qualitative_factors')
 export class RiskQualitativeFactor {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @Column({ type: 'bigint' })
@@ -31,7 +31,7 @@ export class RiskQualitativeFactor {
   analysis: RiskAnalysis;
 
   @ApiProperty({ enum: QualitativeFactorType })
-  @Column({ type: 'enum', enum: QualitativeFactorType })
+  @Column({ type: 'text' })
   factor_type: QualitativeFactorType;
 
   @ApiProperty()

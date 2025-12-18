@@ -17,7 +17,7 @@ export enum RiskConfidenceLevel {
 @Index(['symbol_id', 'as_of']) // Index as per spec
 export class RiskRewardScore {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty({ example: '1' })
@@ -25,7 +25,7 @@ export class RiskRewardScore {
   symbol_id: string;
 
   @ApiProperty()
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'datetime' })
   as_of: Date;
 
   @ApiProperty({
@@ -49,8 +49,7 @@ export class RiskRewardScore {
 
   @ApiProperty({ enum: RiskConfidenceLevel, example: RiskConfidenceLevel.HIGH })
   @Column({
-    type: 'enum',
-    enum: RiskConfidenceLevel,
+    type: 'text',
     default: RiskConfidenceLevel.MEDIUM,
   })
   confidence_level: RiskConfidenceLevel;
@@ -60,7 +59,7 @@ export class RiskRewardScore {
   provider: string;
 
   @ApiProperty({ example: ['gpt-4'] })
-  @Column({ type: 'text', array: true })
+  @Column({ type: 'simple-array' })
   models_used: string[];
 
   @ApiProperty({ example: '10', required: false })
@@ -72,10 +71,10 @@ export class RiskRewardScore {
   rationale_markdown: string;
 
   @ApiProperty()
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'simple-json' })
   numeric_context: Record<string, any>;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

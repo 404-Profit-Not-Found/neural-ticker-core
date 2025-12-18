@@ -6,7 +6,7 @@ export class TickerLogoEntity {
   @PrimaryColumn({ type: 'bigint' })
   symbol_id: string; // FK to Tickers
 
-  @Column({ type: 'bytea' })
+  @Column({ type: 'blob' })
   image_data: Buffer;
 
   @Column({ type: 'text' })

@@ -59,7 +59,7 @@ import configuration from './config/configuration';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        if (process.env.NODE_ENV === 'test') {
+        if (process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true') {
           return testTypeOrmConfig;
         }
         const dbConfig = configService.get('database');

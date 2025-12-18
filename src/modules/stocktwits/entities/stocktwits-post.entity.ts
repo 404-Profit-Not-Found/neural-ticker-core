@@ -46,6 +46,6 @@ export class StockTwitsPost {
     description: 'Post creation timestamp',
   })
   @Index()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

@@ -5,6 +5,8 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
 // CRITICAL: Set DB credentials before module import for CI
+process.env.TEST_MODE = 'true';
+process.env.NODE_ENV = 'test';
 process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'password';
 process.env.DB_USERNAME = process.env.DB_USERNAME || 'neural';
 process.env.DB_DATABASE = process.env.DB_DATABASE || 'neural_db';

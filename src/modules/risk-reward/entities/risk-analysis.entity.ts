@@ -17,7 +17,7 @@ import { RiskQualitativeFactor } from './risk-qualitative-factor.entity';
 @Entity('risk_analyses')
 export class RiskAnalysis {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty()
@@ -29,7 +29,7 @@ export class RiskAnalysis {
   ticker: TickerEntity;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty({ example: '1.0.0' })
@@ -170,7 +170,7 @@ export class RiskAnalysis {
 
   // --- Fundamentals Snapshot (JSONB) ---
   @ApiProperty()
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'simple-json' })
   fundamentals: {
     cash_on_hand: number;
     runway_years: number;
@@ -183,7 +183,7 @@ export class RiskAnalysis {
 
   // --- Red Flags ---
   @ApiProperty()
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'simple-json', default: '[]' })
   red_flags: string[];
 
   @ApiProperty({ example: 'uuid', required: false })
@@ -192,6 +192,6 @@ export class RiskAnalysis {
 
   // --- Metadata ---
   @ApiProperty()
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   metadata: Record<string, any>;
 }

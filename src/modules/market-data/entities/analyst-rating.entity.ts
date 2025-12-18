@@ -44,6 +44,6 @@ export class AnalystRating {
   rating_date: string;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

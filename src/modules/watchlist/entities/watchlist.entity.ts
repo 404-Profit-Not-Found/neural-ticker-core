@@ -16,7 +16,7 @@ import { WatchlistItem } from './watchlist-item.entity';
 @Entity('watchlists')
 export class Watchlist {
   @ApiProperty({ example: '1' })
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id: string;
 
   @ApiProperty({ example: 'My Tech Picks' })
@@ -36,11 +36,11 @@ export class Watchlist {
   items: WatchlistItem[];
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
   @ApiProperty()
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 
   // Audit improvement: Soft Delete
