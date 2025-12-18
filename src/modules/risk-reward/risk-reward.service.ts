@@ -351,8 +351,8 @@ export class RiskRewardService {
       "sector": string,
       "market_cap_current": number,
       "price_current": number,
+      "neural_investment_rating": number,
       "risk_score": {
-        "overall": number,
         "financial_risk": number,
         "execution_risk": number,
         "dilution_risk": number,
@@ -448,13 +448,16 @@ export class RiskRewardService {
       }
 
       CRITICAL RULES:
-      1. Extract ACTUAL price targets from the research if present - do NOT invent numbers.
-      2. If specific Bull/Base/Bear targets are mentioned, use those EXACT values.
-      3. If exact numbers are missing, infer reasonable estimates based on sentiment.
-      6. OUTPUT PURE JSON ONLY. No markdown formatting (no code blocks).
-      7. Numeric fields must be FINAL CALCULATED NUMBERS (e.g., 150.50).
-      8. DO NOT include equations, math, or "show your work" (e.g., NEVER output "100 * 1.5").
-      9. DO NOT include comments like "// this is a comment".
+      1. neural_investment_rating (0-10): This is NOT a risk score. It is an overall "Buy/Hold/Sell" equivalent. 10.0 = Exceptional Opportunity/High Conviction, 5.0 = Neutral, 0.0 = Extreme Warning/Bankrupt/Avoid.
+      2. If a stock is bankrupt, delisted, or has -100% upside potential, neural_investment_rating MUST be 0.0.
+      3. risk_score fields (0-10): 10.0 = EXTREME RISK, 0.0 = NO RISK.
+      4. Extract ACTUAL price targets from the research if present - do NOT invent numbers.
+      5. If specific Bull/Base/Bear targets are mentioned, use those EXACT values.
+      6. If exact numbers are missing, infer reasonable estimates based on sentiment.
+      7. OUTPUT PURE JSON ONLY. No markdown formatting (no code blocks).
+      8. Numeric fields must be FINAL CALCULATED NUMBERS (e.g., 150.50).
+      9. DO NOT include equations, math, or "show your work" (e.g., NEVER output "100 * 1.5").
+      10. DO NOT include comments like "// this is a comment".
       `,
       tickers: [symbol],
       numericContext: context,
@@ -582,17 +585,31 @@ export class RiskRewardService {
 
     // Scores
     const rs = parsed.risk_score || {};
-    analysis.overall_score = rs.overall || 5;
+    let overall = parsed.neural_investment_rating ?? 5;
+
+    // Expected Value extraction
+    const ev = parsed.expected_value || {};
+    const upside = ev.upside_vs_current_percent || 0;
+
+    // Safety Logic: If upside is -100% or price is 0, force low overall score
+    const price = snapshot.latestPrice?.close || 0;
+    if (upside <= -99 || price <= 0) {
+      this.logger.warn(
+        `Forcing low rating for potentially bankrupt ticker ${symbol}`,
+      );
+      overall = Math.min(overall, 1.0);
+    }
+
+    analysis.overall_score = overall;
     analysis.financial_risk = rs.financial_risk || 5;
     analysis.execution_risk = rs.execution_risk || 5;
     analysis.dilution_risk = rs.dilution_risk || 5;
     analysis.competitive_risk = rs.competitive_risk || 5;
     analysis.regulatory_risk = rs.regulatory_risk || 5;
 
-    // Expected Value
-    const ev = parsed.expected_value || {};
+    // Expected Value (using already declared ev)
     analysis.price_target_weighted = ev.price_target_weighted || 0;
-    analysis.upside_percent = ev.upside_vs_current_percent || 0;
+    analysis.upside_percent = upside;
     analysis.time_horizon_years = parsed.time_horizon_years || 1;
 
     // Analyst

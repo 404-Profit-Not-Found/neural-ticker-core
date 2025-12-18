@@ -37,7 +37,11 @@ export class RiskAnalysis {
   model_version: string;
 
   // --- Scores ---
-  @ApiProperty({ example: 8.0, description: 'Overall Risk Score (0-10)' })
+  @ApiProperty({
+    example: 8.0,
+    description:
+      'Overall Investment Potential Score (0-10, where 10 is excellent and 0 is immediate risk/bankrupt)',
+  })
   @Column({
     type: 'numeric',
     precision: 4,
