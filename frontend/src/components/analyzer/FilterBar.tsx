@@ -182,7 +182,7 @@ export function FilterBar({
         </PopoverTrigger>
         <PopoverContent align="start" className="w-[200px] p-0">
           <div className="px-2 py-1.5 text-sm font-semibold border-b">
-            Min R/R Coefficient
+            Min Risk/Reward Coefficient
           </div>
           <div className="p-1">
             {['> 5.0', '> 7.5', '> 8.5'].map((val) => {

@@ -10,5 +10,6 @@ export interface GetAnalyzerTickersOptions {
   aiRating?: string[];
   upside?: string;
   sector?: string[];
+  overallScore?: string;
   isAdmin?: boolean;
 }

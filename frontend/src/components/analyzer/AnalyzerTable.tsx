@@ -63,6 +63,7 @@ export function AnalyzerTable({
     aiRating: filters?.aiRating,
     upside: filters?.upside,
     sector: filters?.sector,
+    overallScore: filters?.overallScore,
   });
 
   const items = data?.items || [];
@@ -223,7 +224,7 @@ export function AnalyzerTable({
     // 5.5 Risk/Reward (Overall Score)
     columnHelper.accessor((row) => row.aiAnalysis?.overall_score, {
       id: 'overall_score',
-      header: 'R/R',
+      header: 'Risk/Reward',
       cell: (info) => {
         const val = info.getValue();
         if (val === undefined || val === null) return '-';

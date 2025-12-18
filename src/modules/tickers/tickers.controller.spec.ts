@@ -76,7 +76,7 @@ describe('TickersController', () => {
         status: jest.fn().mockReturnThis(),
       };
 
-      await controller.getLogo('AAPL', res as any);
+      await controller.getLogo({} as any, 'AAPL', res as any);
 
       expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/png');
       expect(res.set).toHaveBeenCalledWith(
@@ -95,7 +95,7 @@ describe('TickersController', () => {
         status: jest.fn().mockReturnThis(),
       };
 
-      await controller.getLogo('UNKNOWN', res as any);
+      await controller.getLogo({} as any, 'UNKNOWN', res as any);
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.send).toHaveBeenCalledWith('Logo not found');
@@ -107,10 +107,10 @@ describe('TickersController', () => {
       const ticker = { symbol: 'AAPL', name: 'Apple Inc' };
       mockTickersService.getTicker.mockResolvedValue(ticker);
 
-      const result = await controller.get('AAPL');
+      const result = await controller.get({} as any, 'AAPL');
 
       expect(result).toEqual(ticker);
-      expect(mockTickersService.getTicker).toHaveBeenCalledWith('AAPL');
+      expect(mockTickersService.getTicker).toHaveBeenCalledWith('AAPL', false);
     });
   });
 });

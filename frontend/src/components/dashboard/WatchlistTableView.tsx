@@ -234,7 +234,7 @@ export function WatchlistTableView({
             // 5.5 Risk/Reward (Overall Score)
             columnHelper.accessor((row) => row.overallScore, {
                 id: 'overall_score',
-                header: 'R/R',
+                header: 'Risk/Reward',
                 cell: (info) => {
                     const val = info.getValue();
                     if (val === undefined || val === null) return '-';

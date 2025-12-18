@@ -733,10 +733,9 @@ export class MarketDataService {
         .where('cn.symbol_id = ticker.id');
     }, 'news_count');
 
-    // Filter
-    if (!options.isAdmin) {
-      qb.andWhere('ticker.is_hidden = :isHidden', { isHidden: false });
-    }
+    // Filter: Always hide shadowbanned tickers from the main Analyzer/Dashboard list.
+    // They should only be visible in the Admin Console (Management) or specific Watchlists.
+    qb.andWhere('ticker.is_hidden = :isHidden', { isHidden: false });
 
     if (search) {
       qb.andWhere(
@@ -790,6 +789,18 @@ export class MarketDataService {
       if (match) {
         const val = parseInt(match[0], 10);
         qb.andWhere('risk.upside_percent > :upsideVal', { upsideVal: val });
+      }
+    }
+
+    // 2.5 Overall Score (Risk/Reward) Filter
+    if (options.overallScore) {
+      // Expected format: "> 8.5", "> 7.5", "> 5.0"
+      const match = options.overallScore.match(/(\d+(\.\d+)?)/);
+      if (match) {
+        const val = parseFloat(match[0]);
+        qb.andWhere('risk.overall_score > :overallScoreVal', {
+          overallScoreVal: val,
+        });
       }
     }
 

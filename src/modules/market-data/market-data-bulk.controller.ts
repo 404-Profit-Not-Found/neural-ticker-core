@@ -66,6 +66,7 @@ export class MarketDataBulkController {
   @ApiQuery({ name: 'upside', required: false, type: String, example: '> 20%' })
   @ApiQuery({ name: 'sector', required: false, isArray: true, type: String })
   @ApiQuery({ name: 'symbols', required: false, isArray: true, type: String })
+  @ApiQuery({ name: 'overallScore', required: false, type: String, example: '> 8.5' })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',
@@ -83,6 +84,7 @@ export class MarketDataBulkController {
     @Query('upside') upside?: string,
     @Query('sector') sector?: string[],
     @Query('symbols') symbols?: string[],
+    @Query('overallScore') overallScore?: string,
   ) {
     return this.service.getAnalyzerTickers({
       page,
@@ -95,6 +97,7 @@ export class MarketDataBulkController {
       upside,
       sector: Array.isArray(sector) ? sector : sector ? [sector] : [],
       symbols: Array.isArray(symbols) ? symbols : symbols ? [symbols] : [],
+      overallScore,
       isAdmin: req.user?.role === 'admin',
     });
   }
