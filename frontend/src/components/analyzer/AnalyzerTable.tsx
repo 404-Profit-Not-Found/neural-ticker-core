@@ -81,7 +81,7 @@ export function AnalyzerTable({
 
         return (
           <div className="flex items-start gap-3">
-            <div 
+            <div
               className="cursor-pointer"
               onClick={() => navigate(`/ticker/${info.getValue()}`)}
             >
@@ -93,13 +93,13 @@ export function AnalyzerTable({
             </div>
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
-                <span 
+                <span
                   className="text-base font-bold text-foreground hover:underline cursor-pointer"
                   onClick={() => navigate(`/ticker/${info.getValue()}`)}
                 >
                   {info.getValue()}
                 </span>
-                
+
                 {/* Insight Icons Next to Symbol */}
                 {hasInsights && (
                   <div className="flex items-center gap-2">
@@ -124,15 +124,15 @@ export function AnalyzerTable({
                   </div>
                 )}
               </div>
-              
+
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.ticker.name}>
                   {info.row.original.ticker.name}
                 </span>
                 {info.row.original.ticker.sector && (
-                     <span className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">
-                        {info.row.original.ticker.sector}
-                     </span>
+                  <span className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">
+                    {info.row.original.ticker.sector}
+                  </span>
                 )}
               </div>
             </div>
@@ -148,21 +148,21 @@ export function AnalyzerTable({
       cell: (info) => {
         const change = info.getValue();
         const price = info.row.original.latestPrice?.close;
-        
+
         if (!price) return '-';
 
         const isPositive = (change || 0) >= 0;
-        
+
         return (
           <div className="flex flex-col items-end">
             <span className="text-sm font-mono font-medium text-foreground/70">
               ${price.toFixed(2)}
             </span>
             {change !== undefined && change !== null ? (
-               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
-                  {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
-                  {Math.abs(change).toFixed(2)}%
-               </div>
+              <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                {isPositive ? <ArrowUp size={12} className="mr-0.5" /> : <ArrowDown size={12} className="mr-0.5" />}
+                {Math.abs(change).toFixed(2)}%
+              </div>
             ) : <span className="text-xs text-muted-foreground">-</span>}
           </div>
         );
@@ -177,11 +177,11 @@ export function AnalyzerTable({
         const val = info.getValue();
         // Hide if 0 or null/undefined
         if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
-        
+
         const formatCap = (n: number) => {
-           if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-           if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-           return (n / 1e6).toFixed(2) + 'M';
+          if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+          if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+          return (n / 1e6).toFixed(2) + 'M';
         };
 
         return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
@@ -205,7 +205,7 @@ export function AnalyzerTable({
       cell: (info) => {
         const val = info.getValue();
         if (val === undefined || val === null) return '-';
-        
+
         let colorClass = 'text-muted-foreground';
         let Icon = ShieldCheck;
         if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
@@ -228,7 +228,7 @@ export function AnalyzerTable({
       cell: (info) => {
         const val = info.getValue();
         if (val === undefined || val === null) return '-';
-        
+
         let colorClass = 'text-muted-foreground';
         if (val >= 7.5) colorClass = 'text-emerald-500';
         else if (val >= 5.0) colorClass = 'text-yellow-500';
@@ -242,19 +242,19 @@ export function AnalyzerTable({
       },
     }),
 
-     // 6. Upside (Base Case)
+    // 6. Upside (Base Case)
     columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
       id: 'upside_percent',
       header: 'Upside',
       cell: (info) => {
         const basePrice = info.getValue();
         const price = info.row.original.latestPrice?.close ?? 0;
-        
+
         let upside = 0;
         if (typeof basePrice === 'number' && price > 0) {
-            upside = ((basePrice - price) / price) * 100;
+          upside = ((basePrice - price) / price) * 100;
         } else {
-            upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
+          upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
         }
 
         const isPositive = upside > 0;
@@ -276,14 +276,14 @@ export function AnalyzerTable({
         const bearPrice = info.getValue();
         const price = info.row.original.latestPrice?.close ?? 0;
         const risk = Number(info.row.original.aiAnalysis?.financial_risk ?? 0);
-        
+
         let downside = 0;
         if (typeof bearPrice === 'number' && price > 0) {
-            downside = ((bearPrice - price) / price) * 100;
+          downside = ((bearPrice - price) / price) * 100;
         } else if (risk >= 8) {
-            downside = -100;
+          downside = -100;
         } else {
-            downside = -(risk * 2.5);
+          downside = -(risk * 2.5);
         }
 
         return (
@@ -301,25 +301,25 @@ export function AnalyzerTable({
       header: 'AI Rating',
       enableSorting: true,
       cell: (info) => {
-         // Use financial_risk instead of overall_score to align with the visible Risk column
-         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-         const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
-         let rating = 'Hold';
-         let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'outline';
- 
-          if (riskRaw !== undefined && upsideRaw !== undefined) {
-             const risk = Number(riskRaw);
-             const upside = Number(upsideRaw);
-             const result = calculateAiRating(risk, upside);
-             rating = result.rating;
-             variant = result.variant;
-          }
+        // Use financial_risk instead of overall_score to align with the visible Risk column
+        const riskRaw = info.row.original.aiAnalysis?.financial_risk;
+        const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
+        let rating = 'Hold';
+        let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'outline';
+
+        if (riskRaw !== undefined && upsideRaw !== undefined) {
+          const risk = Number(riskRaw);
+          const upside = Number(upsideRaw);
+          const result = calculateAiRating(risk, upside);
+          rating = result.rating;
+          variant = result.variant;
+        }
 
         return (
-             <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
-                  <Bot size={12} />
-                  {rating}
-             </Badge>
+          <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
+            <Bot size={12} />
+            {rating}
+          </Badge>
         );
       }
     }),
@@ -331,32 +331,32 @@ export function AnalyzerTable({
       cell: (info) => {
         const rawRating = info.getValue() as string;
         if (!rawRating || rawRating === '-') return <span className="text-muted-foreground">-</span>;
-        
+
         const rLower = rawRating.toLowerCase();
         let displayRating = 'Hold';
         let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'hold';
 
         if (rLower.includes('strong buy')) {
-           displayRating = 'Strong Buy';
-           variant = 'strongBuy';
+          displayRating = 'Strong Buy';
+          variant = 'strongBuy';
         } else if (rLower.includes('buy')) {
-           displayRating = 'Buy';
-           variant = 'buy';
+          displayRating = 'Buy';
+          variant = 'buy';
         } else if (rLower.includes('sell')) {
-           displayRating = 'Sell';
-           variant = 'sell';
+          displayRating = 'Sell';
+          variant = 'sell';
         } else {
-           displayRating = 'Hold';
-           variant = 'hold';
+          displayRating = 'Hold';
+          variant = 'hold';
         }
 
         const count = info.row.original.counts?.analysts || 0;
         const label = count > 0 ? `${displayRating} (${count})` : displayRating;
 
         return (
-             <Badge variant={variant} className="whitespace-nowrap h-6 px-2">
-                {label}
-             </Badge>
+          <Badge variant={variant} className="whitespace-nowrap h-6 px-2">
+            {label}
+          </Badge>
         );
       },
     }),
@@ -365,8 +365,8 @@ export function AnalyzerTable({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:w-64">
+      <div className="flex flex-row items-center justify-between gap-4">
+        <div className="relative flex-1 sm:flex-none sm:w-64">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             placeholder="Search tickers..."

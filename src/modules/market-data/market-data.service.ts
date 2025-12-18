@@ -44,6 +44,15 @@ export class MarketDataService {
     private readonly configService: ConfigService, // Added
   ) {}
 
+  async getQuote(symbol: string) {
+    try {
+      return await this.finnhubService.getQuote(symbol);
+    } catch (e) {
+      this.logger.error(`Failed to get quote for ${symbol}: ${e.message}`);
+      return null;
+    }
+  }
+
   async getSnapshot(symbol: string) {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
 

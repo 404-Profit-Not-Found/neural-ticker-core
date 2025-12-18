@@ -66,7 +66,12 @@ export class MarketDataBulkController {
   @ApiQuery({ name: 'upside', required: false, type: String, example: '> 20%' })
   @ApiQuery({ name: 'sector', required: false, isArray: true, type: String })
   @ApiQuery({ name: 'symbols', required: false, isArray: true, type: String })
-  @ApiQuery({ name: 'overallScore', required: false, type: String, example: '> 8.5' })
+  @ApiQuery({
+    name: 'overallScore',
+    required: false,
+    type: String,
+    example: '> 8.5',
+  })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',

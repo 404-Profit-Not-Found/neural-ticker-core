@@ -50,7 +50,7 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
     const getModelCost = (key: string, quality: ModelTier) => {
         if (key === 'gemini-2.5-flash-lite') return 1;
         if (key === 'gemini-3-flash-preview') return 2;
-        if (key === 'gpt-4.1-mini') return 3;
+        if (key === 'gpt-4.1-mini') return 1;
         return quality === 'deep' ? 5 : 1;
     };
 

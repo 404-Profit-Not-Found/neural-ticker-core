@@ -283,7 +283,7 @@ export class TickersService {
     const results = await this.tickerRepo
       .createQueryBuilder('ticker')
       .select(
-        'DISTINCT COALESCE(NULLIF(ticker.sector, \'\'), ticker.finnhub_industry)',
+        "DISTINCT COALESCE(NULLIF(ticker.sector, ''), ticker.finnhub_industry)",
         'sector',
       )
       .where('ticker.sector IS NOT NULL OR ticker.finnhub_industry IS NOT NULL')
@@ -291,8 +291,6 @@ export class TickersService {
       .orderBy('sector', 'ASC') // sort by the alias
       .getRawMany();
 
-    return results
-      .map((r) => r.sector)
-      .filter((s) => s && s.trim().length > 0);
+    return results.map((r) => r.sector).filter((s) => s && s.trim().length > 0);
   }
 }

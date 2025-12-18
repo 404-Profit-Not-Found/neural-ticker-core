@@ -33,6 +33,7 @@
     "recharts": "^3.5.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
@@ -47,6 +48,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.22",
+    "cypress": "^13.0.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -58,7 +60,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^2.1.4",
-    "cypress": "^13.0.0"
+    "vitest": "^2.1.4"
   }
 }

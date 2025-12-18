@@ -69,8 +69,15 @@ export class QualityScoringService {
       });
 
       // Extract JSON-like block if embedded in text
+      // Improved regex to handle code blocks and greedy matching
       const jsonMatch = result.answerMarkdown.match(/\{[\s\S]*\}/);
-      const contentToParse = jsonMatch ? jsonMatch[0] : result.answerMarkdown;
+      let contentToParse = jsonMatch ? jsonMatch[0] : result.answerMarkdown;
+
+      // Clean up markdown code blocks if present
+      contentToParse = contentToParse
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
 
       let scoreData: any;
       try {
@@ -80,14 +87,23 @@ export class QualityScoringService {
         try {
           scoreData = JSON.parse(contentToParse);
         } catch {
+          this.logger.error(`Failed to parse content: ${contentToParse}`);
           throw new Error(
             `Failed to parse response as TOON or JSON: ${e.message}`,
           );
         }
       }
 
+      // Numeric Coercion
+      if (scoreData.score && typeof scoreData.score === 'string') {
+        scoreData.score = parseFloat(scoreData.score);
+      }
+
       // Validate schema loosely
       if (typeof scoreData.score !== 'number' || !scoreData.rarity) {
+        this.logger.error(
+          `Invalid Schema Recieved: ${JSON.stringify(scoreData)}`,
+        );
         throw new Error('Invalid JSON schema from scoring service');
       }
 

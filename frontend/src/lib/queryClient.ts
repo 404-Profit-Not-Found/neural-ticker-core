@@ -34,5 +34,5 @@ export const persister = createIDBPersister();
 export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   persister,
   maxAge: 1000 * 60 * 60 * 24, // 24 hours
-  buster: 'v2', // Increment this to bust cache on major updates
+  buster: 'v3', // Increment this to bust cache on major updates
 };

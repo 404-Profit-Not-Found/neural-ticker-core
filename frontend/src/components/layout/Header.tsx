@@ -229,6 +229,9 @@ export function Header() {
           <Link to="/analyzer" className={linkClass('/analyzer')}>
             Tickers
           </Link>
+          <Link to="/portfolio" className={linkClass('/portfolio')}>
+            Portfolio
+          </Link>
         </nav>
 
         {/* Right: alerts + profile */}
@@ -404,6 +407,9 @@ export function Header() {
           </Link>
           <Link to="/news" className={mobileLinkClass('/news')}>
             News
+          </Link>
+          <Link to="/portfolio" className={mobileLinkClass('/portfolio')}>
+            Portfolio
           </Link>
           <div className="h-px bg-border my-2" />
         </div>

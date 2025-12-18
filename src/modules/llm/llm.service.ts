@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
-import { ResearchPrompt, ResearchResult } from './llm.types';
+import { ResearchPrompt, ResearchResult, QualityTier } from './llm.types';
 
 import { jsonToToon } from 'toon-parser';
 
@@ -81,5 +81,44 @@ export class LlmService {
       default:
         throw new BadRequestException(`Unknown provider: ${provider as any}`);
     }
+  }
+
+  private resolveModelKey(key: string): {
+    provider: 'openai' | 'gemini' | 'ensemble';
+    quality: QualityTier;
+  } {
+    const k = key.toLowerCase();
+
+    if (k === 'gemini-2.5-flash-lite')
+      return { provider: 'gemini', quality: 'low' };
+    if (k === 'gemini-3-flash-preview' || k === 'gemini')
+      return { provider: 'gemini', quality: 'medium' };
+    if (k === 'gemini-3-pro-preview')
+      return { provider: 'gemini', quality: 'deep' };
+
+    if (k === 'gpt-4.1-mini') return { provider: 'openai', quality: 'medium' };
+    if (k === 'gpt-5.1' || k === 'openai')
+      return { provider: 'openai', quality: 'deep' };
+
+    if (k === 'ensemble') return { provider: 'ensemble', quality: 'deep' };
+
+    // Default fallback
+    return { provider: 'gemini', quality: 'medium' };
+  }
+
+  async generateText(
+    promptText: string,
+    modelOrProvider: string = 'gemini',
+  ): Promise<string> {
+    const resolved = this.resolveModelKey(modelOrProvider);
+    const result = await this.generateResearch({
+      question: promptText,
+      tickers: [],
+      numericContext: {},
+      style: 'concise',
+      provider: resolved.provider,
+      quality: resolved.quality,
+    });
+    return result.answerMarkdown;
   }
 }
