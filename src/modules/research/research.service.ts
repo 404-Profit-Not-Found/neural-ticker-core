@@ -246,8 +246,11 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
   - Bull: $X.XX (Rationale)
   - Base: $X.XX (Rationale)
   - Bear: $X.XX (Rationale)
-- MANDATORY: If Financial Risk is estimated at 8 or higher, the Bear Scenario MUST reflect a 100% downside (Price Target: $0.00) with a rationale of potential bankruptcy or insolvency.
+- MANDATORY: Only if Financial Risk is 9+ AND the research explicitly indicates high probability of insolvency/bankruptcy, the Bear Scenario should reflect a 100% downside ($0.00). Otherwise, for high risk (7-9), use a significant drawdown (e.g., -50% to -90%) but keep it non-zero unless liquidation is the only outcome.
 `;
+
+      this.logger.log(`[Research] Generating note for ${note.tickers.join(', ')}...`);
+      this.logger.log(`[Research] Numeric Context: ${JSON.stringify(context)}`);
 
       const result = await this.llmService.generateResearch({
         question: note.question + dataRequirements,
