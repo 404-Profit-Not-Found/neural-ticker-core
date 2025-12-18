@@ -39,84 +39,6 @@ export function FilterBar({
 
   const sectors = dynamicSectors || [];
 
-  // Helper for Colorful Border Buttons (No Shadow)
-  const FilterButton = ({
-    label,
-    count,
-    activeValue,
-    variant = 'default',
-    children,
-  }: {
-    label: string;
-    count?: number;
-    activeValue?: string | null;
-    variant?: 'purple' | 'amber' | 'emerald' | 'cyan' | 'blue' | 'default';
-    children: React.ReactNode;
-  }) => {
-    const isActive = (count && count > 0) || !!activeValue;
-    
-    // Base: H-8, px-3, border, transition
-    const baseStyles = "h-8 px-3 text-xs font-medium border transition-colors duration-200";
-    
-    // Inactive: Standard dashed outline
-    const inactiveStyles = "border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground";
-    
-    // Active Variant Styles
-    // Design: Solid Colored Border + Colored Text + Subtle Background Tint
-    // Dark/Light Support: Text is 600 (light) / 400 (dark). Bg is 500/10 (universal). Border is 500/50.
-    const activeStyles = {
-      purple:  "border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20",
-      amber:   "border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20",
-      emerald: "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20",
-      cyan:    "border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20",
-      blue:    "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
-      default: "border-primary text-primary bg-primary/10 hover:bg-primary/20",
-    };
-
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            className={cn(
-              baseStyles,
-              "rounded-md flex items-center gap-2",
-              isActive ? activeStyles[variant] : inactiveStyles
-            )}
-          >
-            {label}
-            {isActive && (
-              <div className="flex items-center gap-1.5 ml-0.5">
-                <div className={cn("h-3.5 w-[1px]", isActive ? "bg-current/40" : "bg-border")} />
-                <span className="font-bold">
-                  {count ? count : activeValue}
-                </span>
-              </div>
-            )}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[200px] p-0 animate-in zoom-in-95 duration-200">
-            {children}
-        </PopoverContent>
-      </Popover>
-    );
-  };
-
-  // Shared Item Style
-  const Item = ({ label, selected, onClick }: { label: string, selected: boolean, onClick: () => void }) => (
-    <div
-      className={cn(
-        'flex items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer group',
-        selected && 'bg-accent/50 text-accent-foreground'
-      )}
-      onClick={onClick}
-    >
-      <span className={cn("transition-colors", selected ? "font-medium" : "text-muted-foreground group-hover:text-foreground")}>
-        {label}
-      </span>
-      {selected && <Check className="h-3.5 w-3.5 text-primary animate-in zoom-in duration-200" />}
-    </div>
-  );
-
   return (
     <div className="flex flex-wrap items-center gap-2 p-1 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
       {/* Label */}
@@ -278,3 +200,81 @@ export function FilterBar({
     </div>
   );
 }
+
+// Helper for Colorful Border Buttons (No Shadow)
+const FilterButton = ({
+  label,
+  count,
+  activeValue,
+  variant = 'default',
+  children,
+}: {
+  label: string;
+  count?: number;
+  activeValue?: string | null;
+  variant?: 'purple' | 'amber' | 'emerald' | 'cyan' | 'blue' | 'default';
+  children: React.ReactNode;
+}) => {
+  const isActive = (count && count > 0) || !!activeValue;
+  
+  // Base: H-8, px-3, border, transition
+  const baseStyles = "h-8 px-3 text-xs font-medium border transition-colors duration-200";
+  
+  // Inactive: Standard dashed outline
+  const inactiveStyles = "border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground";
+  
+  // Active Variant Styles
+  // Design: Solid Colored Border + Colored Text + Subtle Background Tint
+  // Dark/Light Support: Text is 600 (light) / 400 (dark). Bg is 500/10 (universal). Border is 500/50.
+  const activeStyles = {
+    purple:  "border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20",
+    amber:   "border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20",
+    emerald: "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20",
+    cyan:    "border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20",
+    blue:    "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
+    default: "border-primary text-primary bg-primary/10 hover:bg-primary/20",
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            baseStyles,
+            "rounded-md flex items-center gap-2",
+            isActive ? activeStyles[variant] : inactiveStyles
+          )}
+        >
+          {label}
+          {isActive && (
+             <div className="flex items-center gap-1.5 ml-0.5">
+                <div className={cn("h-3.5 w-[1px]", isActive ? "bg-current/40" : "bg-border")} />
+                <span className="font-bold">
+                  {count ? count : activeValue}
+                </span>
+              </div>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[200px] p-0 animate-in zoom-in-95 duration-200">
+          {children}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// Shared Item Style
+const Item = ({ label, selected, onClick }: { label: string, selected: boolean, onClick: () => void }) => (
+  <div
+    className={cn(
+      'flex items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer group',
+      selected && 'bg-accent/50 text-accent-foreground'
+    )}
+    onClick={onClick}
+  >
+    <span className={cn("transition-colors", selected ? "font-medium" : "text-muted-foreground group-hover:text-foreground")}>
+      {label}
+    </span>
+     {selected && <Check className="h-3.5 w-3.5 text-primary animate-in zoom-in duration-200" />}
+  </div>
+);
