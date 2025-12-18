@@ -1,4 +1,9 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+} from 'typeorm';
 
 export class CreatePortfolioPositions1765923111750 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -55,27 +60,31 @@ export class CreatePortfolioPositions1765923111750 implements MigrationInterface
     // Foreign Key to Users table
     const table = await queryRunner.getTable('portfolio_positions');
     if (table) {
-        const foreignKey = table.foreignKeys.find((fk) => fk.columnNames.indexOf('user_id') !== -1);
-        if (!foreignKey) {
-            await queryRunner.createForeignKey(
-                'portfolio_positions',
-                new TableForeignKey({
-                    columnNames: ['user_id'],
-                    referencedColumnNames: ['id'],
-                    referencedTableName: 'users',
-                    onDelete: 'CASCADE',
-                }),
-            );
-        }
+      const foreignKey = table.foreignKeys.find(
+        (fk) => fk.columnNames.indexOf('user_id') !== -1,
+      );
+      if (!foreignKey) {
+        await queryRunner.createForeignKey(
+          'portfolio_positions',
+          new TableForeignKey({
+            columnNames: ['user_id'],
+            referencedColumnNames: ['id'],
+            referencedTableName: 'users',
+            onDelete: 'CASCADE',
+          }),
+        );
+      }
     }
 
     // Index on user_id + symbol
     // Check if index exists is trickier with QueryRunner, but safe to verify via pg_indexes or catch error
     // Simplest approach: use IF NOT EXISTS if supported or try/catch
     try {
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_portfolio_user_symbol" ON "portfolio_positions" ("user_id", "symbol")`);
-    } catch (e) {
-        // Ignore if exists
+      await queryRunner.query(
+        `CREATE INDEX IF NOT EXISTS "IDX_portfolio_user_symbol" ON "portfolio_positions" ("user_id", "symbol")`,
+      );
+    } catch {
+      // Ignore if exists
     }
   }
 
@@ -87,7 +96,7 @@ export class CreatePortfolioPositions1765923111750 implements MigrationInterface
       (fk) => fk.columnNames.indexOf('user_id') !== -1,
     );
     if (foreignKey) {
-        await queryRunner.dropForeignKey('portfolio_positions', foreignKey);
+      await queryRunner.dropForeignKey('portfolio_positions', foreignKey);
     }
     await queryRunner.dropTable('portfolio_positions');
   }

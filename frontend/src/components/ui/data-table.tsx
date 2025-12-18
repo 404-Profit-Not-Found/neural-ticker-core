@@ -54,7 +54,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <th
                       key={header.id}
-                      className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none whitespace-nowrap"
+                      className="h-10 px-2 sm:px-4 text-left align-middle font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none whitespace-nowrap"
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       <div className="flex items-center gap-1">
@@ -108,7 +108,7 @@ export function DataTable<TData, TValue>({
                   onClick={() => onRowClick && onRowClick(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="p-4 align-middle whitespace-nowrap">
+                    <td key={cell.id} className="p-2 sm:p-4 align-middle whitespace-nowrap">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

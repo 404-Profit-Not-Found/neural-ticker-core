@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+  HttpCode,
+} from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
@@ -15,7 +26,10 @@ export class PortfolioController {
 
   @Post('positions')
   @ApiOperation({ summary: 'Add a new position' })
-  create(@Req() req: AuthenticatedRequest, @Body() dto: CreatePortfolioPositionDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreatePortfolioPositionDto,
+  ) {
     return this.portfolioService.create(req.user.id, dto);
   }
 
@@ -28,9 +42,9 @@ export class PortfolioController {
   @Patch('positions/:id')
   @ApiOperation({ summary: 'Update a position' })
   update(
-    @Req() req: AuthenticatedRequest, 
-    @Param('id') id: string, 
-    @Body() dto: UpdatePortfolioPositionDto
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdatePortfolioPositionDto,
   ) {
     return this.portfolioService.update(req.user.id, id, dto);
   }
@@ -44,17 +58,32 @@ export class PortfolioController {
 
   @Post('analyze')
   @ApiOperation({ summary: 'Generate AI analysis for portfolio' })
-  @ApiBody({ schema: { example: { riskAppetite: 'medium', horizon: 'medium-term', goal: 'growth', model: 'gemini' } } })
+  @ApiBody({
+    schema: {
+      example: {
+        riskAppetite: 'medium',
+        horizon: 'medium-term',
+        goal: 'growth',
+        model: 'gemini',
+      },
+    },
+  })
   analyze(
-    @Req() req: AuthenticatedRequest, 
-    @Body() body: { riskAppetite?: string; horizon?: string; goal?: string; model?: string }
+    @Req() req: AuthenticatedRequest,
+    @Body()
+    body: {
+      riskAppetite?: string;
+      horizon?: string;
+      goal?: string;
+      model?: string;
+    },
   ) {
     return this.portfolioService.analyzePortfolio(
-      req.user.id, 
+      req.user.id,
       body.riskAppetite || 'medium',
       body.horizon || 'medium-term',
       body.goal || 'growth',
-      body.model || 'gemini'
+      body.model || 'gemini',
     );
   }
 

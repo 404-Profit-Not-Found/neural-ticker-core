@@ -46,10 +46,10 @@ export class MarketDataService {
 
   async getQuote(symbol: string) {
     try {
-        return await this.finnhubService.getQuote(symbol);
+      return await this.finnhubService.getQuote(symbol);
     } catch (e) {
-        this.logger.error(`Failed to get quote for ${symbol}: ${e.message}`);
-        return null;
+      this.logger.error(`Failed to get quote for ${symbol}: ${e.message}`);
+      return null;
     }
   }
 

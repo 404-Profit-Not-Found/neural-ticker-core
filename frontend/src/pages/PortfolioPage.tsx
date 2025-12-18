@@ -13,10 +13,36 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, LayoutGrid, List } from 'lucide-react';
 import { calculateAiRating } from '../lib/rating-utils';
 
+interface PortfolioPosition {
+  id: string;
+  symbol: string;
+  shares: number;
+  buy_price: number;
+  buy_date: string;
+  current_price: number;
+  current_value: number;
+  cost_basis: number;
+  total_gain: number;
+  total_gain_percent: number;
+  ticker?: {
+    name?: string;
+    sector?: string;
+  };
+  fundamentals?: {
+    sector?: string;
+  };
+  aiAnalysis?: {
+    financial_risk?: number;
+    upside_percent?: number;
+    overall_score?: number;
+    base_price?: number;
+  };
+}
+
 export function PortfolioPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
-  const [editingPosition, setEditingPosition] = useState<any | null>(null);
+  const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [search, setSearch] = useState('');
   
@@ -45,7 +71,7 @@ export function PortfolioPage() {
     let totalRisk = 0;
     let riskCount = 0;
 
-    positions.forEach((p: any) => {
+    positions.forEach((p: PortfolioPosition) => {
       totalValue += p.current_value;
       totalCost += p.cost_basis;
       
@@ -65,7 +91,7 @@ export function PortfolioPage() {
 
   // Client-Side Filtering
   const filteredPositions = useMemo(() => {
-    return positions.filter((item: any) => {
+    return positions.filter((item: PortfolioPosition) => {
         // 1. Search (Symbol or Name)
         const matchSearch = !search || 
             item.symbol.includes(search.toUpperCase()) || 
@@ -169,33 +195,35 @@ export function PortfolioPage() {
                 onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
              />
 
-             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                 <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                 <div className="relative flex-1 sm:max-w-md">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <input
-                        placeholder="Search positions..."
+                        placeholder="Search symbols or names..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-8 h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
                 </div>
 
-                {/* View Toggle */}
-                <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card">
-                    <button
-                        onClick={() => setViewMode('table')}
-                        className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                        title="Table View"
-                    >
-                        <List size={16} />
-                    </button>
-                    <button
-                        onClick={() => setViewMode('grid')}
-                        className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                        title="Grid View"
-                    >
-                        <LayoutGrid size={16} />
-                    </button>
+                <div className="flex items-center justify-end gap-2">
+                    {/* View Toggle */}
+                    <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                            title="Table View"
+                        >
+                            <List size={16} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                    </div>
                 </div>
              </div>
         </div>
@@ -226,7 +254,7 @@ export function PortfolioPage() {
       {editingPosition && (
           <EditPositionDialog 
             open={!!editingPosition} 
-            onOpenChange={(open) => !open && setEditingPosition(null)}
+            onOpenChange={(open: boolean) => !open && setEditingPosition(null)}
             position={editingPosition}
             onSuccess={() => {
                 setEditingPosition(null);

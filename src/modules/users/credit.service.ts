@@ -17,12 +17,13 @@ export class CreditService {
   getModelCost(model?: string): number {
     if (!model) return 1;
     const m = model.toLowerCase();
-    
+
     // Exact mapping matches shown in UI image
     if (m.includes('pro') || m.includes('gpt-5')) return 5;
     if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash') return 2;
-    if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite')) return 1;
-    
+    if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite'))
+      return 1;
+
     return 1;
   }
 

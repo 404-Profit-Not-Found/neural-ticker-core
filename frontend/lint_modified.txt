@@ -1,0 +1,29 @@
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\portfolio\AddPositionDialog.tsx
+  128:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\portfolio\PortfolioTable.tsx
+   75:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  286:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\ui\data-table.tsx
+  32:17  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\ui\data-table.tsx:32:17
+  30 |   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
+  31 |
+> 32 |   const table = useReactTable({
+     |                 ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  33 |     data,
+  34 |     columns,
+  35 |     state: {  react-hooks/incompatible-library
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\pages\PortfolioPage.tsx
+  19:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  48:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  68:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 7 problems (6 errors, 1 warning)
+

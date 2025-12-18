@@ -7,7 +7,7 @@ import { Badge } from '../ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { calculateAiRating } from '../../lib/rating-utils';
 
-interface Position {
+export interface Position {
   id: string;
   symbol: string;
   shares: string | number;
@@ -72,7 +72,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
     const navigate = useNavigate();
     const columnHelper = createColumnHelper<Position>();
 
-    const columns: any[] = [
+    const columns = [
         // 1. Asset Column
         columnHelper.accessor('symbol', {
             header: 'Asset',
@@ -168,20 +168,20 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
         // 4. Value
         columnHelper.accessor('current_value', {
-            header: 'Value',
-            cell: (info) => <span className="font-medium text-foreground">{formatCurrency(info.getValue())}</span>
+            header: () => <span className="hidden md:inline">Value</span>,
+            cell: (info) => <span className="hidden md:inline font-medium text-foreground">{formatCurrency(info.getValue())}</span>
         }),
 
         // 5. Total Return
         columnHelper.accessor('gain_loss', {
-            header: 'Total Return',
+            header: () => <span className="hidden md:inline">Total Return</span>,
             cell: (info) => {
                 const val = info.getValue();
                 const pct = info.row.original.gain_loss_percent;
                 const isProfit = val >= 0;
 
                 return (
-                     <div className={cn("flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
+                     <div className={cn("hidden md:flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
                         <div className="flex items-center gap-1">
                              <span className="font-mono font-bold text-sm">
                                 {val > 0 ? '+' : ''}{formatCurrency(val)}
@@ -200,27 +200,27 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         // 6. Market Cap
         columnHelper.accessor(row => row.fundamentals?.market_cap, {
             id: 'mkt_cap',
-            header: 'Mkt Cap',
-            cell: (info) => <span className="text-xs font-mono text-muted-foreground">{formatCap(Number(info.getValue()))}</span>
+            header: () => <span className="hidden md:inline">Mkt Cap</span>,
+            cell: (info) => <span className="hidden md:inline text-xs font-mono text-muted-foreground">{formatCap(Number(info.getValue()))}</span>
         }),
 
         // 7. P/E
         columnHelper.accessor(row => row.fundamentals?.pe_ttm, {
             id: 'pe',
-            header: 'P/E',
+            header: () => <span className="hidden md:inline">P/E</span>,
             cell: (info) => {
                 const val = info.getValue();
-                return val ? <span className="text-xs font-mono text-muted-foreground">{Number(val).toFixed(2)}</span> : '-';
+                return val ? <span className="hidden md:inline text-xs font-mono text-muted-foreground">{Number(val).toFixed(2)}</span> : <span className="hidden md:inline">-</span>;
             }
         }),
 
         // 8. Risk
         columnHelper.accessor(row => row.aiAnalysis?.financial_risk, {
             id: 'risk',
-            header: 'Risk',
+            header: () => <span className="hidden md:inline">Risk</span>,
             cell: (info) => {
                 const val = info.getValue();
-                if (val === undefined || val === null) return '-';
+                if (val === undefined || val === null) return <span className="hidden md:inline">-</span>;
                 
                 let colorClass = 'text-muted-foreground';
                 let Icon = ShieldCheck;
@@ -229,7 +229,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 else { colorClass = 'text-red-500'; Icon = Flame; }
 
                 return (
-                  <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
+                  <span className={cn('hidden md:flex items-center gap-1.5 font-bold', colorClass)}>
                     <Icon size={14} />
                     {Number(val).toFixed(1)}
                   </span>
@@ -240,22 +240,22 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         // 9. Overall Score (Risk/Reward)
         columnHelper.accessor(row => row.aiAnalysis?.overall_score, {
             id: 'risk_reward',
-            header: 'Risk/Reward',
+            header: () => <span className="hidden md:inline">Risk/Reward</span>,
             cell: (info) => {
                 const val = info.getValue();
-                if (!val) return '-';
+                if (!val) return <span className="hidden md:inline">-</span>;
                 let color = 'text-red-500';
                 if (val >= 7.5) color = 'text-emerald-500';
                 else if (val >= 5.0) color = 'text-yellow-500';
                 
-                return <span className={cn("font-bold", color)}>{Number(val).toFixed(1)}</span>
+                return <span className={cn("hidden md:inline font-bold", color)}>{Number(val).toFixed(1)}</span>
             }
         }),
 
         // 10. Upside
          columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
               id: 'upside',
-              header: 'Upside',
+              header: () => <span className="hidden md:inline">Upside</span>,
               cell: (info) => {
                 const basePrice = info.getValue();
                 const price = info.row.original.current_price;
@@ -267,7 +267,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 }
                 const isPositive = upside > 0;
                 return (
-                  <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                  <div className={cn('hidden md:flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
                     {isPositive && <ArrowUp size={12} className="mr-0.5" />}
                     {upside.toFixed(1)}%
                   </div>
@@ -278,12 +278,12 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         // 11. AI Rating
         columnHelper.accessor((row) => row.aiAnalysis?.financial_risk, {
             id: 'ai_rating',
-            header: 'AI Rating',
+            header: () => <span className="hidden md:inline">AI Rating</span>,
             cell: (info) => {
                  const riskRaw = info.row.original.aiAnalysis?.financial_risk;
                  const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
                  let rating = 'Hold';
-                 let variant: any = 'outline';
+                 let variant: 'default' | 'destructive' | 'outline' | 'secondary' = 'outline';
          
                   if (riskRaw !== undefined && upsideRaw !== undefined) {
                      const risk = Number(riskRaw);
@@ -294,7 +294,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                   }
         
                 return (
-                     <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
+                     <Badge variant={variant} className="hidden md:flex whitespace-nowrap h-6 px-2 gap-1.5 cursor-default w-fit">
                           <Bot size={12} />
                           {rating}
                      </Badge>

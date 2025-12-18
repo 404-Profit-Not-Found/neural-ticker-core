@@ -43,7 +43,7 @@ const mockMarketDataService = {
     {
       ticker: { symbol: 'NVDA', name: 'Nvidia' },
       latestPrice: { close: 150, prevClose: 100 },
-    }
+    },
   ]),
 };
 
@@ -54,8 +54,8 @@ const mockLlmService = {
 const mockTickersService = {};
 
 const mockCreditService = {
-    getModelCost: jest.fn().mockReturnValue(1),
-    deductCredits: jest.fn().mockResolvedValue({}),
+  getModelCost: jest.fn().mockReturnValue(1),
+  deductCredits: jest.fn().mockResolvedValue({}),
 };
 
 describe('PortfolioService', () => {
@@ -101,7 +101,12 @@ describe('PortfolioService', () => {
 
   describe('create', () => {
     it('should create a position', async () => {
-      const dto = { symbol: 'NVDA', shares: 10, buy_price: 100, buy_date: '2024-01-01' };
+      const dto = {
+        symbol: 'NVDA',
+        shares: 10,
+        buy_price: 100,
+        buy_date: '2024-01-01',
+      };
       const result = await service.create('user-1', dto);
       expect(result).toEqual(mockPosition);
       expect(mockPositionRepo.save).toHaveBeenCalled();
@@ -121,11 +126,11 @@ describe('PortfolioService', () => {
 
   describe('analyzePortfolio', () => {
     it('should return analysis text and deduct credits', async () => {
-        const result = await service.analyzePortfolio('user-1', 'medium');
-        expect(result).toContain('Suggested Analysis');
-        expect(mockLlmService.generateText).toHaveBeenCalled();
-        expect(mockCreditService.deductCredits).toHaveBeenCalled();
-        expect(mockAnalysisRepo.save).toHaveBeenCalled();
+      const result = await service.analyzePortfolio('user-1', 'medium');
+      expect(result).toContain('Suggested Analysis');
+      expect(mockLlmService.generateText).toHaveBeenCalled();
+      expect(mockCreditService.deductCredits).toHaveBeenCalled();
+      expect(mockAnalysisRepo.save).toHaveBeenCalled();
     });
   });
 });
