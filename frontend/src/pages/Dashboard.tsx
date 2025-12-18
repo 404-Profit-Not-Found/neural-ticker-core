@@ -162,6 +162,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     newsCount: item.counts?.news || 0,
     researchCount: item.counts?.research || 0,
     socialCount: item.counts?.social || 0,
+    overallScore: item.aiAnalysis?.overall_score ?? null,
     itemId: item.ticker.id,
   };
 }
