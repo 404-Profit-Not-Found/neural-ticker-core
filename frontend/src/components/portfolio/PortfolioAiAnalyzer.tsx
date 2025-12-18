@@ -355,20 +355,20 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
         {step === 'analyzing' && (
           <div className="h-64 flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-500">
             <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative bg-background border-2 border-primary/50 p-6 rounded-full animate-bounce duration-1000">
-                <Bot size={48} className="text-primary" />
+              <div className="absolute inset-0 bg-violet-600/20 rounded-full blur-xl animate-pulse" />
+              <div className="relative bg-background border-2 border-violet-500/50 p-6 rounded-full animate-bounce duration-1000 shadow-[0_0_30px_rgba(124,58,237,0.3)]">
+                <Bot size={48} className="text-violet-500" />
               </div>
               <div className="absolute -top-2 -right-2">
-                <Sparkles size={24} className="text-yellow-400 animate-spin-slow" />
+                <Sparkles size={24} className="text-fuchsia-400 animate-spin-slow" />
               </div>
             </div>
             <div className="text-center space-y-2">
               <h3 className="text-xl font-bold tracking-tight">AI is analyzing your holdings...</h3>
               <div className="flex items-center justify-center gap-1.5 overflow-hidden">
-                <div className="h-1 w-1 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <div className="h-1 w-1 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <div className="h-1 w-1 bg-primary rounded-full animate-bounce" />
+                <div className="h-1 w-1 bg-violet-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="h-1 w-1 bg-fuchsia-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="h-1 w-1 bg-violet-500 rounded-full animate-bounce" />
               </div>
               <p className="text-sm text-muted-foreground max-w-[280px]">Checking diversification, risk scores, and sector overexposure.</p>
             </div>

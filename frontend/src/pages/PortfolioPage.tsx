@@ -177,7 +177,7 @@ export function PortfolioPage() {
       <Header />
       <Toaster position="top-right" theme="dark" />
 
-      <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-4 sm:space-y-8 animate-in fade-in duration-500">
+      <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-4 sm:space-y-5 animate-in fade-in duration-500">
 
         {/* HERO STATS */}
         <PortfolioStats

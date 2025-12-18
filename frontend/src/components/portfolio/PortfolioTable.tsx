@@ -1,6 +1,6 @@
 import { Trash2, Edit2, ArrowUp, ArrowDown, ShieldCheck, AlertTriangle, Flame, Bot, Brain, Newspaper, MessageCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
@@ -72,7 +72,8 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
     const navigate = useNavigate();
     const columnHelper = createColumnHelper<Position>();
 
-    const columns = [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const columns: ColumnDef<Position, any>[] = [
         // 1. Asset Column
         columnHelper.accessor('symbol', {
             header: 'Asset',
