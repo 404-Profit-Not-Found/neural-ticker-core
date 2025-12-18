@@ -489,6 +489,30 @@ describe('MarketDataService', () => {
     });
 
     it('should filter by overallScore (Risk/Reward)', async () => {
+      // Setup mock Repo for this specific test
+      const mockQueryBuilder = {
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest
+          .fn()
+          .mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+
+      mockTickersService.getRepo.mockReturnValue(repo);
+
       await service.getAnalyzerTickers({ overallScore: '> 8.5' });
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'risk.overall_score > :overallScoreVal',

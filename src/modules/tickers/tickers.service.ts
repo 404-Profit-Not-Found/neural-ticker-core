@@ -96,6 +96,7 @@ export class TickersService {
       web_url: profile.weburl,
       logo_url: profile.logo,
       finnhub_industry: profile.finnhubIndustry,
+      sector: profile.finnhubIndustry, // Fallback/Populate standard column
       finnhub_raw: profile,
     });
 
@@ -275,14 +276,23 @@ export class TickersService {
   }
 
   async getUniqueSectors(): Promise<string[]> {
+    // 1. Try to get distinct 'sector' column
+    // 2. Fallback to 'finnhub_industry' if sector is null/empty
+    // We can just query both or coalesce.
+    // Given the current state where `sector` might be null but `finnhub_industry` is populated:
     const results = await this.tickerRepo
       .createQueryBuilder('ticker')
-      .select('DISTINCT ticker.sector', 'sector')
-      .where('ticker.sector IS NOT NULL')
-      .andWhere("ticker.sector != ''")
-      .orderBy('ticker.sector', 'ASC')
+      .select(
+        'DISTINCT COALESCE(NULLIF(ticker.sector, \'\'), ticker.finnhub_industry)',
+        'sector',
+      )
+      .where('ticker.sector IS NOT NULL OR ticker.finnhub_industry IS NOT NULL')
+      .andWhere("ticker.sector != '' OR ticker.finnhub_industry != ''")
+      .orderBy('sector', 'ASC') // sort by the alias
       .getRawMany();
 
-    return results.map((r) => r.sector);
+    return results
+      .map((r) => r.sector)
+      .filter((s) => s && s.trim().length > 0);
   }
 }

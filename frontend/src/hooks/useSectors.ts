@@ -8,6 +8,6 @@ export function useSectors() {
       const { data } = await api.get('/tickers/sectors');
       return data;
     },
-    staleTime: 1000 * 60 * 60, // 1 hour - sectors don't change often
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
