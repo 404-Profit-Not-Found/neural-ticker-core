@@ -5,7 +5,7 @@ import { DataTable } from '../ui/data-table';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { calculateAiRating } from '../../lib/rating-utils';
+import { calculateAiRating, type RatingVariant } from '../../lib/rating-utils';
 
 export interface Position {
     id: string;
@@ -260,12 +260,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             cell: (info) => {
                 const basePrice = info.getValue();
                 const price = info.row.original.current_price;
-                let upside = 0;
-                if (typeof basePrice === 'number' && price > 0) {
-                    upside = ((basePrice - price) / price) * 100;
-                } else {
-                    upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
-                }
+                const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
                 const isPositive = upside > 0;
                 return (
                     <div className={cn('hidden md:flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
@@ -284,14 +279,16 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
                 const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
                 let rating = 'Hold';
-                let variant: 'default' | 'destructive' | 'outline' | 'secondary' = 'outline';
+                let variant: RatingVariant = 'outline';
 
-                if (riskRaw !== undefined && upsideRaw !== undefined) {
+                if (riskRaw !== undefined) {
                     const risk = Number(riskRaw);
-                    const upside = Number(upsideRaw);
-                    const result = calculateAiRating(risk, upside);
+                    const price = info.row.original.current_price;
+                    const upside = calculateUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+                    const overallScore = info.row.original.aiAnalysis?.overall_score;
+                    const result = calculateAiRating(risk, upside, overallScore);
                     rating = result.rating;
-                    variant = result.variant as 'default' | 'destructive' | 'outline' | 'secondary';
+                    variant = result.variant;
                 }
 
                 return (

@@ -168,7 +168,7 @@ export function WatchlistTable() {
                 let aiRating = '-';
                 if (s.aiAnalysis && safeRiskScore !== null) {
                     const upside = Number(s.aiAnalysis.upside_percent || 0);
-                    const { rating } = calculateAiRating(safeRiskScore, upside);
+                    const { rating } = calculateAiRating(safeRiskScore, upside, s.aiAnalysis?.overall_score);
                     aiRating = rating;
                 } else {
                     aiRating = '-';

@@ -23,6 +23,7 @@ interface PortfolioItem {
     base_price?: number;
     upside_percent?: number;
     financial_risk?: number;
+    overall_score?: number;
   };
 }
 
@@ -99,7 +100,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
               {(() => {
                 const risk = Number(item.aiAnalysis?.financial_risk ?? 0);
                 const upsideVal = Number(item.aiAnalysis?.upside_percent ?? 0);
-                const { rating, variant } = calculateAiRating(risk, upsideVal);
+                const { rating, variant } = calculateAiRating(risk, upsideVal, item.aiAnalysis?.overall_score);
 
                 return (
                   <div className="flex items-center gap-1">

@@ -74,7 +74,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                     RiskIcon = Flame;
                 }
 
-                const { rating, variant } = calculateAiRating(risk, upside);
+                const { rating, variant } = calculateAiRating(risk, upside, aiAnalysis?.overall_score);
                 
                 // --- Analyst Consensus Logic ---
                 const consensus = fundamentals?.consensus_rating;

@@ -118,7 +118,8 @@ export function PortfolioPage() {
       if (filters.aiRating.length > 0) {
         const risk = Number(item.aiAnalysis?.financial_risk || 0);
         const upside = Number(item.aiAnalysis?.upside_percent || 0);
-        const { rating } = calculateAiRating(risk, upside); // e.g. "Strong Buy"
+        const overallScore = item.aiAnalysis?.overall_score;
+        const { rating } = calculateAiRating(risk, upside, overallScore); // e.g. "Strong Buy"
 
         // Check direct match ("Strong Buy" === "Strong Buy")
         // Or simple inclusion logic

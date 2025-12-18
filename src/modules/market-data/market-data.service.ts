@@ -830,19 +830,26 @@ export class MarketDataService {
               sub.orWhere(
                 '(risk.upside_percent > 10 AND risk.financial_risk <= 7)',
               );
-            } else if (rating === 'Sell') {
-              // Sell: Low Upside OR High Risk (> 7 or 8)
+            } else if (rating === 'Speculative Buy') {
               sub.orWhere(
-                `(risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})`,
+                '(risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100))',
+              );
+            } else if (rating === 'Sell') {
+              // Sell: Low Upside OR High Risk (> 7 or 8) BUT NOT Speculative Buy
+              sub.orWhere(
+                `((risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE}) 
+                AND NOT (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)))`,
               );
             } else if (rating === 'Hold') {
               // Hold = Everything else
-              // NOT (Strong Buy OR Buy OR Sell)
+              // NOT (Strong Buy OR Buy OR Sell OR Speculative Buy)
               sub.orWhere(
                 `NOT (
                     (risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE}) OR 
                     (risk.upside_percent > 10 AND risk.financial_risk <= 7) OR 
-                    (risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE})
+                    (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)) OR
+                    ((risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE}) 
+                     AND NOT (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)))
                  )`,
               );
             }

@@ -109,26 +109,15 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
   const riskRaw = item.aiAnalysis?.financial_risk;
   const risk = typeof riskRaw === 'number' ? riskRaw : Number(riskRaw || 0);
 
-  if (item.aiAnalysis) {
-    const { upside_percent } = item.aiAnalysis;
-    const { rating } = calculateAiRating(risk, upside_percent);
+    const { base_price, overall_score, upside_percent: fallbackUpside } = item.aiAnalysis;
+    potentialUpside = calculateUpside(currentPrice, base_price, fallbackUpside);
+    const { rating } = calculateAiRating(risk, potentialUpside, overall_score);
     derivedAiRating = rating;
   }
 
-  const currentPrice = Number(item.latestPrice?.close ?? 0);
+  // 2. Calculate Standardized Downside (Bear Case)
   const bearPrice = item.aiAnalysis?.bear_price;
-  const basePrice = item.aiAnalysis?.base_price;
-  
   let potentialDownside: number | null = null;
-  let potentialUpside: number | null = null;
-
-  // 1. Calculate Standardized Upside (Base Case)
-  if (typeof basePrice === 'number' && currentPrice > 0) {
-    potentialUpside = ((basePrice - currentPrice) / currentPrice) * 100;
-  } else {
-    // Fallback to pre-calculated upside_percent if base_price is not available
-    potentialUpside = Number(item.aiAnalysis?.upside_percent ?? 0);
-  }
 
   // 2. Calculate Standardized Downside (Bear Case)
   if (typeof bearPrice === 'number' && currentPrice > 0) {
@@ -291,7 +280,7 @@ export function Dashboard() {
           />
           <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-50">
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-10">
             <div className="space-y-4 max-w-3xl">
               <div className="flex items-center gap-3">
                 <Brain className="w-10 h-10 text-primary" />
@@ -477,7 +466,8 @@ function TopOpportunitiesSection() {
       analyzerParams.sortBy = 'upside_percent';
       analyzerParams.sortDir = 'DESC';
   } else if (category === 'conservative') {
-      // Big Market Cap
+      // Big Market Cap + Quality Ratings
+      analyzerParams.aiRating = ['Strong Buy', 'Buy'];
       analyzerParams.sortBy = 'market_cap';
       analyzerParams.sortDir = 'DESC';
   } else if (category === 'shorts') {
