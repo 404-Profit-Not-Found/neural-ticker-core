@@ -41,7 +41,8 @@ export class WatchlistController {
   })
   @Get()
   async getMyWatchlists(@Req() req: any) {
-    return this.watchlistService.getUserWatchlists(req.user.id);
+    const isAdmin = req.user?.role === 'admin';
+    return this.watchlistService.getUserWatchlists(req.user.id, isAdmin);
   }
 
   @ApiOperation({
@@ -121,10 +122,12 @@ export class WatchlistController {
     @Param('id') watchlistId: string,
     @Body('symbol') symbol: string,
   ) {
+    const isAdmin = req.user?.role === 'admin';
     return this.watchlistService.addTickerToWatchlist(
       req.user.id,
       watchlistId,
       symbol,
+      isAdmin,
     );
   }
 
@@ -185,6 +188,7 @@ export class WatchlistController {
   @Post('favorites/toggle')
   @HttpCode(200)
   async toggleFavorite(@Req() req: any, @Body('symbol') symbol: string) {
-    return this.watchlistService.toggleFavorite(req.user.id, symbol);
+    const isAdmin = req.user?.role === 'admin';
+    return this.watchlistService.toggleFavorite(req.user.id, symbol, isAdmin);
   }
 }

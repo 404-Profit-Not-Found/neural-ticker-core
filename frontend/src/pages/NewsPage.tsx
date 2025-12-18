@@ -5,12 +5,13 @@ import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
 
 interface NewsItem {
-    id: string;
+    id: string | number;
     headline: string;
     source: string;
     url: string;
+    image?: string;
     image_url?: string;
-    published_at: string;
+    datetime: number;
 }
 
 export function NewsPage() {
@@ -23,14 +24,23 @@ export function NewsPage() {
         staleTime: 60000 * 5, // 5 min
     });
 
-    const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString(undefined, {
-            day: 'numeric',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+    const formatDate = (ts: number | string) => {
+        if (!ts) return 'Recently';
+        try {
+            const val = typeof ts === 'string' ? parseFloat(ts) : ts;
+            const date = new Date(val > 10000000000 ? val : val * 1000);
+            
+            if (isNaN(date.getTime())) return 'Recently';
+
+            return date.toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return 'Recently';
+        }
     };
 
     return (
@@ -64,12 +74,13 @@ export function NewsPage() {
                                         rel="noopener noreferrer"
                                         className="flex gap-4 p-4 hover:bg-muted/30 transition-colors group"
                                     >
-                                        {item.image_url && (
+                                        {(item.image || item.image_url) && (
                                             <img
-                                                src={item.image_url}
+                                                src={item.image || item.image_url}
                                                 alt=""
                                                 className="w-20 h-16 md:w-28 md:h-20 object-cover rounded-md shrink-0 bg-muted"
                                                 loading="lazy"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                             />
                                         )}
                                         <div className="flex-1 min-w-0">
@@ -79,7 +90,7 @@ export function NewsPage() {
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar size={10} />
-                                                    {formatDate(item.published_at)}
+                                                    {formatDate(item.datetime)}
                                                 </span>
                                             </div>
                                             <h3 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">

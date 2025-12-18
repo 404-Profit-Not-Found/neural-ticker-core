@@ -36,7 +36,7 @@ describe('WatchlistController', () => {
     it('should call service with user id', async () => {
       const req = { user: { id: 'user-1', uid: 'user-1' } };
       await controller.getMyWatchlists(req);
-      expect(service.getUserWatchlists).toHaveBeenCalledWith('user-1');
+      expect(service.getUserWatchlists).toHaveBeenCalledWith('user-1', false);
     });
   });
 
@@ -56,6 +56,7 @@ describe('WatchlistController', () => {
         'user-1',
         'list-1',
         'AAPL',
+        false, // hidden/shadow-ban flag
       );
     });
   });

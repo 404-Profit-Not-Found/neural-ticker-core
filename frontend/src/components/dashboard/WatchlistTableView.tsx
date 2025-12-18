@@ -45,12 +45,14 @@ export interface TickerData {
     marketCap: number | null;
     potentialUpside: number | null;
     riskScore: number | null;
+    overallScore: number | null;
     rating: string;
     aiRating: string;
     newsCount: number;
     researchCount: number;
     analystCount: number;
     socialCount: number;
+    potentialDownside: number | null;
     itemId?: string;
 }
 
@@ -221,10 +223,31 @@ export function WatchlistTableView({
                     else { colorClass = 'text-red-500'; Icon = Flame; }
 
                     return (
-                    <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
-                        <Icon size={14} />
-                        {Number(val).toFixed(1)}
-                    </span>
+                        <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
+                            <Icon size={14} />
+                            {Number(val).toFixed(1)}
+                        </span>
+                    );
+                },
+            }),
+
+            // 5.5 Risk/Reward (Overall Score)
+            columnHelper.accessor((row) => row.overallScore, {
+                id: 'overall_score',
+                header: 'Risk/Reward',
+                cell: (info) => {
+                    const val = info.getValue();
+                    if (val === undefined || val === null) return '-';
+                    
+                    let colorClass = 'text-muted-foreground';
+                    if (val >= 7.5) colorClass = 'text-emerald-500';
+                    else if (val >= 5.0) colorClass = 'text-yellow-500';
+                    else colorClass = 'text-red-500';
+
+                    return (
+                        <span className={cn('font-bold', colorClass)}>
+                            {Number(val).toFixed(1)}
+                        </span>
                     );
                 },
             }),

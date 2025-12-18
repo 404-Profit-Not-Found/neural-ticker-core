@@ -8,6 +8,7 @@ import {
   Query,
   Res,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -70,6 +71,22 @@ export class TickersController {
   async getCount() {
     const count = await this.tickersService.getCount();
     return { count };
+  }
+
+  @ApiOperation({
+    summary: 'Get unique sectors',
+    description:
+      'Returns a list of all unique sectors present in the database.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of unique sectors.',
+    schema: { example: ['Technology', 'Healthcare'] },
+  })
+  @Public()
+  @Get('sectors')
+  getSectors() {
+    return this.tickersService.getUniqueSectors();
   }
 
   @ApiOperation({
@@ -157,8 +174,13 @@ export class TickersController {
   @ApiResponse({ status: 404, description: 'Logo not found.' })
   @Public()
   @Get(':symbol/logo')
-  async getLogo(@Param('symbol') symbol: string, @Res() res: Response) {
-    const logo = await this.tickersService.getLogo(symbol);
+  async getLogo(
+    @Req() req: any,
+    @Param('symbol') symbol: string,
+    @Res() res: Response,
+  ) {
+    const isAdmin = req.user?.role === 'admin';
+    const logo = await this.tickersService.getLogo(symbol, isAdmin);
     if (!logo) {
       return res.status(404).send('Logo not found');
     }
@@ -185,7 +207,8 @@ export class TickersController {
   @ApiResponse({ status: 404, description: 'Ticker not found.' })
   @Public()
   @Get(':symbol')
-  get(@Param('symbol') symbol: string) {
-    return this.tickersService.getTicker(symbol);
+  get(@Req() req: any, @Param('symbol') symbol: string) {
+    const isAdmin = req.user?.role === 'admin';
+    return this.tickersService.getTicker(symbol, isAdmin);
   }
 }

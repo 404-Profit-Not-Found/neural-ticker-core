@@ -91,7 +91,7 @@ describe('GeminiProvider', () => {
       expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'user-key' });
     });
 
-    it('should use gemini-2.5-pro for "deep" quality', async () => {
+    it('should use gemini-3-pro-preview for "deep" quality', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Deep Response',
         candidates: [],
@@ -101,7 +101,7 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-2.5-pro',
+          model: 'gemini-3-pro-preview',
           config: expect.objectContaining({
             tools: expect.arrayContaining([{ googleSearch: {} }]),
           }),
@@ -159,7 +159,7 @@ describe('GeminiProvider', () => {
       const result = await provider.generate(validPrompt);
 
       expect(result.answerMarkdown).toBe('Final Answer');
-      expect(result.models).toContain('gemini-2.5-flash');
+      expect(result.models).toContain('gemini-3-flash-preview');
       expect(result.groundingMetadata).toBeDefined();
     });
   });

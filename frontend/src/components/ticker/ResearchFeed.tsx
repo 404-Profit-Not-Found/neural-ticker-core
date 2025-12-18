@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { UploadResearchDialog } from './UploadResearchDialog';
 import { RunAnalysisDialog } from './RunAnalysisDialog'; // Import the new dialog
 import { Badge } from '../ui/badge';
+import { ModelBadge } from '../ui/model-badge';
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdateResearchTitle } from '../../hooks/useTicker';
@@ -17,19 +18,7 @@ const formatTimestamp = (value?: string) => {
     return value ? new Date(value).toLocaleString() : 'Unknown time';
 };
 
-const getDisplayRarity = (rarity: string) => {
-    // Legacy Mapping for old data
-    const map: Record<string, string> = {
-        'White': 'Common',
-        'Green': 'Uncommon',
-        'Blue': 'Rare',
-        'Purple': 'Epic',
-        'Gold': 'Legendary'
-    };
-    // Normalize case just in case
-    const normalized = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
-    return map[normalized] || normalized;
-};
+
 
 interface ResearchFeedProps {
     research: ResearchItem[];
@@ -228,32 +217,13 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                                         </>
                                                     )}
 
-                                                    {item.provider !== 'manual' && item.provider && (
+                                                    {(item.provider && item.provider !== 'manual') && (
                                                         <>
                                                             <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
-                                                            <Badge variant="outline" className="px-1.5 py-0 h-4 text-[10px] font-medium bg-white/5 text-white/90 border-white/20 whitespace-nowrap max-w-[100px] truncate">
-                                                                {item.models_used && item.models_used.length > 0 ? item.models_used[0] : item.provider}
-                                                            </Badge>
-                                                        </>
-                                                    )}
-
-                                                    {/* RARITY BADGE */}
-                                                    {item.rarity && (
-                                                        <>
-                                                            <span className="text-muted-foreground text-[10px] md:text-xs hidden md:inline">•</span>
-                                                            {(() => {
-                                                                const display = getDisplayRarity(item.rarity);
-                                                                return (
-                                                                    <Badge variant="outline" className={`px-1.5 py-0 h-4 text-[10px] font-bold uppercase border ${display === 'Legendary' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                                                                        display === 'Epic' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                                            display === 'Rare' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                                                display === 'Uncommon' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                                                    'bg-muted text-muted-foreground border-border'
-                                                                        }`}>
-                                                                        {display}
-                                                                    </Badge>
-                                                                );
-                                                            })()}
+                                                            <ModelBadge
+                                                                model={item.models_used && item.models_used.length > 0 ? item.models_used[0] : item.provider}
+                                                                rarity={item.rarity}
+                                                            />
                                                         </>
                                                     )}
                                                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">

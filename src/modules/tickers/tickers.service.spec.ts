@@ -11,19 +11,23 @@ import { of, throwError } from 'rxjs';
 describe('TickersService', () => {
   let service: TickersService;
 
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    offset: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+    getRawMany: jest.fn().mockResolvedValue([]),
+  };
+
   const mockTickerRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    createQueryBuilder: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    })),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
     find: jest.fn(),
   };
 
@@ -38,7 +42,7 @@ describe('TickersService', () => {
   };
 
   const mockHttpService = {
-    get: jest.fn(),
+    get: jest.fn().mockReturnValue(of({ data: Buffer.from('') })),
   };
 
   beforeEach(async () => {
@@ -278,6 +282,37 @@ describe('TickersService', () => {
     it('should search with query pattern', async () => {
       await service.searchTickers('AAP');
       expect(mockTickerRepo.createQueryBuilder).toHaveBeenCalledWith('ticker');
+    });
+  });
+  describe('getUniqueSectors', () => {
+    it('should return sectors from finnhub_industry if sector column is empty', async () => {
+      const mockRawResults = [
+        { sector: 'Technology' },
+        { sector: 'Healthcare' },
+      ];
+      const qb = mockTickerRepo.createQueryBuilder();
+      qb.getRawMany.mockResolvedValue(mockRawResults);
+
+      const result = await service.getUniqueSectors();
+
+      expect(result).toEqual(['Technology', 'Healthcare']);
+      expect(qb.select).toHaveBeenCalledWith(
+        expect.stringContaining('COALESCE'),
+        'sector',
+      );
+    });
+
+    it('should filter out empty sectors', async () => {
+      const mockRawResults = [
+        { sector: 'Technology' },
+        { sector: '' },
+        { sector: null },
+      ];
+      const qb = mockTickerRepo.createQueryBuilder();
+      qb.getRawMany.mockResolvedValue(mockRawResults);
+
+      const result = await service.getUniqueSectors();
+      expect(result).toEqual(['Technology']);
     });
   });
 });

@@ -72,8 +72,7 @@ describe('WatchlistService', () => {
   describe('getUserWatchlists', () => {
     it('should return user watchlists', async () => {
       const userId = 'user-1';
-      const mockLists = [{ id: '1', name: 'List A' }];
-
+      const mockLists = [{ id: '1', name: 'List A', items: [] }];
       mockWatchlistRepo.find.mockResolvedValue(mockLists);
 
       const result = await service.getUserWatchlists(userId);

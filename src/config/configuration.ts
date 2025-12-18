@@ -45,8 +45,8 @@ export default () => {
       apiKey: process.env.GEMINI_API_KEY,
       models: {
         low: 'gemini-2.5-flash-lite',
-        medium: 'gemini-2.5-flash',
-        deep: 'gemini-2.5-pro',
+        medium: 'gemini-3-flash-preview',
+        deep: 'gemini-3-pro-preview',
         extraction: 'gemini-2.5-flash-lite',
       },
     },

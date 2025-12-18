@@ -26,6 +26,7 @@ import { AnalyzerGridView } from './AnalyzerGridView';
 import { Badge } from '../ui/badge';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
+import { calculateAiRating } from '../../lib/rating-utils';
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -62,6 +63,7 @@ export function AnalyzerTable({
     aiRating: filters?.aiRating,
     upside: filters?.upside,
     sector: filters?.sector,
+    overallScore: filters?.overallScore,
   });
 
   const items = data?.items || [];
@@ -219,20 +221,75 @@ export function AnalyzerTable({
       },
     }),
 
-     // 6. Upside
-    columnHelper.accessor((row) => row.aiAnalysis?.upside_percent, {
-      id: 'upside_percent',
-      header: 'Upside',
+    // 5.5 Risk/Reward (Overall Score)
+    columnHelper.accessor((row) => row.aiAnalysis?.overall_score, {
+      id: 'overall_score',
+      header: 'Risk/Reward',
       cell: (info) => {
         const val = info.getValue();
         if (val === undefined || val === null) return '-';
-        const num = Number(val);
-        const isPositive = num > 0;
+        
+        let colorClass = 'text-muted-foreground';
+        if (val >= 7.5) colorClass = 'text-emerald-500';
+        else if (val >= 5.0) colorClass = 'text-yellow-500';
+        else colorClass = 'text-red-500';
+
+        return (
+          <span className={cn('font-bold', colorClass)}>
+            {Number(val).toFixed(1)}
+          </span>
+        );
+      },
+    }),
+
+     // 6. Upside (Base Case)
+    columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
+      id: 'upside_percent',
+      header: 'Upside',
+      cell: (info) => {
+        const basePrice = info.getValue();
+        const price = info.row.original.latestPrice?.close ?? 0;
+        
+        let upside = 0;
+        if (typeof basePrice === 'number' && price > 0) {
+            upside = ((basePrice - price) / price) * 100;
+        } else {
+            upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
+        }
+
+        const isPositive = upside > 0;
 
         return (
           <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
             {isPositive && <ArrowUp size={12} className="mr-0.5" />}
-            {num.toFixed(1)}%
+            {upside.toFixed(1)}%
+          </div>
+        );
+      },
+    }),
+
+    // 6.5 Downside (Bear Case)
+    columnHelper.accessor((row) => row.aiAnalysis?.bear_price, {
+      id: 'downside_percent',
+      header: 'Downside',
+      cell: (info) => {
+        const bearPrice = info.getValue();
+        const price = info.row.original.latestPrice?.close ?? 0;
+        const risk = Number(info.row.original.aiAnalysis?.financial_risk ?? 0);
+        
+        let downside = 0;
+        if (typeof bearPrice === 'number' && price > 0) {
+            downside = ((bearPrice - price) / price) * 100;
+        } else if (risk >= 8) {
+            downside = -100;
+        } else {
+            downside = -(risk * 2.5);
+        }
+
+        return (
+          <div className="flex items-center font-bold text-xs text-amber-500">
+            <ArrowDown size={12} className="mr-0.5" />
+            {downside.toFixed(1)}%
           </div>
         );
       },
@@ -250,19 +307,13 @@ export function AnalyzerTable({
          let rating = 'Hold';
          let variant: 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'outline' = 'outline';
  
-         if (riskRaw !== undefined && upsideRaw !== undefined) {
-           const risk = Number(riskRaw);
-           const upside = Number(upsideRaw);
-            
-            // Logic aligned with user expectation: High Risk (> 7) cannot be a Buy.
-            if (upside > 10 && risk <= 7) { rating = 'Buy'; variant = 'buy'; }
-            if (upside > 20 && risk <= 6) { rating = 'Strong Buy'; variant = 'strongBuy'; }
-            
-            // Overrides
-            if (upside < 0 || risk >= 8) { rating = 'Sell'; variant = 'sell'; }
-            
-            if (rating === 'Hold') variant = 'hold';
-         }
+          if (riskRaw !== undefined && upsideRaw !== undefined) {
+             const risk = Number(riskRaw);
+             const upside = Number(upsideRaw);
+             const result = calculateAiRating(risk, upside);
+             rating = result.rating;
+             variant = result.variant;
+          }
 
         return (
              <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">

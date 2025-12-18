@@ -36,8 +36,11 @@ export function TickerNews({ news }: TickerNewsProps) {
                                             </div>
 
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold uppercase text-muted-foreground">
-                                                    {new Date(item.datetime * 1000).toLocaleDateString()}
+                                                <span className="text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">
+                                                    {(() => {
+                                                        const d = new Date(item.datetime * 1000);
+                                                        return isNaN(d.getTime()) ? 'Recently' : d.toLocaleDateString();
+                                                    })()}
                                                 </span>
                                                 <span className="text-muted-foreground text-xs">•</span>
 

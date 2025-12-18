@@ -3,6 +3,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { SlidersHorizontal, X, Check } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
+import { useSectors } from '../../hooks/useSectors';
+import { Loader2 } from 'lucide-react';
 
 interface FilterBarProps {
   filters: AnalyzerFilters;
@@ -18,6 +20,7 @@ export interface AnalyzerFilters {
   aiRating: string[];
   upside: string | null;
   sector: string[];
+  overallScore: string | null;
 }
 
 export function FilterBar({
@@ -25,15 +28,22 @@ export function FilterBar({
   onFilterChange,
   onReset,
 }: FilterBarProps) {
+  const { data: dynamicSectors, isLoading: isLoadingSectors } = useSectors();
+
   const activeFilterCount =
-    filters.risk.length + filters.aiRating.length + (filters.upside ? 1 : 0) + filters.sector.length;
+    filters.risk.length +
+    filters.aiRating.length +
+    (filters.upside ? 1 : 0) +
+    filters.sector.length +
+    (filters.overallScore ? 1 : 0);
+
+  const sectors = dynamicSectors || [];
 
   return (
     <div className="flex flex-wrap items-center gap-2 p-1 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
-      {/* Main Filter Icon / Label */}
-      <div className="flex items-center gap-2 mr-2 text-muted-foreground">
+      {/* Label */}
+      <div className="flex items-center gap-2 mr-2 text-muted-foreground/80">
         <SlidersHorizontal className="w-4 h-4" />
-        <span className="text-sm font-medium">Filters</span>
         {activeFilterCount > 0 && (
           <Badge
             variant="secondary"
@@ -44,224 +54,136 @@ export function FilterBar({
         )}
       </div>
 
-      {/* AI Rating Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={filters.aiRating.length ? 'secondary' : 'outline'}
-            size="sm"
-            className="h-8 border-dashed"
-          >
-            AI Rating
-            {filters.aiRating.length > 0 && (
-              <>
-                <span className="mx-2 h-4 w-[1px] bg-border" />
-                <span className="text-xs">
-                  {filters.aiRating.length} selected
-                </span>
-              </>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[200px] p-0">
-          <div className="px-2 py-1.5 text-sm font-semibold border-b">
+      {/* 1. AI Rating (Purple) */}
+      <FilterButton 
+        label="AI Rating" 
+        count={filters.aiRating.length} 
+        variant="purple"
+      >
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
             AI Signal
           </div>
           <div className="p-1">
-            {['Strong Buy', 'Buy', 'Hold', 'Sell'].map((status) => {
-              const isSelected = filters.aiRating.includes(status);
-              return (
-                <div
-                  key={status}
-                  className={cn(
-                    'flex items-center space-x-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                  )}
-                  onClick={() => {
-                    const newRatings = isSelected
+            {['Strong Buy', 'Buy', 'Hold', 'Sell'].map((status) => (
+              <Item 
+                key={status} 
+                label={status} 
+                selected={filters.aiRating.includes(status)} 
+                onClick={() => {
+                   const newRatings = filters.aiRating.includes(status)
                       ? filters.aiRating.filter((r) => r !== status)
                       : [...filters.aiRating, status];
                     onFilterChange('aiRating', newRatings);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex h-4 w-4 items-center justify-center rounded border border-primary',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'opacity-50 [&_svg]:invisible',
-                    )}
-                  >
-                    <Check className={cn('h-3 w-3')} />
-                  </div>
-                  <span>{status}</span>
-                </div>
-              );
-            })}
+                }} 
+              />
+            ))}
           </div>
-        </PopoverContent>
-      </Popover>
+      </FilterButton>
 
-      {/* Risk Level Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={filters.risk.length ? 'secondary' : 'outline'}
-            size="sm"
-            className="h-8 border-dashed"
-          >
-            Risk Level
-            {filters.risk.length > 0 && (
-              <>
-                <span className="mx-2 h-4 w-[1px] bg-border" />
-                <span className="text-xs">{filters.risk.length} selected</span>
-              </>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[200px] p-0">
-          <div className="px-2 py-1.5 text-sm font-semibold border-b">
+      {/* 2. Risk Level (Amber) */}
+      <FilterButton 
+        label="Risk Level" 
+        count={filters.risk.length} 
+        variant="amber"
+      >
+         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
             Risk Profile
           </div>
           <div className="p-1">
-            {['Low (0-3.5)', 'Medium (3.5-6.5)', 'High (6.5+)'].map((level) => {
-              const isSelected = filters.risk.includes(level);
-              return (
-                <div
-                  key={level}
-                  className={cn(
-                    'flex items-center space-x-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                  )}
-                  onClick={() => {
-                    const newRisks = isSelected
+            {['Low (0-3.5)', 'Medium (3.5-6.5)', 'High (6.5+)'].map((level) => (
+               <Item 
+                key={level} 
+                label={level} 
+                selected={filters.risk.includes(level)} 
+                onClick={() => {
+                   const newRisks = filters.risk.includes(level)
                       ? filters.risk.filter((r) => r !== level)
                       : [...filters.risk, level];
                     onFilterChange('risk', newRisks);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex h-4 w-4 items-center justify-center rounded border border-primary',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'opacity-50 [&_svg]:invisible',
-                    )}
-                  >
-                    <Check className={cn('h-3 w-3')} />
-                  </div>
-                  <span>{level}</span>
-                </div>
-              );
-            })}
+                }} 
+              />
+            ))}
           </div>
-        </PopoverContent>
-      </Popover>
+      </FilterButton>
 
-      {/* Upside Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={filters.upside ? 'secondary' : 'outline'}
-            size="sm"
-            className="h-8 border-dashed"
-          >
-            Upside Potential
-            {filters.upside && (
-              <>
-                <span className="mx-2 h-4 w-[1px] bg-border" />
-                <span className="text-xs">{filters.upside}</span>
-              </>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[200px] p-0">
-          <div className="px-2 py-1.5 text-sm font-semibold border-b">
-            Minimum Upside
+      {/* 3. Risk/Reward (Cyan) */}
+       <FilterButton 
+        label="Risk/Reward" 
+        activeValue={filters.overallScore} 
+        variant="cyan"
+      >
+         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
+            Min R/R Score
           </div>
           <div className="p-1">
-            {['> 10%', '> 20%', '> 50%'].map((val) => {
-              const isSelected = filters.upside === val;
-              return (
-                <div
-                  key={val}
-                  className={cn(
-                    'flex items-center space-x-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                  )}
-                  onClick={() => {
-                    onFilterChange('upside', isSelected ? null : val);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex h-4 w-4 items-center justify-center rounded-full border border-primary',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'opacity-50 [&_svg]:invisible',
-                    )}
-                  >
-                    <Check className={cn('h-3 w-3')} />
-                  </div>
-                  <span>{val}</span>
-                </div>
-              );
-            })}
+            {['> 5.0', '> 7.5', '> 8.5'].map((val) => (
+               <Item 
+                key={val} 
+                label={val} 
+                selected={filters.overallScore === val} 
+                onClick={() => onFilterChange('overallScore', filters.overallScore === val ? null : val)} 
+              />
+            ))}
           </div>
-        </PopoverContent>
-      </Popover>
+      </FilterButton>
 
-      {/* Sector Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={filters.sector.length ? 'secondary' : 'outline'}
-            size="sm"
-            className="h-8 border-dashed"
-          >
-            Sector
-            {filters.sector.length > 0 && (
-              <>
-                <span className="mx-2 h-4 w-[1px] bg-border" />
-                <span className="text-xs">{filters.sector.length} selected</span>
-              </>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[200px] p-0">
-          <div className="px-2 py-1.5 text-sm font-semibold border-b">
+      {/* 4. Upside (Emerald) */}
+      <FilterButton 
+        label="Upside" 
+        activeValue={filters.upside} 
+        variant="emerald"
+      >
+         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
+            Min Upside
+          </div>
+          <div className="p-1">
+            {['> 10%', '> 20%', '> 50%'].map((val) => (
+               <Item 
+                key={val} 
+                label={val} 
+                selected={filters.upside === val} 
+                onClick={() => onFilterChange('upside', filters.upside === val ? null : val)} 
+              />
+            ))}
+          </div>
+      </FilterButton>
+
+      {/* 5. Sector (Blue) */}
+      <FilterButton 
+        label="Sector" 
+        count={filters.sector.length} 
+        variant="blue"
+      >
+         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
             Sectors
           </div>
-          <div className="p-1 h-[200px] overflow-y-auto custom-scrollbar">
-            {['Technology', 'Healthcare', 'Energy', 'Financials', 'Consumer Discretionary', 'Industrials', 'Communications', 'Consumer Staples', 'Utilities', 'Real Estate', 'Materials', 'Other'].map((sec) => {
-              const isSelected = filters.sector.includes(sec);
-              return (
-                <div
-                  key={sec}
-                  className={cn(
-                    'flex items-center space-x-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                  )}
-                  onClick={() => {
-                    const newSectors = isSelected
-                      ? filters.sector.filter((s) => s !== sec)
-                      : [...filters.sector, sec];
-                    onFilterChange('sector', newSectors);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex h-4 w-4 items-center justify-center rounded border border-primary',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'opacity-50 [&_svg]:invisible',
-                    )}
-                  >
-                    <Check className={cn('h-3 w-3')} />
-                  </div>
-                  <span>{sec}</span>
-                </div>
-              );
-            })}
+          <div className="p-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+             {isLoadingSectors ? (
+              <div className="flex items-center justify-center py-4 text-muted-foreground text-xs">
+                 <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                 Loading sectors...
+              </div>
+            ) : sectors.length === 0 ? (
+              <div className="px-2 py-4 text-center text-muted-foreground text-xs">
+                No sectors found
+              </div>
+            ) : (
+                sectors.map(sec => (
+                   <Item 
+                    key={sec} 
+                    label={sec} 
+                    selected={filters.sector.includes(sec)} 
+                     onClick={() => {
+                       const newSectors = filters.sector.includes(sec)
+                        ? filters.sector.filter((s) => s !== sec)
+                        : [...filters.sector, sec];
+                      onFilterChange('sector', newSectors);
+                    }} 
+                  />
+                ))
+            )}
           </div>
-        </PopoverContent>
-      </Popover>
+      </FilterButton>
 
       {/* Reset Button */}
       {activeFilterCount > 0 && (
@@ -269,12 +191,90 @@ export function FilterBar({
           variant="ghost"
           size="sm"
           onClick={onReset}
-          className="h-8 px-2 lg:px-3 text-muted-foreground hover:text-foreground"
+          className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
         >
           Reset
-          <X className="ml-2 w-4 h-4" />
+          <X className="ml-1.5 w-3.5 h-3.5" />
         </Button>
       )}
     </div>
   );
 }
+
+// Helper for Colorful Border Buttons (No Shadow)
+const FilterButton = ({
+  label,
+  count,
+  activeValue,
+  variant = 'default',
+  children,
+}: {
+  label: string;
+  count?: number;
+  activeValue?: string | null;
+  variant?: 'purple' | 'amber' | 'emerald' | 'cyan' | 'blue' | 'default';
+  children: React.ReactNode;
+}) => {
+  const isActive = (count && count > 0) || !!activeValue;
+  
+  // Base: H-8, px-3, border, transition
+  const baseStyles = "h-8 px-3 text-xs font-medium border transition-colors duration-200";
+  
+  // Inactive: Standard dashed outline
+  const inactiveStyles = "border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground";
+  
+  // Active Variant Styles
+  // Design: Solid Colored Border + Colored Text + Subtle Background Tint
+  // Dark/Light Support: Text is 600 (light) / 400 (dark). Bg is 500/10 (universal). Border is 500/50.
+  const activeStyles = {
+    purple:  "border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20",
+    amber:   "border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20",
+    emerald: "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20",
+    cyan:    "border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20",
+    blue:    "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
+    default: "border-primary text-primary bg-primary/10 hover:bg-primary/20",
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            baseStyles,
+            "rounded-md flex items-center gap-2",
+            isActive ? activeStyles[variant] : inactiveStyles
+          )}
+        >
+          {label}
+          {isActive && (
+             <div className="flex items-center gap-1.5 ml-0.5">
+                <div className={cn("h-3.5 w-[1px]", isActive ? "bg-current/40" : "bg-border")} />
+                <span className="font-bold">
+                  {count ? count : activeValue}
+                </span>
+              </div>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[200px] p-0 animate-in zoom-in-95 duration-200">
+          {children}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// Shared Item Style
+const Item = ({ label, selected, onClick }: { label: string, selected: boolean, onClick: () => void }) => (
+  <div
+    className={cn(
+      'flex items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer group',
+      selected && 'bg-accent/50 text-accent-foreground'
+    )}
+    onClick={onClick}
+  >
+    <span className={cn("transition-colors", selected ? "font-medium" : "text-muted-foreground group-hover:text-foreground")}>
+      {label}
+    </span>
+     {selected && <Check className="h-3.5 w-3.5 text-primary animate-in zoom-in duration-200" />}
+  </div>
+);

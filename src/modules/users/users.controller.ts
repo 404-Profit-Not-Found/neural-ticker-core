@@ -11,7 +11,14 @@ import {
   Post,
   Patch,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiBody,
+  ApiResponse,
+  ApiParam,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -31,6 +38,7 @@ export class UsersController {
 
   @Roles('admin')
   @ApiOperation({ summary: 'List all users (Admin only)' })
+  @ApiResponse({ status: 200, description: 'List of users' })
   @Get()
   async getAllUsers() {
     return this.usersService.findAll();
@@ -38,6 +46,7 @@ export class UsersController {
 
   @Roles('admin')
   @ApiOperation({ summary: 'View Auth Audit Logs (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Auth logs' })
   @Get('logins')
   async getAuthLogs(@Query() filter: AuthLogFilterDto) {
     return this.authService.getAuthLogs(filter);
@@ -46,6 +55,8 @@ export class UsersController {
   @Roles('admin')
   @ApiOperation({ summary: 'Update User Role (Admin only)' })
   @ApiBody({ schema: { example: { role: 'admin' } } })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Role updated successfully' })
   @Put(':id/role')
   async updateUserRole(@Param('id') id: string, @Body('role') role: string) {
     if (!['user', 'admin'].includes(role)) {
@@ -76,6 +87,7 @@ export class UsersController {
       },
     },
   })
+  @ApiResponse({ status: 200, description: 'Preferences updated successfully' })
   @Post('me/preferences')
   async updatePreferences(
     @Request() req: any,
@@ -85,6 +97,7 @@ export class UsersController {
     return this.usersService.updatePreferences(req.user.id, body);
   }
   @ApiOperation({ summary: 'Get User Profile (including credits)' })
+  @ApiResponse({ status: 200, description: 'User profile with credit balance' })
   @Get('me')
   async getProfile(@Request() req: any) {
     return this.usersService.getProfile(req.user.id);
@@ -100,6 +113,7 @@ export class UsersController {
       },
     },
   })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @Patch('me')
   async updateProfile(
     @Request() req: any,

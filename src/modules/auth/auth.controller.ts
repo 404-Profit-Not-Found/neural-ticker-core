@@ -11,7 +11,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBody,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import type { Request, Response } from 'express';
 
@@ -33,6 +39,7 @@ export class AuthController {
     summary: 'Login with Google',
     description: 'Redirects to Google OAuth2 consent screen.',
   })
+  @ApiResponse({ status: 302, description: 'Redirects to Google Auth' })
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   async googleAuth() {
@@ -43,6 +50,7 @@ export class AuthController {
     summary: 'Google Callback',
     description: 'Handles Google Redirect, creates user, returns JWT.',
   })
+  @ApiResponse({ status: 302, description: 'Redirects to Frontend with Token' })
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   @UseFilters(GoogleAuthExceptionFilter)
@@ -81,6 +89,8 @@ export class AuthController {
     );
   }
 
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile object' })
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
   getProfile(@Req() req: Request) {
@@ -92,6 +102,7 @@ export class AuthController {
     description: 'Exchange Firebase ID Token for App JWT.',
   })
   @ApiBody({ schema: { example: { token: 'firebase_id_token' } } })
+  @ApiResponse({ status: 200, description: 'App JWT token and user info' })
   @Post('firebase')
   async firebaseLogin(@Body() body: { token: string }) {
     if (!body.token) throw new UnauthorizedException('Token required');
@@ -104,6 +115,7 @@ export class AuthController {
     description: 'Get a JWT token for a dev user without OAuth flow.',
   })
   @ApiBody({ schema: { example: { email: 'dev@test.com' } } })
+  @ApiResponse({ status: 200, description: 'App JWT token and user info' })
   @Post('dev/token')
   async devLogin(@Body() body: { email: string }) {
     if (!body.email) throw new UnauthorizedException('Email required');
@@ -113,6 +125,7 @@ export class AuthController {
     summary: 'Logout',
     description: 'Clears authentication cookie.',
   })
+  @ApiResponse({ status: 200, description: 'Cookie cleared' })
   @Post('logout')
   logout(@Res() res: Response) {
     res.clearCookie('authentication', {

@@ -173,10 +173,13 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                                         </span>
                                     )}
                                     <span className="ml-auto flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-0.5 rounded font-medium border border-border/50">
-                                        <ArrowDown size={10} className={risk > 5 ? "text-red-500" : "text-amber-500"} />
+                                        <ArrowDown size={10} className={risk > 6.5 ? "text-red-500" : "text-amber-500"} />
                                         <span className="text-muted-foreground">Downside:</span>
-                                        <span className={risk > 5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
-                                            -{typeof risk === 'number' ? (risk * 2.5).toFixed(1) : '0.0'}%
+                                        <span className={risk > 6.5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
+                                            {item.potentialDownside !== null && item.potentialDownside !== undefined
+                                                ? `${item.potentialDownside.toFixed(1)}%`
+                                                : '-0.0%'
+                                            }
                                         </span>
                                     </span>
                                 </div>

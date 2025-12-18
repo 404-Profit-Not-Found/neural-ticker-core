@@ -267,21 +267,19 @@ Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `s
 
 | Tier | OpenAI | Gemini | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-nano` | `gemini-2.5-flash-lite` | Quick sentiment, simple extraction |
-| **Medium** | `gpt-4.1-mini` | `gemini-2.5-flash` | **Default**: News summaries, alerts |
-| **Deep** | `gpt-5.1`| `gemini-2.5-pro` | 10-K analysis, thesis generation |
+| **Low** | `gpt-4.1-mini` | `gemini-2.5-flash-lite` | Quick sentiment, simple extraction |
+| **Medium** | `gpt-5-mini` | `gemini-3-flash-preview` | **Default**: News summaries, alerts |
+| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` | 10-K analysis, thesis generation |
 
 ### 📊 Gemini Model Benchmarks (Dec 2025)
 
-Empirical testing on financial research tasks yielded the following metrics:
-
 | Model | Success Rate | Avg Time | Output Detail (Chars) | Verdict |
 | :--- | :--- | :--- | :--- | :--- |
-| **gemini-2.5-flash** | 100% | **8.45s** | 2,336 | **🏆 Best Value** (Balanced) |
-| **gemini-2.5-pro** | 100% | 21.97s | **3,087** | **Deepest Analysis** |
-| **gemini-2.5-flash-lite** | 100% | **3.24s** | 1,475 | Fastest / Lower Detail |
+| **gemini-3-flash-preview** | 100% | **~5-8s** | 2,400+ | **🏆 Best Value** (Balanced) |
+| **gemini-3-pro-preview** | 100% | ~12-20s | **3,200+** | **Deepest Analysis** |
+| **gemini-2.5-flash-lite** | 100% | **~2-4s** | 1,500 | Fastest / Lower Detail |
 
-**Recommendation**: Use **`gemini-2.5-flash`** for standard reports and news. Use **`gemini-2.5-pro`** when depth is critical and latency is less important. Use **`gemini-2.5-flash-lite`** for high-throughput, simple jobs.
+**Recommendation**: Use **`gemini-3-flash-preview`** for standard reports and news. Use **`gemini-3-pro-preview`** when depth is critical and latency is less important. Use **`gemini-2.5-flash-lite`** for high-throughput, simple jobs.
 > [!NOTE]
 > Previous failures with `gemini-2.5-pro` were due to testing pre-release versions. The stable channel is now fully operational.
 

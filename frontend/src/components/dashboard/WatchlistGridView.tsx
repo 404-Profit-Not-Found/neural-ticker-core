@@ -44,7 +44,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {data.map((item) => {
-                const { symbol, logo, company, price, change, riskScore, potentialUpside, aiRating, itemId } = item;
+                const { symbol, logo, company, price, change, riskScore, overallScore, potentialUpside, aiRating, itemId } = item;
                 const risk = riskScore || 0;
                 const upside = potentialUpside || 0;
                 const isFavorite = favoritesSet.has(symbol);
@@ -186,12 +186,20 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </div>
 
                                 {/* Stats Grid */}
-                                <div className="flex items-center justify-between gap-2 mt-3 mb-1">
+                                <div className="flex flex-wrap items-center gap-2 mt-3 mb-1">
                                     <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
                                         <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
                                         <span className="text-muted-foreground">Risk:</span>
                                         <span className={riskColorClass}>
                                             {typeof risk === 'number' ? Math.round(risk) : '0'}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
+                                        <Bot size={12} className={overallScore && overallScore >= 7.5 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500"} />
+                                        <span className="text-muted-foreground">R/R:</span>
+                                        <span className={cn("font-bold", overallScore && overallScore >= 7.5 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500")}>
+                                            {Number(overallScore || 0).toFixed(1)}
                                         </span>
                                     </div>
 

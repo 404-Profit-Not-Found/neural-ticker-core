@@ -20,9 +20,13 @@ export class TickersService {
     private readonly httpService: HttpService,
   ) {}
 
-  async getTicker(symbol: string): Promise<TickerEntity> {
+  async getTicker(symbol: string, isAdmin = false): Promise<TickerEntity> {
     // If not in DB, try to fetch from Finnhub via ensureTicker
-    return this.ensureTicker(symbol);
+    const ticker = await this.ensureTicker(symbol);
+    if (!isAdmin && ticker.is_hidden) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
+    return ticker;
   }
 
   // Alias for backward compatibility if needed, or primarily used by other services
@@ -92,6 +96,7 @@ export class TickersService {
       web_url: profile.weburl,
       logo_url: profile.logo,
       finnhub_industry: profile.finnhubIndustry,
+      sector: profile.finnhubIndustry, // Fallback/Populate standard column
       finnhub_raw: profile,
     });
 
@@ -154,11 +159,14 @@ export class TickersService {
     }
   }
 
-  async getLogo(symbol: string): Promise<TickerLogoEntity | null> {
+  async getLogo(
+    symbol: string,
+    isAdmin = false,
+  ): Promise<TickerLogoEntity | null> {
     const ticker = await this.tickerRepo.findOne({
       where: { symbol: symbol.toUpperCase() },
     });
-    if (!ticker) return null;
+    if (!ticker || (!isAdmin && ticker.is_hidden)) return null;
 
     return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }
@@ -265,5 +273,26 @@ export class TickersService {
       .orderBy('ticker.symbol', 'ASC')
       .limit(50)
       .getMany();
+  }
+
+  async getUniqueSectors(): Promise<string[]> {
+    // 1. Try to get distinct 'sector' column
+    // 2. Fallback to 'finnhub_industry' if sector is null/empty
+    // We can just query both or coalesce.
+    // Given the current state where `sector` might be null but `finnhub_industry` is populated:
+    const results = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select(
+        'DISTINCT COALESCE(NULLIF(ticker.sector, \'\'), ticker.finnhub_industry)',
+        'sector',
+      )
+      .where('ticker.sector IS NOT NULL OR ticker.finnhub_industry IS NOT NULL')
+      .andWhere("ticker.sector != '' OR ticker.finnhub_industry != ''")
+      .orderBy('sector', 'ASC') // sort by the alias
+      .getRawMany();
+
+    return results
+      .map((r) => r.sector)
+      .filter((s) => s && s.trim().length > 0);
   }
 }

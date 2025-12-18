@@ -16,6 +16,8 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
 
+console.log('NotificationsService:', NotificationsService);
+
 describe('ResearchService', () => {
   let service: ResearchService;
 

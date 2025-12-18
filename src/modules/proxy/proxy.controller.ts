@@ -9,7 +9,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Proxy')
@@ -27,6 +27,12 @@ export class ProxyController {
     required: true,
     description: 'The URL of the image to proxy (must be from finnhub.io)',
   })
+  @ApiResponse({ status: 200, description: 'The image stream' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid URL or not from finnhub.io',
+  })
+  @ApiResponse({ status: 404, description: 'Image not found' })
   async proxyImage(@Query('url') url: string, @Res() res: Response) {
     if (!url) {
       throw new BadRequestException('URL parameter is required');

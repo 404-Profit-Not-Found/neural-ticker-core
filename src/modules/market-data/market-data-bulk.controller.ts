@@ -1,4 +1,12 @@
-import { Body, Controller, Post, Get, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,12 +16,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
-import { Public } from '../auth/public.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
 @Controller('v1/market-data')
-@Public()
+@UseGuards(JwtAuthGuard)
 export class MarketDataBulkController {
   constructor(private readonly service: MarketDataService) {}
 
@@ -56,12 +64,16 @@ export class MarketDataBulkController {
   @ApiQuery({ name: 'risk', required: false, isArray: true, type: String })
   @ApiQuery({ name: 'aiRating', required: false, isArray: true, type: String })
   @ApiQuery({ name: 'upside', required: false, type: String, example: '> 20%' })
+  @ApiQuery({ name: 'sector', required: false, isArray: true, type: String })
+  @ApiQuery({ name: 'symbols', required: false, isArray: true, type: String })
+  @ApiQuery({ name: 'overallScore', required: false, type: String, example: '> 8.5' })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',
   })
   @Get('analyzer')
   getAnalyzer(
+    @Req() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('sortBy') sortBy?: string,
@@ -70,6 +82,9 @@ export class MarketDataBulkController {
     @Query('risk') risk?: string[],
     @Query('aiRating') aiRating?: string[],
     @Query('upside') upside?: string,
+    @Query('sector') sector?: string[],
+    @Query('symbols') symbols?: string[],
+    @Query('overallScore') overallScore?: string,
   ) {
     return this.service.getAnalyzerTickers({
       page,
@@ -80,6 +95,10 @@ export class MarketDataBulkController {
       risk: Array.isArray(risk) ? risk : risk ? [risk] : [],
       aiRating: Array.isArray(aiRating) ? aiRating : aiRating ? [aiRating] : [],
       upside,
+      sector: Array.isArray(sector) ? sector : sector ? [sector] : [],
+      symbols: Array.isArray(symbols) ? symbols : symbols ? [symbols] : [],
+      overallScore,
+      isAdmin: req.user?.role === 'admin',
     });
   }
 }

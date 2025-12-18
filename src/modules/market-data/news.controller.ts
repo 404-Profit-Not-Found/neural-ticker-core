@@ -3,6 +3,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiQuery,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
@@ -20,6 +21,7 @@ export class NewsController {
   ) {}
 
   @ApiOperation({ summary: 'Get Daily AI News Digest' })
+  @ApiResponse({ status: 200, description: 'Personalized news digest' })
   @Get('digest')
   async getDailyDigest(@Request() req?: any) {
     // If public user, maybe return a generic system digest?
@@ -66,6 +68,7 @@ export class NewsController {
   }
 
   @ApiOperation({ summary: 'Get General Market News' })
+  @ApiResponse({ status: 200, description: 'List of general market news' })
   @Get('general')
   @Public()
   async getGeneralNews() {
@@ -73,6 +76,8 @@ export class NewsController {
   }
 
   // Temporary: Force trigger digest generation
+  @ApiOperation({ summary: 'Force trigger digest generation' })
+  @ApiResponse({ status: 200, description: 'Digest object' })
   @Get('digest/trigger')
   @Public()
   async triggerDigest() {
@@ -85,6 +90,7 @@ export class NewsController {
     description:
       'Returns counts of news items for the given tickers within the provided date window.',
   })
+  @ApiResponse({ status: 200, description: 'News statistics breakdown' })
   @ApiQuery({
     name: 'tickers',
     required: false,

@@ -246,6 +246,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
   - Bull: $X.XX (Rationale)
   - Base: $X.XX (Rationale)
   - Bear: $X.XX (Rationale)
+- MANDATORY: If Financial Risk is estimated at 8 or higher, the Bear Scenario MUST reflect a 100% downside (Price Target: $0.00) with a rationale of potential bankruptcy or insolvency.
 `;
 
       const result = await this.llmService.generateResearch({
@@ -257,71 +258,103 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         apiKey,
       });
 
-      // 4. Generate dynamic title based on findings
-      const title = await this.generateTitle(
-        note.question,
-        result.answerMarkdown,
-        note.tickers,
-      );
-
-      // 5. Complete - Store full response and metadata
+      // 4. COMPLETE CORE DATA (Allows UI to render results immediately)
       note.status = ResearchStatus.COMPLETED;
-      note.title = title;
       note.answer_markdown = result.answerMarkdown;
-      note.full_response = JSON.stringify(result, null, 2); // Store complete response
+      note.full_response = JSON.stringify(result, null, 2);
       note.grounding_metadata = result.groundingMetadata || null;
       note.thinking_process = result.thoughts || null;
       note.tokens_in = result.tokensIn || null;
       note.tokens_out = result.tokensOut || null;
       note.numeric_context = context;
       note.models_used = result.models;
+
+      // 5. INITIAL SAVE - Unlock the UI for polling
       await this.noteRepo.save(note);
+      this.logger.log(`Core research saved for ticket ${id}. Unlocking UI.`);
 
-      // 5.5 Judge Quality (Universal Judge) for AI Notes too
-      try {
-        const judgment = await this.qualityScoringService.score(
-          result.answerMarkdown,
-        );
-        note.quality_score = Math.round(judgment.score);
-        note.rarity = judgment.rarity;
-        note.grounding_metadata = {
-          ...note.grounding_metadata,
-          judgment_reasoning: judgment.details.reasoning,
-        };
-        await this.noteRepo.save(note);
-
-        // Reward if high quality (AI getting credits? why not, the user paid for it or triggered it)
-        // Actually, maybe we only reward MANUAL uploads?
-        // User asked: "are the non manual researches also rated with tag?"
-        // Usually, you don't earn credits for consuming AI credits.
-        // BUT, we DO want the TAG.
-        // So I will apply the tag, but maybe skip the credit reward for AI generated stuff to prevent infinite loop of credits.
-        // I'll leave the credit part out for AI, just save the metadata.
-      } catch (e) {
-        this.logger.warn(`Failed to judge AI note ${id}`, e);
-      }
-
-      // 6. Post-Process: Generate "Deep Tier" Risk Score from the analysis
-      this.logger.log(`Triggering Deep Verification Score for ticket ${id}`);
-      await this.riskRewardService.evaluateFromResearch(note);
-
-      // 7. Post-Process: Extract Structured Financials (Gemini 3 Extraction)
-      this.logger.log(`Triggering Financial Extraction for ticket ${id}`);
-      await this.extractFinancialsFromResearch(
-        note.tickers,
-        result.answerMarkdown,
-      );
-
-      // 8. NOTIFICATION: Alert creator only
+      // 6. EARLY NOTIFICATION: Alert creator now, don't wait for extraction
       if (note.user_id) {
-        await this.notificationsService.create(
-          note.user_id,
-          'research_complete',
-          `Research Ready: ${note.tickers.join(', ')}`,
-          `Your AI research on ${note.tickers.join(', ')} is complete.`,
-          { researchId: note.id, ticker: note.tickers[0] },
-        );
+        // Fire and forget notification
+        this.notificationsService
+          .create(
+            note.user_id,
+            'research_complete',
+            `Research Ready: ${note.tickers.join(', ')}`,
+            `Your AI research on ${note.tickers.join(', ')} is complete.`,
+            { researchId: note.id, ticker: note.tickers[0] },
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send early notification for ${id}`,
+              err,
+            ),
+          );
       }
+
+      // 7. PARALLEL POST-PROCESSING: Enrichment tasks
+      // We wrap these in a separate promise chain so they don't block the caller if we were to await them differently,
+      // but here we are in a background processTicket call anyway.
+      // However, parallelizing these saves real-world seconds.
+      this.logger.log(`Starting parallel enrichment for ticket ${id}...`);
+
+      const enrichmentTasks = [
+        // A. Title Generation (Fast)
+        this.generateTitle(note.question, result.answerMarkdown, note.tickers)
+          .then(async (title) => {
+            await this.noteRepo.update(id, { title });
+            this.logger.log(`Title generated for ticket ${id}: ${title}`);
+          })
+          .catch((err) =>
+            this.logger.error(`Title generation failed for ticket ${id}`, err),
+          ),
+
+        // B. Quality Scoring (Fast)
+        this.qualityScoringService
+          .score(result.answerMarkdown)
+          .then(async (judgment) => {
+            const groundingWithJudgment = {
+              ...(note.grounding_metadata || {}),
+              judgment_reasoning: judgment.details.reasoning,
+            };
+            await this.noteRepo.update(id, {
+              quality_score: Math.round(judgment.score),
+              rarity: judgment.rarity,
+              grounding_metadata: groundingWithJudgment as any,
+            });
+            this.logger.log(
+              `Quality scored for ticket ${id}: ${judgment.score}`,
+            );
+          })
+          .catch((err) =>
+            this.logger.error(`Quality scoring failed for ticket ${id}`, err),
+          ),
+
+        // C. Risk Verification (Medium)
+        this.riskRewardService
+          .evaluateFromResearch(note)
+          .catch((err) =>
+            this.logger.error(`Risk verification failed for ticket ${id}`, err),
+          ),
+
+        // D. Financial Extraction (Slowest)
+        this.extractFinancialsFromResearch(
+          note.tickers,
+          result.answerMarkdown,
+        ).catch((err) =>
+          this.logger.error(
+            `Financial extraction failed for ticket ${id}`,
+            err,
+          ),
+        ),
+      ];
+
+      // Since each task now has its own catch block, Promise.all will only reject
+      // if something truly catastrophic happens in the promise creation itself.
+      // This ensures a failure in Title Gen doesn't mark the whole research as FAILED.
+      await Promise.all(enrichmentTasks);
+
+      this.logger.log(`Enrichment complete for ticket ${id}.`);
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
@@ -827,6 +860,7 @@ Title:`;
       3. Create a Markdown table for last 3y Financials.
       4. Cite every numerical claim.
       5. MANDATORY: End with a "Risk/Reward Profile" section containing: Overall Score (0-10), Financial/Execution Risk scores, Price Targets, and Bull/Base/Bear Scenarios.
+      6. MANDATORY: If Financial Risk is estimated at 8 or higher, the Bear Scenario MUST reflect a 100% downside (Price Target: $0.00) with a rationale of potential bankruptcy or insolvency.
     `;
   }
 

@@ -6,6 +6,7 @@ import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { RiskScenario } from '../risk-reward/entities/risk-scenario.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
 import { TickerEntity as Ticker } from '../tickers/entities/ticker.entity';
 import { Comment } from '../social/entities/comment.entity';
@@ -682,6 +683,24 @@ export class MarketDataService {
       'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
     );
 
+    // Bear Case Price Subquery (for downside calculation in carousel)
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('rs.price_mid', 'bear_price')
+        .from(RiskScenario, 'rs')
+        .where('rs.analysis_id = risk.id')
+        .andWhere("rs.scenario_type = 'bear'");
+    }, 'bear_price');
+
+    // Base Case Price Subquery (for standardized upside calculation)
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('rs.price_mid', 'base_price')
+        .from(RiskScenario, 'rs')
+        .where('rs.analysis_id = risk.id')
+        .andWhere("rs.scenario_type = 'base'");
+    }, 'base_price');
+
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
       return subQuery
@@ -714,9 +733,12 @@ export class MarketDataService {
         .where('cn.symbol_id = ticker.id');
     }, 'news_count');
 
-    // Filter
+    // Filter: Always hide shadowbanned tickers from the main Analyzer/Dashboard list.
+    // They should only be visible in the Admin Console (Management) or specific Watchlists.
+    qb.andWhere('ticker.is_hidden = :isHidden', { isHidden: false });
+
     if (search) {
-      qb.where(
+      qb.andWhere(
         '(UPPER(ticker.symbol) LIKE :search OR UPPER(ticker.name) LIKE :search)',
         { search: `%${search}%` },
       );
@@ -767,6 +789,18 @@ export class MarketDataService {
       if (match) {
         const val = parseInt(match[0], 10);
         qb.andWhere('risk.upside_percent > :upsideVal', { upsideVal: val });
+      }
+    }
+
+    // 2.5 Overall Score (Risk/Reward) Filter
+    if (options.overallScore) {
+      // Expected format: "> 8.5", "> 7.5", "> 5.0"
+      const match = options.overallScore.match(/(\d+(\.\d+)?)/);
+      if (match) {
+        const val = parseFloat(match[0]);
+        qb.andWhere('risk.overall_score > :overallScoreVal', {
+          overallScoreVal: val,
+        });
       }
     }
 
@@ -878,7 +912,17 @@ export class MarketDataService {
           },
           latestPrice: latestPriceWithChange,
           fundamentals: t.fund || {},
-          aiAnalysis: t.latestRisk || null,
+          aiAnalysis: t.latestRisk
+            ? {
+                ...t.latestRisk,
+                bear_price: rawData?.bear_price
+                  ? parseFloat(rawData.bear_price)
+                  : null,
+                base_price: rawData?.base_price
+                  ? parseFloat(rawData.base_price)
+                  : null,
+              }
+            : null,
           counts: {
             analysts: analystCount,
             research: researchCount,
