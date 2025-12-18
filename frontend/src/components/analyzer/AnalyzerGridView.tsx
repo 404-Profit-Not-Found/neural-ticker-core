@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
+import { calculateAiRating } from '../../lib/rating-utils';
 
 interface AnalyzerGridViewProps {
     data: StockSnapshot[];
@@ -38,13 +39,26 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                 const { ticker, latestPrice, aiAnalysis, fundamentals, counts } = item;
                 const price = latestPrice?.close ?? 0;
                 const change = latestPrice?.change ?? 0;
+                const risk = aiAnalysis?.financial_risk ?? 0;
 
-                // Risk / Upside
-                const rawRisk = aiAnalysis?.financial_risk;
-                const risk = typeof rawRisk === 'number' ? rawRisk : Number(rawRisk || 0);
+                const basePrice = aiAnalysis?.base_price;
+                const bearPrice = aiAnalysis?.bear_price;
 
-                const rawUpside = aiAnalysis?.upside_percent;
-                const upside = typeof rawUpside === 'number' ? rawUpside : Number(rawUpside || 0);
+                let upside = 0;
+                if (typeof basePrice === 'number' && price > 0) {
+                    upside = ((basePrice - price) / price) * 100;
+                } else {
+                    upside = Number(aiAnalysis?.upside_percent ?? 0);
+                }
+
+                let downside = 0;
+                if (typeof bearPrice === 'number' && price > 0) {
+                    downside = ((bearPrice - price) / price) * 100;
+                } else if (risk >= 8) {
+                    downside = -100;
+                } else {
+                    downside = -(risk * 2.5);
+                }
 
                 // --- Risk Logic ---
                 let riskColorClass = "text-muted-foreground";
@@ -60,14 +74,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                     RiskIcon = Flame;
                 }
 
-                // --- AI Rating Logic ---
-                // Match Watchlist/Dashboard logic exactly
-                let rating = 'Hold';
-                let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "outline";
-
-                if (upside > 10 && risk <= 7) { rating = 'Buy'; variant = 'buy'; }
-                if (upside > 20 && risk <= 6) { rating = 'Strong Buy'; variant = 'strongBuy'; }
-                if (upside < 0 || risk >= 8) { rating = 'Sell'; variant = 'sell'; }
+                const { rating, variant } = calculateAiRating(risk, upside);
                 
                 // --- Analyst Consensus Logic ---
                 const consensus = fundamentals?.consensus_rating;
@@ -149,12 +156,20 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                             </div>
 
                             {/* Stats Grid */}
-                            <div className="flex items-center justify-between gap-2 mt-3 mb-1">
+                            <div className="flex flex-wrap items-center gap-2 mt-3 mb-1">
                                 <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
                                     <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
                                     <span className="text-muted-foreground">Risk:</span>
                                     <span className={riskColorClass}>
                                         {Math.round(risk)}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
+                                    <Bot size={12} className={aiAnalysis?.overall_score && aiAnalysis.overall_score >= 7.5 ? "text-emerald-500" : aiAnalysis?.overall_score && aiAnalysis.overall_score >= 5.0 ? "text-yellow-500" : "text-red-500"} />
+                                    <span className="text-muted-foreground">R/R:</span>
+                                    <span className={cn("font-bold", aiAnalysis?.overall_score && aiAnalysis.overall_score >= 7.5 ? "text-emerald-500" : aiAnalysis?.overall_score && aiAnalysis.overall_score >= 5.0 ? "text-yellow-500" : "text-red-500")}>
+                                        {Number(aiAnalysis?.overall_score || 0).toFixed(1)}
                                     </span>
                                 </div>
 
@@ -186,10 +201,10 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                                 ) : null}
 
                                 <span className="ml-auto flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-0.5 rounded font-medium border border-border/50">
-                                    <ArrowDown size={10} className={risk > 5 ? "text-red-500" : "text-amber-500"} />
+                                    <ArrowDown size={10} className={risk > 6.5 ? "text-red-500" : "text-amber-500"} />
                                     <span className="text-muted-foreground">Downside:</span>
-                                    <span className={risk > 5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
-                                        -{(risk * 2.5).toFixed(1)}%
+                                    <span className={risk > 6.5 ? "text-red-500 font-bold" : "text-amber-500 font-bold"}>
+                                        {downside.toFixed(1)}%
                                     </span>
                                 </span>
                             </div>

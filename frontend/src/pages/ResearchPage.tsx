@@ -10,7 +10,6 @@ import {
 
     Quote,
     Link as LinkIcon,
-    Brain,
     FileText,
     Database,
     Printer,
@@ -27,7 +26,7 @@ import { Header } from '../components/layout/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { InlineAlert } from '../components/ui/inline-alert';
-import { Badge } from '../components/ui/badge';
+import { ModelBadge } from '../components/ui/model-badge';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import { useTickerDetails } from '../hooks/useTicker';
 
@@ -56,19 +55,7 @@ interface ResearchNote {
     rarity?: string;
 }
 
-const getDisplayRarity = (rarity: string) => {
-    // Legacy Mapping for old data
-    const map: Record<string, string> = {
-        'White': 'Common',
-        'Green': 'Uncommon',
-        'Blue': 'Rare',
-        'Purple': 'Epic',
-        'Gold': 'Legendary'
-    };
-    // Normalize case just in case
-    const normalized = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
-    return map[normalized] || normalized;
-};
+
 
 export function ResearchPage() {
     const { id } = useParams<{ id: string }>();
@@ -197,12 +184,13 @@ export function ResearchPage() {
                             <span className="capitalize">{note.status}</span>
                         </div>
 
-                        {/* Model Badge */}
+                        {/* Model & Rarity Badge */}
                         {note.models_used && note.models_used.length > 0 && (
-                            <div className="flex items-center gap-1.5 bg-white/5 text-white/90 border border-white/20 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
-                                <Brain className="w-3 h-3" />
-                                <span>{note.models_used[0]}</span>
-                            </div>
+                            <ModelBadge
+                                model={note.models_used[0]}
+                                rarity={note.rarity}
+                                className="h-6"
+                            />
                         )}
 
                         <div className="h-4 w-px bg-border mx-1 hidden md:block" />
@@ -233,19 +221,7 @@ export function ResearchPage() {
 
                         {note.rarity && (
                             <div className="flex items-center gap-1.5">
-                                {(() => {
-                                    const display = getDisplayRarity(note.rarity);
-                                    return (
-                                        <Badge variant="outline" className={`px-1.5 py-0 h-4 text-[10px] font-bold uppercase border ${display === 'Legendary' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                                            display === 'Epic' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                display === 'Rare' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                    display === 'Uncommon' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                        'bg-muted text-muted-foreground border-border'
-                                            }`}>
-                                            {display}
-                                        </Badge>
-                                    );
-                                })()}
+                                <ModelBadge model={note.models_used?.[0] || 'AI'} rarity={note.rarity} showIcon={false} />
                             </div>
                         )}
 

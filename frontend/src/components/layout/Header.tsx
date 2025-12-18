@@ -4,9 +4,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Bell, User as UserIcon, Shield, Menu, X, Brain } from 'lucide-react';
 import { api } from '../../lib/api';
+import { queryClient } from '../../lib/queryClient';
 import { Badge } from '../ui/badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
-
 
 interface Notification {
   id: string;
@@ -18,7 +18,6 @@ interface Notification {
   data: Record<string, unknown> | null;
   created_at: string;
 }
-
 
 // React Query for smart polling
 function useUnreadNotifications(isAuthenticated: boolean) {
@@ -58,7 +57,6 @@ function ActiveResearchIndicator({ count }: ActiveResearchIndicatorProps) {
 
 export function Header() {
   const { user, logout } = useAuth();
-  // const isAuthenticated = !!user; // Unused
   const location = useLocation();
   const navigate = useNavigate();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -70,15 +68,8 @@ export function Header() {
   const { data: researchCount = 0 } = useActiveResearchCount();
   const prevResearchCount = useRef(researchCount);
 
-  const { unreadCount, check: refreshNotifications } = useUnreadNotifications(!!user);
-
-  // Sync: When research finishes (count drops to 0), immediately check for new notifications (e.g. "Research Complete")
-  useEffect(() => {
-    if (prevResearchCount.current > 0 && researchCount === 0) {
-      refreshNotifications();
-    }
-    prevResearchCount.current = researchCount;
-  }, [researchCount, refreshNotifications]);
+  const { unreadCount, check: refreshNotifications } =
+    useUnreadNotifications(!!user);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -95,18 +86,67 @@ export function Header() {
     setNotificationsMenuOpen(false);
   }, []);
 
-  // Close menus on route change
+  // SSE: Real-time notification bridge
+  useEffect(() => {
+    if (!user) return;
 
+    const sseUrl = '/api/v1/notifications/stream';
+    const eventSource = new EventSource(sseUrl, {
+      withCredentials: true,
+    });
+
+    eventSource.addEventListener('notification', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        // 1. Immediately refresh the unread count badge
+        void refreshNotifications();
+
+        // 2. If it's a research complete event, also refresh research list if menu is open
+        if (notificationsMenuOpen) {
+          void fetchNotifications();
+        }
+
+        // 3. Specifically for research updates, invalidate the active research count
+        void queryClient.invalidateQueries({
+          queryKey: ['research', 'active-count'],
+        });
+
+        // 4. Also invalidate specific ticker research if we can derive it
+        if (payload.data?.ticker) {
+          void queryClient.invalidateQueries({
+            queryKey: ['tickers', 'research', payload.data.ticker],
+          });
+        }
+      } catch (e) {
+        console.error('[SSE] Failed to parse notification event', e);
+      }
+    });
+
+    return () => {
+      eventSource.close();
+    };
+  }, [user, refreshNotifications, notificationsMenuOpen, fetchNotifications]);
+
+  // Sync: When research finishes (count drops to 0), immediately check for new notifications
+  useEffect(() => {
+    if (prevResearchCount.current > 0 && researchCount === 0) {
+      void refreshNotifications();
+    }
+    prevResearchCount.current = researchCount;
+  }, [researchCount, refreshNotifications]);
+
+  // Close menus on route change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileMenuOpen(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileMenuOpen(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotificationsMenuOpen(false);
   }, [location.pathname]);
 
   const toggleNotifications = async () => {
     if (!notificationsMenuOpen) {
-      // Opening
       await fetchNotifications();
       setNotificationsMenuOpen(true);
       setProfileMenuOpen(false);
@@ -117,20 +157,17 @@ export function Header() {
 
   const handleNotificationClick = async (n: Notification) => {
     try {
-      // 1. Mark as read
       if (!n.read) {
         await api.patch(`/notifications/${n.id}/read`);
-        refreshNotifications(); // Update badge immediately
+        void refreshNotifications();
       }
 
-      // 2. Navigation logic based on type
       if (n.type === 'research_complete' && n.data?.ticker) {
         navigate(`/ticker/${n.data.ticker}`);
       } else if (n.data?.ticker) {
         navigate(`/ticker/${n.data.ticker}`);
       }
 
-      // 3. Close menu
       setNotificationsMenuOpen(false);
     } catch (e) {
       console.error('Failed to handle notification click', e);
@@ -138,23 +175,27 @@ export function Header() {
   };
 
   const isActive = (path: string) => {
-    if (path === '/dashboard' && (location.pathname === '/' || location.pathname === '/dashboard')) return true;
+    if (
+      path === '/dashboard' &&
+      (location.pathname === '/' || location.pathname === '/dashboard')
+    )
+      return true;
     return location.pathname === path;
   };
 
   const linkClass = (path: string) =>
-    `text-sm font-medium h-14 flex items-center px-1 transition-colors ${isActive(path)
-      ? 'text-foreground border-b-2 border-primary'
-      : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+    `text-sm font-medium h-14 flex items-center px-1 transition-colors ${
+      isActive(path)
+        ? 'text-foreground border-b-2 border-primary'
+        : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
     }`;
 
   const mobileLinkClass = (path: string) =>
-    `block px-4 py-3 text-base font-medium transition-colors rounded-md ${isActive(path)
-      ? 'bg-primary/10 text-primary'
-      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+    `block px-4 py-3 text-base font-medium transition-colors rounded-md ${
+      isActive(path)
+        ? 'bg-primary/10 text-primary'
+        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
     }`;
-
-
 
   const goTo = (path: string) => {
     closeMenus();
@@ -164,7 +205,6 @@ export function Header() {
   return (
     <header className="rgb-border-b h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
-
         {/* Left: Mobile Menu Toggle & Logo */}
         <div className="flex items-center gap-4">
           <button
@@ -175,12 +215,13 @@ export function Header() {
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
 
-          <Link to="/dashboard" className="text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity">
+          <Link
+            to="/dashboard"
+            className="text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity"
+          >
             NeuralTicker.com
           </Link>
         </div>
-
-
 
         {/* Center: Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
@@ -194,7 +235,6 @@ export function Header() {
 
         {/* Right: alerts + profile */}
         <div className="flex items-center gap-4">
-
           {/* Active Research Indicator */}
           <ActiveResearchIndicator count={researchCount} />
 
@@ -202,7 +242,7 @@ export function Header() {
           <div className="relative">
             <button
               className={`flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors relative ${notificationsMenuOpen ? 'text-foreground' : ''}`}
-              onClick={toggleNotifications}
+              onClick={() => { void toggleNotifications(); }}
             >
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -214,16 +254,21 @@ export function Header() {
 
             {/* Notifications Dropdown */}
             <div
-              className={`absolute right-0 top-full mt-3 w-80 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 overflow-hidden ${notificationsMenuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
-                }`}
+              className={`absolute right-0 top-full mt-3 w-80 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 overflow-hidden ${
+                notificationsMenuOpen
+                  ? 'opacity-100 visible translate-y-0'
+                  : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+              }`}
             >
               <div className="p-3 border-b border-border flex justify-between items-center bg-muted/30">
                 <h3 className="font-semibold text-sm">Notifications</h3>
                 <button
-                  onClick={async () => {
-                    await api.patch('/notifications/read-all');
-                    await fetchNotifications(); // Re-fetch to get updated read status
-                    refreshNotifications(); // Update badge immediately
+                  onClick={() => {
+                    void (async () => {
+                      await api.patch('/notifications/read-all');
+                      await fetchNotifications();
+                      void refreshNotifications();
+                    })();
                   }}
                   className="text-xs text-primary hover:underline"
                 >
@@ -240,14 +285,18 @@ export function Header() {
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      onClick={() => handleNotificationClick(n)}
+                      onClick={() => { void handleNotificationClick(n); }}
                       className={`p-3 border-b border-border last:border-0 hover:bg-muted/50 cursor-pointer transition-colors ${!n.read ? 'bg-primary/5' : ''}`}
                     >
                       <div className="flex justify-between items-start gap-2">
-                        <p className={`text-sm ${!n.read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                        <p
+                          className={`text-sm ${!n.read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+                        >
                           {n.title}
                         </p>
-                        {!n.read && <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />}
+                        {!n.read && (
+                          <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                         {n.message}
@@ -289,18 +338,22 @@ export function Header() {
 
             {/* Profile Dropdown */}
             <div
-              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${profileMenuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
-                }`}
+              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${
+                profileMenuOpen
+                  ? 'opacity-100 visible translate-y-0'
+                  : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+              }`}
             >
               <div className="p-4 border-b border-border">
                 <div className="font-semibold text-foreground flex items-center gap-2">
                   {user?.nickname || 'Trader'}
                   <Badge
                     variant="outline"
-                    className={`text-[10px] h-5 px-1.5 ${(user?.tier === 'pro' || user?.tier === 'admin')
-                      ? 'border-purple-500 text-purple-500 uppercase'
-                      : 'border-emerald-500 text-emerald-500 uppercase'
-                      }`}
+                    className={`text-[10px] h-5 px-1.5 ${
+                      user?.tier === 'pro' || user?.tier === 'admin'
+                        ? 'border-purple-500 text-purple-500 uppercase'
+                        : 'border-emerald-500 text-emerald-500 uppercase'
+                    }`}
                   >
                     {(user?.tier || 'free').toUpperCase()}
                   </Badge>
@@ -327,7 +380,6 @@ export function Header() {
                     Admin Console
                   </button>
                 )}
-
               </div>
 
               <div className="p-2 border-t border-border">
@@ -356,9 +408,8 @@ export function Header() {
             News
           </Link>
           <div className="h-px bg-border my-2" />
-
         </div>
       )}
-    </header >
+    </header>
   );
 }

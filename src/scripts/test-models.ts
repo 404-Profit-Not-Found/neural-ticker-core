@@ -7,14 +7,10 @@ dotenv.config();
 const chalk = new Chalk({ level: 3 });
 
 const modelsToTest = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash-exp',
+  'gemini-3-flash-preview',
+  'gemini-3-pro-preview',
   'gemini-2.0-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.0-flash-lite',
-  'gemini-2.5-pro',
-  'gemini-3-pro',
-  'deep-research-pro-preview',
 ];
 
 const ITERATIONS = 3;

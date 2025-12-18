@@ -2,13 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
+import { Subject, Observable } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 @Injectable()
 export class NotificationsService {
+  private readonly events$ = new Subject<Notification>();
+
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
   ) {}
+
+  /**
+   * Stream notifications for a specific user.
+   */
+  getEventStream(userId: string): Observable<Notification> {
+    return this.events$.asObservable().pipe(
+      filter((n) => n.user_id === userId), // Only stream to the correct user
+    );
+  }
 
   async create(
     userId: string,
@@ -24,7 +37,12 @@ export class NotificationsService {
       message,
       data,
     });
-    return this.notificationRepo.save(notification);
+    const saved = await this.notificationRepo.save(notification);
+
+    // Emit event for real-time listeners
+    this.events$.next(saved);
+
+    return saved;
   }
 
   async findAllForUser(userId: string) {

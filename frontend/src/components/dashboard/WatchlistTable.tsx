@@ -34,6 +34,7 @@ import {
 import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
+import { calculateAiRating } from '../../lib/rating-utils';
 
 // --- Types ---
 interface TickerSearchResult {
@@ -56,8 +57,10 @@ interface MarketSnapshot {
     };
     aiAnalysis?: {
         overall_score: number;
-        financial_risk?: number; // Added field
+        financial_risk?: number;
         upside_percent: number;
+        bear_price?: number | null;
+        base_price?: number | null;
     };
     counts?: {
         news?: number;
@@ -162,21 +165,35 @@ export function WatchlistTable() {
                 const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
 
                 // AI Rating Logic (Strict Financial Risk)
-                let aiRating = 'Hold';
+                let aiRating = '-';
                 if (s.aiAnalysis && safeRiskScore !== null) {
                     const upside = Number(s.aiAnalysis.upside_percent || 0);
-                    
-                    if (upside > 10 && safeRiskScore <= 7) aiRating = 'Buy';
-                    if (upside > 20 && safeRiskScore <= 6) aiRating = 'Strong Buy';
-                    
-                    // Override: High Risk => Sell
-                    if (upside < 0 || safeRiskScore >= 8) aiRating = 'Sell';
+                    const { rating } = calculateAiRating(safeRiskScore, upside);
+                    aiRating = rating;
                 } else {
                     aiRating = '-';
                 }
 
                 // Find corresponding watchlist item to get ID
                 const watchlistItem = watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol);
+
+                const bearPrice = s.aiAnalysis?.bear_price;
+                const basePrice = s.aiAnalysis?.base_price;
+                let potentialDownside: number | null = null;
+                let potentialUpside: number | null = null;
+
+                if (typeof basePrice === 'number' && price > 0) {
+                    potentialUpside = ((basePrice - price) / price) * 100;
+                } else {
+                    potentialUpside = s.aiAnalysis?.upside_percent ?? null;
+                }
+
+                if (typeof bearPrice === 'number' && price > 0) {
+                    potentialDownside = ((bearPrice - price) / price) * 100;
+                } else if (safeRiskScore !== null) {
+                    if (safeRiskScore >= 8) potentialDownside = -100;
+                    else if (safeRiskScore > 0) potentialDownside = -(safeRiskScore * 2.5);
+                }
 
                 return {
                     symbol: s.ticker?.symbol || 'UNKNOWN',
@@ -187,8 +204,10 @@ export function WatchlistTable() {
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
                     marketCap: fundamentals.market_cap ?? null,
-                    potentialUpside: s.aiAnalysis?.upside_percent ?? null,
+                    potentialUpside: potentialUpside,
+                    potentialDownside: potentialDownside,
                     riskScore: safeRiskScore,
+                    overallScore: s.aiAnalysis?.overall_score ?? null,
                     rating: fundamentals.consensus_rating || '-',
                     aiRating: aiRating,
                     newsCount: s.counts?.news || 0,

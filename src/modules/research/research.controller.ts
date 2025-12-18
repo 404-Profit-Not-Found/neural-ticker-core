@@ -400,7 +400,8 @@ export class ResearchController {
   }
 
   @ApiOperation({ summary: 'Update research title' })
-  @ApiResponse({ status: 200, description: 'Title updated.' })
+  @ApiResponse({ status: 200, description: 'Title updated successfully' })
+  @ApiResponse({ status: 404, description: 'Research note not found' })
   @Post(':id/title') // Using POST or PATCH
   async updateTitle(
     @Request() req: any,
@@ -419,6 +420,12 @@ export class ResearchController {
     }
   }
 
+  @ApiOperation({ summary: 'Stream deep research (SSE)' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'SSE stream of research events (status, thought, source, content)',
+  })
   @Post('stream')
   @Sse() // Content-Type: text/event-stream
   startResearch(

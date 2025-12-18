@@ -30,6 +30,7 @@ import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
+import { calculateAiRating } from '../lib/rating-utils';
 
 interface TickerResult {
   symbol: string;
@@ -105,27 +106,55 @@ function StatPill({
 function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
   // Determine AI Rating from core logic (Strictly calculated, ignoring verbose sentiment string)
   let derivedAiRating = '-';
+  const riskRaw = item.aiAnalysis?.financial_risk;
+  const risk = typeof riskRaw === 'number' ? riskRaw : Number(riskRaw || 0);
+
   if (item.aiAnalysis) {
-    const { overall_score, upside_percent } = item.aiAnalysis;
-    // Logic matching WatchlistTable
-    if (upside_percent > 10 && overall_score <= 7) derivedAiRating = 'Buy';
-    if (upside_percent > 20 && overall_score <= 6)
-      derivedAiRating = 'Strong Buy';
-    if (upside_percent < 0 || overall_score >= 8) derivedAiRating = 'Sell';
-    if (derivedAiRating === '-') derivedAiRating = 'Hold';
+    const { upside_percent } = item.aiAnalysis;
+    const { rating } = calculateAiRating(risk, upside_percent);
+    derivedAiRating = rating;
+  }
+
+  const currentPrice = Number(item.latestPrice?.close ?? 0);
+  const bearPrice = item.aiAnalysis?.bear_price;
+  const basePrice = item.aiAnalysis?.base_price;
+  
+  let potentialDownside: number | null = null;
+  let potentialUpside: number | null = null;
+
+  // 1. Calculate Standardized Upside (Base Case)
+  if (typeof basePrice === 'number' && currentPrice > 0) {
+    potentialUpside = ((basePrice - currentPrice) / currentPrice) * 100;
+  } else {
+    // Fallback to pre-calculated upside_percent if base_price is not available
+    potentialUpside = Number(item.aiAnalysis?.upside_percent ?? 0);
+  }
+
+  // 2. Calculate Standardized Downside (Bear Case)
+  if (typeof bearPrice === 'number' && currentPrice > 0) {
+    potentialDownside = ((bearPrice - currentPrice) / currentPrice) * 100;
+  } else if (risk >= 8) {
+    potentialDownside = -100;
+  } else if (risk > 0) {
+    potentialDownside = -(risk * 2.5);
   }
 
   return {
     symbol: item.ticker.symbol,
     company: item.ticker.name,
     logo: item.ticker.logo_url,
-    sector: item.ticker.industry || item.ticker.sector || (item.fundamentals?.sector as string) || 'Unknown',
-    price: Number(item.latestPrice?.close ?? 0),
+    sector:
+      item.ticker.industry ||
+      item.ticker.sector ||
+      (item.fundamentals?.sector as string) ||
+      'Unknown',
+    price: currentPrice,
     change: Number(item.latestPrice?.change ?? 0),
     pe: Number(item.fundamentals.pe_ratio ?? 0) || null,
     marketCap: Number(item.fundamentals.market_cap ?? 0) || null,
-    potentialUpside: Number(item.aiAnalysis?.upside_percent ?? 0),
-    riskScore: Number(item.aiAnalysis?.overall_score ?? 0),
+    potentialUpside,
+    potentialDownside,
+    riskScore: risk,
     rating: (item.fundamentals.consensus_rating as string) || '-',
     aiRating: derivedAiRating,
     analystCount: item.counts?.analysts || 0,

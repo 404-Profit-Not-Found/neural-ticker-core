@@ -32,6 +32,8 @@ export interface StockSnapshot {
         upside_percent: number;
         financial_risk: number;
         sentiment: string;
+        bear_price?: number | null;
+        base_price?: number | null;
     } | null;
     counts?: {
         news?: number;
@@ -62,6 +64,7 @@ export interface AnalyzerParams {
     aiRating?: string[];
     upside?: string | null;
     sector?: string[];
+    overallScore?: string | null;
 }
 
 export function useStockAnalyzer(params: AnalyzerParams) {
@@ -80,6 +83,7 @@ export function useStockAnalyzer(params: AnalyzerParams) {
       params.aiRating?.forEach(r => queryParams.append('aiRating', r));
       params.sector?.forEach(s => queryParams.append('sector', s));
       if (params.upside) queryParams.append('upside', params.upside);
+      if (params.overallScore) queryParams.append('overallScore', params.overallScore);
 
       const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {
         params: queryParams,

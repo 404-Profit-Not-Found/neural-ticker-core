@@ -6,7 +6,7 @@ import {
   forwardRef,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
@@ -26,10 +26,13 @@ export class TickerDetailController {
     private readonly researchService: ResearchService,
   ) {}
 
-  @Get(':symbol/composite')
   @ApiOperation({
     summary: 'Get composite ticker data (Profile, Price, Risk, Research)',
   })
+  @ApiParam({ name: 'symbol', example: 'AAPL', description: 'Ticker symbol' })
+  @ApiResponse({ status: 200, description: 'Composite data object' })
+  @ApiResponse({ status: 404, description: 'Ticker not found' })
+  @Get(':symbol/composite')
   async getCompositeData(@Param('symbol') symbol: string) {
     // 1. Get Market Data Snapshot (Handles Ticker existence and Fundamentals)
     // If ticker doesn't exist, getSnapshot attempts to fetch from Finnhub or throws.

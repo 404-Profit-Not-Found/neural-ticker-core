@@ -73,6 +73,22 @@ export class TickersController {
   }
 
   @ApiOperation({
+    summary: 'Get unique sectors',
+    description:
+      'Returns a list of all unique sectors present in the database.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of unique sectors.',
+    schema: { example: ['Technology', 'Healthcare'] },
+  })
+  @Public()
+  @Get('sectors')
+  getSectors() {
+    return this.tickersService.getUniqueSectors();
+  }
+
+  @ApiOperation({
     summary: 'Admin: Get hidden (shadow banned) tickers',
     description: 'Returns a list of all hidden tickers. Admin only.',
   })

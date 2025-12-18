@@ -186,12 +186,20 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </div>
 
                                 {/* Stats Grid */}
-                                <div className="flex items-center justify-between gap-2 mt-3 mb-1">
+                                <div className="flex flex-wrap items-center gap-2 mt-3 mb-1">
                                     <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
                                         <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
                                         <span className="text-muted-foreground">Risk:</span>
                                         <span className={riskColorClass}>
                                             {typeof risk === 'number' ? Math.round(risk) : '0'}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
+                                        <Bot size={12} className={item.overallScore && item.overallScore >= 7.5 ? "text-emerald-500" : item.overallScore && item.overallScore >= 5.0 ? "text-yellow-500" : "text-red-500"} />
+                                        <span className="text-muted-foreground">R/R:</span>
+                                        <span className={cn("font-bold", item.overallScore && item.overallScore >= 7.5 ? "text-emerald-500" : item.overallScore && item.overallScore >= 5.0 ? "text-yellow-500" : "text-red-500")}>
+                                            {Number(item.overallScore || 0).toFixed(1)}
                                         </span>
                                     </div>
 

@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { MiniTickerTile } from './MiniTickerTile';
+import { ModelBadge } from '../ui/model-badge';
 
 interface NewsItem {
     id: number;
@@ -74,16 +75,17 @@ export function NewsFeed() {
     }, []);
 
     const formatDate = (ts: number | string) => {
-        if (!ts) return 'Just now';
+        if (!ts) return 'Recently';
         try {
+            // Robust parsing for numeric strings
+            const val = typeof ts === 'string' && !isNaN(parseFloat(ts)) ? parseFloat(ts) : ts;
+            
             let date: Date;
-            // Handle number (unix timestamp)
-            if (typeof ts === 'number') {
+            if (typeof val === 'number') {
                 // Finnhub returns seconds, but check if it's ms (huge number)
-                date = new Date(ts > 10000000000 ? ts : ts * 1000);
+                date = new Date(val > 10000000000 ? val : val * 1000);
             } else {
-                // Handle string (ISO or other formats)
-                date = new Date(ts);
+                date = new Date(val);
             }
 
             if (isNaN(date.getTime())) return 'Recently';
@@ -128,9 +130,7 @@ export function NewsFeed() {
                         {digest && digest.models_used && (
                             <div className="flex items-center gap-2">
                                 {digest.models_used.map(model => (
-                                    <Badge key={model} variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-white/5 text-white/90 border-white/20 hover:bg-white/10">
-                                        {model}
-                                    </Badge>
+                                    <ModelBadge key={model} model={model} />
                                 ))}
                                 {digest.tokens_out && (
                                     <span className="text-[10px] text-muted-foreground font-normal">

@@ -6,6 +6,7 @@ import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { AnalystRating } from './entities/analyst-rating.entity';
 import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { RiskScenario } from '../risk-reward/entities/risk-scenario.entity';
 import { ResearchNote } from '../research/entities/research-note.entity';
 import { TickerEntity as Ticker } from '../tickers/entities/ticker.entity';
 import { Comment } from '../social/entities/comment.entity';
@@ -682,6 +683,24 @@ export class MarketDataService {
       'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
     );
 
+    // Bear Case Price Subquery (for downside calculation in carousel)
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('rs.price_mid', 'bear_price')
+        .from(RiskScenario, 'rs')
+        .where('rs.analysis_id = risk.id')
+        .andWhere("rs.scenario_type = 'bear'");
+    }, 'bear_price');
+
+    // Base Case Price Subquery (for standardized upside calculation)
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('rs.price_mid', 'base_price')
+        .from(RiskScenario, 'rs')
+        .where('rs.analysis_id = risk.id')
+        .andWhere("rs.scenario_type = 'base'");
+    }, 'base_price');
+
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
       return subQuery
@@ -878,7 +897,17 @@ export class MarketDataService {
           },
           latestPrice: latestPriceWithChange,
           fundamentals: t.fund || {},
-          aiAnalysis: t.latestRisk || null,
+          aiAnalysis: t.latestRisk
+            ? {
+                ...t.latestRisk,
+                bear_price: rawData?.bear_price
+                  ? parseFloat(rawData.bear_price)
+                  : null,
+                base_price: rawData?.base_price
+                  ? parseFloat(rawData.base_price)
+                  : null,
+              }
+            : null,
           counts: {
             analysts: analystCount,
             research: researchCount,

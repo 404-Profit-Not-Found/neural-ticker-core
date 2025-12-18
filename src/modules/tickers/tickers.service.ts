@@ -266,4 +266,16 @@ export class TickersService {
       .limit(50)
       .getMany();
   }
+
+  async getUniqueSectors(): Promise<string[]> {
+    const results = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select('DISTINCT ticker.sector', 'sector')
+      .where('ticker.sector IS NOT NULL')
+      .andWhere("ticker.sector != ''")
+      .orderBy('ticker.sector', 'ASC')
+      .getRawMany();
+
+    return results.map((r) => r.sector);
+  }
 }
