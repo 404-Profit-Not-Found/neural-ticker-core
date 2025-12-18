@@ -41,12 +41,24 @@ export class WatchlistService {
     return this.watchlistRepo.save(list);
   }
 
-  async getUserWatchlists(userId: string): Promise<Watchlist[]> {
-    return this.watchlistRepo.find({
+  async getUserWatchlists(
+    userId: string,
+    isAdmin = false,
+  ): Promise<Watchlist[]> {
+    const watchlists = await this.watchlistRepo.find({
       where: { user_id: userId },
       relations: ['items', 'items.ticker'],
       order: { created_at: 'ASC' }, // ASC so oldest (Default) is first
     });
+
+    if (!isAdmin) {
+      // Filter out items where the ticker is hidden
+      watchlists.forEach((list) => {
+        list.items = list.items.filter((item) => !item.ticker.is_hidden);
+      });
+    }
+
+    return watchlists;
   }
 
   async updateWatchlist(
@@ -68,6 +80,7 @@ export class WatchlistService {
     userId: string,
     watchlistId: string,
     symbol: string,
+    isAdmin = false,
   ): Promise<WatchlistItem> {
     // 1. Verify owner
     const watchlist = await this.watchlistRepo.findOne({
@@ -79,6 +92,11 @@ export class WatchlistService {
 
     // 2. Ensure Ticker exists
     const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+
+    // 2.5 Block hidden tickers for non-admins
+    if (!isAdmin && ticker.is_hidden) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
 
     // 3. Check if ticker already in watchlist
     const existing = await this.itemRepo.findOne({
@@ -167,6 +185,7 @@ export class WatchlistService {
   async toggleFavorite(
     userId: string,
     symbol: string,
+    isAdmin = false,
   ): Promise<{ added: boolean; message: string }> {
     const FAV_NAME = 'Favourites';
 
@@ -181,6 +200,11 @@ export class WatchlistService {
 
     // 2. Ensure Ticker Exists
     const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+
+    // 2.5 Block if hidden and not admin
+    if (!isAdmin && ticker.is_hidden) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
 
     // 3. Check if exists in list
     const existingItem = await this.itemRepo.findOne({

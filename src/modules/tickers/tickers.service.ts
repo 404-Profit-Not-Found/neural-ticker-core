@@ -20,9 +20,13 @@ export class TickersService {
     private readonly httpService: HttpService,
   ) {}
 
-  async getTicker(symbol: string): Promise<TickerEntity> {
+  async getTicker(symbol: string, isAdmin = false): Promise<TickerEntity> {
     // If not in DB, try to fetch from Finnhub via ensureTicker
-    return this.ensureTicker(symbol);
+    const ticker = await this.ensureTicker(symbol);
+    if (!isAdmin && ticker.is_hidden) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
+    return ticker;
   }
 
   // Alias for backward compatibility if needed, or primarily used by other services
@@ -154,11 +158,14 @@ export class TickersService {
     }
   }
 
-  async getLogo(symbol: string): Promise<TickerLogoEntity | null> {
+  async getLogo(
+    symbol: string,
+    isAdmin = false,
+  ): Promise<TickerLogoEntity | null> {
     const ticker = await this.tickerRepo.findOne({
       where: { symbol: symbol.toUpperCase() },
     });
-    if (!ticker) return null;
+    if (!ticker || (!isAdmin && ticker.is_hidden)) return null;
 
     return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }

@@ -56,6 +56,7 @@ describe('WatchlistController', () => {
         'user-1',
         'list-1',
         'AAPL',
+        false, // hidden/shadow-ban flag
       );
     });
   });

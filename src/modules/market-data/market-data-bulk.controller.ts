@@ -1,4 +1,12 @@
-import { Body, Controller, Post, Get, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,12 +16,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
-import { Public } from '../auth/public.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
 @Controller('v1/market-data')
-@Public()
+@UseGuards(JwtAuthGuard)
 export class MarketDataBulkController {
   constructor(private readonly service: MarketDataService) {}
 
@@ -64,6 +72,7 @@ export class MarketDataBulkController {
   })
   @Get('analyzer')
   getAnalyzer(
+    @Req() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('sortBy') sortBy?: string,
@@ -86,6 +95,7 @@ export class MarketDataBulkController {
       upside,
       sector: Array.isArray(sector) ? sector : sector ? [sector] : [],
       symbols: Array.isArray(symbols) ? symbols : symbols ? [symbols] : [],
+      isAdmin: req.user?.role === 'admin',
     });
   }
 }

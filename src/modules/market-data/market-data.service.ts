@@ -734,8 +734,12 @@ export class MarketDataService {
     }, 'news_count');
 
     // Filter
+    if (!options.isAdmin) {
+      qb.andWhere('ticker.is_hidden = :isHidden', { isHidden: false });
+    }
+
     if (search) {
-      qb.where(
+      qb.andWhere(
         '(UPPER(ticker.symbol) LIKE :search OR UPPER(ticker.name) LIKE :search)',
         { search: `%${search}%` },
       );

@@ -201,6 +201,12 @@ describe('MarketDataService', () => {
 
     jest.clearAllMocks();
 
+    mockFinnhubService.getQuote.mockReset();
+    mockFinnhubService.getProfile2.mockReset();
+    mockFinnhubService.getCompanyProfile.mockReset();
+    mockFinnhubService.getCompanyNews.mockReset();
+    mockFinnhubService.getBasicFinancials.mockReset();
+
     mockAnalystRatingRepo.find.mockResolvedValue([]);
     mockAnalystRatingRepo.count.mockResolvedValue(0);
     mockRiskAnalysisRepo.findOne.mockResolvedValue(null);
@@ -424,7 +430,7 @@ describe('MarketDataService', () => {
         search: 'AAPL',
       });
 
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         expect.stringContaining('LIKE :search'),
         { search: '%AAPL%' },
       );
