@@ -25,6 +25,7 @@ export function AnalyzerPage() {
       aiRating: aiRatingParam.length > 0 ? aiRatingParam : [],
       sector: sectorParam.length > 0 ? sectorParam : [],
       upside: upsideParam || null,
+      overallScore: null,
     };
 
     if (filterParam === 'strong_buy' && initialFilters.aiRating.length === 0) {
@@ -80,7 +81,7 @@ export function AnalyzerPage() {
   };
 
   const handleReset = () => {
-    setFilters({ risk: [], aiRating: [], sector: [], upside: null });
+    setFilters({ risk: [], aiRating: [], sector: [], upside: null, overallScore: null });
     // View mode persists on reset usually, or reset to table? Let's persist.
   };
 
