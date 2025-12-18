@@ -1,5 +1,11 @@
-import { Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, ShieldCheck, AlertTriangle, Flame, Bot, Brain, Newspaper, MessageCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { createColumnHelper } from '@tanstack/react-table';
+import { DataTable } from '../ui/data-table';
+import { TickerLogo } from '../dashboard/TickerLogo';
+import { Badge } from '../ui/badge';
+import { useNavigate } from 'react-router-dom';
+import { calculateAiRating } from '../../lib/rating-utils';
 
 interface Position {
   id: string;
@@ -7,37 +13,337 @@ interface Position {
   shares: string | number;
   buy_price: string | number;
   current_price: number;
+  change_percent: number; 
   current_value: number;
   cost_basis: number;
   gain_loss: number;
   gain_loss_percent: number;
+  
+  // Enriched Backend Data
+  ticker?: { 
+      logo_url?: string;
+      name?: string;
+      sector?: string;
+      industry?: string;
+  };
+  fundamentals?: {
+      market_cap?: number;
+      pe_ttm?: number;
+      consensus_rating?: string;
+      sector?: string;
+  };
+  aiAnalysis?: {
+      financial_risk?: number;
+      overall_score?: number;
+      upside_percent?: number;
+      base_price?: number;
+      bear_price?: number;
+  };
+  counts?: {
+      analysts?: number;
+      news?: number;
+      research?: number;
+      social?: number;
+  }
 }
 
 interface PortfolioTableProps {
   positions: Position[];
   onDelete: (id: string) => void;
+  onEdit?: (position: Position) => void; // Added Edit Handler
   loading: boolean;
 }
 
-// Helper for currency format
+// Helpers
 const formatCurrency = (val: number) => 
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
 const formatPct = (val: number) => 
   `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
-export function PortfolioTable({ positions, onDelete, loading }: PortfolioTableProps) {
-  if (loading) {
+const formatCap = (n: number) => {
+    if (!n) return '-';
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    return (n / 1e6).toFixed(2) + 'M';
+};
+
+export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
+    const navigate = useNavigate();
+    const columnHelper = createColumnHelper<Position>();
+
+    const columns: any[] = [
+        // 1. Asset Column
+        columnHelper.accessor('symbol', {
+            header: 'Asset',
+            cell: (info) => {
+                const ticker = info.row.original.ticker;
+                const fundamentals = info.row.original.fundamentals;
+                const counts = info.row.original.counts;
+                const showCounts = (counts?.research || 0) + (counts?.news || 0) + (counts?.social || 0) > 0;
+
+                return (
+                    <div className="flex items-start gap-3 min-w-[140px]">
+                        <TickerLogo 
+                            url={ticker?.logo_url} 
+                            symbol={info.getValue()} 
+                            className="w-10 h-10 rounded-full" 
+                        />
+                        <div className="flex flex-col gap-0.5">
+                           <div className="flex items-center gap-2">
+                                <span className="text-base font-bold text-foreground hover:underline cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/ticker/${info.getValue()}`);
+                                    }}
+                                >{info.getValue()}</span>
+                                
+                                {showCounts && (
+                                    <div className="flex items-center gap-2">
+                                        {counts?.research ? (
+                                            <div className="flex items-center gap-0.5 text-purple-400" title={`${counts.research} Reports`}>
+                                                <Brain size={10} />
+                                                <span className="text-[9px] font-medium">{counts.research}</span>
+                                            </div>
+                                        ) : null}
+                                        {counts?.news ? (
+                                            <div className="flex items-center gap-0.5 text-sky-400" title={`${counts.news} News`}>
+                                                <Newspaper size={10} />
+                                                <span className="text-[9px] font-medium">{counts.news}</span>
+                                            </div>
+                                        ) : null}
+                                        {counts?.social ? (
+                                            <div className="flex items-center gap-0.5 text-blue-400" title={`${counts.social} Social`}>
+                                                <MessageCircle size={10} />
+                                                <span className="text-[9px] font-medium">{counts.social}</span>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
+                           </div>
+                            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                {ticker?.name || 'Unknown'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/70 truncate max-w-[120px]">
+                                {ticker?.industry || ticker?.sector || fundamentals?.sector || 'Unknown Sector'}
+                            </span>
+                        </div>
+                    </div>
+                );
+            }
+        }),
+
+        // 2. Price / Change
+        columnHelper.accessor('current_price', {
+            header: 'Price / Change',
+            cell: (info) => {
+                const price = info.getValue();
+                const change = info.row.original.change_percent || 0;
+                const isPositive = change >= 0;
+
+                return (
+                    <div className="flex flex-col items-start min-w-[90px]">
+                         <span className="text-sm font-mono font-medium text-foreground/90">
+                            {formatCurrency(price)}
+                         </span>
+                         <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                            {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
+                            {Math.abs(change).toFixed(2)}%
+                         </div>
+                    </div>
+                );
+            }
+        }),
+
+        // 3. Shares & Cost (Combined for space)
+        columnHelper.accessor('shares', {
+            header: 'Position',
+            cell: (info) => (
+                <div className="flex flex-col min-w-[80px]">
+                    <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
+                    <span className="text-xs text-muted-foreground">Avg: {formatCurrency(Number(info.row.original.buy_price))}</span>
+                </div>
+            )
+        }),
+
+        // 4. Value
+        columnHelper.accessor('current_value', {
+            header: 'Value',
+            cell: (info) => <span className="font-medium text-foreground">{formatCurrency(info.getValue())}</span>
+        }),
+
+        // 5. Total Return
+        columnHelper.accessor('gain_loss', {
+            header: 'Total Return',
+            cell: (info) => {
+                const val = info.getValue();
+                const pct = info.row.original.gain_loss_percent;
+                const isProfit = val >= 0;
+
+                return (
+                     <div className={cn("flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
+                        <div className="flex items-center gap-1">
+                             <span className="font-mono font-bold text-sm">
+                                {val > 0 ? '+' : ''}{formatCurrency(val)}
+                             </span>
+                        </div>
+                        <span className="text-xs opacity-80">
+                            {formatPct(pct)}
+                        </span>
+                     </div>
+                );
+            }
+        }),
+
+        // --- NEW ANALYZER COLUMNS ---
+
+        // 6. Market Cap
+        columnHelper.accessor(row => row.fundamentals?.market_cap, {
+            id: 'mkt_cap',
+            header: 'Mkt Cap',
+            cell: (info) => <span className="text-xs font-mono text-muted-foreground">{formatCap(Number(info.getValue()))}</span>
+        }),
+
+        // 7. P/E
+        columnHelper.accessor(row => row.fundamentals?.pe_ttm, {
+            id: 'pe',
+            header: 'P/E',
+            cell: (info) => {
+                const val = info.getValue();
+                return val ? <span className="text-xs font-mono text-muted-foreground">{Number(val).toFixed(2)}</span> : '-';
+            }
+        }),
+
+        // 8. Risk
+        columnHelper.accessor(row => row.aiAnalysis?.financial_risk, {
+            id: 'risk',
+            header: 'Risk',
+            cell: (info) => {
+                const val = info.getValue();
+                if (val === undefined || val === null) return '-';
+                
+                let colorClass = 'text-muted-foreground';
+                let Icon = ShieldCheck;
+                if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
+                else if (val <= 6.5) { colorClass = 'text-yellow-500'; Icon = AlertTriangle; }
+                else { colorClass = 'text-red-500'; Icon = Flame; }
+
+                return (
+                  <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
+                    <Icon size={14} />
+                    {Number(val).toFixed(1)}
+                  </span>
+                );
+            }
+        }),
+
+        // 9. Overall Score (Risk/Reward)
+        columnHelper.accessor(row => row.aiAnalysis?.overall_score, {
+            id: 'risk_reward',
+            header: 'Risk/Reward',
+            cell: (info) => {
+                const val = info.getValue();
+                if (!val) return '-';
+                let color = 'text-red-500';
+                if (val >= 7.5) color = 'text-emerald-500';
+                else if (val >= 5.0) color = 'text-yellow-500';
+                
+                return <span className={cn("font-bold", color)}>{Number(val).toFixed(1)}</span>
+            }
+        }),
+
+        // 10. Upside
+         columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
+              id: 'upside',
+              header: 'Upside',
+              cell: (info) => {
+                const basePrice = info.getValue();
+                const price = info.row.original.current_price;
+                let upside = 0;
+                if (typeof basePrice === 'number' && price > 0) {
+                    upside = ((basePrice - price) / price) * 100;
+                } else {
+                    upside = Number(info.row.original.aiAnalysis?.upside_percent ?? 0);
+                }
+                const isPositive = upside > 0;
+                return (
+                  <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                    {isPositive && <ArrowUp size={12} className="mr-0.5" />}
+                    {upside.toFixed(1)}%
+                  </div>
+                );
+              },
+        }),
+
+        // 11. AI Rating
+        columnHelper.accessor((row) => row.aiAnalysis?.financial_risk, {
+            id: 'ai_rating',
+            header: 'AI Rating',
+            cell: (info) => {
+                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
+                 const upsideRaw = info.row.original.aiAnalysis?.upside_percent;
+                 let rating = 'Hold';
+                 let variant: any = 'outline';
+         
+                  if (riskRaw !== undefined && upsideRaw !== undefined) {
+                     const risk = Number(riskRaw);
+                     const upside = Number(upsideRaw);
+                     const result = calculateAiRating(risk, upside);
+                     rating = result.rating;
+                     variant = result.variant;
+                  }
+        
+                return (
+                     <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
+                          <Bot size={12} />
+                          {rating}
+                     </Badge>
+                );
+            }
+        }),
+
+        // 12. Actions
+        columnHelper.display({
+            id: 'actions',
+            header: 'Actions',
+            cell: (info) => (
+                <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                    {onEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(info.row.original);
+                            }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                            title="Edit Position"
+                        >
+                            <Edit2 size={14} />
+                        </button>
+                    )}
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(info.row.original.id);
+                        }}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Delete Position"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            )
+        })
+    ];
+
+  if (loading && positions.length === 0) {
     return (
-        <div className="w-full mt-8 space-y-4">
-            {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 w-full bg-card/30 animate-pulse rounded-md border border-border/50" />
-            ))}
+        <div className="w-full mt-6">
+             <DataTable columns={columns} data={[]} isLoading={true} />
         </div>
     );
   }
 
-  if (positions.length === 0) {
+  if (positions.length === 0 && !loading) {
     return (
         <div className="mt-8 p-12 text-center border border-dashed border-border rounded-xl bg-muted/20">
             <h3 className="text-xl font-medium text-foreground">Your portfolio is empty</h3>
@@ -47,64 +353,12 @@ export function PortfolioTable({ positions, onDelete, loading }: PortfolioTableP
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm mt-6">
-      <table className="w-full text-sm text-left">
-        <thead className="text-xs uppercase bg-muted/50 text-muted-foreground border-b border-border">
-          <tr>
-            <th className="px-6 py-4 font-medium tracking-wider">Ticker</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-right">Shares</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-right">Avg Cost</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-right">Last Price</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-right">Market Value</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-right">Total Return</th>
-            <th className="px-6 py-4 font-medium tracking-wider text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {positions.map((pos) => {
-             const isProfit = pos.gain_loss >= 0;
-             const RowIcon = isProfit ? TrendingUp : TrendingDown;
-
-             return (
-              <tr key={pos.id} className="group hover:bg-muted/30 transition-colors">
-                <td className="px-6 py-4 font-semibold text-foreground">
-                    <div className="flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs">
-                            {pos.symbol[0]}
-                        </span>
-                        {pos.symbol}
-                    </div>
-                </td>
-                <td className="px-6 py-4 text-right text-muted-foreground">{Number(pos.shares).toFixed(2)}</td>
-                <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(Number(pos.buy_price))}</td>
-                <td className="px-6 py-4 text-right font-mono text-foreground">{formatCurrency(pos.current_price)}</td>
-                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(pos.current_value)}</td>
-                <td className="px-6 py-4 text-right">
-                    <div className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
-                        isProfit 
-                            ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                            : "bg-red-500/10 text-red-400 border-red-500/20"
-                    )}>
-                        <RowIcon size={12} />
-                        <span>{formatCurrency(pos.gain_loss)}</span>
-                        <span className="opacity-70">({formatPct(pos.gain_loss_percent)})</span>
-                    </div>
-                </td>
-                <td className="px-6 py-4 text-center">
-                    <button 
-                        onClick={() => onDelete(pos.id)}
-                        className="p-2 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        title="Delete Position"
-                    >
-                        <Trash2 size={16} />
-                    </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="mt-6">
+      <DataTable 
+        columns={columns} 
+        data={positions} 
+        onRowClick={(row) => navigate(`/ticker/${row.symbol}`)}
+      />
     </div>
   );
 }

@@ -155,6 +155,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     potentialUpside,
     potentialDownside,
     riskScore: risk,
+    overallScore: Number(item.aiAnalysis?.overall_score || 0) || null,
     rating: (item.fundamentals.consensus_rating as string) || '-',
     aiRating: derivedAiRating,
     analystCount: item.counts?.analysts || 0,

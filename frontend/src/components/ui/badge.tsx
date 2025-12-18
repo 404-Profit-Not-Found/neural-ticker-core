@@ -20,6 +20,7 @@ const badgeVariants = cva(
                 hold: "border-transparent bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 badge-light-hold",
                 purple: "border-transparent bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 badge-light-purple",
                 sell: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+                success: "border-transparent bg-green-500/20 text-green-400 hover:bg-green-500/30",
             },
         },
         defaultVariants: {

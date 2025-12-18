@@ -29,6 +29,7 @@ export class CreditTransaction {
   @ApiProperty({
     enum: [
       'research_spend',
+      'portfolio_analysis_spend',
       'manual_contribution',
       'monthly_reset',
       'admin_gift',
@@ -37,6 +38,7 @@ export class CreditTransaction {
   @Column({ type: 'text' })
   reason:
     | 'research_spend'
+    | 'portfolio_analysis_spend'
     | 'manual_contribution'
     | 'monthly_reset'
     | 'admin_gift';

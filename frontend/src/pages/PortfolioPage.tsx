@@ -1,139 +1,239 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
+import { api } from '../lib/api';
 import { Header } from '../components/layout/Header';
 import { PortfolioTable } from '../components/portfolio/PortfolioTable';
+import { PortfolioGridView } from '../components/portfolio/PortfolioGridView';
+import { PortfolioStats } from '../components/portfolio/PortfolioStats';
 import { AddPositionDialog } from '../components/portfolio/AddPositionDialog';
-import { PortfolioAiWidget } from '../components/portfolio/PortfolioAiWidget';
-import { api, cn } from '../lib/api';
-import { PlusCircle, Wallet } from 'lucide-react';
-import { useToast } from '../components/ui/toast';
+import { EditPositionDialog } from '../components/portfolio/EditPositionDialog';
+import { PortfolioAiAnalyzer } from '../components/portfolio/PortfolioAiAnalyzer';
+import { FilterBar, type AnalyzerFilters } from '../components/analyzer/FilterBar';
+import { Toaster, toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { Search, LayoutGrid, List } from 'lucide-react';
+import { calculateAiRating } from '../lib/rating-utils';
 
 export function PortfolioPage() {
-  const [positions, setPositions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const { showToast } = useToast();
+  const [isAiOpen, setIsAiOpen] = useState(false);
+  const [editingPosition, setEditingPosition] = useState<any | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [search, setSearch] = useState('');
+  
+  // State for filters
+  const [filters, setFilters] = useState<AnalyzerFilters>({
+    risk: [],
+    aiRating: [],
+    upside: null,
+    sector: [],
+    overallScore: null,
+  });
 
-  const fetchPortfolio = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get('/portfolio');
-      setPositions(data);
-    } catch (error) {
-      console.error(error);
-      showToast('Failed to load portfolio', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: positions = [], isLoading, refetch } = useQuery({
+    queryKey: ['portfolio'],
+    queryFn: async () => {
+      const { data } = await api.get('/portfolio/positions');
+      return data;
+    },
+  });
 
-  useEffect(() => {
-    fetchPortfolio();
-  }, []);
+  // Calculate Aggregates
+  const stats = useMemo(() => {
+    let totalValue = 0;
+    let totalGain = 0;
+    let totalCost = 0;
+    let totalRisk = 0;
+    let riskCount = 0;
+
+    positions.forEach((p: any) => {
+      totalValue += p.current_value;
+      totalCost += p.cost_basis;
+      
+      const risk = p.aiAnalysis?.financial_risk;
+      if (typeof risk === 'number') {
+        totalRisk += risk;
+        riskCount++;
+      }
+    });
+
+    totalGain = totalValue - totalCost;
+    const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+    const avgRisk = riskCount > 0 ? totalRisk / riskCount : null;
+
+    return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk };
+  }, [positions]);
+
+  // Client-Side Filtering
+  const filteredPositions = useMemo(() => {
+    return positions.filter((item: any) => {
+        // 1. Search (Symbol or Name)
+        const matchSearch = !search || 
+            item.symbol.includes(search.toUpperCase()) || 
+            item.ticker?.name?.toLowerCase().includes(search.toLowerCase());
+        
+        if (!matchSearch) return false;
+
+        // 2. Risk
+        if (filters.risk.length > 0) {
+            const risk = Number(item.aiAnalysis?.financial_risk || 0);
+            const matchesRisk = filters.risk.some(range => {
+                if (range.includes('Low')) return risk <= 3.5;
+                if (range.includes('Medium')) return risk > 3.5 && risk <= 6.5;
+                if (range.includes('High')) return risk > 6.5;
+                return false;
+            });
+            if (!matchesRisk) return false;
+        }
+
+        // 3. AI Rating
+        if (filters.aiRating.length > 0) {
+            const risk = Number(item.aiAnalysis?.financial_risk || 0);
+            const upside = Number(item.aiAnalysis?.upside_percent || 0);
+            const { rating } = calculateAiRating(risk, upside); // e.g. "Strong Buy"
+            
+            // Check direct match ("Strong Buy" === "Strong Buy")
+            // Or simple inclusion logic
+            const matchesRating = filters.aiRating.includes(rating);
+            if (!matchesRating) return false;
+        }
+
+        // 4. Sector
+        if (filters.sector.length > 0) {
+            const sec = item.ticker?.sector || item.fundamentals?.sector;
+            if (!sec || !filters.sector.includes(sec)) return false;
+        }
+
+        // 5. Upside
+        if (filters.upside) {
+            // "> 10%"
+            const minUpside = parseInt(filters.upside.replace(/[^0-9]/g, ''));
+            const up = Number(item.aiAnalysis?.upside_percent || 0);
+            
+            // Or calculate base_price upside dynamically? 
+            // Let's stick to stored 'upside_percent' for filtering consistency vs display.
+            // Display logic uses base_price if available.
+            // Let's use the better logic:
+            let displayUpside = up;
+             if (typeof item.aiAnalysis?.base_price === 'number' && item.current_price > 0) {
+                displayUpside = ((item.aiAnalysis.base_price - item.current_price) / item.current_price) * 100;
+             }
+            
+            if (displayUpside <= minUpside) return false;
+        }
+
+        // 6. Overall Score (Risk/Reward)
+        if (filters.overallScore) {
+             const minScore = parseFloat(filters.overallScore.replace(/[^0-9.]/g, ''));
+             const score = Number(item.aiAnalysis?.overall_score || 0);
+             if (score <= minScore) return false;
+        }
+
+        return true;
+    });
+  }, [positions, search, filters]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this position?')) return;
     try {
-        await api.delete(`/portfolio/positions/${id}`);
-        setPositions(prev => prev.filter(p => p.id !== id));
-        showToast('Position removed', 'success');
-    } catch (e) {
-        showToast('Failed to delete position', 'error');
+      await api.delete(`/portfolio/positions/${id}`);
+      toast.success('Position removed');
+      refetch();
+    } catch {
+      toast.error('Failed to remove position');
     }
   };
-
-  // Calculate totals
-  const totalValue = positions.reduce((sum, p) => sum + (Number(p.current_value) || 0), 0);
-  const totalCost = positions.reduce((sum, p) => sum + (Number(p.cost_basis) || 0), 0);
-  const totalGain = totalValue - totalCost;
-  const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <Header />
+      <Toaster position="top-right" theme="dark" />
+
       <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500">
         
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-8">
-            <div className="space-y-1">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                        <Wallet size={28} />
-                    </div>
-                    My Portfolio
-                </h1>
-                <p className="text-muted-foreground ml-14">Track your performance and get AI-driven insights.</p>
-            </div>
-
-            <button 
-                onClick={() => setIsAddOpen(true)}
-                className="flex items-center gap-2 bg-primary text-black px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
-            >
-                <PlusCircle size={20} />
-                Add Position
-            </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatsCard 
-                label="Total Value" 
-                value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue)} 
-                isCurrency 
-            />
-            <StatsCard 
-                label="Total Gain/Loss" 
-                value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalGain)} 
-                subValue={`${totalGain >= 0 ? '+' : ''}${totalGainPct.toFixed(2)}%`}
-                trend={totalGain >= 0 ? 'up' : 'down'}
-            />
-            <StatsCard 
-                label="Positions" 
-                value={positions.length.toString()} 
-            />
-        </div>
-
-        {/* AI Widget */}
-        <PortfolioAiWidget hasPositions={positions.length > 0} />
-
-        {/* Table */}
-        <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">Holdings</h2>
-            <PortfolioTable 
-                positions={positions} 
-                loading={loading} 
-                onDelete={handleDelete} 
-            />
-        </div>
-
-        <AddPositionDialog 
-            isOpen={isAddOpen} 
-            onClose={() => setIsAddOpen(false)} 
-            onSuccess={fetchPortfolio} 
+        {/* HERO STATS */}
+        <PortfolioStats 
+            totalValue={stats.totalValue}
+            totalGainLoss={stats.totalGain}
+            totalGainLossPercent={stats.totalGainPct}
+            positionCount={stats.count}
+            avgRisk={stats.avgRisk}
+            onAddPosition={() => setIsAddOpen(true)}
+            onAnalyze={() => setIsAiOpen(true)}
         />
 
+        {/* FILTERS & TOOLBAR */}
+        <div className="space-y-4">
+             <FilterBar 
+                filters={filters} 
+                onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
+                onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
+             />
+
+             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                 <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                        placeholder="Search positions..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-8 h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                </div>
+
+                {/* View Toggle */}
+                <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card">
+                    <button
+                        onClick={() => setViewMode('table')}
+                        className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                        title="Table View"
+                    >
+                        <List size={16} />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                        title="Grid View"
+                    >
+                        <LayoutGrid size={16} />
+                    </button>
+                </div>
+             </div>
+        </div>
+
+        {/* CONTENT */}
+        {viewMode === 'table' ? (
+            <div className="border border-border rounded-lg bg-card overflow-hidden">
+                <PortfolioTable 
+                    positions={filteredPositions} 
+                    loading={isLoading} 
+                    onDelete={handleDelete}
+                    onEdit={setEditingPosition}
+                />
+            </div>
+        ) : (
+            <PortfolioGridView 
+                data={filteredPositions}
+                isLoading={isLoading}
+            />
+        )}
       </main>
+
+      <AddPositionDialog open={isAddOpen} onOpenChange={setIsAddOpen} onSuccess={refetch} />
+      
+      <PortfolioAiAnalyzer open={isAiOpen} onOpenChange={setIsAiOpen} />
+      
+      {/* Edit Dialog - To be implemented or reused AddPositionDialog with edit mode */}
+      {editingPosition && (
+          <EditPositionDialog 
+            open={!!editingPosition} 
+            onOpenChange={(open) => !open && setEditingPosition(null)}
+            position={editingPosition}
+            onSuccess={() => {
+                setEditingPosition(null);
+                refetch();
+            }}
+          />
+      )}
     </div>
   );
-}
-
-function StatsCard({ label, value, subValue, trend }: any) {
-    const isUp = trend === 'up';
-    // const isDown = trend === 'down'; // unused
-    
-    return (
-        <div className="p-6 bg-card border border-border rounded-xl shadow-sm hover:border-primary/50 transition-colors">
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <div className="mt-2 flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-foreground">{value}</span>
-                {subValue && (
-                    <span className={cn(
-                        "text-sm font-medium px-2 py-0.5 rounded-full",
-                        isUp ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
-                    )}>
-                        {subValue}
-                    </span>
-                )}
-            </div>
-        </div>
-    );
 }

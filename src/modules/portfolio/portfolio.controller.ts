@@ -9,7 +9,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 @ApiTags('Portfolio')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/portfolio')
+@Controller('v1/portfolio')
 export class PortfolioController {
   constructor(private readonly portfolioService: PortfolioService) {}
 
@@ -19,7 +19,7 @@ export class PortfolioController {
     return this.portfolioService.create(req.user.id, dto);
   }
 
-  @Get()
+  @Get('positions')
   @ApiOperation({ summary: 'Get portfolio positions with real-time data' })
   findAll(@Req() req: AuthenticatedRequest) {
     return this.portfolioService.findAll(req.user.id);
@@ -44,8 +44,23 @@ export class PortfolioController {
 
   @Post('analyze')
   @ApiOperation({ summary: 'Generate AI analysis for portfolio' })
-  @ApiBody({ schema: { example: { riskAppetite: 'medium' } } })
-  analyze(@Req() req: AuthenticatedRequest, @Body('riskAppetite') riskAppetite: string) {
-    return this.portfolioService.analyzePortfolio(req.user.id, riskAppetite || 'medium');
+  @ApiBody({ schema: { example: { riskAppetite: 'medium', horizon: 'medium-term', goal: 'growth', model: 'gemini' } } })
+  analyze(
+    @Req() req: AuthenticatedRequest, 
+    @Body() body: { riskAppetite?: string; horizon?: string; goal?: string; model?: string }
+  ) {
+    return this.portfolioService.analyzePortfolio(
+      req.user.id, 
+      body.riskAppetite || 'medium',
+      body.horizon || 'medium-term',
+      body.goal || 'growth',
+      body.model || 'gemini'
+    );
+  }
+
+  @Get('analyses')
+  @ApiOperation({ summary: 'Get historical portfolio analyses' })
+  getAnalyses(@Req() req: AuthenticatedRequest) {
+    return this.portfolioService.getAnalyses(req.user.id);
   }
 }

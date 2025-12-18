@@ -16,14 +16,13 @@ export class CreditService {
 
   getModelCost(model?: string): number {
     if (!model) return 1;
-    if (
-      model.includes('deep') ||
-      model.includes('pro') ||
-      model.includes('gpt-5')
-    ) {
-      return 5;
-    }
-    // Specific check for flash light if needed, or default
+    const m = model.toLowerCase();
+    
+    // Exact mapping matches shown in UI image
+    if (m.includes('pro') || m.includes('gpt-5')) return 5;
+    if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash') return 2;
+    if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite')) return 1;
+    
     return 1;
   }
 
@@ -68,7 +67,7 @@ export class CreditService {
   async deductCredits(
     userId: string,
     amount: number,
-    reason: 'research_spend',
+    reason: 'research_spend' | 'portfolio_analysis_spend',
     metadata?: Record<string, any>,
   ): Promise<User> {
     const queryRunner = this.dataSource.createQueryRunner();

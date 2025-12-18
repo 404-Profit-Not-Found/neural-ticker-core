@@ -6,12 +6,12 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 interface AddPositionDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function AddPositionDialog({ isOpen, onClose, onSuccess }: AddPositionDialogProps) {
+export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPositionDialogProps) {
   const [symbol, setSymbol] = useState('');
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
@@ -21,14 +21,14 @@ export function AddPositionDialog({ isOpen, onClose, onSuccess }: AddPositionDia
 
   // Reset form when dialog opens
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
         setSymbol('');
         setShares('');
         setPrice('');
         setDate(new Date().toISOString().split('T')[0]);
         setError(null);
     }
-  }, [isOpen]);
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +43,7 @@ export function AddPositionDialog({ isOpen, onClose, onSuccess }: AddPositionDia
         buy_date: date,
       });
       onSuccess();
-      onClose();
+      onOpenChange(false);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to add position');
     } finally {
@@ -52,7 +52,7 @@ export function AddPositionDialog({ isOpen, onClose, onSuccess }: AddPositionDia
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
                 <div className="p-1.5 rounded-md bg-primary/10 text-primary">
@@ -120,7 +120,7 @@ export function AddPositionDialog({ isOpen, onClose, onSuccess }: AddPositionDia
             </div>
 
             <DialogFooter className="pt-2">
-                <Button variant="ghost" type="button" onClick={onClose}>
+                <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={loading} className="bg-primary text-black hover:bg-primary/90">
