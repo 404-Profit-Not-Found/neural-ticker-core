@@ -18,13 +18,16 @@ export class FinnhubService implements OnModuleInit {
 
   async getCompanyProfile(symbol: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.finnhubClient.companyProfile2({ symbol }, (error: any, data: any) => {
-        if (error) {
-          this.handleError(error, symbol);
-          return reject(error);
-        }
-        resolve(data);
-      });
+      this.finnhubClient.companyProfile2(
+        { symbol },
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, symbol);
+            return reject(error);
+          }
+          resolve(data);
+        },
+      );
     });
   }
 
@@ -101,7 +104,32 @@ export class FinnhubService implements OnModuleInit {
     });
   }
 
+  async getHistorical(
+    symbol: string,
+    resolution: string,
+    from: number,
+    to: number,
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.stockCandles(
+        symbol,
+        resolution,
+        from,
+        to,
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, symbol);
+            return reject(error);
+          }
+          resolve(data);
+        },
+      );
+    });
+  }
+
   private handleError(error: any, context?: string) {
-    this.logger.error(`Finnhub API Error [${context}]: ${error.message || error}`);
+    this.logger.error(
+      `Finnhub API Error [${context}]: ${error.message || error}`,
+    );
   }
 }

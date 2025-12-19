@@ -26,7 +26,6 @@ export function TickerOverview({ risk_analysis, market_data, ratings }: TickerOv
             )}
 
             {/* Catalysts Summary */}
-            {/* Catalysts Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Card className="border-red-500/20 bg-red-500/5">
                     <CardHeader className="pb-2 pt-3 px-3">

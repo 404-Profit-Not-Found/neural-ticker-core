@@ -1,0 +1,76 @@
+(node:9016) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[DEBUG Config] DB_PASSWORD env: undefined
+[DEBUG Config] DB_PASSWORD type: undefined
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +21ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDatabaseModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mYahooFinanceModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mThrottlerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHttpModule dependencies initialized[39m[38;5;3m +0ms[39m
+[Database] env=development, NODE_ENV=undefined, isProduction=false, synchronize=true
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +3ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mServeStaticModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProxyModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mFinnhubModule dependencies initialized[39m[38;5;3m +33ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mFirebaseModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLlmModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:04 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +0ms[39m
+Connecting via DATABASE_URL: postgresql://neondb_owner:****@ep-quiet-fire-ag2vydfm-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+Initializing DataSource...
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +1250ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRiskRewardModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSocialModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mStockTwitsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJobsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNotificationsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTickersModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWatchlistModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPortfolioModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mResearchModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMarketDataModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:05 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+Checking tables...
+'symbols' table does not exist. Migration skipped (already done?).
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +570ms[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [32m    LOG[39m [38;5;3m[FirebaseService] [39m[32mFirebase Admin initialized successfully.[39m
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [32m    LOG[39m [38;5;3m[YahooFinanceService] [39m[32mYahoo Finance service initialized[39m
+
+--- Testing Direct History for AAPL ---
+Success! Received 64 data points.
+First point: {
+  ts: 2025-12-05T21:00:00.000Z,
+  close: 278.78,
+  source: 'finnhub_quote'
+}
+
+--- Testing Direct History for SOI.PA ---
+[32m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [32m    LOG[39m [38;5;3m[MarketDataService] [39m[32mFetching history for SOI.PA from providers...[39m
+[Nest] 9016  - 19. 12. 2025 20:56:06   ERROR [FinnhubService] Finnhub API Error [SOI.PA]: [object Object]
+[33m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [33m   WARN[39m [38;5;3m[MarketDataService] [39m[33mFinnhub history failed for SOI.PA: undefined. Trying Yahoo fallback...[39m
+[95m[Nest] 9016  - [39m19. 12. 2025 20:56:06 [95m  DEBUG[39m [38;5;3m[YahooFinanceService] [39m[95mFetching historical data for SOI.PA from Yahoo Finance[39m
+[Deprecated] historical() relies on an API that Yahoo have removed.  We'll map this request to chart() for convenience, but, please consider using chart() directly instead; for more info see https://github.com/gadicc/yahoo-finance2/issues/795.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['ripHistorical'] })`.
+Success! Received 23 data points.
+First point: {
+  ts: 2025-11-19T08:00:00.000Z,
+  close: 34.5,
+  source: 'yahoo_historical'
+}

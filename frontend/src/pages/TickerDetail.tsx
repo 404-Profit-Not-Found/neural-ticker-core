@@ -21,6 +21,7 @@ import { TickerOverview } from '../components/ticker/TickerOverview';
 import { TickerFinancials } from '../components/ticker/TickerFinancials';
 import { TickerNews } from '../components/ticker/TickerNews';
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
+import { PriceChart } from '../components/ticker/PriceChart';
 import {
     useTickerDetails,
     useTickerNews,
@@ -51,7 +52,7 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news'];
+    const validTabs = ['overview', 'financials', 'research', 'news', 'about'];
     const currentTab = (tab && validTabs.includes(tab)) ? tab : 'overview';
 
     // -- Hooks --
@@ -320,7 +321,6 @@ export function TickerDetail() {
                                 </Button>
                             </div>
                         </div>
-
                         {/* Row 2: Data & Context */}
                         <div className="flex items-start gap-12">
                             {/* Price & Risk Block */}
@@ -353,14 +353,16 @@ export function TickerDetail() {
                                 )}
                             </div>
 
-                            {/* Description Block */}
-                            {profile?.description && (
-                                <div className="flex-1 pt-1">
-                                    <div className="text-sm text-muted-foreground/80 leading-relaxed max-w-3xl border-l-2 border-primary/20 pl-4 py-1 italic">
-                                        {profile.description}
+                            {/* Chart Area */}
+                            <div className="flex-1 min-h-[160px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden group">
+                                {market_data?.history && market_data.history.length > 0 ? (
+                                    <PriceChart data={market_data.history} className="h-full" />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
+                                        No historical data available for chart
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -411,12 +413,18 @@ export function TickerDetail() {
                             )}
                         </div>
 
-                        {/* Mobile: Description */}
-                        {profile?.description && (
-                            <div className="mt-3 text-xs text-muted-foreground/80 leading-relaxed line-clamp-3">
-                                {profile.description}
-                            </div>
-                        )}
+                        {/* Mobile: Chart Area */}
+                        <div className="md:hidden mt-6 h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
+                            {market_data?.history && market_data.history.length > 0 ? (
+                                <PriceChart data={market_data.history} className="h-full" />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
+                                    No historical data available for chart
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Mobile: Description - Removed as it is now in the About tab */}
                     </div>
                 </div>
 
@@ -433,6 +441,7 @@ export function TickerDetail() {
                         <TabsTrigger value="research">AI Research</TabsTrigger>
                         <TabsTrigger value="financials">Financials</TabsTrigger>
                         <TabsTrigger value="news">News</TabsTrigger>
+                        <TabsTrigger value="about">About</TabsTrigger>
                     </TabsList>
 
                     {/* OVERVIEW TAB */}
@@ -463,6 +472,64 @@ export function TickerDetail() {
                     {/* NEWS TAB */}
                     <TabsContent value="news">
                         <TickerNews news={news} />
+                    </TabsContent>
+
+                    {/* ABOUT TAB */}
+                    <TabsContent value="about" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="max-w-4xl mx-auto space-y-8">
+                            {/* Company Summary Section */}
+                            <section className="space-y-4">
+                                <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2 flex items-center gap-2">
+                                    Business Summary
+                                </h2>
+                                <div className="text-sm text-muted-foreground/90 leading-relaxed bg-muted/30 p-6 rounded-xl border border-border/50 italic">
+                                    {profile?.description || "No company description available."}
+                                </div>
+                            </section>
+
+                            {/* Background Context (if available) - Industry/Sector Details */}
+                            <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                <div className="space-y-4 p-6 bg-muted/20 rounded-xl border border-border/40">
+                                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Classification</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-muted-foreground">Sector</span>
+                                            <span className="font-medium text-foreground">{profile?.sector || "N/A"}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-muted-foreground">Industry</span>
+                                            <span className="font-medium text-foreground">{profile?.industry || "N/A"}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 p-6 bg-muted/20 rounded-xl border border-border/40">
+                                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Corporate Registry</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-muted-foreground">HQ</span>
+                                            <span className="font-medium text-foreground">{profile?.country || "N/A"}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-muted-foreground">Website</span>
+                                            {profile?.web_url ? (
+                                                <a href={profile.web_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
+                                                    {(() => {
+                                                        try {
+                                                            return new URL(profile.web_url).hostname;
+                                                        } catch (e) {
+                                                            return profile.web_url.replace(/^https?:\/\//, '').split('/')[0];
+                                                        }
+                                                    })()}
+                                                </a>
+                                            ) : (
+                                                <span className="font-medium text-foreground">N/A</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
                     </TabsContent>
                 </Tabs>
 
