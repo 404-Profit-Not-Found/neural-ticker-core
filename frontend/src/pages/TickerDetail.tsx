@@ -517,7 +517,7 @@ export function TickerDetail() {
                                                     {(() => {
                                                         try {
                                                             return new URL(profile.web_url).hostname;
-                                                        } catch (e) {
+                                                        } catch {
                                                             return profile.web_url.replace(/^https?:\/\//, '').split('/')[0];
                                                         }
                                                     })()}

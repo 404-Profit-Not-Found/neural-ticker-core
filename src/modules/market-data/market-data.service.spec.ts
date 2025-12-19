@@ -14,6 +14,7 @@ import { Repository } from 'typeorm';
 import { TickerEntity } from '../tickers/entities/ticker.entity';
 
 import { ConfigService } from '@nestjs/config';
+import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 
 describe('MarketDataService', () => {
   let service: MarketDataService;
@@ -116,10 +117,15 @@ describe('MarketDataService', () => {
 
   const mockFinnhubService = {
     getQuote: jest.fn(),
-    getProfile2: jest.fn(), // Service uses getCompanyProfile? No, code says getCompanyProfile.
     getCompanyProfile: jest.fn(),
     getCompanyNews: jest.fn(),
     getBasicFinancials: jest.fn(),
+  };
+  const mockYahooService = {
+    getQuote: jest.fn(),
+    getHistorical: jest.fn(),
+    getSummary: jest.fn(),
+    fetchNewsFromYahoo: jest.fn().mockResolvedValue([]),
   };
 
   const mockConfigService = {
@@ -165,6 +171,10 @@ describe('MarketDataService', () => {
         {
           provide: FinnhubService,
           useValue: mockFinnhubService,
+        },
+        {
+          provide: YahooFinanceService,
+          useValue: mockYahooService,
         },
         {
           provide: ConfigService,
@@ -218,7 +228,6 @@ describe('MarketDataService', () => {
     jest.clearAllMocks();
 
     mockFinnhubService.getQuote.mockReset();
-    mockFinnhubService.getProfile2.mockReset();
     mockFinnhubService.getCompanyProfile.mockReset();
     mockFinnhubService.getCompanyNews.mockReset();
     mockFinnhubService.getBasicFinancials.mockReset();

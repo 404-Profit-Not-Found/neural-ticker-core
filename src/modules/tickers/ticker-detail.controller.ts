@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Inject,
-  forwardRef,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Param, Inject, forwardRef } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';

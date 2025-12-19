@@ -4,6 +4,7 @@ import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
@@ -40,6 +41,9 @@ describe('TickersService', () => {
   const mockFinnhubService = {
     getCompanyProfile: jest.fn(),
   };
+  const mockYahooService = {
+    getSummary: jest.fn(),
+  };
 
   const mockHttpService = {
     get: jest.fn().mockReturnValue(of({ data: Buffer.from('') })),
@@ -60,6 +64,10 @@ describe('TickersService', () => {
         {
           provide: FinnhubService,
           useValue: mockFinnhubService,
+        },
+        {
+          provide: YahooFinanceService,
+          useValue: mockYahooService,
         },
         {
           provide: HttpService,

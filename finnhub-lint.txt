@@ -1,0 +1,12 @@
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\src\modules\finnhub\finnhub.service.ts
+   26:20  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+   39:18  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+   55:20  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+   71:20  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+   87:20  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+  100:18  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+  122:20  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+
+Γ£û 7 problems (7 errors, 0 warnings)
+

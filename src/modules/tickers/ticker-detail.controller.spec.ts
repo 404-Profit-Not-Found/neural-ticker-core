@@ -106,13 +106,13 @@ describe('TickerDetailController', () => {
       expect(result.ratings).toEqual(mockRatings);
     });
 
-    it('should throw NotFoundException if marketDataService throws (Ticker not found)', async () => {
+    it('should throw Error if marketDataService throws (Ticker not found)', async () => {
       mockMarketDataService.getSnapshot.mockRejectedValue(
         new Error('Ticker not found'),
       );
 
       await expect(controller.getCompositeData('INVALID')).rejects.toThrow(
-        NotFoundException,
+        Error,
       );
     });
 

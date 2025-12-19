@@ -35,7 +35,9 @@ describe('YahooFinanceService', () => {
   describe('getQuote', () => {
     it('should return quote data on success', async () => {
       const mockResult = { symbol: 'AAPL', regularMarketPrice: 150 };
-      (mockYahooInstance.quote as unknown as jest.Mock).mockResolvedValue(mockResult);
+      (mockYahooInstance.quote as unknown as jest.Mock).mockResolvedValue(
+        mockResult,
+      );
 
       const result = await service.getQuote('AAPL');
       expect(result).toEqual(mockResult);
@@ -43,7 +45,9 @@ describe('YahooFinanceService', () => {
     });
 
     it('should throw error on failure', async () => {
-      (mockYahooInstance.quote as unknown as jest.Mock).mockRejectedValue(new Error('API Error'));
+      (mockYahooInstance.quote as unknown as jest.Mock).mockRejectedValue(
+        new Error('API Error'),
+      );
 
       await expect(service.getQuote('AAPL')).rejects.toThrow('API Error');
     });
@@ -52,18 +56,25 @@ describe('YahooFinanceService', () => {
   describe('getSummary', () => {
     it('should return summary data on success', async () => {
       const mockResult = { summaryProfile: { sector: 'Tech' } };
-      (mockYahooInstance.quoteSummary as unknown as jest.Mock).mockResolvedValue(mockResult);
+      (
+        mockYahooInstance.quoteSummary as unknown as jest.Mock
+      ).mockResolvedValue(mockResult);
 
       const result = await service.getSummary('AAPL');
       expect(result).toEqual(mockResult);
-      expect(mockYahooInstance.quoteSummary).toHaveBeenCalledWith('AAPL', expect.any(Object));
+      expect(mockYahooInstance.quoteSummary).toHaveBeenCalledWith(
+        'AAPL',
+        expect.any(Object),
+      );
     });
   });
 
   describe('getHistorical', () => {
     it('should return historical data on success', async () => {
       const mockResult = [{ date: new Date(), close: 150 }];
-      (mockYahooInstance.historical as unknown as jest.Mock).mockResolvedValue(mockResult);
+      (mockYahooInstance.historical as unknown as jest.Mock).mockResolvedValue(
+        mockResult,
+      );
 
       const from = new Date('2024-01-01');
       const to = new Date('2024-01-02');
@@ -80,7 +91,9 @@ describe('YahooFinanceService', () => {
   describe('search', () => {
     it('should return search results on success', async () => {
       const mockResult = { news: [{ title: 'Headline' }] };
-      (mockYahooInstance.search as unknown as jest.Mock).mockResolvedValue(mockResult);
+      (mockYahooInstance.search as unknown as jest.Mock).mockResolvedValue(
+        mockResult,
+      );
 
       const result = await service.search('AAPL');
       expect(result).toEqual(mockResult);

@@ -23,6 +23,7 @@ describe('ResearchController', () => {
   };
   const mockMarketDataService = {
     dedupeAnalystRatings: jest.fn(),
+    syncCompanyNews: jest.fn(),
   };
   const mockCreditService = {
     getModelCost: jest.fn(),
@@ -56,11 +57,12 @@ describe('ResearchController', () => {
   });
 
   describe('syncResearch', () => {
-    it('should reprocess and dedupe', async () => {
+    it('should reprocess, dedupe and sync news', async () => {
       mockResearchService.reprocessFinancials.mockResolvedValue(undefined);
       mockMarketDataService.dedupeAnalystRatings.mockResolvedValue({
         removed: 2,
       });
+      mockMarketDataService.syncCompanyNews.mockResolvedValue(undefined);
 
       const result = await controller.syncResearch('AAPL');
 
@@ -68,6 +70,9 @@ describe('ResearchController', () => {
         'AAPL',
       );
       expect(mockMarketDataService.dedupeAnalystRatings).toHaveBeenCalledWith(
+        'AAPL',
+      );
+      expect(mockMarketDataService.syncCompanyNews).toHaveBeenCalledWith(
         'AAPL',
       );
       expect(result).toEqual({ message: 'Sync completed', deduped: 2 });

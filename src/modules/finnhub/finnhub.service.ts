@@ -23,7 +23,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(error));
           }
           resolve(data);
         },
@@ -36,7 +36,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.quote(symbol, (error: any, data: any) => {
         if (error) {
           this.handleError(error, symbol);
-          return reject(error);
+          return reject(new Error(error));
         }
         resolve(data);
       });
@@ -52,7 +52,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(error));
           }
           resolve(data);
         },
@@ -68,7 +68,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, 'general-news');
-            return reject(error);
+            return reject(new Error(error));
           }
           resolve(data);
         },
@@ -84,7 +84,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(error));
           }
           resolve(data);
         },
@@ -97,7 +97,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.stockSymbols(exchange, {}, (error: any, data: any) => {
         if (error) {
           this.handleError(error, exchange);
-          return reject(error);
+          return reject(new Error(error));
         }
         resolve(data);
       });
@@ -119,7 +119,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(error));
           }
           resolve(data);
         },

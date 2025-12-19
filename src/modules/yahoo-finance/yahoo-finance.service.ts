@@ -9,10 +9,10 @@ export class YahooFinanceService implements OnModuleInit {
   onModuleInit() {
     // Suppress survey notices as discussed in deep dive
     try {
-      // @ts-ignore
+      // @ts-expect-error - suppressNotices is a private property in yahoo-finance2
       this.yahoo._env.suppressNotices = ['yahooSurvey', 'ripHistorical'];
       this.logger.log('Yahoo Finance service initialized');
-    } catch (e) {
+    } catch {
       this.logger.warn('Failed to suppress Yahoo Finance notices');
     }
   }
@@ -61,7 +61,9 @@ export class YahooFinanceService implements OnModuleInit {
     interval: '1d' | '1wk' | '1mo' = '1d',
   ): Promise<any> {
     try {
-      this.logger.debug(`Fetching historical data for ${symbol} from Yahoo Finance`);
+      this.logger.debug(
+        `Fetching historical data for ${symbol} from Yahoo Finance`,
+      );
       return await this.yahoo.historical(symbol, {
         period1: from,
         period2: to,

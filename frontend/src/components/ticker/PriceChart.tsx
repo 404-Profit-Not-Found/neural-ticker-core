@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries, AreaSeries } from 'lightweight-charts';
 import { CandlestickChart, LineChart, AreaChart as MountainChart } from 'lucide-react';
-import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, Time, CandlestickData, LineData, AreaData } from 'lightweight-charts';
 import type { CandlePoint } from '../../types/ticker';
 
 type ChartType = 'candle' | 'line' | 'mountain';
@@ -15,7 +15,7 @@ export function PriceChart({ data, className }: PriceChartProps) {
     const [chartType, setChartType] = useState<ChartType>('mountain');
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
-    const seriesRef = useRef<ISeriesApi<any> | null>(null);
+    const seriesRef = useRef<ISeriesApi<"Candlestick" | "Line" | "Area"> | null>(null);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -97,7 +97,7 @@ export function PriceChart({ data, className }: PriceChartProps) {
         }
 
         if (seriesRef.current && data.length > 0) {
-            let formattedData: any[] = [];
+            let formattedData: (CandlestickData | LineData | AreaData)[] = [];
 
             if (chartType === 'candle') {
                 formattedData = data.map(d => ({

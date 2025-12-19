@@ -61,10 +61,12 @@ export class TickersService {
         `Ticker ${upperSymbol} not found, fetching from Finnhub...`,
       );
       profile = await this.finnhubService.getCompanyProfile(upperSymbol);
-      
+
       // If Finnhub returns empty object or null, it's a "not found" or "restricted" case for us
       if (!profile || Object.keys(profile).length === 0) {
-        this.logger.warn(`Finnhub returned no profile for ${upperSymbol}, trying Yahoo Finance fallback...`);
+        this.logger.warn(
+          `Finnhub returned no profile for ${upperSymbol}, trying Yahoo Finance fallback...`,
+        );
         profile = await this.fetchFromYahoo(upperSymbol);
         source = 'yahoo';
       }
@@ -76,11 +78,15 @@ export class TickersService {
       }
 
       if (status === 401 || status === 403) {
-        this.logger.warn(`Finnhub restricted access for ${upperSymbol}, trying Yahoo Finance fallback...`);
+        this.logger.warn(
+          `Finnhub restricted access for ${upperSymbol}, trying Yahoo Finance fallback...`,
+        );
         profile = await this.fetchFromYahoo(upperSymbol);
         source = 'yahoo';
       } else {
-        this.logger.error(`Finnhub fetch error for ${upperSymbol}: ${error.message}`);
+        this.logger.error(
+          `Finnhub fetch error for ${upperSymbol}: ${error.message}`,
+        );
         // Final fallback try
         profile = await this.fetchFromYahoo(upperSymbol);
         source = 'yahoo';
@@ -88,7 +94,9 @@ export class TickersService {
     }
 
     if (!profile) {
-      throw new NotFoundException(`Ticker ${upperSymbol} not found in any provider`);
+      throw new NotFoundException(
+        `Ticker ${upperSymbol} not found in any provider`,
+      );
     }
 
     const newTicker = this.tickerRepo.create({
@@ -104,7 +112,7 @@ export class TickersService {
       web_url: profile.weburl,
       logo_url: profile.logo,
       finnhub_industry: profile.finnhubIndustry,
-      sector: profile.finnhubIndustry || profile.sector, 
+      sector: profile.finnhubIndustry || profile.sector,
       description: profile.description,
       finnhub_raw: source === 'finnhub' ? profile : { yahoo_fallback: profile },
     });
@@ -313,12 +321,16 @@ export class TickersService {
 
       // Map to a common format similar to Finnhub profile
       return {
-        name: quote?.longName || quote?.shortName || summary?.summaryProfile?.longName,
+        name:
+          quote?.longName ||
+          quote?.shortName ||
+          summary?.summaryProfile?.longName,
         exchange: quote?.fullExchangeName || 'Yahoo Finance',
         currency: quote?.currency || 'USD',
         country: summary?.summaryProfile?.country || 'Unknown',
         ipo: null, // Yahoo doesn't explicitly provide this in easy field
-        marketCapitalization: quote?.marketCap || summary?.defaultKeyStatistics?.enterpriseValue,
+        marketCapitalization:
+          quote?.marketCap || summary?.defaultKeyStatistics?.enterpriseValue,
         shareOutstanding: summary?.defaultKeyStatistics?.sharesOutstanding,
         phone: summary?.summaryProfile?.phone,
         weburl: summary?.summaryProfile?.website,
