@@ -38,13 +38,25 @@ export class JobsService {
       for (const ticker of tickers) {
         if (!ticker.symbol) continue;
         try {
-          // write-through cache: fetches from Finnhub if stale/missing and saves to DB
+          // 1. Sync Snapshot (Latest Price + News)
           await this.marketDataService.getSnapshot(ticker.symbol);
-          this.logger.debug(`Synced ${ticker.symbol}`);
+
+          // 2. Sync History (180 days for charts)
+          const to = new Date();
+          const from = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+          await this.marketDataService.getHistory(
+            ticker.symbol,
+            '1d',
+            from.toISOString(),
+            to.toISOString(),
+          );
+
+          this.logger.debug(`Synced snapshot and history for ${ticker.symbol}`);
         } catch (err) {
           this.logger.error(`Failed to sync ${ticker.symbol}: ${err.message}`);
         }
-        // Optional: rate limit sleep here if needed
+        // Small delay to be respectful to API rate limits
+        await new Promise((r) => setTimeout(r, 1000));
       }
       this.logger.log('Daily candle sync completed.');
     } catch (e) {

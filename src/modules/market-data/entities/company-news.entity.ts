@@ -26,8 +26,8 @@ export class CompanyNews {
   ticker: TickerEntity;
 
   @ApiProperty({ description: 'External ID from provider (e.g. Finnhub)' })
-  @Column({ type: 'bigint' })
-  external_id: number;
+  @Column({ type: 'text' })
+  external_id: string;
 
   @ApiProperty()
   @Column({ type: 'timestamptz' })

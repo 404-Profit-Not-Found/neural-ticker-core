@@ -13,6 +13,7 @@ import { Comment } from '../social/entities/comment.entity';
 import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { RISK_ALGO } from '../../config/risk-algorithm.config';
 import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
 
@@ -41,14 +42,56 @@ export class MarketDataService {
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly finnhubService: FinnhubService,
+    private readonly yahooFinanceService: YahooFinanceService,
     private readonly configService: ConfigService, // Added
   ) {}
 
   async getQuote(symbol: string) {
     try {
-      return await this.finnhubService.getQuote(symbol);
+      const finnhubQuote = await this.finnhubService.getQuote(symbol);
+      // If Finnhub returns zeros for price (e.g. restricted for free users), try Yahoo
+      if (finnhubQuote && finnhubQuote.c !== 0) {
+        return finnhubQuote;
+      }
+
+      this.logger.log(
+        `Finnhub quote missing or zero for ${symbol}, trying Yahoo fallback...`,
+      );
+      const yahooQuote = await this.yahooFinanceService.getQuote(symbol);
+      if (yahooQuote) {
+        return {
+          c: yahooQuote.regularMarketPrice,
+          h: yahooQuote.regularMarketDayHigh,
+          l: yahooQuote.regularMarketDayLow,
+          o: yahooQuote.regularMarketOpen,
+          pc: yahooQuote.regularMarketPreviousClose,
+          t: Math.floor(yahooQuote.regularMarketTime.getTime() / 1000),
+          v: yahooQuote.regularMarketVolume,
+        };
+      }
+      return null;
     } catch (e) {
-      this.logger.error(`Failed to get quote for ${symbol}: ${e.message}`);
+      this.logger.warn(
+        `Fallback to Yahoo for quote ${symbol} due to error: ${e.message}`,
+      );
+      try {
+        const yahooQuote = await this.yahooFinanceService.getQuote(symbol);
+        if (yahooQuote) {
+          return {
+            c: yahooQuote.regularMarketPrice,
+            h: yahooQuote.regularMarketDayHigh,
+            l: yahooQuote.regularMarketDayLow,
+            o: yahooQuote.regularMarketOpen,
+            pc: yahooQuote.regularMarketPreviousClose,
+            t: Math.floor(yahooQuote.regularMarketTime.getTime() / 1000),
+            v: yahooQuote.regularMarketVolume,
+          };
+        }
+      } catch (yError) {
+        this.logger.error(
+          `Yahoo quote also failed for ${symbol}: ${yError.message}`,
+        );
+      }
       return null;
     }
   }
@@ -101,62 +144,127 @@ export class MarketDataService {
 
         source = 'finnhub';
 
-        // Function to save quote as OHLCV
-        if (quote) {
-          const newCandle = this.ohlcvRepo.create({
-            symbol_id: tickerEntity.id,
-            ts: new Date(quote.t * 1000), // Finnhub sends unix timestamp in seconds
-            timeframe: '1d', // Storing daily snapshot as '1d'
-            open: quote.o,
-            high: quote.h,
-            low: quote.l,
-            close: quote.c,
-            prevClose: quote.pc,
-            volume: 0,
-            source: 'finnhub_quote',
-          });
-          // Upsert (ignore if exists for this timeframe+ts)
-          await this.ohlcvRepo
-            .save(newCandle)
-            .catch((e) =>
-              this.logger.warn(`Failed to save candle: ${e.message}`),
-            );
-          latestCandle = newCandle;
-        }
+        // Check if Finnhub returned actually usable data
+        const isFinnhubRestricted = !quote || quote.c === 0;
 
-        // Function to save Fundamentals
-        if (profile || financials?.metric) {
-          const metrics = financials?.metric || {};
-
-          // Use existing fundamentals or create new wrapped in merge logic
-          const entity =
-            fundamentals ||
-            this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
-
-          if (profile) {
-            entity.market_cap = profile.marketCapitalization;
-            entity.sector = profile.finnhubIndustry;
+        if (isFinnhubRestricted) {
+          this.logger.warn(
+            `Finnhub data restricted for ${symbol}, fetching from Yahoo Finance...`,
+          );
+          const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
+          if (yahooData) {
+            source = 'yahoo';
+            if (yahooData.quote) {
+              const newCandle = this.saveYahooQuoteAsCandle(
+                tickerEntity.id,
+                yahooData.quote,
+              );
+              latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
+                this.logger.warn(`Failed to save Yahoo candle: ${e.message}`);
+                return latestCandle;
+              });
+            }
+            if (yahooData.summary) {
+              fundamentals = await this.applyYahooEnrichment(
+                tickerEntity.id,
+                fundamentals,
+                yahooData.summary,
+                yahooData.quote,
+              );
+            }
+          }
+        } else {
+          // Normal Finnhub path
+          if (quote) {
+            const newCandle = this.ohlcvRepo.create({
+              symbol_id: tickerEntity.id,
+              ts: new Date(quote.t * 1000),
+              timeframe: '1d',
+              open: quote.o,
+              high: quote.h,
+              low: quote.l,
+              close: quote.c,
+              prevClose: quote.pc,
+              volume: 0,
+              source: 'finnhub_quote',
+            });
+            await this.ohlcvRepo
+              .save(newCandle)
+              .catch((e) =>
+                this.logger.warn(`Failed to save candle: ${e.message}`),
+              );
+            latestCandle = newCandle;
           }
 
-          if (metrics) {
-            if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
-            if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
-            if (metrics.beta) entity.beta = metrics.beta;
-            if (metrics.dividendYieldIndicatedAnnual)
-              entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
-            // debt_to_equity is not always clean in basic metrics, skipping for now
+          if (profile || financials?.metric) {
+            const metrics = financials?.metric || {};
+            const entity =
+              fundamentals ||
+              this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
+
+            if (profile) {
+              entity.market_cap = profile.marketCapitalization;
+              entity.sector = profile.finnhubIndustry;
+            }
+
+            if (metrics) {
+              if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
+              if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
+              if (metrics.beta) entity.beta = metrics.beta;
+              if (metrics.dividendYieldIndicatedAnnual)
+                entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
+            }
+
+            // Optional: Enrich with Yahoo even if Finnhub worked, if we want "depth"
+            try {
+              const yahooSummary =
+                await this.yahooFinanceService.getSummary(symbol);
+              if (yahooSummary) {
+                await this.applyYahooEnrichment(
+                  tickerEntity.id,
+                  entity,
+                  yahooSummary,
+                );
+              }
+            } catch (ye) {
+              this.logger.debug(
+                `Background Yahoo enrichment skipped for ${symbol}: ${ye.message}`,
+              );
+            }
+
+            entity.updated_at = new Date();
+            await this.fundamentalsRepo.save(entity);
+            fundamentals = entity;
           }
-
-          entity.updated_at = new Date();
-
-          await this.fundamentalsRepo.save(entity);
-          fundamentals = entity;
         }
       } catch (error) {
         this.logger.error(
-          `Failed to refresh data for ${symbol}: ${error.message}`,
+          `Failed to refresh data for ${symbol} via Finnhub: ${error.message}. Triggering Yahoo fallback...`,
         );
-        // Fallback to what we have (even if stale)
+        const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
+        if (yahooData) {
+          source = 'yahoo';
+          if (yahooData.quote) {
+            const newCandle = this.saveYahooQuoteAsCandle(
+              tickerEntity.id,
+              yahooData.quote,
+            );
+            latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
+              this.logger.warn(
+                `Failed to save Yahoo fallback candle: ${e.message}`,
+              );
+              return latestCandle;
+            });
+          }
+          if (yahooData.summary) {
+            fundamentals = await this.applyYahooEnrichment(
+              tickerEntity.id,
+              fundamentals,
+              yahooData.summary,
+              yahooData.quote,
+            );
+          }
+        }
       }
     }
 
@@ -221,13 +329,12 @@ export class MarketDataService {
         this.analystRatingRepo.count({
           where: { symbol_id: tickerEntity.id },
         }),
-        this.finnhubService.getCompanyNews(
-          symbol,
-          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0],
-          new Date().toISOString().split('T')[0],
-        ),
+        this.getCompanyNews(symbol).catch((err) => {
+          this.logger.warn(
+            `Failed to fetch news for ${symbol} in snapshot: ${err.message}`,
+          );
+          return [];
+        }),
         this.commentRepo.count({
           where: { ticker_symbol: symbol },
         }),
@@ -278,18 +385,132 @@ export class MarketDataService {
   ) {
     const tickerEntity = await this.tickersService.getTicker(symbol);
 
-    // Basic date parsing, assuming ISO or unix timestamp from QS
     const from = new Date(fromStr);
     const to = new Date(toStr);
 
-    return this.ohlcvRepo.find({
+    // 1. Try DB first
+    const dbData = await this.ohlcvRepo.find({
       where: {
         symbol_id: tickerEntity.id,
-        timeframe: interval, // Assuming interval matches timeframe enums/strings
+        timeframe: interval,
         ts: Between(from, to),
       },
       order: { ts: 'ASC' },
     });
+
+    // If we have some data and it's somewhat recent, return it
+    // For MVP, if we have ANY data in the range, we return it.
+    // In production, we'd check for gaps.
+    if (dbData.length > 50) {
+      return dbData;
+    }
+
+    // 2. Fetch from Providers
+    this.logger.log(`Fetching history for ${symbol} from providers...`);
+    let history: any[] = [];
+    let source = 'finnhub';
+
+    const fromUnix = Math.floor(from.getTime() / 1000);
+    const toUnix = Math.floor(to.getTime() / 1000);
+
+    try {
+      // Map interval to Finnhub resolution
+      const resolution =
+        interval === '1d' ? 'D' : interval === '1wk' ? 'W' : 'M';
+      const finnhubHistory = await this.finnhubService.getHistorical(
+        symbol,
+        resolution,
+        fromUnix,
+        toUnix,
+      );
+
+      if (finnhubHistory && finnhubHistory.s === 'ok') {
+        history = finnhubHistory.t.map((t: number, i: number) => ({
+          ts: new Date(t * 1000),
+          open: finnhubHistory.o[i],
+          high: finnhubHistory.h[i],
+          low: finnhubHistory.l[i],
+          close: finnhubHistory.c[i],
+          volume: finnhubHistory.v[i],
+        }));
+      } else {
+        throw new Error('Finnhub returned no history or restricted');
+      }
+    } catch (e) {
+      this.logger.warn(
+        `Finnhub history failed for ${symbol}: ${e.message}. Trying Yahoo fallback...`,
+      );
+      try {
+        // Map common intervals
+        const yahooInterval: '1d' | '1wk' | '1mo' =
+          interval === '1d' ? '1d' : interval === '1wk' ? '1wk' : '1mo';
+        const yahooHistory = await this.yahooFinanceService.getHistorical(
+          symbol,
+          from,
+          to,
+          yahooInterval,
+        );
+
+        if (yahooHistory && yahooHistory.length > 0) {
+          source = 'yahoo';
+          history = yahooHistory.map((h: any) => ({
+            ts: h.date,
+            open: h.open,
+            high: h.high,
+            low: h.low,
+            close: h.close,
+            volume: h.volume,
+          }));
+        }
+      } catch (ye) {
+        this.logger.error(`Yahoo history fallback failed: ${ye.message}`);
+      }
+    }
+
+    if (history.length > 0) {
+      // 3. Save to DB (Async, don't block response)
+      void this.saveHistoricalData(tickerEntity.id, interval, history, source);
+      return history.map((h) => ({
+        ...h,
+        symbol_id: tickerEntity.id,
+        timeframe: interval,
+        source: `${source}_historical`,
+      }));
+    }
+
+    return dbData;
+  }
+
+  private async saveHistoricalData(
+    symbolId: string,
+    interval: string,
+    data: any[],
+    source: string,
+  ) {
+    try {
+      const entities = data.map((h) =>
+        this.ohlcvRepo.create({
+          symbol_id: symbolId,
+          ts: h.ts,
+          timeframe: interval,
+          open: h.open,
+          high: h.high,
+          low: h.low,
+          close: h.close,
+          volume: h.volume,
+          source: `${source}_historical`,
+        }),
+      );
+
+      // Use chunking for large inserts if needed, but for 180 days it's fine
+      await this.ohlcvRepo.save(entities, { chunk: 100 }).catch((e) => {
+        // On conflict do nothing or update?
+        // For simplicity with sqlite/postgres mix, we just catch and log
+        this.logger.debug(`Batch save history partially failed: ${e.message}`);
+      });
+    } catch (e) {
+      this.logger.error(`Failed to save historical data: ${e.message}`);
+    }
   }
 
   private formatDateOnly(date: Date) {
@@ -325,11 +546,24 @@ export class MarketDataService {
     }
 
     // Fetch from API
-    const news = await this.finnhubService.getCompanyNews(
-      symbol,
-      fromDate.toISOString().split('T')[0],
-      toDate.toISOString().split('T')[0],
-    );
+    let news;
+    try {
+      news = await this.finnhubService.getCompanyNews(
+        symbol,
+        fromDate.toISOString().split('T')[0],
+        toDate.toISOString().split('T')[0],
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Finnhub news fetch failed for ${symbol}: ${error.message}. Trying Yahoo fallback...`,
+      );
+      try {
+        news = await this.fetchNewsFromYahoo(symbol);
+      } catch (yError) {
+        this.logger.error(`Yahoo news fallback also failed: ${yError.message}`);
+        throw error; // Re-throw original error if fallback fails
+      }
+    }
 
     // Upsert logic
     if (news && news.length > 0) {
@@ -366,6 +600,63 @@ export class MarketDataService {
     return [];
   }
 
+  /**
+   * Dedicated helper to fetch and map news from Yahoo Finance
+   */
+  async fetchNewsFromYahoo(symbol: string) {
+    const yahooResults = await this.yahooFinanceService.search(symbol);
+    return (yahooResults.news || []).map((n: any) => ({
+      id: n.uuid,
+      datetime: Math.floor(new Date(n.providerPublishTime).getTime() / 1000),
+      headline: n.title,
+      source: n.publisher,
+      url: n.link,
+      summary: '', // Yahoo search news doesn't always have summary in this module
+      image: n.thumbnail?.resolutions?.[0]?.url || '',
+      related: symbol,
+    }));
+  }
+
+  /**
+   * Forces a fresh fetch of news from Yahoo Finance and saves it to the database.
+   * This is used for on-demand sync from the UI.
+   */
+  async syncCompanyNews(symbol: string) {
+    const ticker = await this.tickersService.awaitEnsureTicker(symbol);
+    this.logger.log(`Syncing news for ${symbol} from Yahoo Finance...`);
+
+    try {
+      const news = await this.fetchNewsFromYahoo(symbol);
+      if (news && news.length > 0) {
+        const entities = news.map((n: any) => ({
+          symbol_id: ticker.id,
+          external_id: n.id,
+          datetime: new Date(n.datetime * 1000),
+          headline: n.headline,
+          source: n.source,
+          url: n.url,
+          summary: n.summary,
+          image: n.image,
+          related: n.related,
+        }));
+
+        await this.companyNewsRepo
+          .createQueryBuilder()
+          .insert()
+          .values(entities)
+          .orIgnore() // Based on unique constraint (symbol_id, external_id)
+          .execute();
+
+        this.logger.log(`Synced ${news.length} news items for ${symbol}`);
+        return news.length;
+      }
+    } catch (e) {
+      this.logger.error(`News sync failed for ${symbol}: ${e.message}`);
+      throw e;
+    }
+    return 0;
+  }
+
   async getGeneralNews() {
     // For now, fetch live. We can add caching later if needed.
     // Finnhub '/news?category=general' returns latest market news.
@@ -373,8 +664,29 @@ export class MarketDataService {
       const news = await this.finnhubService.getGeneralNews('general');
       return news || [];
     } catch (e) {
-      this.logger.error(`Failed to fetch general news: ${e.message}`);
-      return [];
+      this.logger.error(
+        `Failed to fetch general news via Finnhub: ${e.message}. Trying Yahoo fallback...`,
+      );
+      try {
+        const yahooResults =
+          await this.yahooFinanceService.search('market news');
+        return (yahooResults.news || []).map((n: any) => ({
+          id: n.uuid,
+          datetime: Math.floor(
+            new Date(n.providerPublishTime).getTime() / 1000,
+          ),
+          headline: n.title,
+          source: n.publisher,
+          url: n.link,
+          summary: '',
+          image: n.thumbnail?.resolutions?.[0]?.url || '',
+        }));
+      } catch (yError) {
+        this.logger.error(
+          `Yahoo general news fallback failed: ${yError.message}`,
+        );
+        return [];
+      }
     }
   }
 
@@ -1022,6 +1334,78 @@ export class MarketDataService {
           : null,
       };
     });
+  }
+
+  private async fetchFullSnapshotFromYahoo(symbol: string) {
+    try {
+      const [quote, summary] = await Promise.all([
+        this.yahooFinanceService.getQuote(symbol),
+        this.yahooFinanceService.getSummary(symbol),
+      ]);
+      return { quote, summary };
+    } catch (e) {
+      this.logger.error(
+        `Failed to fetch Yahoo snapshot for ${symbol}: ${e.message}`,
+      );
+      return null;
+    }
+  }
+
+  private saveYahooQuoteAsCandle(symbolId: string, quote: any): PriceOhlcv {
+    return this.ohlcvRepo.create({
+      symbol_id: symbolId,
+      ts: quote.regularMarketTime || new Date(),
+      timeframe: '1d',
+      open: quote.regularMarketOpen,
+      high: quote.regularMarketDayHigh,
+      low: quote.regularMarketDayLow,
+      close: quote.regularMarketPrice,
+      prevClose: quote.regularMarketPreviousClose,
+      volume: quote.regularMarketVolume,
+      source: 'yahoo_quote',
+    });
+  }
+
+  private async applyYahooEnrichment(
+    symbolId: string,
+    fundamentals: Fundamentals | null,
+    summary: any,
+    quote?: any,
+  ): Promise<Fundamentals> {
+    const entity =
+      fundamentals || this.fundamentalsRepo.create({ symbol_id: symbolId });
+
+    if (summary.defaultKeyStatistics) {
+      const stats = summary.defaultKeyStatistics;
+      if (stats.forwardPE) entity.pe_ttm = stats.forwardPE;
+      if (stats.trailingEps) entity.eps_ttm = stats.trailingEps;
+      if (stats.beta) entity.beta = stats.beta;
+      if (stats.priceToBook) entity.price_to_book = stats.priceToBook;
+      if (stats.bookValue) entity.book_value_per_share = stats.bookValue;
+    }
+
+    if (summary.financialData) {
+      const fin = summary.financialData;
+      if (fin.totalCash) entity.total_cash = fin.totalCash;
+      if (fin.totalDebt) entity.total_debt = fin.totalDebt;
+      if (fin.debtToEquity) entity.debt_to_equity = fin.debtToEquity / 100; // Normalize to decimal if it's 150 style
+      if (fin.totalRevenue) entity.revenue_ttm = fin.totalRevenue;
+      if (fin.grossMargins) entity.gross_margin = fin.grossMargins;
+      if (fin.profitMargins) entity.net_profit_margin = fin.profitMargins;
+      if (fin.operatingMargins) entity.operating_margin = fin.operatingMargins;
+      if (fin.returnOnEquity) entity.roe = fin.returnOnEquity;
+      if (fin.returnOnAssets) entity.roa = fin.returnOnAssets;
+      if (fin.freeCashflow) entity.free_cash_flow_ttm = fin.freeCashflow;
+      if (fin.currentRatio) entity.current_ratio = fin.currentRatio;
+      if (fin.quickRatio) entity.quick_ratio = fin.quickRatio;
+    }
+
+    if (quote) {
+      if (quote.marketCap) entity.market_cap = quote.marketCap;
+    }
+
+    entity.updated_at = new Date();
+    return await this.fundamentalsRepo.save(entity);
   }
 }
 

@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Inject,
-  forwardRef,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Param, Inject, forwardRef } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
@@ -41,7 +34,7 @@ export class TickerDetailController {
       snapshot = await this.marketDataService.getSnapshot(symbol);
     } catch (e) {
       console.error(`Error getting snapshot for ${symbol}:`, e);
-      throw new NotFoundException(`Ticker ${symbol} not found`);
+      throw e;
     }
 
     const { ticker, latestPrice, fundamentals } = snapshot;

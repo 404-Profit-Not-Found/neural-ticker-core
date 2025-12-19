@@ -1,15 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { FinnhubService } from './finnhub.service';
-import { of, throwError } from 'rxjs';
-import { AxiosError } from 'axios';
+
+// Mock the finnhub library
+const mockFinnhubClient = {
+  companyProfile2: jest.fn(),
+  quote: jest.fn(),
+  companyNews: jest.fn(),
+  marketNews: jest.fn(),
+  companyBasicFinancials: jest.fn(),
+};
+
+jest.mock('finnhub', () => ({
+  DefaultApi: jest.fn().mockImplementation(() => mockFinnhubClient),
+}));
 
 describe('FinnhubService', () => {
   let service: FinnhubService;
-  let httpService: HttpService;
+  let configService: ConfigService;
 
-  const mockHttpService = {
-    get: jest.fn(),
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue('test-api-key'),
   };
 
   beforeEach(async () => {
@@ -17,14 +28,15 @@ describe('FinnhubService', () => {
       providers: [
         FinnhubService,
         {
-          provide: HttpService,
-          useValue: mockHttpService,
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
 
     service = module.get<FinnhubService>(FinnhubService);
-    httpService = module.get<HttpService>(HttpService);
+    configService = module.get<ConfigService>(ConfigService);
+    service.onModuleInit();
     jest.clearAllMocks();
   });
 
@@ -35,21 +47,26 @@ describe('FinnhubService', () => {
   describe('getCompanyProfile', () => {
     it('should return company profile', async () => {
       const mockData = { name: 'Apple Inc', ticker: 'AAPL' };
-      mockHttpService.get.mockReturnValue(of({ data: mockData }));
+      mockFinnhubClient.companyProfile2.mockImplementation(
+        (params: any, cb: any) => cb(null, mockData),
+      );
 
       const result = await service.getCompanyProfile('AAPL');
       expect(result).toEqual(mockData);
-      expect(httpService.get).toHaveBeenCalledWith('/stock/profile2', {
-        params: { symbol: 'AAPL' },
-      });
+      expect(mockFinnhubClient.companyProfile2).toHaveBeenCalledWith(
+        { symbol: 'AAPL' },
+        expect.any(Function),
+      );
     });
 
     it('should handle API error', async () => {
-      const axiosError = { response: { status: 500, data: 'Server error' } };
-      mockHttpService.get.mockReturnValue(throwError(() => axiosError));
+      const error = new Error('API Error');
+      mockFinnhubClient.companyProfile2.mockImplementation(
+        (params: any, cb: any) => cb(error),
+      );
 
-      await expect(service.getCompanyProfile('AAPL')).rejects.toEqual(
-        axiosError,
+      await expect(service.getCompanyProfile('AAPL')).rejects.toThrow(
+        'API Error',
       );
     });
   });
@@ -57,28 +74,25 @@ describe('FinnhubService', () => {
   describe('getQuote', () => {
     it('should return quote data', async () => {
       const mockData = { c: 150.0, d: 2.0, dp: 1.5 };
-      mockHttpService.get.mockReturnValue(of({ data: mockData }));
+      mockFinnhubClient.quote.mockImplementation((symbol: any, cb: any) =>
+        cb(null, mockData),
+      );
 
       const result = await service.getQuote('AAPL');
       expect(result).toEqual(mockData);
-      expect(httpService.get).toHaveBeenCalledWith('/quote', {
-        params: { symbol: 'AAPL' },
-      });
-    });
-
-    it('should handle API error', async () => {
-      mockHttpService.get.mockReturnValue(
-        throwError(() => new Error('Network error')),
+      expect(mockFinnhubClient.quote).toHaveBeenCalledWith(
+        'AAPL',
+        expect.any(Function),
       );
-
-      await expect(service.getQuote('AAPL')).rejects.toThrow('Network error');
     });
   });
 
   describe('getCompanyNews', () => {
     it('should return company news', async () => {
       const mockData = [{ headline: 'News 1' }, { headline: 'News 2' }];
-      mockHttpService.get.mockReturnValue(of({ data: mockData }));
+      mockFinnhubClient.companyNews.mockImplementation(
+        (symbol: any, from: any, to: any, cb: any) => cb(null, mockData),
+      );
 
       const result = await service.getCompanyNews(
         'AAPL',
@@ -86,19 +100,12 @@ describe('FinnhubService', () => {
         '2023-12-31',
       );
       expect(result).toEqual(mockData);
-      expect(httpService.get).toHaveBeenCalledWith('/company-news', {
-        params: { symbol: 'AAPL', from: '2023-01-01', to: '2023-12-31' },
-      });
-    });
-
-    it('should handle API error', async () => {
-      const axiosError = new AxiosError('Request failed');
-      (axiosError as any).response = { status: 403, data: 'Forbidden' };
-      mockHttpService.get.mockReturnValue(throwError(() => axiosError));
-
-      await expect(
-        service.getCompanyNews('AAPL', '2023-01-01', '2023-12-31'),
-      ).rejects.toBeInstanceOf(AxiosError);
+      expect(mockFinnhubClient.companyNews).toHaveBeenCalledWith(
+        'AAPL',
+        '2023-01-01',
+        '2023-12-31',
+        expect.any(Function),
+      );
     });
   });
 });

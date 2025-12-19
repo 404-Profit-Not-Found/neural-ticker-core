@@ -10,6 +10,16 @@ export interface Scenario {
     key_drivers: string[];
 }
 
+export interface CandlePoint {
+    ts: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    source?: string;
+}
+
 export interface NewsItem {
     id: string;
     url: string;
@@ -71,10 +81,12 @@ export interface TickerData {
         industry?: string;
         web_url?: string;
         description?: string;
+        country?: string;
     };
     market_data: {
         price: number;
         change_percent: number;
+        history?: CandlePoint[];
     };
     risk_analysis: {
         overall_score: number;

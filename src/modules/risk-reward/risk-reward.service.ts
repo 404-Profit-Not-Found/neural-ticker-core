@@ -467,9 +467,7 @@ export class RiskRewardService {
       quality: 'medium' as QualityTier,
     };
 
-    this.logger.log(
-      `[${symbol}] Numeric Context: ${JSON.stringify(context)}`,
-    );
+    this.logger.log(`[${symbol}] Numeric Context: ${JSON.stringify(context)}`);
     this.logger.log(
       `Extracting Risk Analysis for ${symbol} from Research Note...`,
     );
@@ -484,7 +482,9 @@ export class RiskRewardService {
       try {
         const result = await this.llmService.generateResearch(prompt);
         const raw = result.answerMarkdown || '';
-        this.logger.log(`[${symbol}] Raw LLM Response: ${raw.substring(0, 1000)}${raw.length > 1000 ? '...' : ''}`);
+        this.logger.log(
+          `[${symbol}] Raw LLM Response: ${raw.substring(0, 1000)}${raw.length > 1000 ? '...' : ''}`,
+        );
         lastRaw = raw;
         const toonMatch = raw.match(/\{[\s\S]*\}/);
         if (!toonMatch) {

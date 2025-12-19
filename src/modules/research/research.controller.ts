@@ -457,6 +457,7 @@ export class ResearchController {
   @Post('sync/:ticker')
   async syncResearch(@Param('ticker') ticker: string) {
     await this.researchService.reprocessFinancials(ticker);
+    await this.marketDataService.syncCompanyNews(ticker);
     const dedupe = await this.marketDataService.dedupeAnalystRatings(ticker);
     return { message: 'Sync completed', deduped: dedupe.removed };
   }

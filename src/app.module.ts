@@ -29,6 +29,7 @@ import { SocialModule } from './modules/social/social.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
+import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
 import configuration from './config/configuration';
 
 // ...
@@ -105,6 +106,7 @@ import configuration from './config/configuration';
     ProxyModule,
     NotificationsModule,
     PortfolioModule,
+    YahooFinanceModule,
   ],
   controllers: [AppController],
   providers: [

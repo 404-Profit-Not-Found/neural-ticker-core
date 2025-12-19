@@ -1,77 +1,155 @@
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useEffect, useRef, useState } from 'react';
+import { createChart, ColorType, CandlestickSeries, LineSeries, AreaSeries } from 'lightweight-charts';
+import { CandlestickChart, LineChart, AreaChart as MountainChart } from 'lucide-react';
+import type { IChartApi, ISeriesApi, Time, CandlestickData, LineData, AreaData } from 'lightweight-charts';
+import type { CandlePoint } from '../../types/ticker';
 
-interface PricePoint {
-    time: string;
-    close: number;
-}
+type ChartType = 'candle' | 'line' | 'mountain';
 
 interface PriceChartProps {
-    data: PricePoint[];
+    data: CandlePoint[];
+    className?: string;
 }
 
-export function PriceChart({ data }: PriceChartProps) {
-    if (!data || data.length === 0) {
-        return <div className="h-64 flex items-center justify-center text-muted-foreground">No price history available</div>;
-    }
+export function PriceChart({ data, className }: PriceChartProps) {
+    const [chartType, setChartType] = useState<ChartType>('mountain');
+    const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartRef = useRef<IChartApi | null>(null);
+    const seriesRef = useRef<ISeriesApi<"Candlestick" | "Line" | "Area"> | null>(null);
 
-    // Sort by date just in case
-    const sortedData = [...data].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    useEffect(() => {
+        if (!chartContainerRef.current) return;
 
-    const stats = {
-        min: Math.min(...sortedData.map(d => d.close)),
-        max: Math.max(...sortedData.map(d => d.close)),
-        start: sortedData[0]?.close || 0,
-        end: sortedData[sortedData.length - 1]?.close || 0,
-    };
+        const chart = createChart(chartContainerRef.current, {
+            layout: {
+                background: { type: ColorType.Solid, color: 'transparent' },
+                textColor: '#a1a1aa', // text-muted-foreground
+            },
+            grid: {
+                vertLines: { color: 'rgba(39, 39, 42, 0.3)' },
+                horzLines: { color: 'rgba(39, 39, 42, 0.3)' },
+            },
+            width: chartContainerRef.current.clientWidth,
+            height: 200,
+            timeScale: {
+                borderColor: '#27272a',
+                timeVisible: true,
+                secondsVisible: false,
+            },
+            rightPriceScale: {
+                borderColor: '#27272a',
+                scaleMargins: {
+                    top: 0.1,
+                    bottom: 0.1,
+                },
+            },
+            handleScroll: true,
+            handleScale: true,
+        });
 
-    const isPositive = stats.end >= stats.start;
-    const color = isPositive ? '#10b981' : '#ef4444'; // Green or Red
+        chartRef.current = chart;
+
+        const handleResize = () => {
+            if (chartContainerRef.current && chartRef.current) {
+                chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            chart.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!chartRef.current || !data) return;
+
+        // Remove old series if it exists
+        if (seriesRef.current) {
+            chartRef.current.removeSeries(seriesRef.current);
+            seriesRef.current = null;
+        }
+
+        const chart = chartRef.current;
+
+        if (chartType === 'candle') {
+            seriesRef.current = chart.addSeries(CandlestickSeries, {
+                upColor: '#22c55e',
+                downColor: '#ef4444',
+                borderVisible: false,
+                wickUpColor: '#22c55e',
+                wickDownColor: '#ef4444',
+            });
+        } else if (chartType === 'line') {
+            seriesRef.current = chart.addSeries(LineSeries, {
+                color: '#3b82f6',
+                lineWidth: 2,
+            });
+        } else if (chartType === 'mountain') {
+            seriesRef.current = chart.addSeries(AreaSeries, {
+                topColor: 'rgba(59, 130, 246, 0.4)',
+                bottomColor: 'rgba(59, 130, 246, 0.0)',
+                lineColor: '#3b82f6',
+                lineWidth: 2,
+            });
+        }
+
+        if (seriesRef.current && data.length > 0) {
+            let formattedData: (CandlestickData | LineData | AreaData)[] = [];
+
+            if (chartType === 'candle') {
+                formattedData = data.map(d => ({
+                    time: (new Date(d.ts).getTime() / 1000) as Time,
+                    open: d.open,
+                    high: d.high,
+                    low: d.low,
+                    close: d.close,
+                }));
+            } else {
+                formattedData = data.map(d => ({
+                    time: (new Date(d.ts).getTime() / 1000) as Time,
+                    value: d.close,
+                }));
+            }
+
+            formattedData.sort((a, b) => (a.time as number) - (b.time as number));
+            seriesRef.current.setData(formattedData);
+            chart.timeScale().fitContent();
+        }
+    }, [data, chartType]);
+
+    const chartTypes: { id: ChartType; label: string; icon: React.ElementType }[] = [
+        { id: 'mountain', label: 'Mountain', icon: MountainChart },
+        { id: 'line', label: 'Line', icon: LineChart },
+        { id: 'candle', label: 'Candles', icon: CandlestickChart },
+    ];
 
     return (
-        <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={sortedData}>
-                    <defs>
-                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={color} stopOpacity={0.2} />
-                            <stop offset="95%" stopColor={color} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <XAxis
-                        dataKey="time"
-                        hide
-                        tickFormatter={(str) => new Date(str).toLocaleDateString()}
-                    />
-                    <YAxis
-                        domain={['auto', 'auto']}
-                        orientation="right"
-                        tick={{ fontSize: 12, fill: '#888' }}
-                        tickFormatter={(val) => `$${val.toFixed(0)}`}
-                        width={40}
-                        axisLine={false}
-                        tickLine={false}
-                    />
-                    <Tooltip
-                        contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            borderColor: 'hsl(var(--border))',
-                            color: 'hsl(var(--foreground))',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                        }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString()}
-                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="close"
-                        stroke={color}
-                        fillOpacity={1}
-                        fill="url(#colorPrice)"
-                        strokeWidth={2}
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
+        <div className={`relative w-full h-full min-h-[180px] ${className}`}>
+            {/* Chart Type Selector - Top Left (to avoid price overlap on right) */}
+            <div className="absolute top-2 left-2 z-10 flex bg-muted/20 backdrop-blur-md rounded-md border border-border/40 p-0.5 shadow-sm">
+                {chartTypes.map((type) => (
+                    <button
+                        key={type.id}
+                        onClick={() => setChartType(type.id)}
+                        className={`p-1.5 rounded transition-all duration-200 ${
+                            chartType === type.id
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        }`}
+                        title={type.label}
+                    >
+                        <type.icon size={14} />
+                    </button>
+                ))}
+            </div>
+
+            <div 
+                ref={chartContainerRef} 
+                className="w-full h-full"
+            />
         </div>
     );
 }
