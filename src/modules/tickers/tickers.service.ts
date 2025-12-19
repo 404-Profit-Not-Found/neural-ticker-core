@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
+import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
@@ -17,6 +18,7 @@ export class TickersService {
     @InjectRepository(TickerLogoEntity)
     private readonly logoRepo: Repository<TickerLogoEntity>,
     private readonly finnhubService: FinnhubService,
+    private readonly yahooFinanceService: YahooFinanceService,
     private readonly httpService: HttpService,
   ) {}
 
@@ -52,35 +54,41 @@ export class TickersService {
     }
 
     let profile;
+    let source = 'finnhub';
+
     try {
       this.logger.log(
         `Ticker ${upperSymbol} not found, fetching from Finnhub...`,
       );
       profile = await this.finnhubService.getCompanyProfile(upperSymbol);
-    } catch (error) {
-      if (error.response?.status === 429) {
-        this.logger.warn(
-          `Finnhub Rate Limit Exceeded for ${upperSymbol}. Retrying later suggested.`,
-        );
-        throw new NotFoundException(
-          `Ticker ${upperSymbol} could not be verified due to rate limits. Please try again later.`,
-        );
+      
+      // If Finnhub returns empty object or null, it's a "not found" or "restricted" case for us
+      if (!profile || Object.keys(profile).length === 0) {
+        this.logger.warn(`Finnhub returned no profile for ${upperSymbol}, trying Yahoo Finance fallback...`);
+        profile = await this.fetchFromYahoo(upperSymbol);
+        source = 'yahoo';
       }
-      this.logger.error(
-        `Finnhub fetch failed for ${upperSymbol}: ${error.message}`,
-      );
-      // Fallback: throw NotFound to be consistent with "lazy load failed"
-      throw new NotFoundException(
-        `Ticker ${upperSymbol} not found or external API unavailable`,
-      );
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 429) {
+        this.logger.warn(`Finnhub Rate Limit Exceeded for ${upperSymbol}.`);
+        throw new NotFoundException(`Ticker ${upperSymbol} rate limited.`);
+      }
+
+      if (status === 401 || status === 403) {
+        this.logger.warn(`Finnhub restricted access for ${upperSymbol}, trying Yahoo Finance fallback...`);
+        profile = await this.fetchFromYahoo(upperSymbol);
+        source = 'yahoo';
+      } else {
+        this.logger.error(`Finnhub fetch error for ${upperSymbol}: ${error.message}`);
+        // Final fallback try
+        profile = await this.fetchFromYahoo(upperSymbol);
+        source = 'yahoo';
+      }
     }
 
-    // If Finnhub returns empty object or error logic needs handling
-    if (!profile || Object.keys(profile).length === 0) {
-      this.logger.warn(`Finnhub returned no profile for ${upperSymbol}`);
-      throw new NotFoundException(
-        `Ticker ${upperSymbol} details not found in Finnhub`,
-      );
+    if (!profile) {
+      throw new NotFoundException(`Ticker ${upperSymbol} not found in any provider`);
     }
 
     const newTicker = this.tickerRepo.create({
@@ -96,8 +104,9 @@ export class TickersService {
       web_url: profile.weburl,
       logo_url: profile.logo,
       finnhub_industry: profile.finnhubIndustry,
-      sector: profile.finnhubIndustry, // Fallback/Populate standard column
-      finnhub_raw: profile,
+      sector: profile.finnhubIndustry || profile.sector, 
+      description: profile.description,
+      finnhub_raw: source === 'finnhub' ? profile : { yahoo_fallback: profile },
     });
 
     const savedTicker = await this.tickerRepo.save(newTicker);
@@ -292,5 +301,35 @@ export class TickersService {
       .getRawMany();
 
     return results.map((r) => r.sector).filter((s) => s && s.trim().length > 0);
+  }
+
+  private async fetchFromYahoo(symbol: string): Promise<any> {
+    try {
+      this.logger.log(`Fetching ${symbol} from Yahoo Finance...`);
+      const summary = await this.yahooFinanceService.getSummary(symbol);
+      const quote = await this.yahooFinanceService.getQuote(symbol);
+
+      if (!summary && !quote) return null;
+
+      // Map to a common format similar to Finnhub profile
+      return {
+        name: quote?.longName || quote?.shortName || summary?.summaryProfile?.longName,
+        exchange: quote?.fullExchangeName || 'Yahoo Finance',
+        currency: quote?.currency || 'USD',
+        country: summary?.summaryProfile?.country || 'Unknown',
+        ipo: null, // Yahoo doesn't explicitly provide this in easy field
+        marketCapitalization: quote?.marketCap || summary?.defaultKeyStatistics?.enterpriseValue,
+        shareOutstanding: summary?.defaultKeyStatistics?.sharesOutstanding,
+        phone: summary?.summaryProfile?.phone,
+        weburl: summary?.summaryProfile?.website,
+        logo: null, // Yahoo doesn't provide easy logo URL
+        finnhubIndustry: summary?.summaryProfile?.industry,
+        sector: summary?.summaryProfile?.sector,
+        description: summary?.summaryProfile?.longBusinessSummary,
+      };
+    } catch (e) {
+      this.logger.error(`Yahoo fallback failed for ${symbol}: ${e.message}`);
+      return null;
+    }
   }
 }

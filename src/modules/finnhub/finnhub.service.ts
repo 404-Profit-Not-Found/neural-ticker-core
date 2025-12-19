@@ -59,7 +59,7 @@ export class FinnhubService implements OnModuleInit {
 
   async getGeneralNews(category = 'general', minId?: number): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.finnhubClient.generalNews(
+      this.finnhubClient.marketNews(
         category,
         { minId },
         (error: any, data: any) => {
@@ -75,7 +75,7 @@ export class FinnhubService implements OnModuleInit {
 
   async getBasicFinancials(symbol: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.finnhubClient.companyBasicFinancial(
+      this.finnhubClient.companyBasicFinancials(
         symbol,
         'all',
         (error: any, data: any) => {
@@ -86,6 +86,18 @@ export class FinnhubService implements OnModuleInit {
           resolve(data);
         },
       );
+    });
+  }
+
+  async getSymbols(exchange: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.stockSymbols(exchange, {}, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, exchange);
+          return reject(error);
+        }
+        resolve(data);
+      });
     });
   }
 

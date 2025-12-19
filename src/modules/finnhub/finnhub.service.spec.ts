@@ -7,8 +7,8 @@ const mockFinnhubClient = {
   companyProfile2: jest.fn(),
   quote: jest.fn(),
   companyNews: jest.fn(),
-  generalNews: jest.fn(),
-  companyBasicFinancial: jest.fn(),
+  marketNews: jest.fn(),
+  companyBasicFinancials: jest.fn(),
 };
 
 jest.mock('finnhub', () => ({

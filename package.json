@@ -54,7 +54,8 @@
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
     "toon-parser": "^1.1.1",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "yahoo-finance2": "^3.10.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

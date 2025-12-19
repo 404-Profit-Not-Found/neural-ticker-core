@@ -1,0 +1,58 @@
+=== Yahoo Finance Deep Dive: SOI.PA ===
+
+--- [1] yahoo.quote() ---
+Please consider completing the survey at https://bit.ly/yahoo-finance-api-feedback if you haven't already; for more info see https://github.com/gadicc/yahoo-finance2/issues/764#issuecomment-2056623851.  This will only be shown once, but you can suppress this message in future with `new YahooFinance({ suppressNotices: ['yahooSurvey'] })`.
+Sample Fields (Quote): {
+  symbol: 'SOI.PA',
+  price: 23.3,
+  currency: 'EUR',
+  exchange: 'Paris',
+  marketCap: 831448064,
+  sharesOutstanding: 35684468
+}
+
+
+--- [2] yahoo.historical() ---
+Fetched 505 historical records.
+Sample Historical Record: {
+  date: 2025-12-19T16:35:17.000Z,
+  high: 23.760000228881836,
+  volume: 265287,
+  open: 23.700000762939453,
+  low: 23.1200008392334,
+  close: 23.299999237060547,
+  adjClose: 23.299999237060547
+}
+
+
+--- [3] yahoo.quoteSummary() ---
+Summary Profile: {
+  sector: 'Technology',
+  industry: 'Semiconductor Equipment & Materials',
+  website: 'https://www.soitec.com',
+  employees: 1991
+}
+Financial Highlights: {
+  recommendation: 'hold',
+  targetPrice: 32.41176,
+  totalCash: 823729984,
+  totalDebt: 952681024,
+  freeCashflow: -31613624,
+  operatingMargins: 0.08242
+}
+Key Statistics: {
+  beta: 1.248,
+  forwardPE: 28.463228,
+  trailingEps: 0.29,
+  sharesOutstanding: 35684468
+}
+
+
+--- [4] yahoo.search() ---
+Found 4 news items.
+Latest News Headline: Truist Securities Adjusts Price Target on Regions Financial to $29 From $26
+Latest News URL: https://finance.yahoo.com/news/truist-securities-adjusts-price-target-191332842.html
+
+
+=== Deep Dive Complete ===
+Tip: You can see the full JSON by uncommenting the log lines in the script.

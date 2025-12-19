@@ -41,7 +41,7 @@ export class TickerDetailController {
       snapshot = await this.marketDataService.getSnapshot(symbol);
     } catch (e) {
       console.error(`Error getting snapshot for ${symbol}:`, e);
-      throw new NotFoundException(`Ticker ${symbol} not found`);
+      throw e;
     }
 
     const { ticker, latestPrice, fundamentals } = snapshot;
