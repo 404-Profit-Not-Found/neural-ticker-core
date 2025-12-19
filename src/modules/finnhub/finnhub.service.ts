@@ -1,87 +1,95 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
-import { AxiosError } from 'axios';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const finnhub = require('finnhub');
 
 @Injectable()
-export class FinnhubService {
+export class FinnhubService implements OnModuleInit {
   private readonly logger = new Logger(FinnhubService.name);
+  private finnhubClient: any;
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly configService: ConfigService) {}
+
+  onModuleInit() {
+    const apiKey = this.configService.get<string>('finnhub.apiKey');
+    this.finnhubClient = new finnhub.DefaultApi(apiKey);
+  }
 
   async getCompanyProfile(symbol: string): Promise<any> {
-    try {
-      const { data } = await firstValueFrom(
-        this.httpService.get('/stock/profile2', {
-          params: { symbol },
-        }),
-      );
-      return data;
-    } catch (error) {
-      this.handleError(error, symbol);
-    }
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.companyProfile2({ symbol }, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, symbol);
+          return reject(error);
+        }
+        resolve(data);
+      });
+    });
   }
 
   async getQuote(symbol: string): Promise<any> {
-    try {
-      const { data } = await firstValueFrom(
-        this.httpService.get('/quote', {
-          params: { symbol },
-        }),
-      );
-      return data;
-    } catch (error) {
-      this.handleError(error, symbol);
-    }
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.quote(symbol, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, symbol);
+          return reject(error);
+        }
+        resolve(data);
+      });
+    });
   }
 
   async getCompanyNews(symbol: string, from: string, to: string): Promise<any> {
-    try {
-      const { data } = await firstValueFrom(
-        this.httpService.get('/company-news', {
-          params: { symbol, from, to },
-        }),
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.companyNews(
+        symbol,
+        from,
+        to,
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, symbol);
+            return reject(error);
+          }
+          resolve(data);
+        },
       );
-      return data;
-    } catch (error) {
-      this.handleError(error, symbol);
-    }
+    });
   }
 
   async getGeneralNews(category = 'general', minId?: number): Promise<any> {
-    try {
-      const { data } = await firstValueFrom(
-        this.httpService.get('/news', {
-          params: { category, minId },
-        }),
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.generalNews(
+        category,
+        { minId },
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, 'general-news');
+            return reject(error);
+          }
+          resolve(data);
+        },
       );
-      return data;
-    } catch (error) {
-      this.handleError(error, 'general-news');
-    }
+    });
   }
 
   async getBasicFinancials(symbol: string): Promise<any> {
-    try {
-      const { data } = await firstValueFrom(
-        this.httpService.get('/stock/metric', {
-          params: { symbol, metric: 'all' },
-        }),
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.companyBasicFinancial(
+        symbol,
+        'all',
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, symbol);
+            return reject(error);
+          }
+          resolve(data);
+        },
       );
-      return data;
-    } catch (error) {
-      this.handleError(error, symbol);
-    }
+    });
   }
 
   private handleError(error: any, context?: string) {
-    if (error instanceof AxiosError) {
-      this.logger.error(
-        `Finnhub API Error [${context}]: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`,
-      );
-    } else {
-      this.logger.error(`Unexpected Error [${context}]: ${error.message}`);
-    }
-    throw error;
+    this.logger.error(`Finnhub API Error [${context}]: ${error.message || error}`);
   }
 }

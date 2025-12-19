@@ -42,6 +42,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "figlet": "^1.9.4",
+    "finnhub": "^2.0.12",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "openai": "^6.10.0",
