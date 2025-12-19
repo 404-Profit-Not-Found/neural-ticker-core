@@ -128,8 +128,10 @@ export class FinnhubService implements OnModuleInit {
   }
 
   private handleError(error: any, context?: string) {
-    this.logger.error(
-      `Finnhub API Error [${context}]: ${error.message || error}`,
-    );
+    const msg = error?.response?.data
+      ? JSON.stringify(error.response.data)
+      : error?.message || String(error);
+
+    this.logger.error(`Finnhub API Error [${context}]: ${msg}`);
   }
 }

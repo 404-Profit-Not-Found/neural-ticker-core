@@ -44,32 +44,6 @@ interface TickerSearchResult {
     name: string;
 }
 
-interface MarketSnapshot {
-    ticker: { symbol: string; logo_url?: string; name?: string; id: string; industry?: string; sector?: string };
-    latestPrice?: { close: number; prevClose?: number };
-    fundamentals?: {
-        sector?: string;
-        pe_ttm?: number;
-        market_cap?: number;
-        dividend_yield?: number;
-        beta?: number;
-        consensus_rating?: string;
-    };
-    aiAnalysis?: {
-        overall_score: number;
-        financial_risk?: number;
-        upside_percent: number;
-        bear_price?: number | null;
-        base_price?: number | null;
-    };
-    counts?: {
-        news?: number;
-        research?: number;
-        analysts?: number;
-        social?: number;
-    };
-
-}
 
 // Constant empty arrays
 const EMPTY_SYMBOLS: string[] = [];
@@ -146,78 +120,79 @@ export function WatchlistTable() {
     }, [watchlistItems]);
 
     // -- Market Data Query --
-    const { data: snapshotData, isLoading: isLoadingSnapshots } = useMarketSnapshots(symbols);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: snapshotData } = useMarketSnapshots(symbols);
 
     const tableData = useMemo<TickerData[]>(() => {
-        if (!activeWatchlist || !snapshotData || !Array.isArray(snapshotData)) return EMPTY_TABLE_DATA;
+        if (!watchlistItems || watchlistItems.length === 0) return EMPTY_TABLE_DATA;
 
-        return snapshotData
-            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
-            .map((s: MarketSnapshot) => {
-                const price = Number(s.latestPrice?.close || 0);
-                const prevClose = Number(s.latestPrice?.prevClose || price);
-                const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-                const fundamentals = s.fundamentals || {};
+        return watchlistItems.map((item) => {
+            const symbol = item.ticker.symbol;
+            // Find snapshot for this item
+            const s = snapshotData?.find(snap => snap.ticker.symbol === symbol);
 
-                // Use financial_risk instead of overall_score if available
-                const riskVal = s.aiAnalysis?.financial_risk;
-                const parsedRiskScore = typeof riskVal === 'number' ? riskVal : Number(riskVal);
-                const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
+            // Default values if snapshot missing (optimistic or loading)
+            const price = s?.latestPrice ? Number(s.latestPrice.close) : 0;
+            const prevClose = s?.latestPrice ? Number(s.latestPrice.prevClose || price) : 0;
+            const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+            const fundamentals = s?.fundamentals || {};
 
-                // AI Rating Logic (Strict Financial Risk)
-                let aiRating = '-';
-                if (s.aiAnalysis && safeRiskScore !== null) {
-                    const upside = Number(s.aiAnalysis.upside_percent || 0);
-                    const { rating } = calculateAiRating(safeRiskScore, upside, s.aiAnalysis?.overall_score);
-                    aiRating = rating;
-                } else {
-                    aiRating = '-';
-                }
+             // Use financial_risk instead of overall_score if available
+             const riskVal = s?.aiAnalysis?.financial_risk;
+             const parsedRiskScore = typeof riskVal === 'number' ? riskVal : Number(riskVal);
+             const safeRiskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : null;
 
-                // Find corresponding watchlist item to get ID
-                const watchlistItem = watchlistItems.find(i => i.ticker.symbol === s.ticker?.symbol);
+             // AI Rating Logic (Strict Financial Risk)
+             let aiRating = '-';
+             if (s?.aiAnalysis && safeRiskScore !== null) {
+                 const upside = Number(s.aiAnalysis.upside_percent || 0);
+                 const { rating } = calculateAiRating(safeRiskScore, upside, s.aiAnalysis?.overall_score);
+                 aiRating = rating;
+             } else {
+                 aiRating = '-';
+             }
 
-                const bearPrice = s.aiAnalysis?.bear_price;
-                const basePrice = s.aiAnalysis?.base_price;
-                let potentialDownside: number | null = null;
-                let potentialUpside: number | null = null;
+             const bearPrice = s?.aiAnalysis?.bear_price;
+             const basePrice = s?.aiAnalysis?.base_price;
+             let potentialDownside: number | null = null;
+             let potentialUpside: number | null = null;
 
-                if (typeof basePrice === 'number' && price > 0) {
-                    potentialUpside = ((basePrice - price) / price) * 100;
-                } else {
-                    potentialUpside = s.aiAnalysis?.upside_percent ?? null;
-                }
+             if (typeof basePrice === 'number' && price > 0) {
+                 potentialUpside = ((basePrice - price) / price) * 100;
+             } else {
+                 potentialUpside = s?.aiAnalysis?.upside_percent ?? null;
+             }
 
-                if (typeof bearPrice === 'number' && price > 0) {
-                    potentialDownside = ((bearPrice - price) / price) * 100;
-                } else if (safeRiskScore !== null) {
-                    if (safeRiskScore >= 8) potentialDownside = -100;
-                    else if (safeRiskScore > 0) potentialDownside = -(safeRiskScore * 2.5);
-                }
+             if (typeof bearPrice === 'number' && price > 0) {
+                 potentialDownside = ((bearPrice - price) / price) * 100;
+             } else if (safeRiskScore !== null) {
+                 if (safeRiskScore >= 8) potentialDownside = -100;
+                 else if (safeRiskScore > 0) potentialDownside = -(safeRiskScore * 2.5);
+             }
 
-                return {
-                    symbol: s.ticker?.symbol || 'UNKNOWN',
-                    logo: s.ticker?.logo_url,
-                    company: s.ticker?.name || 'Unknown',
-                    sector: s.ticker?.industry || s.ticker?.sector || fundamentals.sector || 'Others',
-                    price: price,
-                    change: change,
-                    pe: fundamentals.pe_ttm ?? null,
-                    marketCap: fundamentals.market_cap ?? null,
-                    potentialUpside: potentialUpside,
-                    potentialDownside: potentialDownside,
-                    riskScore: safeRiskScore,
-                    overallScore: s.aiAnalysis?.overall_score ?? null,
-                    rating: fundamentals.consensus_rating || '-',
-                    aiRating: aiRating,
-                    newsCount: s.counts?.news || 0,
-                    researchCount: s.counts?.research || 0,
-                    analystCount: s.counts?.analysts || 0,
-                    socialCount: s.counts?.social || 0,
-                    itemId: watchlistItem?.id
-                };
-            });
-    }, [snapshotData, activeWatchlist, watchlistItems]);
+            return {
+                symbol: symbol,
+                logo: s?.ticker?.logo_url,
+                company: s?.ticker?.name || 'Loading...',
+                sector: s?.ticker?.industry || s?.ticker?.sector || fundamentals.sector || 'Others',
+                price: price,
+                change: change,
+                pe: fundamentals.pe_ttm ?? null,
+                marketCap: fundamentals.market_cap ?? null,
+                potentialUpside: potentialUpside,
+                potentialDownside: potentialDownside,
+                riskScore: safeRiskScore,
+                overallScore: s?.aiAnalysis?.overall_score ?? null,
+                rating: fundamentals.consensus_rating || '-',
+                aiRating: aiRating,
+                newsCount: s?.counts?.news || 0,
+                researchCount: s?.counts?.research || 0,
+                analystCount: s?.counts?.analysts || 0,
+                socialCount: s?.counts?.social || 0,
+                itemId: item.id
+            };
+        });
+    }, [snapshotData, watchlistItems]);
 
     const uniqueSectors = useMemo(() => {
         if (!tableData || tableData.length === 0) return EMPTY_SECTORS;
@@ -225,7 +200,7 @@ export function WatchlistTable() {
         return Array.from(sectors).sort();
     }, [tableData]);
 
-    const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && symbols.length > 0);
+    const isGlobalLoading = isLoadingWatchlists;
     const activeSectorFilter = useMemo(() => {
         const sectorFilter = columnFilters.find(f => f.id === 'sector');
         return (sectorFilter?.value as string) || null;

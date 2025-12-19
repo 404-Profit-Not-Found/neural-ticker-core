@@ -276,7 +276,8 @@ export function Dashboard() {
 
       <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500">
         {/* --- HEADER / HERO SECTION --- */}
-        <section className="style-hero rgb-border relative overflow-hidden rounded-lg border border-border bg-card p-8">
+        {/* --- HEADER / HERO SECTION --- */}
+        <section className="style-hero rgb-border relative rounded-lg border border-border bg-card p-8">
           <div
             className="style-hero-grid absolute inset-0 pointer-events-none"
             aria-hidden
@@ -323,8 +324,7 @@ export function Dashboard() {
 
               {showResults && results.length > 0 && (
                 <div
-                  className="absolute top-full mt-2 w-full border border-border rounded-lg shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-                  style={{ backgroundColor: '#09090b' }}
+                  className="absolute top-full mt-2 w-full border border-border rounded-lg shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200 bg-popover text-popover-foreground"
                 >
                   <div className="py-1 max-h-[300px] overflow-y-auto">
                     {results.map((ticker, index) => (

@@ -482,7 +482,7 @@ export function TickerDetail() {
                                 <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2 flex items-center gap-2">
                                     Business Summary
                                 </h2>
-                                <div className="text-sm text-muted-foreground/90 leading-relaxed bg-muted/30 p-6 rounded-xl border border-border/50 italic">
+                                <div className="text-sm text-foreground/90 leading-relaxed bg-muted/20 p-6 rounded-xl border border-border/40 text-justify">
                                     {profile?.description || "No company description available."}
                                 </div>
                             </section>

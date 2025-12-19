@@ -94,7 +94,7 @@ export function ProfilePage() {
                     </div>
                     <div>
                         <div className="flex items-center justify-center sm:justify-start gap-3">
-                            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">
                                 {nickname || user?.name || 'Trader'}
                             </h1>
                             {profile?.tier === 'pro' && (

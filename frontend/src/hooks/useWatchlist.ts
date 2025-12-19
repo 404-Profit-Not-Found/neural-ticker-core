@@ -102,7 +102,33 @@ export function useAddTickerToWatchlist() {
       });
       return data;
     },
-    onSuccess: () => {
+    onMutate: async ({ watchlistId, symbol }) => {
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+        if (!old) return [];
+        return old.map((list) => {
+          if (list.id === watchlistId) {
+            const optimItem: WatchlistItem = {
+              id: `optim-${Date.now()}`,
+              ticker: { id: `optim-${symbol}`, symbol },
+              addedAt: new Date().toISOString()
+            };
+            return { ...list, items: [...(list.items || []), optimItem] };
+          }
+          return list;
+        });
+      });
+
+      return { previousWatchlists };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousWatchlists) {
+        queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
     },
   });
@@ -121,9 +147,45 @@ export function useRemoveTickerFromWatchlist() {
       await api.delete(`/watchlists/${watchlistId}/items/${itemId}`);
       return itemId;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
+    onMutate: async ({ watchlistId, itemId }) => {
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+        if (!old) return [];
+        return old.map((list) => {
+          if (list.id === watchlistId) {
+            return {
+              ...list,
+              items: (list.items || []).filter((item) => String(item.id) !== String(itemId))
+            };
+          }
+          return list;
+        });
+      });
+
+      return { previousWatchlists };
     },
+    onError: (_err, _variables, context) => {
+      if (context?.previousWatchlists) {
+        queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+      }
+    },
+    onSuccess: (_, variables) => {
+      // Commit the removal to cache permanently (until next organic refetch)
+      queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+        if (!old) return [];
+        return old.map((list) => {
+          if (list.id === variables.watchlistId) {
+            return {
+              ...list,
+              items: (list.items || []).filter((item) => String(item.id) !== String(variables.itemId))
+            };
+          }
+          return list;
+        });
+      });
+    }
   });
 }
 
@@ -147,7 +209,7 @@ export function useMarketSnapshots(symbols: string[]) {
       }
     },
     enabled: symbols.length > 0,
-    placeholderData: EMPTY_SNAPSHOTS,
+    placeholderData: (previousData) => previousData,
     staleTime: 1000 * 30, // 30s fresh
     retry: 1,
     refetchOnWindowFocus: false,
