@@ -1,32 +1,42 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { join } from 'path';
 
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
+      inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const env = configService.get<string>('env');
-        const nodeEnv = process.env.NODE_ENV;
-        const isProduction = env === 'prod' || nodeEnv === 'production';
-        // Temporarily enable synchronize to add is_hidden column, then revert
-        const shouldSync =
-          process.env.DB_SYNCHRONIZE === 'true' || !isProduction;
-        console.log(
-          `[Database] env=${env}, NODE_ENV=${nodeEnv}, isProduction=${isProduction}, synchronize=${shouldSync}`,
-        );
+        const dbConfig = configService.get('database');
+        const isTest = process.env.NODE_ENV === 'test';
+
         return {
           type: 'postgres',
-          url: configService.get<string>('database.url'),
+          url: dbConfig.url,
+          host: dbConfig.host || 'localhost',
+          port: dbConfig.port || 5432,
+          username:
+            process.env.DB_USERNAME ?? process.env.POSTGRES_USER ?? 'admin',
+          ...(dbConfig.password ? { password: dbConfig.password } : {}),
+          database: dbConfig.database || 'postgres',
           autoLoadEntities: true,
-          synchronize: shouldSync,
-          migrationsRun: true,
-          migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+          synchronize: isTest || dbConfig.synchronize,
+          migrationsRun: !isTest,
+          migrations: [join(__dirname, '..', 'migrations', '*.{ts,js}')],
+          connectTimeoutMS: 10000,
+          ssl:
+            process.env.DB_SSL === 'false'
+              ? false
+              : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
+                  process.env.DB_SSL === 'true'
+                ? { rejectUnauthorized: false }
+                : false,
         };
       },
-      inject: [ConfigService],
     }),
   ],
+  exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

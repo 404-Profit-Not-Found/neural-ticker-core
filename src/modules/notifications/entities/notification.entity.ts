@@ -35,6 +35,6 @@ export class Notification {
   @Column({ type: 'jsonb', nullable: true })
   data: any; // e.g., { researchId: '...' }
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 }

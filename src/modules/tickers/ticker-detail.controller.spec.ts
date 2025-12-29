@@ -4,6 +4,8 @@ import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ResearchService } from '../research/research.service';
+import { SocialAnalysisService } from '../social-analysis/social-analysis.service';
+import { EventCalendarService } from '../events/event-calendar.service';
 import { NotFoundException } from '@nestjs/common';
 
 describe('TickerDetailController', () => {
@@ -39,6 +41,14 @@ describe('TickerDetailController', () => {
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: ResearchService, useValue: mockResearchService },
+        {
+          provide: SocialAnalysisService,
+          useValue: { getLatestSentiment: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: EventCalendarService,
+          useValue: { getUpcomingEvents: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 

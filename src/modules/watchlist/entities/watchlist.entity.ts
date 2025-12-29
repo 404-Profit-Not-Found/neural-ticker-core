@@ -44,6 +44,6 @@ export class Watchlist {
   updated_at: Date;
 
   // Audit improvement: Soft Delete
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
   deleted_at: Date;
 }

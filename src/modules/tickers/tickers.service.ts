@@ -7,6 +7,7 @@ import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class TickersService {
@@ -105,7 +106,7 @@ export class TickersService {
       exchange: profile.exchange || 'Unknown',
       currency: profile.currency || 'USD',
       country: profile.country || 'Unknown',
-      ipo_date: profile.ipo,
+      ipo_date: profile.ipo || undefined,
       market_capitalization: profile.marketCapitalization,
       share_outstanding: profile.shareOutstanding,
       phone: profile.phone,
@@ -309,6 +310,56 @@ export class TickersService {
       .getRawMany();
 
     return results.map((r) => r.sector).filter((s) => s && s.trim().length > 0);
+  }
+
+  async getTickerBySymbol(symbol: string): Promise<TickerEntity | null> {
+    return this.tickerRepo.findOne({ where: { symbol: symbol.toUpperCase() } });
+  }
+
+  /**
+   * Get all tickers with social analysis enabled.
+   */
+  async getTickersWithSocialAnalysis(): Promise<TickerEntity[]> {
+    return this.tickerRepo.find({
+      where: {
+        social_analysis_enabled: true,
+        is_hidden: false,
+      },
+      order: { symbol: 'ASC' },
+    });
+  }
+
+  /**
+   * Enable/disable social analysis for a ticker.
+   */
+  async toggleSocialAnalysis(
+    tickerId: string,
+    enabled: boolean,
+    userId: string,
+  ): Promise<TickerEntity> {
+    await this.tickerRepo.update(tickerId, {
+      social_analysis_enabled: enabled,
+      social_analysis_enabled_by: enabled ? userId : null,
+    });
+    const ticker = await this.tickerRepo.findOne({
+      where: { id: tickerId },
+      relations: ['social_analysis_owner'],
+    });
+    if (!ticker) {
+      throw new NotFoundException(`Ticker ID ${tickerId} not found`);
+    }
+    return ticker;
+  }
+
+  /**
+   * Get the user who enabled social analysis for a ticker.
+   */
+  async getSocialAnalysisOwner(tickerId: string): Promise<User | null> {
+    const ticker = await this.tickerRepo.findOne({
+      where: { id: tickerId },
+      relations: ['social_analysis_owner'],
+    });
+    return ticker?.social_analysis_owner || null;
   }
 
   private async fetchFromYahoo(symbol: string): Promise<any> {

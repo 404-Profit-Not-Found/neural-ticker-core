@@ -212,10 +212,56 @@ export function useToggleFavorite() {
             const res = await api.post('/watchlists/favorites/toggle', { symbol });
             return res.data;
         },
-        onSuccess: (_, symbol) => {
-            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
-            // Ideally we invalidate watchlist queries too
+        onMutate: async (symbol: string) => {
+            // Cancel any outgoing refetches for watchlists so they don't overwrite our optimistic update
+            await queryClient.cancelQueries({ queryKey: ['watchlists'] });
+
+            // Snapshot the previous value
+            const previousWatchlists = queryClient.getQueryData<any[]>(['watchlists']);
+
+            // Optimistically update to the new value
+            if (previousWatchlists) {
+                queryClient.setQueryData<any[]>(['watchlists'], (old: any[] = []) => {
+                    return old.map(list => {
+                        if (list.name === 'Favourites') {
+                            const exists = list.items.some((item: any) => item.ticker.symbol === symbol);
+                            if (exists) {
+                                // Remove
+                                return {
+                                    ...list,
+                                    items: list.items.filter((item: any) => item.ticker.symbol !== symbol)
+                                };
+                            } else {
+                                // Add (Mock item structure)
+                                return {
+                                    ...list,
+                                    items: [
+                                        ...list.items,
+                                        {
+                                            id: 'temp-' + Date.now(),
+                                            ticker: { symbol, id: 'temp' } // Minimal needed for UI
+                                        }
+                                    ]
+                                };
+                            }
+                        }
+                        return list;
+                    });
+                });
+            }
+
+            // Return a context object with the snapshotted value
+            return { previousWatchlists };
+        },
+        onError: (_err, _symbol, context: any) => {
+            if (context?.previousWatchlists) {
+                queryClient.setQueryData(['watchlists'], context.previousWatchlists);
+            }
+        },
+        onSettled: (_, __, symbol) => {
+            // Always refetch after error or success to ensure server state
             queryClient.invalidateQueries({ queryKey: ['watchlists'] }); 
+            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
         }
     });
 }
@@ -235,7 +281,7 @@ export function useActiveResearchCount() {
             if (count && count > 0) {
                 return 3000; // Poll actively if we have active items
             }
-            return 10000; // Poll less frequently if idle, to catch new starts from other tabs
+            return 30000; // Poll less frequently if idle (30s) to catch new starts from other tabs
         },
         staleTime: 0,
     });

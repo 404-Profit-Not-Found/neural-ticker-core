@@ -1,7 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { testTypeOrmConfig } from './database/typeorm.test.config';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static'; // Added
 import { join } from 'path'; // Added
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
@@ -30,6 +28,9 @@ import { ProxyModule } from './modules/proxy/proxy.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
 import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
+import { EventsModule } from './modules/events/events.module';
+import { SocialAnalysisModule } from './modules/social-analysis/social-analysis.module';
+import { DatabaseModule } from './database/database.module';
 import configuration from './config/configuration';
 
 // ...
@@ -56,38 +57,7 @@ import configuration from './config/configuration';
       },
     ]),
 
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        if (process.env.NODE_ENV === 'test') {
-          return testTypeOrmConfig;
-        }
-        const dbConfig = configService.get('database');
-        return {
-          type: 'postgres',
-          url: dbConfig.url,
-          host: dbConfig.host || 'localhost',
-          port: dbConfig.port || 5432,
-          username:
-            process.env.DB_USERNAME ?? process.env.POSTGRES_USER ?? 'admin',
-          ...(dbConfig.password ? { password: dbConfig.password } : {}),
-          database: dbConfig.database || 'postgres',
-          autoLoadEntities: true,
-          synchronize: dbConfig.synchronize,
-          migrationsRun: true,
-          migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-          connectTimeoutMS: 10000,
-          ssl:
-            process.env.DB_SSL === 'false'
-              ? false
-              : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
-                  process.env.DB_SSL === 'true'
-                ? { rejectUnauthorized: false }
-                : false,
-        };
-      },
-    }),
+    DatabaseModule,
     HealthModule,
     FinnhubModule,
     LlmModule,
@@ -102,11 +72,12 @@ import configuration from './config/configuration';
     StockTwitsModule,
     WatchlistModule,
     SocialModule,
-    SocialModule,
     ProxyModule,
     NotificationsModule,
     PortfolioModule,
     YahooFinanceModule,
+    EventsModule,
+    SocialAnalysisModule,
   ],
   controllers: [AppController],
   providers: [

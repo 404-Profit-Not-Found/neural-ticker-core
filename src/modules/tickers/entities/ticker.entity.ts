@@ -4,9 +4,12 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ColumnNumericTransformer } from '../../../common/transformers/column-numeric.transformer';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('tickers')
 export class TickerEntity {
@@ -134,6 +137,21 @@ export class TickerEntity {
   })
   @Column({ type: 'boolean', default: false })
   is_hidden: boolean;
+
+  @ApiProperty({
+    example: false,
+    description: 'Enable AI-powered social sentiment analysis for this ticker',
+    required: false,
+  })
+  @Column({ type: 'boolean', default: false })
+  social_analysis_enabled: boolean;
+
+  @Column({ type: 'uuid', nullable: true })
+  social_analysis_enabled_by: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'social_analysis_enabled_by' })
+  social_analysis_owner: User;
 
   @ApiProperty({ description: 'Raw Finnhub Profile Data', required: false })
   @Column({ type: 'jsonb', nullable: true })

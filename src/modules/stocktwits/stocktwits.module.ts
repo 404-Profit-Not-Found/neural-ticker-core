@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockTwitsService } from './stocktwits.service';
@@ -11,7 +11,7 @@ import { TickersModule } from '../tickers/tickers.module';
   imports: [
     HttpModule,
     TypeOrmModule.forFeature([StockTwitsPost, StockTwitsWatcher]),
-    TickersModule,
+    forwardRef(() => TickersModule),
   ],
   controllers: [StockTwitsController],
   providers: [StockTwitsService],

@@ -39,11 +39,20 @@ export class NewsController {
     // If user_id is nullable (it is in ResearchNote entity), then passing null is fine?
     // Let's pass userId || null.
     const digest = await this.researchService.getCachedDigest(userId ?? null);
+    
     if (!digest) {
-      return {
-        status: 'pending',
-        message: 'Digest generation in progress or scheduled.',
-      };
+        if (!userId) {
+            // If we want to support public digest later, we'd fetch 'system-trigger' here.
+            // For now, require login.
+            return {
+                status: 'failed',
+                message: 'Please log in to view your Daily Digest.',
+            };
+        }
+        return {
+            status: 'failed',
+            message: 'Could not generate digest. Ensure you have tickers in your watchlist.',
+        };
     }
 
     // Enrich with live data for the mentioned tickers

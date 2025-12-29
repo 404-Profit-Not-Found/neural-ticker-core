@@ -32,18 +32,30 @@ describe('NewsController', () => {
   });
 
   describe('getDailyDigest', () => {
-    it('should pass user ID from request to research service', async () => {
+    it('should return failed status if user is logged in but generation returns null', async () => {
       const mockReq = { user: { id: 'user-123' } };
-      await controller.getDailyDigest(mockReq);
+      mockResearchService.getCachedDigest.mockResolvedValue(null);
+      
+      const result = await controller.getDailyDigest(mockReq);
 
       expect(researchService.getCachedDigest).toHaveBeenCalledWith('user-123');
+      expect(result).toEqual({
+        status: 'failed',
+        message: 'Could not generate digest. Ensure you have tickers in your watchlist.',
+      });
     });
 
-    it('should pass null if user is missing (though guard usually prevents this)', async () => {
+    it('should return failed status if user is missing', async () => {
       const mockReq = {};
-      await controller.getDailyDigest(mockReq);
+      mockResearchService.getCachedDigest.mockResolvedValue(null);
+
+      const result = await controller.getDailyDigest(mockReq);
 
       expect(researchService.getCachedDigest).toHaveBeenCalledWith(null);
+      expect(result).toEqual({
+        status: 'failed',
+        message: 'Please log in to view your Daily Digest.',
+      });
     });
   });
 });

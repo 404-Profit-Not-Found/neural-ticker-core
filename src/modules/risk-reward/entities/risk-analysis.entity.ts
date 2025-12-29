@@ -183,7 +183,7 @@ export class RiskAnalysis {
 
   // --- Red Flags ---
   @ApiProperty()
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'jsonb', default: '[]' })
   red_flags: string[];
 
   @ApiProperty({ example: 'uuid', required: false })

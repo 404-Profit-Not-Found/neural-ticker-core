@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
   Req,
+  NotFoundException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -163,6 +164,51 @@ export class TickersController {
   @Patch(':symbol/hidden')
   setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
     return this.tickersService.setTickerHidden(symbol, hidden);
+  }
+
+  @ApiOperation({
+    summary: 'Get all tickers with social analysis enabled',
+    description:
+      'Returns a list of tickers that have AI social analysis enabled.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of social-enabled tickers.',
+  })
+  @Public()
+  @Get('social-enabled/list')
+  getSocialEnabled() {
+    return this.tickersService.getTickersWithSocialAnalysis();
+  }
+
+  @ApiOperation({
+    summary: 'Toggle social analysis for a ticker',
+    description:
+      'Enables or disables AI social analysis for a ticker. Admin or PRO users only.',
+  })
+  @ApiParam({ name: 'symbol', example: 'NVDA' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { enabled: { type: 'boolean', example: true } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Social analysis toggled.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'pro')
+  @Patch(':symbol/social-analysis')
+  async toggleSocial(
+    @Req() req: any,
+    @Param('symbol') symbol: string,
+    @Body('enabled') enabled: boolean,
+  ) {
+    const ticker = await this.tickersService.getTickerBySymbol(symbol);
+    if (!ticker) throw new NotFoundException(`Ticker ${symbol} not found`);
+    return this.tickersService.toggleSocialAnalysis(
+      ticker.id,
+      enabled,
+      req.user.id,
+    );
   }
 
   @ApiOperation({

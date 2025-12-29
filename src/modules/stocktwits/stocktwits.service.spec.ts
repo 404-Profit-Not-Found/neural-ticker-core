@@ -32,6 +32,7 @@ describe('StockTwitsService', () => {
 
   const mockTickersService = {
     getAllTickers: jest.fn(),
+    getTickerBySymbol: jest.fn().mockResolvedValue({ id: 1, symbol: 'AAPL' }),
   };
 
   beforeEach(async () => {

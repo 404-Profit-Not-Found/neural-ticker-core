@@ -5,6 +5,9 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ResearchService } from '../research/research.service';
 import { Fundamentals } from '../market-data/entities/fundamentals.entity';
+import { Public } from '../auth/public.decorator';
+import { SocialAnalysisService } from '../social-analysis/social-analysis.service';
+import { EventCalendarService } from '../events/event-calendar.service';
 
 @ApiTags('tickers')
 @Controller('v1/tickers')
@@ -17,6 +20,8 @@ export class TickerDetailController {
     private readonly riskRewardService: RiskRewardService,
     @Inject(forwardRef(() => ResearchService))
     private readonly researchService: ResearchService,
+    private readonly socialAnalysisService: SocialAnalysisService,
+    private readonly eventCalendarService: EventCalendarService,
   ) {}
 
   @ApiOperation({
@@ -25,6 +30,7 @@ export class TickerDetailController {
   @ApiParam({ name: 'symbol', example: 'AAPL', description: 'Ticker symbol' })
   @ApiResponse({ status: 200, description: 'Composite data object' })
   @ApiResponse({ status: 404, description: 'Ticker not found' })
+  @Public()
   @Get(':symbol/composite')
   async getCompositeData(@Param('symbol') symbol: string) {
     // 1. Get Market Data Snapshot (Handles Ticker existence and Fundamentals)
@@ -41,20 +47,28 @@ export class TickerDetailController {
     const safeFundamentals = fundamentals || ({} as Partial<Fundamentals>);
 
     // 2. Parallel Fetching for Risk, Research, and History
-    const [riskAnalysis, researchNote, priceHistory, analystRatings] =
-      await Promise.all([
-        this.riskRewardService.getLatestAnalysis(ticker.id).catch(() => null),
-        this.researchService.getLatestNoteForTicker(symbol).catch(() => null),
-        this.marketDataService
-          .getHistory(
-            symbol,
-            '1d',
-            new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
-            new Date().toISOString(),
-          )
-          .catch(() => []),
-        this.marketDataService.getAnalystRatings(symbol).catch(() => []),
-      ]);
+    const [
+      riskAnalysis,
+      researchNote,
+      priceHistory,
+      analystRatings,
+      latestSocialSentiment,
+      upcomingEvents,
+    ] = await Promise.all([
+      this.riskRewardService.getLatestAnalysis(ticker.id).catch(() => null),
+      this.researchService.getLatestNoteForTicker(symbol).catch(() => null),
+      this.marketDataService
+        .getHistory(
+          symbol,
+          '1d',
+          new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+          new Date().toISOString(),
+        )
+        .catch(() => []),
+      this.marketDataService.getAnalystRatings(symbol).catch(() => []),
+      this.socialAnalysisService.getLatestSentiment(symbol).catch(() => null),
+      this.eventCalendarService.getUpcomingEvents(symbol).catch(() => []),
+    ]);
 
     // 3. Construct Composite Response
     return {
@@ -133,6 +147,8 @@ export class TickerDetailController {
         : null,
       notes: researchNote ? [researchNote] : [], // Legacy support expects array
       ratings: analystRatings,
+      social_sentiment: latestSocialSentiment,
+      upcoming_events: upcomingEvents,
     };
   }
 }

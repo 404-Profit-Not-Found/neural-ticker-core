@@ -117,7 +117,9 @@ async function migrate() {
   }
 }
 
-migrate().catch((err) => {
-  console.error('Migration failed', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  migrate().catch((err) => {
+    console.error('Migration failed', err);
+    process.exit(1);
+  });
+}

@@ -11,6 +11,8 @@ import { MarketDataModule } from '../market-data/market-data.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { ResearchModule } from '../research/research.module';
 import { YahooFinanceModule } from '../yahoo-finance/yahoo-finance.module';
+import { SocialAnalysisModule } from '../social-analysis/social-analysis.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { YahooFinanceModule } from '../yahoo-finance/yahoo-finance.module';
     forwardRef(() => RiskRewardModule),
     forwardRef(() => ResearchModule),
     YahooFinanceModule,
+    forwardRef(() => SocialAnalysisModule),
+    forwardRef(() => EventsModule),
   ],
   controllers: [TickersController, TickerDetailController],
   providers: [TickersService],

@@ -9,6 +9,8 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { YahooFinanceModule } from '../yahoo-finance/yahoo-finance.module';
+import { HttpModule } from '@nestjs/axios';
+import { MarketStatusService } from './market-status.service';
 
 import { AnalystRating } from './entities/analyst-rating.entity';
 
@@ -38,6 +40,7 @@ import { ResearchModule } from '../research/research.module';
     FinnhubModule,
     forwardRef(() => TickersModule),
     YahooFinanceModule,
+    HttpModule,
   ],
   controllers: [
     MarketDataController,
@@ -45,7 +48,7 @@ import { ResearchModule } from '../research/research.module';
     NewsController,
     StatsController,
   ],
-  providers: [MarketDataService],
-  exports: [MarketDataService],
+  providers: [MarketDataService, MarketStatusService],
+  exports: [MarketDataService, MarketStatusService],
 })
 export class MarketDataModule {}

@@ -84,6 +84,6 @@ export class PriceOhlcv {
   source: string;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz', name: 'inserted_at' })
+  @CreateDateColumn({ name: 'inserted_at', type: 'timestamptz' })
   inserted_at: Date;
 }

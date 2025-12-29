@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
@@ -29,6 +29,8 @@ export class StockTwitsService {
   async fetchAndStorePosts(symbol: string) {
     try {
       this.logger.log(`Fetching StockTwits posts for ${symbol}...`);
+      const ticker = await this.tickersService.getTickerBySymbol(symbol);
+
       const { data } = await firstValueFrom(
         this.httpService.get(`${this.BASE_URL}/${symbol}.json`),
       );
@@ -54,7 +56,8 @@ export class StockTwitsService {
             body: msg.body,
             likes_count: msg.likes?.total || 0,
             created_at: new Date(msg.created_at),
-          });
+            ticker_id: ticker?.id,
+          } as any);
           await this.postsRepository.save(post);
           newPostsCount++;
         }
@@ -65,6 +68,25 @@ export class StockTwitsService {
         `Failed to fetch posts for ${symbol}: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Get recent posts from DB within a time window.
+   */
+  async getRecentPostsFromDb(
+    symbol: string,
+    hours: number = 24,
+  ): Promise<any[]> {
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - hours);
+
+    return this.postsRepository.find({
+      where: {
+        symbol,
+        created_at: MoreThan(cutoff),
+      },
+      order: { created_at: 'DESC' },
+    });
   }
 
   /**

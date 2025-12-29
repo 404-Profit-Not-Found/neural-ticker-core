@@ -779,42 +779,43 @@ export class MarketStatusService {
 | `searchEventCalendar` | 9:00 AM ET | Market trading day + `social_analysis_enabled` | AI-powered event search |
 | `cleanupOldAnalyses` | 2:00 AM ET | Always | Remove analyses older than 90 days |
 
-### 5.4 JobsModule Enhancement
+### 5.4 Social Analysis Service (Job Logic)
 
 ```typescript
-// src/modules/jobs/social-analysis.job.ts
+// src/modules/social-analysis/social-analysis.service.ts
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { MarketStatusService } from '../market-data/market-status.service';
-import { SocialAnalysisService } from '../social-analysis/social-analysis.service';
 import { EventCalendarService } from '../events/event-calendar.service';
 import { TickersService } from '../tickers/tickers.service';
+import { CreditService } from '../users/credit.service';
 
 @Injectable()
-export class SocialAnalysisJob {
-  private readonly logger = new Logger(SocialAnalysisJob.name);
+export class SocialAnalysisService {
+  private readonly logger = new Logger(SocialAnalysisService.name);
+  private readonly SOCIAL_ANALYSIS_CREDIT_COST = 2;
 
   constructor(
     private readonly marketStatusService: MarketStatusService,
-    private readonly socialAnalysisService: SocialAnalysisService,
     private readonly eventCalendarService: EventCalendarService,
     private readonly tickersService: TickersService,
+    private readonly creditService: CreditService,
+    @InjectRepository(StockTwitsAnalysis)
+    private readonly analysisRepo: Repository<StockTwitsAnalysis>,
   ) {}
 
   /**
-   * Run 30 minutes before US market open (9:00 AM ET = 14:00 UTC).
-   * Market opens at 9:30 AM ET.
+   * Main job: Pre-market analysis (called via API endpoint).
+   * Runs 30 minutes before US market open (9:00 AM ET).
    */
-  @Cron('0 14 * * 1-5', { timeZone: 'UTC' }) // 9:00 AM ET on weekdays
-  async handlePreMarketAnalysis() {
+  async runPreMarketAnalysis(): Promise<{ success: boolean; processed: number; skipped: number; errors: number }> {
     this.logger.log('Pre-market analysis job triggered');
     
     // Check if market is trading today
     const isTradingDay = await this.marketStatusService.isMarketTradingDay();
     if (!isTradingDay) {
       this.logger.log('Market is closed today (holiday). Skipping analysis.');
-      return;
+      return { success: true, processed: 0, skipped: 0, errors: 0 };
     }
     
     // Get only tickers with social analysis enabled
@@ -822,41 +823,206 @@ export class SocialAnalysisJob {
     
     if (tickers.length === 0) {
       this.logger.log('No tickers have social analysis enabled.');
-      return;
+      return { success: true, processed: 0, skipped: 0, errors: 0 };
     }
     
     this.logger.log(`Running analysis for ${tickers.length} tickers...`);
     
+    let processed = 0;
+    let skipped = 0;
+    let errors = 0;
+    
     for (const ticker of tickers) {
       try {
+        // Get the user who enabled this ticker's analysis
+        const enabledBy = await this.tickersService.getSocialAnalysisOwner(ticker.id);
+        
+        // If PRO user, check and deduct credits
+        if (enabledBy && enabledBy.tier === 'pro') {
+          const balance = await this.creditService.getBalance(enabledBy.id);
+          
+          if (balance < this.SOCIAL_ANALYSIS_CREDIT_COST) {
+            this.logger.warn(`Skipping ${ticker.symbol}: User ${enabledBy.id} has insufficient credits`);
+            skipped++;
+            continue;
+          }
+          
+          // Deduct credits
+          await this.creditService.deductCredits(
+            enabledBy.id,
+            this.SOCIAL_ANALYSIS_CREDIT_COST,
+            'social_analysis_spend',
+            { ticker_id: ticker.id, symbol: ticker.symbol },
+          );
+        }
+        
         // Run sentiment analysis (last 24 hours of posts)
-        await this.socialAnalysisService.analyzeRecentPosts(ticker.symbol, 24);
+        await this.analyzeRecentPosts(ticker.symbol, 24);
         
         // Run event search
         await this.eventCalendarService.searchUpcomingEvents(ticker.symbol);
         
         this.logger.log(`✓ Completed analysis for ${ticker.symbol}`);
+        processed++;
       } catch (error) {
         this.logger.error(`Failed analysis for ${ticker.symbol}: ${error.message}`);
+        errors++;
       }
     }
     
-    this.logger.log('Pre-market analysis job completed.');
+    this.logger.log(`Pre-market analysis complete: ${processed} processed, ${skipped} skipped, ${errors} errors`);
+    return { success: true, processed, skipped, errors };
   }
 
   /**
-   * Cleanup old analyses daily at 2 AM ET.
+   * Cleanup old analyses (called via API endpoint).
    */
-  @Cron('0 7 * * *', { timeZone: 'UTC' }) // 2:00 AM ET
-  async handleCleanup() {
-    this.logger.log('Running cleanup of old analyses...');
+  async cleanupOldAnalyses(ageInDays: number = 30): Promise<number> {
+    this.logger.log(`Running cleanup of analyses older than ${ageInDays} days...`);
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - ageInDays);
+    
+    const result = await this.analysisRepo
+      .createQueryBuilder()
+      .delete()
+      .where('created_at < :cutoffDate', { cutoffDate })
+      .execute();
+    
+    const deleted = result.affected || 0;
+    this.logger.log(`Deleted ${deleted} analyses older than ${ageInDays} days.`);
+    return deleted;
+  }
+
+  // ... other methods like analyzeRecentPosts, getLatestSentiment, etc.
+}
+```
+
+### 5.5 API Controller for Job Triggers
+
+```typescript
+// src/modules/social-analysis/social-analysis.controller.ts
+
+import { Controller, Post, Headers, UnauthorizedException, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiHeader, ApiResponse } from '@nestjs/swagger';
+import { Public } from '../auth/public.decorator';
+import { SocialAnalysisService } from './social-analysis.service';
+
+@ApiTags('Social Analysis Jobs')
+@Controller('v1/social-analysis/jobs')
+@Public()
+export class SocialAnalysisController {
+  private readonly logger = new Logger(SocialAnalysisController.name);
+
+  constructor(private readonly socialAnalysisService: SocialAnalysisService) {}
+
+  private validateSecret(secret: string) {
+    if (secret !== process.env.CRON_SECRET) {
+      this.logger.warn('Unauthorized cron attempt');
+      throw new UnauthorizedException('Invalid Cron Secret');
+    }
+  }
+
+  @Post('pre-market-analysis')
+  @ApiOperation({ 
+    summary: 'Trigger pre-market social analysis (GitHub Actions)',
+    description: 'Runs 30 min before market open. Analyzes social sentiment and extracts events for enabled tickers.'
+  })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ 
+    status: 200,
+    description: 'Job completed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Pre-market analysis completed' },
+        result: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            processed: { type: 'number' },
+            skipped: { type: 'number' },
+            errors: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async handlePreMarketAnalysis(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    const result = await this.socialAnalysisService.runPreMarketAnalysis();
+    return { message: 'Pre-market analysis completed', result };
+  }
+
+  @Post('cleanup')
+  @ApiOperation({ 
+    summary: 'Cleanup old social analyses (GitHub Actions)',
+    description: 'Removes analyses older than 90 days'
+  })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Cleanup completed' })
+  async handleCleanup(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
     const deleted = await this.socialAnalysisService.cleanupOldAnalyses(90);
-    this.logger.log(`Deleted ${deleted} analyses older than 90 days.`);
+    return { message: 'Cleanup completed', deleted };
   }
 }
 ```
 
-### 5.5 TickersService Enhancement
+### 5.6 GitHub Actions Workflow
+
+```yaml
+# .github/workflows/crons.yml
+
+name: Cron Jobs
+
+on:
+  schedule:
+    # Pre-market analysis: 9:00 AM ET (14:00 UTC) on weekdays
+    - cron: '0 14 * * 1-5'
+    # Cleanup: 2:00 AM ET (7:00 UTC) daily
+    - cron: '0 7 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  pre-market-analysis:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: github.event.schedule == '0 14 * * 1-5' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Pre-Market Social Analysis
+        run: |
+          curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/social-analysis/jobs/pre-market-analysis \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: github.event.schedule == '0 7 * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Cleanup Old Analyses
+        run: |
+          curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/social-analysis/jobs/cleanup \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+```
+
+### 5.7 Local Testing (Manual Trigger)
+
+```bash
+# Pre-market analysis
+curl -X POST http://localhost:3000/api/v1/social-analysis/jobs/pre-market-analysis \
+  -H "X-Cron-Secret:your-local-secret" \
+  -H "Content-Type:application/json"
+
+# Cleanup
+curl -X POST http://localhost:3000/api/v1/social-analysis/jobs/cleanup \
+  -H "X-Cron-Secret:your-local-secret" \
+  -H "Content-Type:application/json"
+```
+
+### 5.8 TickersService Enhancement
 
 ```typescript
 // Add to src/modules/tickers/tickers.service.ts
@@ -883,21 +1049,120 @@ async toggleSocialAnalysis(tickerId: string, enabled: boolean): Promise<TickerEn
 }
 ```
 
-### 5.6 Admin API for Toggling Social Analysis
+### 5.9 Access Control: Admin & PRO Users Only
+
+> [!IMPORTANT]
+> Social analysis toggle is available to:
+> - **Admins**: Free, unlimited access
+> - **PRO users**: Costs credits per analysis run
 
 ```typescript
-// Add to tickers.controller.ts or admin controller
+// Add to src/modules/tickers/tickers.controller.ts
+
+import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import { CreditService } from '../users/credit.service';
+
+// Credit cost for social analysis per ticker
+const SOCIAL_ANALYSIS_CREDIT_COST = 2; // 2 credits per ticker per run
 
 @Patch(':id/social-analysis')
-@ApiOperation({ summary: 'Toggle social analysis for a ticker' })
+@UseGuards(JwtAuthGuard)
+@ApiOperation({ summary: 'Toggle social analysis for a ticker (Admin/PRO only)' })
 @ApiResponse({ status: 200, type: TickerEntity })
 async toggleSocialAnalysis(
   @Param('id') id: string,
   @Body() body: { enabled: boolean },
+  @Request() req: any,
 ): Promise<TickerEntity> {
+  const user = req.user;
+  
+  // Check access: Admin or PRO tier only
+  if (user.role !== 'admin' && user.tier !== 'pro') {
+    throw new ForbiddenException('Social analysis is only available for Admin and PRO users');
+  }
+  
+  // PRO users need sufficient credits to enable (checked per-run, but warn early)
+  if (user.tier === 'pro' && body.enabled) {
+    const balance = await this.creditService.getBalance(user.id);
+    if (balance < SOCIAL_ANALYSIS_CREDIT_COST) {
+      throw new BadRequestException(
+        `Insufficient credits. Social analysis costs ${SOCIAL_ANALYSIS_CREDIT_COST} credits per run. ` +
+        `Current balance: ${balance}`
+      );
+    }
+  }
+  
   return this.tickersService.toggleSocialAnalysis(id, body.enabled);
 }
 ```
+
+### 5.10 Credit Deduction for PRO Users
+
+Add `social_analysis_spend` as a new credit transaction reason:
+
+```typescript
+// Update CreditService deductCredits reason type
+reason: 'research_spend' | 'portfolio_analysis_spend' | 'social_analysis_spend',
+```
+
+> [!NOTE]
+> Credit deduction logic is already included in section 5.4 (SocialAnalysisService.runPreMarketAnalysis).
+> The job checks user tier and deducts credits before running analysis.
+
+### 5.11 Track Who Enabled Social Analysis
+
+Add user tracking to the ticker entity:
+
+```typescript
+// Add to TickerEntity
+
+@ApiProperty({ description: 'User who enabled social analysis', required: false })
+@Column({ type: 'uuid', nullable: true })
+social_analysis_enabled_by: string;
+
+@ManyToOne(() => User, { nullable: true })
+@JoinColumn({ name: 'social_analysis_enabled_by' })
+social_analysis_owner: User;
+```
+
+Update toggle method:
+
+```typescript
+async toggleSocialAnalysis(
+  tickerId: string, 
+  enabled: boolean,
+  userId: string,
+): Promise<TickerEntity> {
+  await this.tickerRepo.update(tickerId, { 
+    social_analysis_enabled: enabled,
+    social_analysis_enabled_by: enabled ? userId : null,
+  });
+  return this.tickerRepo.findOne({ 
+    where: { id: tickerId },
+    relations: ['social_analysis_owner'],
+  });
+}
+
+async getSocialAnalysisOwner(tickerId: string): Promise<User | null> {
+  const ticker = await this.tickerRepo.findOne({
+    where: { id: tickerId },
+    relations: ['social_analysis_owner'],
+  });
+  return ticker?.social_analysis_owner || null;
+}
+```
+
+### 5.12 Credit Cost Summary
+
+| User Type | Access | Cost |
+|-----------|--------|------|
+| **Admin** | ✅ Full access | **Free** |
+| **PRO** | ✅ Full access | **2 credits/ticker/day** |
+| **Free** | ❌ No access | N/A |
+
+**Monthly cost estimate for PRO users:**
+- 5 tickers × 2 credits × ~22 trading days = **220 credits/month**
+- 10 tickers × 2 credits × ~22 trading days = **440 credits/month**
 
 ---
 
@@ -1031,12 +1296,10 @@ Timeline/calendar view of upcoming events:
 > [!IMPORTANT]
 > Please review the following key decisions:
 
-1. **Sentiment Analysis Frequency:** Every 4 hours reasonable, or should it be more/less frequent?
+1. **Sentiment Analysis Frequency:** Every 24 hours reasonable
 
-2. **Event Search Scope:** Currently searching 90 days ahead - adjust timeframe?
+2. **Event Search Scope:** Currently searching 30 days ahead 
 
-3. **Model Selection:** Using Flash for cost efficiency - prefer Pro for better accuracy?
+3. **Model Selection:** Using Flash for cost efficiency
 
-4. **Database Schema:** Any additional fields needed for `StockTwitsAnalysis` or `EventCalendar`?
 
-5. **Priority:** Which phase should be implemented first? Any specific features to prioritize?

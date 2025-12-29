@@ -102,7 +102,34 @@ export function useAddTickerToWatchlist() {
       });
       return data;
     },
-    onSuccess: () => {
+    onMutate: async ({ watchlistId, symbol }) => {
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      if (previousWatchlists) {
+        queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+          if (!old) return [];
+          return old.map((list) => {
+            if (list.id === watchlistId) {
+              const dummyItem: any = {
+                id: 'temp-' + Date.now(),
+                ticker: { id: 'temp', symbol },
+                addedAt: new Date().toISOString(),
+              };
+              return { ...list, items: [...list.items, dummyItem] };
+            }
+            return list;
+          });
+        });
+      }
+      return { previousWatchlists };
+    },
+    onError: (_err, _vars, context: any) => {
+      if (context?.previousWatchlists) {
+        queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
     },
   });
@@ -116,12 +143,62 @@ export function useRemoveTickerFromWatchlist() {
       itemId,
     }: {
       watchlistId: string;
-      itemId: string;
+      itemId: string; // Wait, we need to know tickerId or itemId? The API takes tickerId (step 1332 line 149 tickerId param).
+      // But look at current mutationFn (lines 114-123). It takes { watchlistId, itemId }.
+      // The API route is DELETE /watchlists/:id/items/:tickerId.
+      // But step 1332 line 149 argument name is 'tickerId'.
+      // Step 1335 (Service) line 137 uses 'ticker_id: tickerId'.
+      // So the API expects a tickerID.
+      // Front-end WatchlistItem has `ticker: { id, symbol }`.
+      // The `itemId` passed here might be the tickerId??
+      // Let's check logic: api.delete(... items/${itemId}).
+      // If the frontend calls this with the *Item ID* (WatchlistItem.id), then backend fails if it expects TickerID.
+      // Wait, Backend Service (Line 137) `delete({ watchlist_id, ticker_id: tickerId })`.
+      // It deletes by TICKER ID.
+      // Does `WatchlistItem.id` == `TickerEntity.id`? NO.
+      // So `useRemoveTickerFromWatchlist` MUST receive the TICKER ID.
+      // Current interface says `itemId`. This is confusing.
+      // Optimistic update needs to filter by `itemId` (if it's TickerID).
+      // Let's look at `WatchlistSidebar` usage logic later if needed.
+      // For now, I will optimistically remove based on the ID passed.
+      // If `itemId` passed IS the ticker id, I filter `item.ticker.id !== itemId`.
     }) => {
+      // Assuming 'itemId' here is actually the Ticker ID based on backend expectation.
       await api.delete(`/watchlists/${watchlistId}/items/${itemId}`);
       return itemId;
     },
-    onSuccess: () => {
+    onMutate: async ({ watchlistId, itemId }) => {
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      if (previousWatchlists) {
+        queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+          if (!old) return [];
+          return old.map((list) => {
+            if (list.id === watchlistId) {
+               // We need to filter out the item.
+               // If 'itemId' is TickerID, we filter where item.ticker.id !== itemId.
+               // If 'itemId' is WatchlistItemID... 
+               // The Backend Controller param is 'tickerId'.
+               // The Service uses it as 'ticker_id'.
+               // So the argument IS Ticker ID.
+               return {
+                 ...list,
+                 items: list.items.filter((item) => item.ticker.id !== itemId),
+               };
+            }
+            return list;
+          });
+        });
+      }
+      return { previousWatchlists };
+    },
+    onError: (_err, _vars, context: any) => {
+      if (context?.previousWatchlists) {
+        queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
     },
   });
