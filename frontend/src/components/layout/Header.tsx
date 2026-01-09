@@ -7,6 +7,7 @@ import { api } from '../../lib/api';
 import { queryClient } from '../../lib/queryClient';
 import { Badge } from '../ui/badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
+import { GlobalSearch } from './GlobalSearch';
 
 interface Notification {
   id: string;
@@ -182,17 +183,15 @@ export function Header() {
   };
 
   const linkClass = (path: string) =>
-    `text-sm font-medium h-14 flex items-center px-1 transition-colors ${
-      isActive(path)
-        ? 'text-foreground border-b-2 border-primary'
-        : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+    `text-sm font-medium h-14 flex items-center px-1 transition-colors ${isActive(path)
+      ? 'text-foreground border-b-2 border-primary'
+      : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
     }`;
 
   const mobileLinkClass = (path: string) =>
-    `block px-4 py-3 text-base font-medium transition-colors rounded-md ${
-      isActive(path)
-        ? 'bg-primary/10 text-primary'
-        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+    `block px-4 py-3 text-base font-medium transition-colors rounded-md ${isActive(path)
+      ? 'bg-primary/10 text-primary'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
     }`;
 
   const goTo = (path: string) => {
@@ -202,27 +201,31 @@ export function Header() {
 
   return (
     <header className="rgb-border-b h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
-        {/* Left: Mobile Menu Toggle & Logo */}
-        <div className="flex items-center gap-4">
-          <button
-            className="md:hidden text-muted-foreground hover:text-foreground"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+      <div className="container max-w-[80rem] mx-auto h-full flex items-center gap-2 md:gap-4 px-4">
+        {/* Mobile Menu Toggle */}
+        <button
+          className="md:hidden text-muted-foreground hover:text-foreground flex-shrink-0"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
 
-          <Link
-            to="/dashboard"
-            className="text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity"
-          >
-            NeuralTicker.com
-          </Link>
+        {/* Logo: Desktop only */}
+        <Link
+          to="/dashboard"
+          className="hidden md:flex text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
+        >
+          NeuralTicker.com
+        </Link>
+
+        {/* Search Bar - Always visible */}
+        <div className="flex-1 max-w-sm md:ml-4 lg:ml-8">
+          <GlobalSearch />
         </div>
 
         {/* Center: Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6 px-2">
           <Link to="/watchlist" className={linkClass('/watchlist')}>
             Watchlist
           </Link>
@@ -234,8 +237,8 @@ export function Header() {
           </Link>
         </nav>
 
-        {/* Right: alerts + profile */}
-        <div className="flex items-center gap-4">
+        {/* Right: actions (Research, Notifications, Profile) */}
+        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
           {/* Active Research Indicator */}
           <ActiveResearchIndicator count={researchCount} />
 
@@ -255,11 +258,10 @@ export function Header() {
 
             {/* Notifications Dropdown */}
             <div
-              className={`absolute right-0 top-full mt-3 w-80 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 overflow-hidden ${
-                notificationsMenuOpen
-                  ? 'opacity-100 visible translate-y-0'
-                  : 'opacity-0 invisible -translate-y-1 pointer-events-none'
-              }`}
+              className={`absolute right-0 top-full mt-3 w-80 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 overflow-hidden ${notificationsMenuOpen
+                ? 'opacity-100 visible translate-y-0'
+                : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+                }`}
             >
               <div className="p-3 border-b border-border flex justify-between items-center bg-muted/30">
                 <h3 className="font-semibold text-sm">Notifications</h3>
@@ -339,22 +341,20 @@ export function Header() {
 
             {/* Profile Dropdown */}
             <div
-              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${
-                profileMenuOpen
-                  ? 'opacity-100 visible translate-y-0'
-                  : 'opacity-0 invisible -translate-y-1 pointer-events-none'
-              }`}
+              className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${profileMenuOpen
+                ? 'opacity-100 visible translate-y-0'
+                : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+                }`}
             >
               <div className="p-4 border-b border-border">
                 <div className="font-semibold text-foreground flex items-center gap-2">
                   {user?.nickname || 'Trader'}
                   <Badge
                     variant="outline"
-                    className={`text-[10px] h-5 px-1.5 ${
-                      user?.tier === 'pro' || user?.tier === 'admin'
-                        ? 'border-purple-500 text-purple-500 uppercase'
-                        : 'border-emerald-500 text-emerald-500 uppercase'
-                    }`}
+                    className={`text-[10px] h-5 px-1.5 ${user?.tier === 'pro' || user?.tier === 'admin'
+                      ? 'border-purple-500 text-purple-500 uppercase'
+                      : 'border-emerald-500 text-emerald-500 uppercase'
+                      }`}
                   >
                     {(user?.tier || 'free').toUpperCase()}
                   </Badge>
@@ -399,6 +399,12 @@ export function Header() {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-14 left-0 w-full bg-background border-b border-border shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2">
+          {/* Dashboard rebranded from Logo */}
+          <Link to="/dashboard" className={mobileLinkClass('/dashboard')}>
+            Dashboard
+          </Link>
+          <div className="h-px bg-border my-1" />
+
           <Link to="/watchlist" className={mobileLinkClass('/watchlist')}>
             Watchlist
           </Link>

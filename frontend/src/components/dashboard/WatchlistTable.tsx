@@ -445,7 +445,7 @@ export function WatchlistTable() {
                         {showSuggestions && (
                             <>
                                 <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
-                                <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
+                                <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-[#09090b] !bg-opacity-100 border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 !opacity-100">
                                     <div className="py-1 max-h-[300px] overflow-y-auto">
                                         {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
                                             <button

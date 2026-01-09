@@ -5,7 +5,8 @@ import { Button } from '../ui/button';
 import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import type { TickerData } from './WatchlistTableView';
-import { useToggleFavorite, useWatchlists } from '../../hooks/useTicker';
+import { useToggleFavorite } from '../../hooks/useTicker';
+import { useWatchlists } from '../../hooks/useWatchlist';
 
 interface WatchlistGridViewProps {
     data: TickerData[];
@@ -92,9 +93,9 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                 </Button>
                             </div>
                         )}
-                        
-                         {/* Favorite Action (Absolute Top Right, left of Remove if exists, or simple absolute if no remove) */}
-                         {!onRemove && (
+
+                        {/* Favorite Action (Absolute Top Right, left of Remove if exists, or simple absolute if no remove) */}
+                        {!onRemove && (
                             <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button
                                     variant="ghost"
@@ -112,7 +113,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                     <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
                                 </Button>
                             </div>
-                         )}
+                        )}
 
 
                         {/* Top Section Clickable */}
@@ -156,17 +157,17 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                             let analystVariant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "outline" = "hold";
 
                                             if (rLower.includes('strong buy')) {
-                                               displayRating = 'Strong Buy';
-                                               analystVariant = 'strongBuy';
+                                                displayRating = 'Strong Buy';
+                                                analystVariant = 'strongBuy';
                                             } else if (rLower.includes('buy')) {
-                                               displayRating = 'Buy';
-                                               analystVariant = 'buy';
+                                                displayRating = 'Buy';
+                                                analystVariant = 'buy';
                                             } else if (rLower.includes('sell')) {
-                                               displayRating = 'Sell';
-                                               analystVariant = 'sell';
+                                                displayRating = 'Sell';
+                                                analystVariant = 'sell';
                                             } else {
-                                               displayRating = 'Hold';
-                                               analystVariant = 'hold';
+                                                displayRating = 'Hold';
+                                                analystVariant = 'hold';
                                             }
 
                                             return (

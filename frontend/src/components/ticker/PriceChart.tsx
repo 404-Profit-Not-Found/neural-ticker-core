@@ -60,19 +60,24 @@ export function PriceChart({ data, className }: PriceChartProps) {
         return () => {
             window.removeEventListener('resize', handleResize);
             chart.remove();
+            chartRef.current = null;
+            seriesRef.current = null;
         };
     }, []);
 
     useEffect(() => {
-        if (!chartRef.current || !data) return;
+        const chart = chartRef.current;
+        if (!chart || !data) return;
 
         // Remove old series if it exists
         if (seriesRef.current) {
-            chartRef.current.removeSeries(seriesRef.current);
+            try {
+                chart.removeSeries(seriesRef.current);
+            } catch (e) {
+                console.warn('Could not remove series:', e);
+            }
             seriesRef.current = null;
         }
-
-        const chart = chartRef.current;
 
         if (chartType === 'candle') {
             seriesRef.current = chart.addSeries(CandlestickSeries, {
@@ -99,24 +104,42 @@ export function PriceChart({ data, className }: PriceChartProps) {
         if (seriesRef.current && data.length > 0) {
             let formattedData: (CandlestickData | LineData | AreaData)[] = [];
 
-            if (chartType === 'candle') {
-                formattedData = data.map(d => ({
+            // Filter and transform data
+            const validPoints = data
+                .filter(d => d && d.ts && d.close !== undefined && d.close !== null)
+                .map(d => ({
+                    ...d,
                     time: (new Date(d.ts).getTime() / 1000) as Time,
-                    open: d.open,
-                    high: d.high,
-                    low: d.low,
-                    close: d.close,
-                }));
-            } else {
-                formattedData = data.map(d => ({
-                    time: (new Date(d.ts).getTime() / 1000) as Time,
-                    value: d.close,
-                }));
-            }
+                }))
+                .filter(p => !isNaN(p.time as number))
+                .sort((a, b) => (a.time as number) - (b.time as number));
 
-            formattedData.sort((a, b) => (a.time as number) - (b.time as number));
-            seriesRef.current.setData(formattedData);
-            chart.timeScale().fitContent();
+            // Remove duplicate timestamps (lightweight-charts requirement)
+            const uniquePoints = validPoints.filter((p, i) => i === 0 || p.time !== validPoints[i - 1].time);
+
+            if (uniquePoints.length > 0) {
+                if (chartType === 'candle') {
+                    formattedData = uniquePoints.map(p => ({
+                        time: p.time,
+                        open: p.open ?? p.close,
+                        high: p.high ?? p.close,
+                        low: p.low ?? p.close,
+                        close: p.close,
+                    }));
+                } else {
+                    formattedData = uniquePoints.map(p => ({
+                        time: p.time,
+                        value: p.close,
+                    }));
+                }
+
+                try {
+                    seriesRef.current.setData(formattedData);
+                    chart.timeScale().fitContent();
+                } catch (e) {
+                    console.error('Failed to set chart data:', e);
+                }
+            }
         }
     }, [data, chartType]);
 
@@ -134,11 +157,10 @@ export function PriceChart({ data, className }: PriceChartProps) {
                     <button
                         key={type.id}
                         onClick={() => setChartType(type.id)}
-                        className={`p-1.5 rounded transition-all duration-200 ${
-                            chartType === type.id
+                        className={`p-1.5 rounded transition-all duration-200 ${chartType === type.id
                                 ? 'bg-primary text-primary-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                        }`}
+                            }`}
                         title={type.label}
                     >
                         <type.icon size={14} />
@@ -146,8 +168,8 @@ export function PriceChart({ data, className }: PriceChartProps) {
                 ))}
             </div>
 
-            <div 
-                ref={chartContainerRef} 
+            <div
+                ref={chartContainerRef}
                 className="w-full h-full"
             />
         </div>

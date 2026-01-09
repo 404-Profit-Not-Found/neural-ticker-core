@@ -1004,23 +1004,30 @@ export class MarketDataService {
       'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
     );
 
-    // Bear Case Price Subquery (for downside calculation in carousel)
-    qb.addSelect((subQuery) => {
-      return subQuery
-        .select('rs.price_mid', 'bear_price')
-        .from(RiskScenario, 'rs')
-        .where('rs.analysis_id = risk.id')
-        .andWhere("rs.scenario_type = 'bear'");
-    }, 'bear_price');
+    // Join Base/Bear Scenarios for dynamic calculation
+    qb.leftJoin(
+      RiskScenario,
+      'base_scenario',
+      "base_scenario.analysis_id = risk.id AND base_scenario.scenario_type = 'base'",
+    );
+    qb.leftJoin(
+      RiskScenario,
+      'bear_scenario',
+      "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'",
+    );
 
-    // Base Case Price Subquery (for standardized upside calculation)
-    qb.addSelect((subQuery) => {
-      return subQuery
-        .select('rs.price_mid', 'base_price')
-        .from(RiskScenario, 'rs')
-        .where('rs.analysis_id = risk.id')
-        .andWhere("rs.scenario_type = 'base'");
-    }, 'base_price');
+    const upsideExpr = `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100`;
+    const downsideExpr = `CASE 
+      WHEN bear_scenario.price_mid IS NOT NULL AND price.close > 0 
+      THEN ((bear_scenario.price_mid - price.close) / price.close) * 100
+      WHEN risk.financial_risk >= 8 THEN -100
+      ELSE -(risk.financial_risk * 2.5)
+    END`;
+
+    qb.addSelect('base_scenario.price_mid', 'base_price');
+    qb.addSelect('bear_scenario.price_mid', 'bear_price');
+    qb.addSelect(upsideExpr, 'dynamic_upside');
+    qb.addSelect(downsideExpr, 'dynamic_downside');
 
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
@@ -1103,13 +1110,17 @@ export class MarketDataService {
       );
     }
 
-    // 2. Upside Filter
+    // 2. Upside Filter (Dynamic Calculation)
     if (options.upside) {
       // Expected format: "> 10%", "> 20%", "> 50%"
       const match = options.upside.match(/(\d+)/);
       if (match) {
         const val = parseInt(match[0], 10);
-        qb.andWhere('risk.upside_percent > :upsideVal', { upsideVal: val });
+        // Use the same dynamic expression we defined for selects
+        qb.andWhere(
+          `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100 > :upsideVal`,
+          { upsideVal: val },
+        );
       }
     }
 
@@ -1174,15 +1185,15 @@ export class MarketDataService {
     let sortField = `fund.${sortBy}`; // Default to fundamentals
 
     if (sortBy === 'change' || sortBy === 'price_change') {
-      // Sort by computed column expression or alias (alias often works in Postgres if selected)
-      // We use the alias 'price_change_pct' which we defined above.
-      // Note: Postgres allows ordering by alias in ORDER BY clause.
       sortField = '"price_change_pct"';
     } else if (sortBy === 'ai_rating') {
-      // Map AI Rating sort to Financial Risk (Proxy for rating quality)
       sortField = 'risk.financial_risk';
     } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
+    } else if (sortBy === 'upside_percent') {
+      sortField = '"dynamic_upside"';
+    } else if (sortBy === 'downside_percent') {
+      sortField = '"dynamic_downside"';
     } else if (
       ['overall_score', 'upside_percent', 'financial_risk'].includes(sortBy)
     ) {

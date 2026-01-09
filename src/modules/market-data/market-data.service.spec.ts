@@ -29,6 +29,7 @@ describe('MarketDataService', () => {
 
   const mockQueryBuilder: any = {
     leftJoinAndMapOne: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
@@ -44,6 +45,7 @@ describe('MarketDataService', () => {
   };
   // Fix circular reference for mockReturnThis by explicitly returning self
   mockQueryBuilder.leftJoinAndMapOne.mockReturnValue(mockQueryBuilder);
+  mockQueryBuilder.leftJoin.mockReturnValue(mockQueryBuilder);
   mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
   mockQueryBuilder.andWhere.mockReturnValue(mockQueryBuilder);
   mockQueryBuilder.orderBy.mockReturnValue(mockQueryBuilder);
@@ -185,6 +187,7 @@ describe('MarketDataService', () => {
           useValue: {
             createQueryBuilder: jest.fn(() => ({
               where: jest.fn().mockReturnThis(),
+              leftJoin: jest.fn().mockReturnThis(),
               leftJoinAndMapOne: jest.fn().mockReturnThis(),
               leftJoinAndSelect: jest.fn().mockReturnThis(),
               orderBy: jest.fn().mockReturnThis(),
@@ -377,6 +380,7 @@ describe('MarketDataService', () => {
   describe('getAnalyzerTickers', () => {
     it('should return paginated data with correct structure', async () => {
       const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -431,6 +435,7 @@ describe('MarketDataService', () => {
 
     it('should apply search filter when provided', async () => {
       const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -463,6 +468,7 @@ describe('MarketDataService', () => {
 
     it('should filter out bankrupt shadowbanned tickers for admin', async () => {
       const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -501,6 +507,7 @@ describe('MarketDataService', () => {
     it('should filter by overallScore (Risk/Reward)', async () => {
       // Setup mock Repo for this specific test
       const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
         leftJoinAndMapOne: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -527,6 +534,71 @@ describe('MarketDataService', () => {
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'risk.overall_score > :overallScoreVal',
         { overallScoreVal: 8.5 },
+      );
+    });
+
+    it('should apply dynamic upside filter when provided', async () => {
+      const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest
+          .fn()
+          .mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+
+      mockTickersService.getRepo.mockReturnValue(repo);
+
+      await service.getAnalyzerTickers({ upside: '> 20%' });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('base_scenario.price_mid'),
+        expect.objectContaining({ upsideVal: 20 }),
+      );
+    });
+
+    it('should apply dynamic sorting for upside_percent', async () => {
+      const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        leftJoinAndMapOne: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest
+          .fn()
+          .mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+
+      const repo = {
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      };
+
+      mockTickersService.getRepo.mockReturnValue(repo);
+
+      await service.getAnalyzerTickers({
+        sortBy: 'upside_percent',
+        sortDir: 'ASC',
+      });
+
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        '"dynamic_upside"',
+        'ASC',
       );
     });
   });
