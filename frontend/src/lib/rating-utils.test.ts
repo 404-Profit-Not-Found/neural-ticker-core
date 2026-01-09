@@ -16,31 +16,33 @@ describe('Rating Utilities', () => {
 
   describe('calculateAiRating', () => {
     it('should return Speculative Buy for high risk and high neural score', () => {
-      expect(calculateAiRating(8, 20, 7.5)).toEqual({ rating: 'Speculative Buy', variant: 'speculativeBuy' });
+      expect(calculateAiRating(8, 20, 7.5)).toMatchObject({ rating: 'Speculative Buy', variant: 'speculativeBuy' });
     });
 
     it('should return Speculative Buy for extreme upside even with high risk', () => {
-      expect(calculateAiRating(8, 100, 5)).toEqual({ rating: 'Speculative Buy', variant: 'speculativeBuy' });
+      expect(calculateAiRating(8, 100, 5)).toMatchObject({ rating: 'Speculative Buy', variant: 'speculativeBuy' });
     });
 
     it('should return Sell for high risk without speculative triggers', () => {
-      expect(calculateAiRating(8, 20, 5)).toEqual({ rating: 'Sell', variant: 'sell' });
+      expect(calculateAiRating(8, 20, 5)).toMatchObject({ rating: 'Sell', variant: 'sell' });
     });
 
     it('should return Sell for negative upside', () => {
-      expect(calculateAiRating(3, -5)).toEqual({ rating: 'Sell', variant: 'sell' });
+      expect(calculateAiRating(3, -5)).toMatchObject({ rating: 'Sell', variant: 'sell' });
     });
 
     it('should return Strong Buy for low risk and high upside', () => {
-      expect(calculateAiRating(3, 25)).toEqual({ rating: 'Strong Buy', variant: 'strongBuy' });
+      expect(calculateAiRating(3, 25)).toMatchObject({ rating: 'Strong Buy', variant: 'strongBuy' });
     });
 
     it('should return Buy for moderate risk and moderate upside', () => {
-      expect(calculateAiRating(5, 15)).toEqual({ rating: 'Buy', variant: 'buy' });
+      // Adjusted upside slightly to hit the score threshold if needed, or check logic
+      // Risk 5, Upside 15. Base 50. Upside +6. Risk 0. Neural?
+      expect(calculateAiRating(5, 15)).toMatchObject({ rating: 'Buy', variant: 'buy' });
     });
 
     it('should return Hold for low upside', () => {
-      expect(calculateAiRating(3, 5)).toEqual({ rating: 'Hold', variant: 'hold' });
+      expect(calculateAiRating(3, 5)).toMatchObject({ rating: 'Hold', variant: 'hold' });
     });
   });
 });

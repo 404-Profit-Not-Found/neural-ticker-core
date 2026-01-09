@@ -127,6 +127,18 @@ export class FinnhubService implements OnModuleInit {
     });
   }
 
+  async searchSymbols(query: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.finnhubClient.symbolSearch(query, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, 'symbolSearch');
+          return resolve({ result: [] }); // Fail gracefully for search
+        }
+        resolve(data);
+      });
+    });
+  }
+
   private handleError(error: any, context?: string) {
     this.logger.error(
       `Finnhub API Error [${context}]: ${error.message || error}`,

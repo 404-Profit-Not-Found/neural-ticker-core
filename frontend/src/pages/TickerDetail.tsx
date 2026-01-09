@@ -9,6 +9,15 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import {
+    Dialog,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { toast } from "sonner";
 import { api } from '../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { tickerKeys } from '../hooks/useTicker';
@@ -49,6 +58,31 @@ export function TickerDetail() {
     const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [placeholderId, setPlaceholderId] = useState<string | null>(null);
     const [placeholderTimestamp, setPlaceholderTimestamp] = useState<string | null>(null);
+
+    // Secret Logo Upload State
+    const [isLogoUploadOpen, setIsLogoUploadOpen] = useState(false);
+    const [logoUploadUrl, setLogoUploadUrl] = useState('');
+
+    const handleLogoDoubleClick = () => {
+        // Simple "secret" check - mostly just UI obscurity.
+        // Real auth happens on backend.
+        setLogoUploadUrl(tickerData?.profile?.image || ''); // Use tickerData.profile.image for current logo
+        setIsLogoUploadOpen(true);
+    };
+
+    const handleLogoUpdate = async () => {
+        if (!symbol || !logoUploadUrl) return;
+        try {
+            await api.patch(`/tickers/${symbol}`, { logo_url: logoUploadUrl });
+            // Invalidate query to refetch ticker details and update logo
+            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
+            setIsLogoUploadOpen(false);
+            toast.success('Logo updated');
+        } catch (err) {
+            console.error('Failed to update logo', err);
+            toast.error('Failed to update logo (Admin only)');
+        }
+    };
     const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
     const [isSyncing, setIsSyncing] = useState(false);
     const queryClient = useQueryClient();
@@ -250,7 +284,13 @@ export function TickerDetail() {
                                         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
                                             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                                         </Button>
-                                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
+                                        <div
+                                            className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted border border-border shadow-sm group"
+                                            onDoubleClick={handleLogoDoubleClick}
+                                            title="Double-click to update logo (Admin)"
+                                        >
+                                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-full h-full object-contain" />
+                                        </div>
                                         <div>
                                             <div className="flex items-center gap-3">
                                                 <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
@@ -545,6 +585,29 @@ export function TickerDetail() {
                     </main>
                 );
             })()}
+            {/* Secret Admin Logo Upload Dialog */}
+            <Dialog open={isLogoUploadOpen} onOpenChange={setIsLogoUploadOpen}>
+                <div className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Update Logo (Admin)</DialogTitle>
+                        <DialogDescription>
+                            Enter a direct URL to a PNG/JPG image for {symbol}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Input
+                            id="logo-url"
+                            placeholder="https://example.com/logo.png"
+                            value={logoUploadUrl}
+                            onChange={(e) => setLogoUploadUrl(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsLogoUploadOpen(false)}>Cancel</Button>
+                        <Button onClick={handleLogoUpdate}>Save Logo</Button>
+                    </DialogFooter>
+                </div>
+            </Dialog>
         </div>
     );
 }

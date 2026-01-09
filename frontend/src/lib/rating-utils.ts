@@ -170,6 +170,12 @@ export function calculateAiRating(
         return { rating: 'Sell', variant: 'sell', score };
     }
 
+    // Speculative Buy Override
+    // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
+    if (risk >= 8 && (upside >= 100 || (overallScore && overallScore >= 7.5))) {
+        return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
+    }
+
     if (score >= 80) return { rating: 'Strong Buy', variant: 'strongBuy', score };
     if (score >= 65) return { rating: 'Buy', variant: 'buy', score };
     if (score >= 45) return { rating: 'Hold', variant: 'hold', score };

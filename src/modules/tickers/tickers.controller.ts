@@ -105,19 +105,21 @@ export class TickersController {
   }
 
   @ApiOperation({
-    summary: 'Admin: Search tickers (includes hidden)',
-    description: 'Returns a list of tickers including hidden ones. Admin only.',
+    summary: 'Admin: Search tickers',
+    description: 'Search tickers including hidden ones. Admin only.',
   })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    description: 'Filter by symbol or name prefix',
-  })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'missing_logo', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'List of tickers.' })
   @UseGuards(RolesGuard)
   @Roles('admin')
   @Get('admin/search')
-  searchTickersAdmin(@Query('search') search?: string) {
-    return this.tickersService.searchTickersAdmin(search);
+  adminSearch(
+    @Query('search') search?: string,
+    @Query('missing_logo') missingLogo?: string,
+  ) {
+    const isMissingLogo = missingLogo === 'true';
+    return this.tickersService.searchTickersAdmin(search, isMissingLogo);
   }
 
   @ApiOperation({
@@ -163,6 +165,23 @@ export class TickersController {
   @Patch(':symbol/hidden')
   setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
     return this.tickersService.setTickerHidden(symbol, hidden);
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Update ticker logo',
+    description: 'Updates the logo URL for a ticker. Admin only.',
+  })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiBody({ schema: { properties: { logo_url: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: 'Ticker updated.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Patch(':symbol')
+  updateTicker(
+    @Param('symbol') symbol: string,
+    @Body('logo_url') logoUrl: string,
+  ) {
+    return this.tickersService.updateLogo(symbol, logoUrl);
   }
 
   @ApiOperation({

@@ -206,7 +206,9 @@ export class TickersService {
     }
 
     const searchPattern = `${search.toUpperCase()}%`;
-    return this.tickerRepo
+    
+    // 1. Local DB Search
+    const dbResults = await this.tickerRepo
       .createQueryBuilder('ticker')
       .select([
         'ticker.symbol',
@@ -222,6 +224,36 @@ export class TickersService {
       .orderBy('ticker.symbol', 'ASC')
       .limit(20)
       .getMany();
+
+    // 2. External Search (Fallback/Supplement)
+    // Only search external if query is substantial enough to be valid
+    if (search.length >= 2) {
+      try {
+        const extData = await this.finnhubService.searchSymbols(search);
+        if (extData && extData.result && Array.isArray(extData.result)) {
+          const existingSymbols = new Set(dbResults.map((t) => t.symbol.toUpperCase()));
+          
+          const extResults = extData.result
+            .filter((item: any) => !existingSymbols.has(item.symbol.toUpperCase()))
+            // Filter out obviously bad data or non-US common stocks if desired, 
+            // but for now keep it broad as user requested logic restoration.
+            .slice(0, 10) // Limit external noise
+            .map((item: any) => ({
+              symbol: item.symbol,
+              name: item.description,
+              exchange: item.type || 'External',
+              logo_url: null, // No logo for external yet
+            }));
+            
+          return [...dbResults, ...extResults];
+        }
+      } catch (err) {
+        this.logger.error(`External search failed: ${err.message}`);
+        // Fallback to just DB results on error
+      }
+    }
+
+    return dbResults;
   }
 
   async getSymbolsByIds(ids: string[] | number[]): Promise<string[]> {
@@ -255,6 +287,29 @@ export class TickersService {
     return this.tickerRepo.save(ticker);
   }
 
+  async updateLogo(symbol: string, logoUrl: string): Promise<TickerEntity> {
+    const ticker = await this.tickerRepo.findOne({
+      where: { symbol: symbol.toUpperCase() },
+    });
+    if (!ticker) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
+
+    ticker.logo_url = logoUrl;
+    const saved = await this.tickerRepo.save(ticker);
+
+    // Trigger download in background
+    if (logoUrl) {
+      this.downloadAndSaveLogo(saved.id, logoUrl).catch((err) =>
+        this.logger.error(
+          `Failed to download logo for ${saved.symbol}: ${err.message}`,
+        ),
+      );
+    }
+
+    return saved;
+  }
+
   async getHiddenTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
       select: ['id', 'symbol', 'name', 'exchange', 'is_hidden'],
@@ -263,18 +318,11 @@ export class TickersService {
     });
   }
 
-  async searchTickersAdmin(search?: string): Promise<Partial<TickerEntity>[]> {
-    // Admin search includes hidden tickers
-    if (!search || search.trim() === '') {
-      return this.tickerRepo.find({
-        select: ['id', 'symbol', 'name', 'exchange', 'is_hidden'],
-        order: { symbol: 'ASC' },
-        take: 50,
-      });
-    }
-
-    const searchPattern = `${search.toUpperCase()}%`;
-    return this.tickerRepo
+  async searchTickersAdmin(
+    search?: string,
+    missingLogo?: boolean,
+  ): Promise<Partial<TickerEntity>[]> {
+    const query = this.tickerRepo
       .createQueryBuilder('ticker')
       .select([
         'ticker.id',
@@ -282,14 +330,36 @@ export class TickersService {
         'ticker.name',
         'ticker.exchange',
         'ticker.is_hidden',
+        'ticker.logo_url',
       ])
-      .where(
+      .orderBy('ticker.symbol', 'ASC')
+      .limit(50);
+
+    // Filter by missing logo if requested
+    if (missingLogo) {
+      query.andWhere(
+        '(ticker.logo_url IS NULL OR ticker.logo_url = :empty OR ticker.logo_url = :broken)',
+        { empty: '', broken: 'null' }, // Sometimes string 'null' gets saved
+      );
+    }
+
+    // Apply search calculation if provided
+    if (search && search.trim() !== '') {
+      const searchPattern = `${search.toUpperCase()}%`;
+      query.andWhere(
         '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
         { pattern: searchPattern },
-      )
-      .orderBy('ticker.symbol', 'ASC')
-      .limit(50)
-      .getMany();
+      );
+    } else if (!missingLogo) {
+      // If no search AND no missingLogo filter, just return basic list
+      // But we already set up the query, just need to limit it.
+      // The default behavior before was:
+      // if (!search) return this.tickerRepo.find(...)
+      // We can replicate that efficiency or just use the query builder we started.
+      // Query builder is fine.
+    }
+
+    return query.getMany();
   }
 
   async getUniqueSectors(): Promise<string[]> {

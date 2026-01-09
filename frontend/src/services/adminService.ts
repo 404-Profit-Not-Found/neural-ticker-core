@@ -98,7 +98,7 @@ export const AdminService = {
     }
   },
 
-  updateTier: async (userId: string, tier: 'free' | 'pro') => {
+  updateTier: async (userId: string, tier: 'free' | 'pro' | 'whale') => {
     try {
       const { data } = await api.patch<User>(`/admin/users/${userId}/tier`, {
         tier,
@@ -134,9 +134,14 @@ export const AdminService = {
     }
   },
 
-  searchTickersAdmin: async (search?: string) => {
+  searchTickersAdmin: async (search?: string, missingLogo?: boolean) => {
     try {
-      const { data } = await api.get<{ id: string; symbol: string; name: string; exchange: string; is_hidden: boolean }[]>('/tickers/admin/search', { params: { search } });
+      const { data } = await api.get<{ id: string; symbol: string; name: string; exchange: string; is_hidden: boolean, logo_url?: string }[]>('/tickers/admin/search', { 
+        params: { 
+            search,
+            missing_logo: missingLogo 
+        } 
+    });
       return data;
     } catch (error) {
       handleAdminError(error);
@@ -147,6 +152,16 @@ export const AdminService = {
   setTickerHidden: async (symbol: string, hidden: boolean) => {
     try {
       const { data } = await api.patch(`/tickers/${symbol}/hidden`, { hidden });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
+  updateTickerLogo: async (symbol: string, logoUrl: string) => {
+    try {
+      const { data } = await api.patch(`/tickers/${symbol}`, { logo_url: logoUrl });
       return data;
     } catch (error) {
       handleAdminError(error);

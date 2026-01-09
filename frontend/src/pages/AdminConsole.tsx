@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { LogoManager } from '../components/admin/LogoManager';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Plus, ShieldAlert, CheckCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, Shield, User, Coins, TrendingUp, EyeOff, Users } from 'lucide-react';
+import { Trash2, Plus, CheckCircle, Search, ChevronLeft, ArrowUpDown, Shield, User, Coins, TrendingUp, EyeOff, Users, Image as ImageIcon } from 'lucide-react';
 import { ShadowBanManager } from '../components/admin/ShadowBanManager';
 import { Header } from '../components/layout/Header';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import {
     Table,
     TableBody,
@@ -27,11 +29,17 @@ type SortConfig = {
 export function AdminConsole() {
     const { user: currentUser } = useAuth();
     const navigate = useNavigate();
+    
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'users' | 'shadowban' | 'logo'>('users');
+
+    // Users Tab State
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [identities, setIdentities] = useState<any[]>([]);
     const [newEmail, setNewEmail] = useState('');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_error, setError] = useState<string | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
     const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,22 +47,19 @@ export function AdminConsole() {
     const [creditAmount, setCreditAmount] = useState(1);
     const [creditReason, setCreditReason] = useState('Admin Gift');
 
-    // Redirect non-admin users immediately
-    useEffect(() => {
-        if (currentUser && currentUser.role !== 'admin') {
-            navigate('/access-denied', { replace: true });
-        }
-    }, [currentUser, navigate]);
-
-    // Tab State
-    const [activeTab, setActiveTab] = useState<'users' | 'shadowban'>('users');
-
     // Table State
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'WAITLIST' | 'INVITED'>('ALL');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    // Redirect non-admin users immediately
+    useEffect(() => {
+        if (currentUser && currentUser.role !== 'admin') {
+            navigate('/access-denied', { replace: true });
+        }
+    }, [currentUser, navigate]);
 
     const loadData = useCallback(async () => {
         // Don't load if not admin
@@ -84,171 +89,160 @@ export function AdminConsole() {
     }, [currentUser, navigate]);
 
     useEffect(() => {
-        void loadData();
-    }, [loadData]);
+        if (currentUser && currentUser.role === 'admin' && activeTab === 'users') {
+            loadData();
+        }
+    }, [currentUser, activeTab, loadData]);
 
-    const handleAddEmail = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleAddEmail = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!newEmail) return;
         try {
             await AdminService.addToUserlist(newEmail);
             setNewEmail('');
-            await loadData();
             setIsInviteOpen(false);
+            toast.success('User added to waitlist');
+            loadData();
         } catch (err: unknown) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert((err as any).response?.data?.message || 'Failed to add email');
-        }
-    };
-
-    const handleRevoke = async (item: { email: string; status: string }) => {
-        const isWaitlist = item.status === 'WAITLIST';
-        const message = isWaitlist
-            ? `Are you sure you want to REJECT ${item.email}? They will be removed from the database.`
-            : `Are you sure you want to REVOKE access for ${item.email}?`;
-
-        if (!globalThis.confirm(message)) return;
-
-        try {
-            if (isWaitlist) {
-                await AdminService.rejectWaitlistUser(item.email);
-            } else {
-                await AdminService.revokeAccess(item.email);
-            }
-            await loadData();
-        } catch (err: unknown) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert((err as any).response?.data?.message || 'Failed to perform action');
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to add user';
+            toast.error(msg);
         }
     };
 
     const handleApprove = async (email: string) => {
+        // We'll need userId for approve, but let's see if we have it in the item
         try {
-            await AdminService.addToUserlist(email); // Add to allowed list
-            await loadData();
+             // Find user ID from identities
+            const user = identities.find(u => u.email === email);
+            if (!user) throw new Error('User not found');
+            
+            await AdminService.approveUser(user.id);
+            toast.success(`Approved ${email}`);
+            loadData();
         } catch (err: unknown) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert((err as any).response?.data?.message || 'Failed to approve user');
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || (err as any).message || 'Failed to approve user';
+            toast.error(msg);
         }
     };
 
-    const handleUpdateTier = async (userId: string, tier: 'free' | 'pro' | 'admin') => {
-        if (!globalThis.confirm(`Are you sure you want to change user tier to ${tier}?`)) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleRevoke = async (item: any) => {
+        if (!confirm(`Revoke access for ${item.email}?`)) return;
         try {
-            // Assuming 'newTier' was meant to be 'tier' and 'adminService' was a typo for 'AdminService'
-            // Also, the instruction implies restricting the tier value to 'free' or 'pro' for the service call.
-            // If 'tier' is 'admin', this cast will allow it but the service might reject it.
-            // For strict 'free' | 'pro', a runtime check would be needed, but the instruction only provides a type cast.
-            await AdminService.updateTier(userId, tier as 'free' | 'pro');
-            setIdentities(identities.map(u => u.id === userId ? { ...u, tier: tier as 'free' | 'pro' } : u));
+            await AdminService.revokeAccess(item.email);
+            toast.success(`Revoked access for ${item.email}`);
+            loadData();
         } catch (err: unknown) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert((err as any).response?.data?.message || 'Failed to update tier');
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to revoke access';
+            toast.error(msg);
         }
     };
 
-    const handleGiftCredits = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedUserForCredits) return;
+    const handleUpdateTier = async (userId: string, tier: 'free' | 'pro' | 'whale') => {
         try {
-            await AdminService.giftCredits(selectedUserForCredits.id, Number(creditAmount), creditReason);
-            setIsCreditModalOpen(false);
-            setCreditAmount(1);
-            await loadData();
-        } catch (err: unknown) {
+            await AdminService.updateTier(userId, tier);
+            // Optimistic update
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            alert((err as any).response?.data?.message || 'Failed to gift credits');
+            setIdentities(prev => prev.map(u => u.id === userId ? { ...u, tier } : u));
+            toast.success(`Updated tier to ${tier}`);
+        } catch (err: unknown) {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to update tier';
+            toast.error(msg);
         }
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openCreditModal = (user: any) => {
         setSelectedUserForCredits(user);
+        setCreditAmount(1);
+        setCreditReason('Admin Gift');
         setIsCreditModalOpen(true);
     };
 
-    // --- Data Processing Pipeline ---
-    const processedData = useMemo(() => {
-        let filtered = [...identities];
+    const handleGiftCredits = async () => {
+        if (!selectedUserForCredits) return;
+        try {
+            await AdminService.giftCredits(selectedUserForCredits.id, creditAmount, creditReason);
+            toast.success(`Sent ${creditAmount} credits to ${selectedUserForCredits.email}`);
+            setIsCreditModalOpen(false);
+            setSelectedUserForCredits(null);
+            // Optionally reload to see credit counts (if displayed)
+        } catch (err: unknown) {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to gift credits';
+            toast.error(msg);
+        }
+    };
 
-        // 1. Search Filter
+    // Sorting
+    const handleSort = (key: string) => {
+        setSortConfig((current) => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+        }));
+    };
+
+    // Create processed data
+    const processedData = useMemo(() => {
+        let filtered = identities;
+
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
-            filtered = filtered.filter(item =>
-                item.email.toLowerCase().includes(lower) ||
-                (item.full_name && item.full_name.toLowerCase().includes(lower))
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            filtered = filtered.filter((item: any) =>
+                item.email?.toLowerCase().includes(lower) ||
+                item.nickname?.toLowerCase().includes(lower)
             );
         }
 
-        // 2. Status Filter
         if (statusFilter !== 'ALL') {
-            filtered = filtered.filter(item => {
-                if (statusFilter === 'ACTIVE') return item.status === 'ACTIVE' || item.status === 'ADMIN';
-                return item.status === statusFilter;
-            });
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            filtered = filtered.filter((item: any) => item.status === statusFilter);
         }
 
-        // 3. Sorting
-        filtered.sort((a, b) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const aVal = (a as any)[sortConfig.key];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const bVal = (b as any)[sortConfig.key];
+        return [...filtered].sort((a, b) => {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const aVal = a[sortConfig.key];
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const bVal = b[sortConfig.key];
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         });
-
-        return filtered;
     }, [identities, searchTerm, statusFilter, sortConfig]);
 
-    // 4. Pagination
+    // Pagination
     const totalPages = Math.ceil(processedData.length / itemsPerPage);
     const paginatedData = processedData.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    const handleSort = (key: string) => {
-        setSortConfig(current => ({
-            key,
-            direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
-        }));
+    const renderSortIcon = (key: string) => {
+        if (sortConfig.key !== key) return <ArrowUpDown size={14} className="ml-1 text-muted-foreground" />;
+        return sortConfig.direction === 'asc' ? (
+            <ChevronLeft size={14} className="ml-1 rotate-90" />
+        ) : (
+            <ChevronLeft size={14} className="ml-1 -rotate-90" />
+        );
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans">
+        <div className="flex flex-col min-h-screen bg-background">
             <Header />
-
-            <main className="container mx-auto px-4 py-8 max-w-7xl animate-in fade-in duration-500">
-                {error && (
-                    <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive flex items-center gap-2">
-                        <ShieldAlert size={20} />
-                        {error}
+            <main className="flex-1 container mx-auto p-4 md:p-8 pt-24">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
+                            Admin Console
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Manage users, access, and system content</p>
                     </div>
-                )}
-
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-full">
-                            <Shield className="w-8 h-8 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
-                            <p className="text-muted-foreground mt-1">Manage users, invites, and content moderation</p>
-                        </div>
-                    </div>
-
-                    {activeTab === 'users' && (
-                        <Button
-                            onClick={() => setIsInviteOpen(true)}
-                            className="gap-2"
-                        >
-                            <Plus size={18} />
-                            Invite User
-                        </Button>
-                    )}
                 </div>
 
                 {/* Tab Navigation */}
@@ -275,384 +269,282 @@ export function AdminConsole() {
                         <EyeOff size={16} />
                         Shadow Ban
                     </button>
+                    <button
+                        onClick={() => setActiveTab('logo')}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                            activeTab === 'logo'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <ImageIcon size={16} />
+                        Logo Manager
+                    </button>
                 </div>
 
                 {/* Shadow Ban Tab */}
                 {activeTab === 'shadowban' && <ShadowBanManager />}
+                {/* Logo Manager Tab */}
+                {activeTab === 'logo' && <LogoManager />}
 
-                {/* Users Tab */}
+                {/* Users Tab (Inline) */}
                 {activeTab === 'users' && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
-                            <CardTitle>Users Directory</CardTitle>
-
-                            <div className="flex flex-col md:flex-row gap-3 md:items-center">
-                                {/* Search */}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl flex items-center gap-2">
+                                <Shield className="text-primary" size={20} />
+                                User Management
+                            </CardTitle>
+                             <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <Plus size={16} className="mr-2" />
+                                        Add User
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Add to Waitlist / Invite</DialogTitle>
+                                        <DialogDescription>
+                                            Enter the email address to add. They will see the 'You are on the list' screen until approved.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <Input
+                                            value={newEmail}
+                                            onChange={(e) => setNewEmail(e.target.value)}
+                                            placeholder="user@example.com"
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
+                                        <Button onClick={handleAddEmail}>Add User</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Filters */}
+                            <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between">
                                 <div className="relative w-full md:w-64">
-                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
-                                        type="text"
-                                        placeholder="Search users..."
+                                        placeholder="Search email..."
+                                        className="pl-9"
                                         value={searchTerm}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                                        className="pl-9 h-9"
+                                        onChange={(e) => setSearchTerm(e.target.value)}
                                     />
                                 </div>
-
-                                {/* Status Filter */}
-                                <div className="flex p-1 bg-muted rounded-md border border-border">
-                                    {(['ALL', 'ACTIVE', 'WAITLIST', 'INVITED'] as const).map(status => (
-                                        <button
+                                <div className="flex gap-2">
+                                    {(['ALL', 'ACTIVE', 'WAITLIST', 'INVITED'] as const).map((status) => (
+                                        <Button
                                             key={status}
+                                            variant={statusFilter === status ? 'default' : 'outline'}
+                                            size="sm"
                                             onClick={() => setStatusFilter(status)}
-                                            className={`px-3 py-1 text-xs font-medium rounded-sm transition-all ${statusFilter === status
-                                                ? 'bg-background text-foreground shadow-sm'
-                                                : 'text-muted-foreground hover:text-foreground'
-                                                }`}
                                         >
-                                            {status.charAt(0) + status.slice(1).toLowerCase()}
-                                        </button>
+                                            {status}
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="hidden md:block">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="hover:bg-transparent">
-                                        {[
-                                            { label: 'User', key: 'email' },
-                                            { label: 'Role', key: 'role' },
-                                            { label: 'Tier', key: 'tier' },
-                                            { label: 'Credits', key: 'credits_balance' },
-                                            { label: 'Status', key: 'status' },
-                                            { label: 'Timestamp', key: 'created_at' },
-                                            { label: 'Actions', key: 'actions' }
-                                        ].map((head) => (
-                                            <TableHead
-                                                key={head.key}
-                                                onClick={() => head.key !== 'actions' && handleSort(head.key)}
-                                                className={`${head.key !== 'actions' ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-                                            >
-                                                <div className="flex items-center gap-1">
-                                                    {head.label}
-                                                    {head.key !== 'actions' && <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                                                </div>
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
-                                                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                                    <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                                    Loading directory...
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : paginatedData.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                                No users found matching filters.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        paginatedData.map((item) => {
-                                            const isSelf = currentUser?.email === item.email;
-                                            const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
 
-                                            return (
-                                                <TableRow key={item.email}>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                                                                <User size={14} />
-                                                            </div>
-                                                            <div>
-                                                                {item.full_name && <div className="font-medium">{item.full_name}</div>}
-                                                                <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
-                                                            </div>
+                            {/* Table */}
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[200px] cursor-pointer" onClick={() => handleSort('email')}>
+                                                <div className="flex items-center">Email {renderSortIcon('email')}</div>
+                                            </TableHead>
+                                            <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
+                                                <div className="flex items-center">Status {renderSortIcon('status')}</div>
+                                            </TableHead>
+                                            <TableHead className="cursor-pointer" onClick={() => handleSort('tier')}>
+                                                <div className="flex items-center">Tier {renderSortIcon('tier')}</div>
+                                            </TableHead>
+                                            <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
+                                                <div className="flex items-center">Joined {renderSortIcon('created_at')}</div>
+                                            </TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-24 text-center">
+                                                    Loading...
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : paginatedData.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-24 text-center">
+                                                    No users found.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            paginatedData.map((item) => (
+                                                <TableRow key={item.id}>
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex flex-col">
+                                                            <span>{item.email}</span>
+                                                            {item.nickname && (
+                                                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                    <User size={10} /> {item.nickname}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant="outline" className={item.role === 'admin' ? 'border-amber-400 text-amber-400 lowercase' : 'border-emerald-500 text-emerald-500 lowercase'}>
-                                                            {(item.role || 'guest').toLowerCase()}
+                                                        <Badge variant={
+                                                            item.status === 'ACTIVE' ? 'default' :
+                                                            item.status === 'INVITED' ? 'secondary' : 'outline'
+                                                        }>
+                                                            {item.status}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant="outline" className={item.tier === 'pro' ? 'border-purple-500 text-purple-500 uppercase' : 'border-emerald-500 text-emerald-500 uppercase'}>
-                                                            {(item.tier || 'free').toUpperCase()}
-                                                        </Badge>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="capitalize">
+                                                                {item.tier}
+                                                            </Badge>
+                                                            {currentUser?.role === 'admin' && (
+                                                                <div className="flex gap-1">
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => handleUpdateTier(item.id, 'free')}
+                                                                        title="Set Free"
+                                                                    >
+                                                                        <span className="text-xs">F</span>
+                                                                    </Button>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => handleUpdateTier(item.id, 'pro')}
+                                                                        title="Set Pro"
+                                                                    >
+                                                                        <TrendingUp size={12} className="text-green-500" />
+                                                                    </Button>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => handleUpdateTier(item.id, 'whale')}
+                                                                        title="Set Whale"
+                                                                    >
+                                                                        <Coins size={12} className="text-amber-500" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
-                                                    <TableCell className="font-mono text-sm">
-                                                        {item.credits_balance || 0}
+                                                    <TableCell>
+                                                        {new Date(item.created_at).toLocaleDateString()}
                                                     </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => openCreditModal(item)}
+                                                                title="Gift Credits"
+                                                            >
+                                                                <Coins size={16} />
+                                                            </Button>
 
-                                                    <TableCell>
-                                                        {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-xs text-purple-500 font-medium"><ShieldAlert size={14} /> Admin</div>}
-                                                        {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><CheckCircle size={14} /> Active</div>}
-                                                        {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-xs text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
-                                                        {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-xs text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
-                                                    </TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground font-mono">
-                                                        {new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2 justify-end">
                                                             {item.status === 'WAITLIST' && (
                                                                 <Button
-                                                                    onClick={() => handleApprove(item.email)}
-                                                                    size="sm"
                                                                     variant="outline"
-                                                                    className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
+                                                                    size="sm"
+                                                                    className="h-8"
+                                                                    onClick={() => handleApprove(item.email)}
                                                                 >
-                                                                    <CheckCircle size={14} className="mr-1.5" />
+                                                                    <CheckCircle size={14} className="mr-1" />
                                                                     Approve
                                                                 </Button>
                                                             )}
-                                                            {(item.status === 'ACTIVE' || item.status === 'ADMIN' || item.status === 'INVITED' || item.status === 'WAITLIST') && (
+                                                            {item.status === 'ACTIVE' && (
                                                                 <Button
-                                                                    onClick={() => handleRevoke(item)}
-                                                                    disabled={isSelf || isTargetAdmin}
-                                                                    size="icon"
                                                                     variant="ghost"
-                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                                    title="Revoke Access"
+                                                                    size="icon"
+                                                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => handleRevoke(item.email)}
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </Button>
                                                             )}
-                                                            {(item.status === 'ACTIVE' || item.status === 'ADMIN') && (
-                                                                <>
-                                                                    <Button
-                                                                        onClick={() => handleUpdateTier(item.id, item.tier === 'pro' ? 'free' : 'pro')}
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-8 w-8 text-purple-500 hover:bg-purple-500/10"
-                                                                        title={item.tier === 'pro' ? 'Downgrade to Free' : 'Upgrade to Pro'}
-                                                                    >
-                                                                        <TrendingUp size={16} />
-                                                                    </Button>
-                                                                    <Button
-                                                                        onClick={() => openCreditModal(item)}
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10"
-                                                                        title="Gift Credits"
-                                                                    >
-                                                                        <Coins size={16} />
-                                                                    </Button>
-                                                                </>
-                                                            )}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
-                                            );
-                                        })
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
 
-                        {/* Mobile Tile View */}
-                        <div className="grid grid-cols-1 gap-3 p-4 md:hidden">
-                            {loading ? (
-                                <div className="text-center py-8 text-muted-foreground text-sm">Loading users...</div>
-                            ) : paginatedData.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground text-sm">No users found.</div>
-                            ) : (
-                                paginatedData.map((item) => {
-                                    const isSelf = currentUser?.email === item.email;
-                                    const isTargetAdmin = item.role === 'admin' || item.role === 'ADMIN';
-
-                                    return (
-                                        <div key={item.email} className="bg-card border border-border rounded-lg p-3 shadow-sm space-y-3">
-                                            {/* Header: User Info & Role */}
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground bg-primary/5 text-primary">
-                                                        <User size={18} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold text-sm">{item.full_name || 'Unknown User'}</div>
-                                                        <div className="text-xs text-muted-foreground font-mono">{item.email}</div>
-                                                    </div>
-                                                </div>
-                                                <Badge variant="outline" className={`lowercase text-[10px] h-5 ${item.role === 'admin' ? 'border-amber-400 text-amber-400' : 'border-emerald-500 text-emerald-500'}`}>
-                                                    {(item.role || 'guest').toLowerCase()}
-                                                </Badge>
-                                            </div>
-
-                                            <div className="h-px bg-border/50" />
-
-                                            {/* Details Grid */}
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div>
-                                                    <span className="text-muted-foreground block mb-1">Status</span>
-                                                    {item.status === 'ADMIN' && <div className="flex items-center gap-1.5 text-purple-500 font-medium"><ShieldAlert size={12} /> Admin</div>}
-                                                    {item.status === 'ACTIVE' && <div className="flex items-center gap-1.5 text-emerald-500 font-medium"><CheckCircle size={12} /> Active</div>}
-                                                    {item.status === 'WAITLIST' && <div className="flex items-center gap-1.5 text-orange-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" /> Waitlist</div>}
-                                                    {item.status === 'INVITED' && <div className="flex items-center gap-1.5 text-blue-500 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Invited</div>}
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="text-muted-foreground block mb-1">Joined</span>
-                                                    <span className="font-mono">{new Date(item.created_at || item.invited_at || Date.now()).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Actions */}
-                                            {(item.status === 'WAITLIST' || !isTargetAdmin) && (
-                                                <div className="flex items-center justify-end gap-2 pt-1">
-                                                    {item.status === 'WAITLIST' && (
-                                                        <Button
-                                                            onClick={() => handleApprove(item.email)}
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-7 text-xs border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 w-full"
-                                                        >
-                                                            <CheckCircle size={12} className="mr-1.5" />
-                                                            Approve Request
-                                                        </Button>
-                                                    )}
-                                                    {(item.status === 'ACTIVE' || item.status === 'INVITED' || item.status === 'WAITLIST' || item.status === 'ADMIN') && !isSelf && !isTargetAdmin && (
-                                                        <Button
-                                                            onClick={() => handleRevoke(item)}
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-7 text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 hover:text-red-600 w-full"
-                                                        >
-                                                            <Trash2 size={12} className="mr-1.5" />
-                                                            Revoke
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center mt-4 gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="flex items-center text-sm text-muted-foreground px-2">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
                             )}
-                        </div>
-                    </CardContent>
-
-                    {/* Pagination */}
-                    <div className="p-4 border-t border-border flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                            Showing {paginatedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} users
-                        </span>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                            >
-                                <ChevronLeft size={16} />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                            >
-                                <ChevronRight size={16} />
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
+                        </CardContent>
+                    </Card>
                 )}
             </main>
 
-            {/* Invite Dialog */}
-            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                <div className="flex flex-col gap-4">
-                    <DialogHeader>
-                        <DialogTitle>Invite New User</DialogTitle>
-                        <DialogDescription>
-                            Send an invitation email to add a new user.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={handleAddEmail} className="flex flex-col gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Email Address</label>
-                            <Input
-                                type="email"
-                                value={newEmail}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEmail(e.target.value)}
-                                placeholder="colleague@example.com"
-                                required
-                            />
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-2">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setIsInviteOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit">
-                                Send Invitation
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-            </Dialog>
-
-            {/* Credit Gift Modal */}
             <Dialog open={isCreditModalOpen} onOpenChange={setIsCreditModalOpen}>
-                <div className="flex flex-col gap-4">
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Gift Credits</DialogTitle>
                         <DialogDescription>
-                            Grant credits to {selectedUserForCredits?.email}.
+                            Send credits to {selectedUserForCredits?.email}
                         </DialogDescription>
                     </DialogHeader>
-
-                    <form onSubmit={handleGiftCredits} className="flex flex-col gap-4">
-                        <div className="space-y-2">
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
                             <label className="text-sm font-medium">Amount</label>
                             <Input
                                 type="number"
                                 min="1"
                                 value={creditAmount}
-                                onChange={(e) => setCreditAmount(Number(e.target.value))}
-                                required
+                                onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
                             />
                         </div>
-                        <div className="space-y-2">
+                        <div className="grid gap-2">
                             <label className="text-sm font-medium">Reason</label>
                             <Input
-                                type="text"
                                 value={creditReason}
                                 onChange={(e) => setCreditReason(e.target.value)}
-                                placeholder="Bonus, Refund, etc."
-                                required
                             />
                         </div>
-
-                        <div className="flex justify-end gap-3 mt-2">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setIsCreditModalOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit">
-                                Gift Credits
-                            </Button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreditModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleGiftCredits}>Send Gift</Button>
+                    </DialogFooter>
+                </DialogContent>
             </Dialog>
         </div>
     );
