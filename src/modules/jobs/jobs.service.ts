@@ -72,7 +72,7 @@ export class JobsService {
 
       let processed = 0;
       let skipped = 0;
-      const hours48 = 48 * 60 * 60 * 1000;
+      const interval14Days = 14 * 24 * 60 * 60 * 1000;
 
       for (const ticker of tickers) {
         if (!ticker.symbol) continue;
@@ -100,7 +100,7 @@ export class JobsService {
 
           const isStale =
             !existingAnalysis ||
-            Date.now() - existingAnalysis.created_at.getTime() > hours48;
+            Date.now() - existingAnalysis.created_at.getTime() > interval14Days;
 
           if (!isStale) {
             skipped++;
