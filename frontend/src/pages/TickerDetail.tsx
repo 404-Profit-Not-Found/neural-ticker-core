@@ -165,6 +165,7 @@ export function TickerDetail() {
             models_used: ['preparing'],
             tokens_in: 0,
             tokens_out: 0,
+            tickers: symbol ? [symbol] : [],
         }
         : null;
     const researchWithPlaceholder = placeholderEntry ? [placeholderEntry, ...researchList] : researchList;
