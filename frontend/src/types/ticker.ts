@@ -62,6 +62,7 @@ export interface ResearchItem {
         email?: string;
         avatar_url?: string;
     };
+    tickers: string[];
     provider?: string;
     user_id?: string;
     models_used?: string[];
