@@ -14,7 +14,6 @@ import {
     ArrowDownRight,
     ArrowUp,
     ArrowDown,
-    Bot,
     Brain,
     ShieldCheck,
     AlertTriangle,
@@ -32,6 +31,7 @@ import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
+import { VerdictBadge } from "../ticker/VerdictBadge";
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -276,21 +276,21 @@ export function WatchlistTableView({
                 id: 'ai_rating',
                 header: 'AI Rating',
                 cell: (info) => {
-                    const rating = info.getValue() as string;
-                    if (!rating || rating === '-') return <span className="text-muted-foreground">-</span>;
-
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
-                    if (rating === 'Strong Buy') variant = 'strongBuy';
-                    else if (rating === 'Buy') variant = 'buy';
-                    else if (rating === 'Hold') variant = 'hold';
-                    else if (rating === 'Sell') variant = 'sell';
-                    else if (rating === 'Speculative Buy') variant = 'speculativeBuy';
-
+                    const row = info.row.original;
+                    // Ensure we have values
+                    const risk = row.riskScore ?? 0;
+                    const upside = row.potentialUpside ?? 0;
+                    const downside = row.potentialDownside ?? 0;
+                    
                     return (
-                        <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
-                            <Bot size={12} className="opacity-80" />
-                            {rating}
-                        </Badge>
+                        <VerdictBadge 
+                            risk={risk}
+                            upside={upside}
+                            downside={downside}
+                            consensus={row.rating}
+                            overallScore={row.overallScore}
+                            pe={row.pe}
+                        />
                     );
                 },
             }),

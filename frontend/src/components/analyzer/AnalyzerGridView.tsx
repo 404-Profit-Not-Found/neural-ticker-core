@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
-import { calculateAiRating, calculateUpside } from '../../lib/rating-utils';
+import { calculateAiRating, calculateLiveUpside } from '../../lib/rating-utils';
 
 interface AnalyzerGridViewProps {
     data: StockSnapshot[];
@@ -45,11 +45,9 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                 const bearPrice = aiAnalysis?.bear_price;
 
                 let upside = 0;
-                if (typeof basePrice === 'number' && price > 0) {
-                    upside = ((basePrice - price) / price) * 100;
-                } else {
-                    upside = Number(aiAnalysis?.upside_percent ?? 0);
-                }
+                
+                // Unified Upside Calculation
+                upside = calculateLiveUpside(price, basePrice, aiAnalysis?.upside_percent);
 
                 let downside = 0;
                 if (typeof bearPrice === 'number' && price > 0) {
@@ -74,8 +72,13 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                     RiskIcon = Flame;
                 }
 
-                const liveUpside = calculateUpside(price, aiAnalysis?.base_price, aiAnalysis?.upside_percent);
-                const { rating, variant } = calculateAiRating(risk, liveUpside, aiAnalysis?.overall_score);
+                const { rating, variant } = calculateAiRating({
+                    risk, 
+                    upside, 
+                    downside, 
+                    consensus: fundamentals?.consensus_rating ? String(fundamentals.consensus_rating) : undefined, 
+                    overallScore: aiAnalysis?.overall_score
+                });
                 
                 // --- Analyst Consensus Logic ---
                 const consensus = fundamentals?.consensus_rating;

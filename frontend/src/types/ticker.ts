@@ -102,6 +102,7 @@ export interface TickerData {
         dilution_risk: number;
         competitive_risk: number;
         regulatory_risk: number;
+        upside_percent?: number;
         sentiment?: string;
     };
     fundamentals: {
@@ -138,6 +139,8 @@ export interface TickerData {
         // Existing Properties (Keep for compatibility if used)
         cash_on_hand?: number;
         runway_years?: number;
+        consensus_rating?: string;
+        target_price_avg?: number;
     } | null;
     notes: ResearchItem[]; // Ensuring notes is present
     ratings?: AnalystRating[];

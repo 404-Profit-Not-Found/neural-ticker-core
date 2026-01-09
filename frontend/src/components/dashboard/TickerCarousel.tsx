@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle } from 'lucide-react';
+import { ArrowUp, ArrowDown, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import type { TickerData } from './WatchlistTableView';
+import { VerdictBadge } from "../ticker/VerdictBadge";
 
 interface TickerCarouselProps {
     data: TickerData[];
@@ -53,13 +54,7 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                         RiskIcon = Flame;
                     }
 
-                    // --- AI Rating Variant ---
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
-                    if (aiRating === 'Strong Buy') variant = 'strongBuy';
-                    else if (aiRating === 'Buy') variant = 'buy';
-                    else if (aiRating === 'Hold') variant = 'hold';
-                    else if (aiRating === 'Sell') variant = 'sell';
-                    else if (aiRating === 'Speculative Buy') variant = 'speculativeBuy';
+
 
                     return (
                         <div
@@ -76,10 +71,15 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                                             <div className="font-bold text-xl leading-none">{symbol}</div>
                                             {/* AI Badge (Aligned Right) */}
                                             {aiRating && aiRating !== '-' && (
-                                                <Badge variant={variant} className="text-xs h-6 px-2 whitespace-nowrap gap-1 ml-auto">
-                                                    <Bot size={12} className="opacity-80" />
-                                                    {aiRating}
-                                                </Badge>
+                                                <VerdictBadge 
+                                                    risk={riskScore || 0}
+                                                    upside={potentialUpside || 0}
+                                                    downside={item.potentialDownside || 0}
+                                                    consensus={item.rating}
+                                                    overallScore={item.overallScore}
+                                                    pe={item.pe}
+                                                    className="ml-auto"
+                                                />
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-0.5 mt-1">

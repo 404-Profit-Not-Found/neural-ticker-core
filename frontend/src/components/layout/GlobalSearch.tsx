@@ -87,10 +87,8 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             if (highlightedIndex >= 0 && results[highlightedIndex]) {
                 selectTicker(results[highlightedIndex]);
             } else if (results.length > 0) {
-                // Optional: Select first result on Enter if none highlighted?
-                // Or trigger a "full search" page?
-                // Let's select first item for convenience if typed exact match?
-                // For now, only explicit selection via arrows.
+                // If nothing is highlighted, select the first result
+                selectTicker(results[0]);
             }
         } else if (e.key === 'Escape') {
             setIsOpen(false);

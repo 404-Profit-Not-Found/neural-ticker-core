@@ -8,7 +8,6 @@ import {
   List,
   ArrowUp,
   ArrowDown,
-  Bot,
   Brain,
   Newspaper,
   ShieldCheck,
@@ -26,7 +25,8 @@ import { AnalyzerGridView } from './AnalyzerGridView';
 import { Badge } from '../ui/badge';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
-import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
+import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils';
+import { VerdictBadge } from "../ticker/VerdictBadge";
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -249,7 +249,7 @@ export function AnalyzerTable({
       cell: (info) => {
         const basePrice = info.getValue();
         const price = info.row.original.latestPrice?.close ?? 0;
-        const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
+        const upside = calculateLiveUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
         const isPositive = upside > 0;
 
         return (
@@ -296,25 +296,35 @@ export function AnalyzerTable({
       cell: (info) => {
         // Use financial_risk instead of overall_score to align with the visible Risk column
         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-        let rating = 'Hold';
-        let variant: RatingVariant = 'outline';
 
         if (riskRaw !== undefined) {
           const risk = Number(riskRaw);
           const price = info.row.original.latestPrice?.close ?? 0;
-          const upside = calculateUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+          const upside = calculateLiveUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+          
+          let downside = 0;
+          const bearPrice = info.row.original.aiAnalysis?.bear_price;
+          if (typeof bearPrice === 'number' && price > 0) {
+             downside = ((bearPrice - price) / price) * 100;
+          } else {
+             downside = -(risk * 5);
+          }
+
           const overallScore = info.row.original.aiAnalysis?.overall_score;
-          const result = calculateAiRating(risk, upside, overallScore);
-          rating = result.rating;
-          variant = result.variant;
+
+          return (
+            <VerdictBadge 
+                risk={risk}
+                upside={upside}
+                downside={downside}
+                consensus={info.row.original.fundamentals?.consensus_rating ? String(info.row.original.fundamentals.consensus_rating) : undefined}
+                overallScore={overallScore}
+                pe={info.row.original.fundamentals?.pe_ttm}
+            />
+          );
         }
 
-        return (
-          <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
-            <Bot size={12} />
-            {rating}
-          </Badge>
-        );
+        return <span className="text-muted-foreground">-</span>;
       }
     }),
 

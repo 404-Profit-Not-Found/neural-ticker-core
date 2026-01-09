@@ -34,7 +34,7 @@ import {
 import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
-import { calculateAiRating } from '../../lib/rating-utils';
+import { calculateAiRating, calculateLiveUpside } from '../../lib/rating-utils';
 
 // --- Types ---
 interface TickerSearchResult {
@@ -167,8 +167,28 @@ export function WatchlistTable() {
                 // AI Rating Logic (Strict Financial Risk)
                 let aiRating = '-';
                 if (s.aiAnalysis && safeRiskScore !== null) {
-                    const upside = Number(s.aiAnalysis.upside_percent || 0);
-                    const { rating } = calculateAiRating(safeRiskScore, upside, s.aiAnalysis?.overall_score);
+                    // Fix: Use Standardized Upside for Rating Derivation too
+                    const upside = calculateLiveUpside(
+                        price,
+                        s.aiAnalysis.base_price,
+                        s.aiAnalysis.upside_percent
+                    );
+                    
+                    let downside = 0;
+                    const bearPrice = s.aiAnalysis.bear_price;
+                    if (typeof bearPrice === 'number' && price > 0) {
+                        downside = ((bearPrice - price) / price) * 100;
+                    } else {
+                        downside = -(safeRiskScore * 5);
+                    }
+
+                    const { rating } = calculateAiRating({
+                        risk: safeRiskScore,
+                        upside,
+                        downside,
+                        consensus: s.fundamentals?.consensus_rating,
+                        overallScore: s.aiAnalysis?.overall_score
+                    });
                     aiRating = rating;
                 } else {
                     aiRating = '-';
@@ -180,13 +200,13 @@ export function WatchlistTable() {
                 const bearPrice = s.aiAnalysis?.bear_price;
                 const basePrice = s.aiAnalysis?.base_price;
                 let potentialDownside: number | null = null;
-                let potentialUpside: number | null = null;
-
-                if (typeof basePrice === 'number' && price > 0) {
-                    potentialUpside = ((basePrice - price) / price) * 100;
-                } else {
-                    potentialUpside = s.aiAnalysis?.upside_percent ?? null;
-                }
+                
+                // Use Standardized Upside Calculation
+                const potentialUpside = calculateLiveUpside(
+                    price,
+                    basePrice,
+                    s.aiAnalysis?.upside_percent
+                );
 
                 if (typeof bearPrice === 'number' && price > 0) {
                     potentialDownside = ((bearPrice - price) / price) * 100;

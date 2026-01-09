@@ -1136,45 +1136,85 @@ export class MarketDataService {
       }
     }
 
-    // 3. AI Rating Filter (Updated to Financial Risk)
-    // Logic matching RISK_ALGO config
-    // Strong Buy: Upside > MIN_UPSIDE and Score <= MAX_RISK
+    // 3. AI Rating Filter (Standardized Weighted Verdict)
+    // Synchronized with frontend rating-utils.ts
+    // Score Tiers: >= 80 Strong Buy, >= 65 Buy, >= 45 Hold, < 45 Sell
     if (options.aiRating && options.aiRating.length > 0) {
+      // Define the Verdict Score Expression
+      const upsideCalc = `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100`;
+      const downsideCalc = `
+        CASE 
+          WHEN bear_scenario.price_mid IS NOT NULL AND price.close > 0 
+          THEN ((bear_scenario.price_mid - price.close) / price.close) * 100
+          WHEN risk.financial_risk >= 8 THEN -100
+          ELSE -(risk.financial_risk * 5)
+        END
+      `;
+
+      // SQL equivalent of rating-utils.ts calculateAiRating
+      // Note: usage of COALESCE/NULL handling is critical
+      const verdictScoreSql = `(
+        50
+        -- 1. Upside Impact (Max 0+, Capped at 100, * 0.4)
+        + (GREATEST(0, LEAST(100, COALESCE(${upsideCalc}, 0))) * 0.4)
+        
+        -- 2. Downside Impact (Abs, Cap 40, * 0.8) -> Subtract
+        - (LEAST(40, ABS(COALESCE(${downsideCalc}, 0)) * 0.8))
+        
+        -- 3. Risk Penalty / Bonus
+        + CASE 
+            WHEN risk.financial_risk >= 8 THEN -20 
+            WHEN risk.financial_risk >= 6 THEN -10 
+            WHEN risk.financial_risk <= 3 THEN 5 
+            ELSE 0 
+          END
+        
+        -- 4. Neural Score Bonus
+        + CASE 
+            WHEN risk.overall_score >= 8 THEN 10 
+            WHEN risk.overall_score >= 6 THEN 5 
+            WHEN risk.overall_score <= 4 THEN -5 
+            ELSE 0 
+          END
+        
+        -- 5. Analyst Consensus
+        + CASE 
+            WHEN fund.consensus_rating ILIKE '%Strong Buy%' THEN 10 
+            WHEN fund.consensus_rating ILIKE '%Buy%' THEN 5 
+            WHEN fund.consensus_rating ILIKE '%Sell%' THEN -10 
+            ELSE 0 
+          END
+          
+        -- 6. PE Ratio Impact (Value Investing)
+        + CASE 
+            WHEN fund.pe_ttm IS NULL THEN -10       -- Penalty for missing P/E
+            WHEN fund.pe_ttm < 0 THEN -10           -- Unprofitable
+            WHEN fund.pe_ttm < 15 THEN 15           -- Great Value
+            WHEN fund.pe_ttm < 30 THEN 5            -- Fair Value
+            WHEN fund.pe_ttm > 60 THEN -15          -- Extremely Overvalued
+            WHEN fund.pe_ttm > 40 THEN -5           -- Overvalued
+            ELSE 0 
+          END
+      )`;
+
       qb.andWhere(
         new Brackets((sub) => {
           options.aiRating?.forEach((rating) => {
             if (rating === 'Strong Buy') {
-              sub.orWhere(
-                `(risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE})`,
-              );
+              sub.orWhere(`${verdictScoreSql} >= 80`);
             } else if (rating === 'Buy') {
-              // Buy is generally strictly better than Hold but less than Strong Buy
-              // Let's assume Upside > 10% and Score <= 7 (Align with frontend strict logic)
-              sub.orWhere(
-                '(risk.upside_percent > 10 AND risk.financial_risk <= 7)',
-              );
-            } else if (rating === 'Speculative Buy') {
-              sub.orWhere(
-                '(risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100))',
-              );
-            } else if (rating === 'Sell') {
-              // Sell: Low Upside OR High Risk (> 7 or 8) BUT NOT Speculative Buy
-              sub.orWhere(
-                `((risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE}) 
-                AND NOT (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)))`,
-              );
+              sub.orWhere(`${verdictScoreSql} >= 65 AND ${verdictScoreSql} < 80`);
             } else if (rating === 'Hold') {
-              // Hold = Everything else
-              // NOT (Strong Buy OR Buy OR Sell OR Speculative Buy)
-              sub.orWhere(
-                `NOT (
-                    (risk.upside_percent > ${RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT} AND risk.financial_risk <= ${RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE}) OR 
-                    (risk.upside_percent > 10 AND risk.financial_risk <= 7) OR 
-                    (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)) OR
-                    ((risk.upside_percent < ${RISK_ALGO.SELL.MAX_UPSIDE_PERCENT} OR risk.financial_risk >= ${RISK_ALGO.SELL.MIN_RISK_SCORE}) 
-                     AND NOT (risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR risk.upside_percent >= 100)))
-                 )`,
-              );
+              sub.orWhere(`${verdictScoreSql} >= 45 AND ${verdictScoreSql} < 65`);
+            } else if (rating === 'Sell') {
+              sub.orWhere(`${verdictScoreSql} < 45`);
+            } else if (rating === 'Speculative Buy') {
+              // Speculative Buy override logic: High Risk but High Reward
+              // Frontend: variant = 'speculativeBuy' if risk >= 8 && (score >= 7.5 || upside >= 100)
+              // But 'rating' string is just 'Sell' or 'Hold' usually in that case unless we explicitly label it.
+              // For backend filter, let's keep it simple or align strictly if 'Speculative Buy' is a requested filter.
+              // Assuming standard tiers for now.
+              sub.orWhere(`risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR COALESCE(${upsideCalc}, 0) >= 100)`);
             }
           });
         }),
