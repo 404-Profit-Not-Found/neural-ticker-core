@@ -233,9 +233,8 @@ export function ResearchListPage() {
               </Button>
             )}
           </div>
-        )
-        }
-      </main >
-    </div >
+        )}
+      </main>
+    </div>
   );
 }
