@@ -45,7 +45,7 @@ import configuration from './config/configuration';
 
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', '..', 'client'),
-      exclude: ['/api/{*splat}'],
+      exclude: [new RegExp('^/api/') as any],
     }),
 
     // Global Rate Limiting: 100 requests per minute per IP
@@ -102,7 +102,7 @@ import configuration from './config/configuration';
     StockTwitsModule,
     WatchlistModule,
     SocialModule,
-    SocialModule,
+
     ProxyModule,
     NotificationsModule,
     PortfolioModule,

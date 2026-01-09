@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, PlusCircle, Database, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
@@ -10,6 +11,8 @@ interface TickerResult {
     name: string;
     exchange: string;
     logo_url?: string;
+    is_locally_tracked: boolean;
+    is_queued?: boolean; // Added for UI feedback
 }
 
 export function GlobalSearch({ className = '' }: { className?: string }) {
@@ -48,10 +51,13 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
 
     // Debounced Search
     useEffect(() => {
+        let active = true;
         const timer = setTimeout(async () => {
             if (query.trim().length === 0) {
-                setResults([]);
-                setIsOpen(false);
+                if (active) {
+                    setResults([]);
+                    setIsOpen(false);
+                }
                 return;
             }
 
@@ -60,17 +66,22 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                 const { data } = await api.get<TickerResult[]>('/tickers', {
                     params: { search: query },
                 });
-                setResults(data);
-                setIsOpen(true);
-                setHighlightedIndex(-1); // Reset highlight on new results
+                if (active) {
+                    setResults(data);
+                    setIsOpen(true);
+                    setHighlightedIndex(-1); // Reset highlight on new results
+                }
             } catch (error) {
-                console.error('Search failed', error);
+                if (active) console.error('Search failed', error);
             } finally {
-                setIsLoading(false);
+                if (active) setIsLoading(false);
             }
         }, 300); // 300ms debounce
 
-        return () => clearTimeout(timer);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
     }, [query]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -97,9 +108,27 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
     };
 
     const selectTicker = (ticker: TickerResult) => {
-        navigate(`/ticker/${ticker.symbol}`);
+        navigate(`/ticker/${encodeURIComponent(ticker.symbol)}`);
         setQuery('');
         setIsOpen(false);
+    };
+
+    const handleAddTicker = async (e: React.MouseEvent, symbol: string) => {
+        e.stopPropagation(); // Don't navigate
+        try {
+            const res = await api.post('/tickers', { symbol });
+            
+            if (res.status === 202) {
+                setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_queued: true } : t));
+                toast.info(`${symbol} queued for background processing`);
+            } else {
+                setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_locally_tracked: true } : t));
+                toast.success(`${symbol} added to tracking`);
+            }
+        } catch (error) {
+            console.error('Failed to add ticker', error);
+            toast.error(`Failed to add ${symbol}`);
+        }
     };
 
     return (
@@ -149,15 +178,39 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                 />
 
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-sm">{ticker.symbol}</span>
-                                        <span className="text-[10px] text-muted-foreground border border-border px-1.5 rounded bg-background/50">
-                                            {ticker.exchange}
-                                        </span>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="font-bold text-sm shrink-0">{ticker.symbol}</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {ticker.is_locally_tracked ? (
+                                                <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 whitespace-nowrap">
+                                                    <Database size={10} className="opacity-70" />
+                                                    Tracked
+                                                </span>
+                                            ) : ticker.is_queued ? (
+                                                <span className="text-[10px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 whitespace-nowrap">
+                                                    <Clock size={10} className="opacity-70" />
+                                                    Queued
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={(e) => handleAddTicker(e, ticker.symbol)}
+                                                    className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 transition-all"
+                                                >
+                                                    <PlusCircle size={10} />
+                                                    Track
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-muted-foreground truncate opacity-80">
-                                        {ticker.name}
-                                    </p>
+                                    
+                                    <div className="mt-0.5 min-w-0 text-left">
+                                        <p className="text-xs text-foreground/90 font-medium truncate">
+                                            {ticker.name}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                                            {ticker.exchange}
+                                        </p>
+                                    </div>
                                 </div>
                             </button>
                         ))}

@@ -32,12 +32,16 @@ interface PortfolioPosition {
   };
   fundamentals?: {
     sector?: string;
+    pe_ttm?: number;
+    consensus_rating?: string;
+    market_cap?: number;
   };
   aiAnalysis?: {
     financial_risk?: number;
     upside_percent?: number;
     overall_score?: number;
     base_price?: number;
+    bear_price?: number;
   };
 }
 

@@ -1,10 +1,4 @@
 export default () => {
-  console.log('[DEBUG Config] DB_PASSWORD env:', process.env.DB_PASSWORD);
-  console.log(
-    '[DEBUG Config] DB_PASSWORD type:',
-    typeof process.env.DB_PASSWORD,
-  );
-
   return {
     env: process.env.APP_ENV || 'local',
     port: parseInt(process.env.APP_PORT || '3000', 10),

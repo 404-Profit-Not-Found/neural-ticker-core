@@ -43,6 +43,19 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
         return "text-yellow-500";
     };
 
+    const getRiskColor = (r: number) => {
+        if (r < 4) return "text-emerald-500"; // Low risk = Good
+        if (r < 7) return "text-yellow-500"; // Medium risk
+        return "text-red-500"; // High risk
+    };
+
+    const getScoreColor = (s?: number | null) => {
+        if (!s) return "text-muted-foreground";
+        if (s >= 7) return "text-emerald-500"; // High score = Good
+        if (s >= 4) return "text-yellow-500"; // Medium score
+        return "text-red-500"; // Low score
+    };
+
     const { rating, variant, score } = useMemo(
         () => calculateAiRating({
             risk, 
@@ -94,11 +107,11 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                 </div>
                 <div className="flex justify-between">
                     <span>Fin. Risk:</span>
-                    <span className={cn("font-medium", risk >= 7 ? "text-red-500" : "text-foreground")}>{risk.toFixed(1)}/10</span>
+                    <span className={cn("font-medium", getRiskColor(risk))}>{risk.toFixed(1)}/10</span>
                 </div>
                 <div className="flex justify-between">
                     <span title="Overall Neural Risk/Reward Score">Neural Score:</span>
-                    <span className={cn("font-medium", overallScore && overallScore >= 7.5 ? "text-emerald-500" : "text-foreground")}>
+                    <span className={cn("font-medium", getScoreColor(overallScore))}>
                         {overallScore ? overallScore.toFixed(1) : '-'}/10
                     </span>
                 </div>
@@ -129,7 +142,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
              <div className="md:hidden">
                 <Popover>
                     <PopoverTrigger asChild>
-                        <button type="button" className="focus:outline-none active:scale-95 transition-transform">
+                        <button type="button" className="focus:outline-none active:scale-95 transition-transform" onClick={(e) => e.stopPropagation()}>
                             {BadgeContent}
                         </button>
                     </PopoverTrigger>
@@ -143,7 +156,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
             <div className="hidden md:block">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                         <button type="button" className="focus:outline-none hover:scale-105 transition-transform">
+                         <button type="button" className="focus:outline-none hover:scale-105 transition-transform" onClick={(e) => e.stopPropagation()}>
                             {BadgeContent}
                         </button>
                     </TooltipTrigger>

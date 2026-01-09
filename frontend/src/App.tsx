@@ -19,7 +19,7 @@ import { PortfolioPage } from './pages/PortfolioPage';
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useEffect } from 'react';
-import { api, httpClient } from './lib/api';
+
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -159,18 +159,8 @@ function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const token = searchParams.get('token');
-
-      if (token) {
-        console.log('OAuth Header Fallback Active');
-        // Set header for current session as fallback if cookie fails
-        httpClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      }
-
       await refreshSession();
-      navigate('/');
+      navigate('/', { replace: true });
     };
 
     handleCallback();

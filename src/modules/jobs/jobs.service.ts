@@ -1,20 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
-import { ResearchService } from '../research/research.service'; // Added
+import { ResearchService } from '../research/research.service';
+import { RequestQueue, RequestStatus, RequestType } from './entities/request-queue.entity'; // Added
+import { InjectRepository } from '@nestjs/typeorm'; // Added
+import { Repository, LessThanOrEqual, IsNull } from 'typeorm'; // Added
 
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
-    private readonly riskRewardService: RiskRewardService,
+    private readonly riskRewardService: RiskRewardService, // Added back
+    @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly marketDataService: MarketDataService,
     private readonly researchService: ResearchService,
+    @InjectRepository(RequestQueue)
+    private readonly requestQueueRepo: Repository<RequestQueue>,
   ) {}
 
   async cleanupStuckResearch() {
@@ -191,5 +197,80 @@ export class JobsService {
     // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
     // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
     await this.researchService.getOrGenerateDailyDigest('system-cron');
+    await this.researchService.getOrGenerateDailyDigest('system-cron');
+  }
+
+  // --- ASYNC REQUEST QUEUE ---
+
+  async queueRequest(type: RequestType, payload: any) {
+    const request = this.requestQueueRepo.create({
+      type,
+      payload,
+      status: RequestStatus.PENDING,
+      attempts: 0,
+    });
+    return this.requestQueueRepo.save(request);
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async processPendingRequests() {
+    this.logger.debug('Checking for pending async requests...');
+    
+    // Fetch pending jobs that are ready to run
+    const pending = await this.requestQueueRepo.find({
+      where: {
+        status: RequestStatus.PENDING,
+        next_attempt: LessThanOrEqual(new Date()),
+      },
+      take: 10, // Batch size
+    });
+
+    if (pending.length === 0) return;
+    this.logger.log(`Found ${pending.length} pending requests to process.`);
+
+    for (const req of pending) {
+      // Lock it (simple optimistic locking via status)
+      req.status = RequestStatus.PROCESSING;
+      await this.requestQueueRepo.save(req);
+
+      try {
+        if (req.type === RequestType.ADD_TICKER) {
+          const { symbol } = req.payload;
+          this.logger.log(`Processing queued ticker addition: ${symbol}`);
+          // Force ensure ticker (will fail again if 429, but that's handled locally here)
+          await this.tickersService.ensureTicker(symbol);
+        }
+
+        // deeply update status
+        await this.requestQueueRepo.update(req.id, {
+           status: RequestStatus.COMPLETED,
+           updated_at: new Date()
+        });
+        this.logger.log(`Request ${req.id} (${req.type}) completed successfully.`);
+
+      } catch (err: any) {
+        this.logger.warn(`Request ${req.id} failed: ${err.message}`);
+        
+        const attempts = req.attempts + 1;
+        
+        let newStatus = RequestStatus.PENDING;
+        // Max 10 attempts
+        if (attempts >= 10) {
+            newStatus = RequestStatus.FAILED;
+            this.logger.error(`Request ${req.id} failed permanently after ${attempts} attempts.`);
+        }
+
+        // Exponential backoff: 30s, 1m, 2m, 4m...
+        const backoffSeconds = 30 * Math.pow(2, attempts - 1); 
+        const nextAttempt = new Date(Date.now() + backoffSeconds * 1000);
+
+        await this.requestQueueRepo.update(req.id, {
+            status: newStatus,
+            attempts: attempts,
+            next_attempt: nextAttempt,
+            updated_at: new Date()
+        });
+      }
+    }
   }
 }

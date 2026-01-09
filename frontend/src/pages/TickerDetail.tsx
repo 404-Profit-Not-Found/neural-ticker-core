@@ -285,7 +285,7 @@ export function TickerDetail() {
                                             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                                         </Button>
                                         <div
-                                            className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted border border-border shadow-sm group"
+                                            className="relative w-14 h-14 shrink-0"
                                             onDoubleClick={handleLogoDoubleClick}
                                             title="Double-click to update logo (Admin)"
                                         >

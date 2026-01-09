@@ -16,6 +16,7 @@ import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { RISK_ALGO } from '../../config/risk-algorithm.config';
 import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
+import { calculateAiRating, VerdictInput } from '../../lib/verdict.util';
 
 @Injectable()
 export class MarketDataService {
@@ -884,75 +885,100 @@ export class MarketDataService {
   }
 
   /**
-   * Get count of tickers where both analyst consensus = "Strong Buy" AND AI rating is bullish.
-   * Criteria defined in RISK_ALGO config.
+   * Get count of tickers where the weighted verdict algorithm returns "Strong Buy".
+   * Uses the same logic as the frontend VerdictBadge.
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
-    // AI Only: Tickers where LATEST risk analysis is Strong Buy
-    // We use a robust join to ensure we only check the *latest* analysis, not just *any* analysis that happened to match.
-
-    const qb = this.tickerRepo.createQueryBuilder('ticker');
-
-    // Inner Join Latest Risk
-    // Using simple subquery join pattern matching getAnalyzerTickers logic
-    qb.innerJoin(
-      RiskAnalysis,
-      'risk',
-      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
-    );
-
-    qb.where('risk.financial_risk <= :maxRisk', {
-      maxRisk: RISK_ALGO.STRONG_BUY.MAX_RISK_SCORE,
-    });
-
-    qb.andWhere('risk.upside_percent > :minUpside', {
-      minUpside: RISK_ALGO.STRONG_BUY.MIN_UPSIDE_PERCENT,
-    });
-
-    // Select symbols
-    qb.select('ticker.symbol');
-
-    const results = await qb.getMany();
-    const symbols = results.map((t) => t.symbol);
-
-    return { count: symbols.length, symbols };
+    const tickers = await this.getTickersWithRiskData();
+    const strongBuys = tickers.filter(t => t.verdict.variant === 'strongBuy');
+    return { count: strongBuys.length, symbols: strongBuys.map(t => t.symbol) };
   }
 
   /**
-   * Get count of tickers where both analyst consensus = "Sell" OR AI rating is bearish.
-   * Criteria defined in RISK_ALGO config.
+   * Get count of tickers where the weighted verdict algorithm returns "Sell".
+   * Uses the same logic as the frontend VerdictBadge.
    */
   async getSellCount(): Promise<{ count: number; symbols: string[] }> {
-    // AI Only: Tickers where LATEST risk analysis is Sell
+    const tickers = await this.getTickersWithRiskData();
+    const sells = tickers.filter(t => t.verdict.variant === 'sell');
+    return { count: sells.length, symbols: sells.map(t => t.symbol) };
+  }
+
+  /**
+   * Internal helper: Fetch all tickers with risk data and compute their verdict using live calculations.
+   * Uses the same dynamic price calculation as the Analyzer filter.
+   */
+  private async getTickersWithRiskData() {
     const qb = this.tickerRepo.createQueryBuilder('ticker');
 
-    // Inner Join Latest Risk
-    qb.innerJoin(
-      RiskAnalysis,
-      'risk',
-      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
-    );
+    // Join Latest Risk
+    qb.leftJoin(RiskAnalysis, 'risk', 
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)');
+    
+    // Join Fundamentals
+    qb.leftJoin(Fundamentals, 'fund', 'fund.symbol_id = ticker.id');
+    
+    // Join Latest Price
+    qb.leftJoin(PriceOhlcv, 'price',
+      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)');
+    
+    // Join Base and Bear Scenarios
+    qb.leftJoin(RiskScenario, 'base_scenario',
+      "base_scenario.analysis_id = risk.id AND base_scenario.scenario_type = 'base'");
+    qb.leftJoin(RiskScenario, 'bear_scenario',
+      "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'");
+    
+    qb.where('ticker.is_hidden = :hidden', { hidden: false });
+    
+    // Select fields with dynamic calculations
+    qb.select([
+      'ticker.symbol',
+      'risk.financial_risk',
+      'risk.overall_score',
+      'fund.consensus_rating',
+      'fund.pe_ttm',
+      'price.close',
+      'base_scenario.price_mid',
+      'bear_scenario.price_mid',
+    ]);
 
-    // AI Sell Criteria: High Financial Risk OR Low/Negative Upside
-    qb.where(
-      new Brackets((sub) => {
-        sub
-          .where('risk.upside_percent < :maxUpside', {
-            maxUpside: RISK_ALGO.SELL.MAX_UPSIDE_PERCENT,
-          })
-          .orWhere('risk.financial_risk >= :minRisk', {
-            minRisk: RISK_ALGO.SELL.MIN_RISK_SCORE,
-          });
-      }),
-    );
+    const rawResults = await qb.getRawMany();
 
-    // Select symbols
-    qb.select('ticker.symbol');
+    return rawResults.map(row => {
+      const currentPrice = parseFloat(row.price_close) || 0;
+      const baseTarget = parseFloat(row.base_scenario_price_mid) || null;
+      const bearTarget = parseFloat(row.bear_scenario_price_mid) || null;
+      const financialRisk = parseFloat(row.risk_financial_risk) || 5;
 
-    const results = await qb.getMany();
-    const symbols = results.map((t) => t.symbol);
+      // Dynamic upside calculation
+      let upside = 0;
+      if (currentPrice > 0 && baseTarget && baseTarget > 0) {
+        upside = ((baseTarget - currentPrice) / currentPrice) * 100;
+      }
 
-    return { count: symbols.length, symbols };
+      // Dynamic downside calculation
+      let downside = 0;
+      if (currentPrice > 0 && bearTarget && bearTarget > 0) {
+        downside = ((bearTarget - currentPrice) / currentPrice) * 100;
+      } else if (financialRisk >= 8) {
+        downside = -100;
+      } else {
+        downside = -(financialRisk * 5);
+      }
+
+      const input: VerdictInput = {
+        risk: financialRisk,
+        upside: upside,
+        downside: downside,
+        consensus: row.fund_consensus_rating || undefined,
+        overallScore: parseFloat(row.risk_overall_score) || null,
+        peRatio: parseFloat(row.fund_pe_ttm) || null,
+      };
+      return {
+        symbol: row.ticker_symbol,
+        verdict: calculateAiRating(input),
+      };
+    });
   }
 
   /**

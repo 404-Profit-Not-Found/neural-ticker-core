@@ -139,9 +139,26 @@ export class TickersController {
   })
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
   @Public()
+  @ApiOperation({
+    summary: 'Ensure ticker exists (Body Payload)',
+    description: 'Safe alternative for symbols with special chars (dots).',
+  })
+  @ApiBody({ schema: { type: 'object', properties: { symbol: { type: 'string' } } } })
+  @ApiResponse({ status: 201, description: 'Ticker ensured/created.' })
+  @ApiResponse({ status: 202, description: 'Ticker addition queued due to rate limiting.' }) // Added
+  @Public()
+  @Post()
+  ensureBody(@Body('symbol') symbol: string) {
+    if (!symbol) return;
+    return this.tickersService.ensureTicker(symbol.trim());
+  }
+
+  @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
+  @ApiResponse({ status: 202, description: 'Ticker addition queued due to rate limiting.' }) // Added
+  @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
-    return this.tickersService.ensureTicker(symbol);
+    return this.tickersService.ensureTicker(symbol.trim());
   }
 
   @ApiOperation({
@@ -164,7 +181,7 @@ export class TickersController {
   @Roles('admin')
   @Patch(':symbol/hidden')
   setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
-    return this.tickersService.setTickerHidden(symbol, hidden);
+    return this.tickersService.setTickerHidden(symbol.trim(), hidden);
   }
 
   @ApiOperation({
@@ -181,7 +198,7 @@ export class TickersController {
     @Param('symbol') symbol: string,
     @Body('logo_url') logoUrl: string,
   ) {
-    return this.tickersService.updateLogo(symbol, logoUrl);
+    return this.tickersService.updateLogo(symbol.trim(), logoUrl);
   }
 
   @ApiOperation({
@@ -228,6 +245,6 @@ export class TickersController {
   @Get(':symbol')
   get(@Req() req: any, @Param('symbol') symbol: string) {
     const isAdmin = req.user?.role === 'admin';
-    return this.tickersService.getTicker(symbol, isAdmin);
+    return this.tickersService.getTicker(symbol.trim(), isAdmin);
   }
 }
