@@ -52,7 +52,7 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news', 'about'];
+    const validTabs = ['overview', 'financials', 'research', 'news'];
     const currentTab = (tab && validTabs.includes(tab)) ? tab : 'overview';
 
     // -- Hooks --
@@ -189,154 +189,237 @@ export function TickerDetail() {
 
 
 
-    if (isLoadingDetails) return (
-        <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <Loader2 className="animate-spin w-8 h-8 text-primary" />
-                <div className="text-muted-foreground animate-pulse text-sm">Loading Terminal Data...</div>
-            </div>
-        </div>
-    );
-
-    if (!tickerData) return (
-        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-4">
-            <div className="text-destructive font-bold text-lg">Ticker Not Found</div>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
-        </div>
-    );
-
-    // Destructure Composite Data
-    const { profile, market_data, risk_analysis, fundamentals, watchers } = tickerData as TickerData;
-    const isPriceUp = market_data?.change_percent >= 0;
-
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
             <Header />
 
-            <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6">
+            {isLoadingDetails ? (
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
+                    <Loader2 className="animate-spin w-8 h-8 text-primary" />
+                    <div className="text-muted-foreground animate-pulse text-sm">Loading Terminal Data...</div>
+                </main>
+            ) : !tickerData ? (
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
+                    <div className="text-destructive font-bold text-lg">Ticker Not Found</div>
+                    <Button variant="outline" onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+                </main>
+            ) : (() => {
+                // Destructure Composite Data
+                const { profile, market_data, risk_analysis, fundamentals, watchers } = tickerData as TickerData;
+                const isPriceUp = market_data?.change_percent >= 0;
 
-                {/* --- 1. HERO HEADER --- */}
-                <div className="relative z-30 space-y-4 pb-4 md:pb-6">
-                    {/* Mobile Actions (Absolute Top Right) */}
-                    <div className="md:hidden absolute top-0 right-0 flex items-center gap-2 z-40">
-                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
-                            <Eye size={12} />
-                            <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2"
-                            title="Add to Favourites"
-                            onClick={() => {
-                                if (symbol) favoriteMutation.mutate(symbol);
-                            }}
-                        >
-                            <Star
-                                size={16}
-                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""}
-                            />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted -mr-2" title="Share">
-                            <Share2 size={16} className="text-muted-foreground" />
-                        </Button>
-                    </div>
+                return (
+                    <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
 
-                    {/* --- DESKTOP LAYOUT --- */}
-                    <div className="hidden md:block space-y-6">
-                        {/* Row 1: Identity & Actions */}
-                        <div className="flex items-center justify-between">
-                            {/* Left: Identity */}
-                            <div className="flex items-center gap-4">
-                                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
-                                    <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                        {/* --- 1. HERO HEADER --- */}
+                        <div className="relative z-30 space-y-4 pb-4 md:pb-6">
+                            {/* Mobile Actions (Absolute Top Right) */}
+                            <div className="md:hidden absolute top-0 right-0 flex items-center gap-2 z-40">
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
+                                    <Eye size={12} />
+                                    <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2"
+                                    title="Add to Favourites"
+                                    onClick={() => {
+                                        if (symbol) favoriteMutation.mutate(symbol);
+                                    }}
+                                >
+                                    <Star
+                                        size={16}
+                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""}
+                                    />
                                 </Button>
-                                <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                        <span className="bg-muted px-2 py-0.5 rounded text-[11px] font-bold text-muted-foreground uppercase tracking-wide border border-border/50">
-                                            {profile?.exchange}
-                                        </span>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted -mr-2" title="Share">
+                                    <Share2 size={16} className="text-muted-foreground" />
+                                </Button>
+                            </div>
+
+                            {/* --- DESKTOP LAYOUT --- */}
+                            <div className="hidden md:block space-y-6">
+                                {/* Row 1: Identity & Actions */}
+                                <div className="flex items-center justify-between">
+                                    {/* Left: Identity */}
+                                    <div className="flex items-center gap-4">
+                                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
+                                            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                                        </Button>
+                                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                                <span className="bg-muted px-2 py-0.5 rounded text-[11px] font-bold text-muted-foreground uppercase tracking-wide border border-border/50">
+                                                    {profile?.exchange}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
+                                                {profile?.industry && (
+                                                    <>
+                                                        <span className="text-muted-foreground/40">•</span>
+                                                        <span className="text-sm text-muted-foreground">{profile.industry}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
-                                        {profile?.industry && (
-                                            <>
-                                                <span className="text-muted-foreground/40">•</span>
-                                                <span className="text-sm text-muted-foreground">{profile.industry}</span>
-                                            </>
+
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 mr-2" title="Watchers">
+                                            <Eye size={14} className="text-muted-foreground" />
+                                            <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                                        </div>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
+                                            onClick={async () => {
+                                                if (!symbol) return;
+                                                try {
+                                                    setIsSyncing(true);
+                                                    await api.post(`/research/sync/${symbol}`);
+                                                    queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
+                                                    queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
+                                                } catch (err) {
+                                                    console.error("Sync failed", err);
+                                                } finally {
+                                                    setIsSyncing(false);
+                                                }
+                                            }}
+                                            disabled={isSyncing}
+                                            title="Sync Data"
+                                        >
+                                            <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-9 w-9 rounded-full"
+                                            onClick={() => {
+                                                if (symbol) favoriteMutation.mutate(symbol);
+                                            }}
+                                            title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                                        >
+                                            <Star
+                                                size={18}
+                                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
+                                            />
+                                        </Button>
+
+                                        <Button variant="ghost" size="sm" className="h-9 w-9 rounded-full" title="Share">
+                                            <Share2 size={18} className="text-muted-foreground" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                {/* Row 2: Data & Context */}
+                                <div className="flex items-start gap-12">
+                                    {/* Price & Risk Block */}
+                                    <div className="shrink-0 min-w-[200px]">
+                                        <div className="flex items-baseline gap-3 mb-4">
+                                            <span className="text-4xl font-mono font-semibold tracking-tighter">
+                                                ${market_data?.price?.toFixed(2)}
+                                            </span>
+                                            <div className={`flex items-center text-lg font-medium px-2 py-0.5 rounded ${isPriceUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                {isPriceUp ? <TrendingUp size={18} className="mr-1.5" /> : <TrendingDown size={18} className="mr-1.5" />}
+                                                {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                            </div>
+                                        </div>
+
+                                        {risk_analysis && (
+                                            <div className="pt-2 border-t border-border/50">
+                                                <RiskLight
+                                                    score={risk_analysis.overall_score}
+                                                    reasoning={risk_analysis.summary}
+                                                    sentiment={risk_analysis.sentiment}
+                                                    breakdown={{
+                                                        financial: risk_analysis.financial_risk,
+                                                        execution: risk_analysis.execution_risk,
+                                                        dilution: risk_analysis.dilution_risk,
+                                                        competitive: risk_analysis.competitive_risk,
+                                                        regulatory: risk_analysis.regulatory_risk
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Chart Area & Summary */}
+                                    <div className="flex-1 space-y-4">
+                                        <div className="min-h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden group">
+                                            {market_data?.history && market_data.history.length > 0 ? (
+                                                <PriceChart data={market_data.history} className="h-full" />
+                                            ) : (
+                                                <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
+                                                    No historical data available for chart
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {profile?.description && (
+                                            <div className="bg-muted/5 border border-border/40 rounded-xl p-4">
+                                                <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-4">
+                                                    {profile.description}
+                                                </p>
+                                                {profile.web_url && (
+                                                    <div className="mt-3 flex items-center gap-2 text-[10px]">
+                                                        <span className="text-muted-foreground/60 uppercase font-bold tracking-widest">Website</span>
+                                                        <a
+                                                            href={profile.web_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-primary hover:underline font-medium"
+                                                        >
+                                                            {(() => {
+                                                                try { return new URL(profile.web_url).hostname; }
+                                                                catch { return profile.web_url.replace(/^https?:\/\//, '').split('/')[0]; }
+                                                            })()}
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Right: Actions */}
-                            <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 mr-2" title="Watchers">
-                                    <Eye size={14} className="text-muted-foreground" />
-                                    <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
-                                </div>
+                            {/* --- MOBILE LAYOUT (Unchanged structure, ensuring compatibility) --- */}
+                            <div className="md:hidden">
+                                {/* Top: Back + Logo + Symbol/Name */}
+                                <div className="flex items-start gap-3 pr-24">
+                                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
+                                        <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                                    </Button>
 
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
-                                    onClick={async () => {
-                                        if (!symbol) return;
-                                        try {
-                                            setIsSyncing(true);
-                                            await api.post(`/research/sync/${symbol}`);
-                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
-                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
-                                        } catch (err) {
-                                            console.error("Sync failed", err);
-                                        } finally {
-                                            setIsSyncing(false);
-                                        }
-                                    }}
-                                    disabled={isSyncing}
-                                    title="Sync Data"
-                                >
-                                    <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
-                                </Button>
+                                    <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-9 w-9 rounded-full"
-                                    onClick={() => {
-                                        if (symbol) favoriteMutation.mutate(symbol);
-                                    }}
-                                    title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                                >
-                                    <Star
-                                        size={18}
-                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
-                                    />
-                                </Button>
-
-                                <Button variant="ghost" size="sm" className="h-9 w-9 rounded-full" title="Share">
-                                    <Share2 size={18} className="text-muted-foreground" />
-                                </Button>
-                            </div>
-                        </div>
-                        {/* Row 2: Data & Context */}
-                        <div className="flex items-start gap-12">
-                            {/* Price & Risk Block */}
-                            <div className="shrink-0 min-w-[200px]">
-                                <div className="flex items-baseline gap-3 mb-4">
-                                    <span className="text-4xl font-mono font-semibold tracking-tighter">
-                                        ${market_data?.price?.toFixed(2)}
-                                    </span>
-                                    <div className={`flex items-center text-lg font-medium px-2 py-0.5 rounded ${isPriceUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                                        {isPriceUp ? <TrendingUp size={18} className="mr-1.5" /> : <TrendingDown size={18} className="mr-1.5" />}
-                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
+                                            {profile?.name}
+                                        </div>
+                                        <div className="flex items-baseline gap-2 mt-1">
+                                            <span className="text-lg font-mono font-bold tracking-tight">
+                                                ${market_data?.price?.toFixed(2)}
+                                            </span>
+                                            <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                                {isPriceUp ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
+                                                {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {risk_analysis && (
-                                    <div className="pt-2 border-t border-border/50">
+                                {/* Mobile: Risk Row */}
+                                <div className="md:hidden flex items-center justify-center mt-4">
+                                    {risk_analysis && (
                                         <RiskLight
                                             score={risk_analysis.overall_score}
                                             reasoning={risk_analysis.summary}
@@ -349,206 +432,114 @@ export function TickerDetail() {
                                                 regulatory: risk_analysis.regulatory_risk
                                             }}
                                         />
+                                    )}
+                                </div>
+
+                                {/* Mobile: Chart Area & Summary */}
+                                <div className="md:hidden mt-6 space-y-4">
+                                    <div className="h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
+                                        {market_data?.history && market_data.history.length > 0 ? (
+                                            <PriceChart data={market_data.history} className="h-full" />
+                                        ) : (
+                                            <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
+                                                No historical data available for chart
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Chart Area */}
-                            <div className="flex-1 min-h-[160px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden group">
-                                {market_data?.history && market_data.history.length > 0 ? (
-                                    <PriceChart data={market_data.history} className="h-full" />
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
-                                        No historical data available for chart
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* --- MOBILE LAYOUT (Unchanged structure, ensuring compatibility) --- */}
-                    <div className="md:hidden">
-                        {/* Top: Back + Logo + Symbol/Name */}
-                        <div className="flex items-start gap-3 pr-24">
-                            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
-                                <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                            </Button>
-
-                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                </div>
-                                <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
-                                    {profile?.name}
-                                </div>
-                                <div className="flex items-baseline gap-2 mt-1">
-                                    <span className="text-lg font-mono font-bold tracking-tight">
-                                        ${market_data?.price?.toFixed(2)}
-                                    </span>
-                                    <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                        {isPriceUp ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
-                                        {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Mobile: Risk Row */}
-                        <div className="md:hidden flex items-center justify-center mt-4">
-                            {risk_analysis && (
-                                <RiskLight
-                                    score={risk_analysis.overall_score}
-                                    reasoning={risk_analysis.summary}
-                                    sentiment={risk_analysis.sentiment}
-                                    breakdown={{
-                                        financial: risk_analysis.financial_risk,
-                                        execution: risk_analysis.execution_risk,
-                                        dilution: risk_analysis.dilution_risk,
-                                        competitive: risk_analysis.competitive_risk,
-                                        regulatory: risk_analysis.regulatory_risk
-                                    }}
-                                />
-                            )}
-                        </div>
-
-                        {/* Mobile: Chart Area */}
-                        <div className="md:hidden mt-6 h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
-                            {market_data?.history && market_data.history.length > 0 ? (
-                                <PriceChart data={market_data.history} className="h-full" />
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
-                                    No historical data available for chart
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Mobile: Description - Removed as it is now in the About tab */}
-                    </div>
-                </div>
-
-
-
-                {/* --- 2. TABS LAYOUT --- */}
-                <Tabs
-                    value={currentTab}
-                    onValueChange={(value) => navigate(`/ticker/${symbol}/${value}`)}
-                    className="w-full relative z-0"
-                >
-                    <TabsList className="mb-6">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="research">AI Research</TabsTrigger>
-                        <TabsTrigger value="financials">Financials</TabsTrigger>
-                        <TabsTrigger value="news">News</TabsTrigger>
-                        <TabsTrigger value="about">About</TabsTrigger>
-                    </TabsList>
-
-                    {/* OVERVIEW TAB */}
-                    <TabsContent value="overview" className="space-y-6">
-                        <TickerOverview
-                            risk_analysis={risk_analysis}
-                            market_data={market_data}
-                            ratings={tickerData.ratings}
-                        />
-                    </TabsContent>
-
-                    {/* AI RESEARCH TAB */}
-                    <TabsContent value="research">
-                        <ResearchFeed
-                            research={researchWithPlaceholder}
-                            onTrigger={handleTriggerResearch}
-                            isAnalyzing={isAnalyzing}
-                            onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
-                            defaultTicker={symbol}
-                        />
-                    </TabsContent>
-
-                    {/* FINANCIALS TAB */}
-                    <TabsContent value="financials">
-                        <TickerFinancials fundamentals={fundamentals} />
-                    </TabsContent>
-
-                    {/* NEWS TAB */}
-                    <TabsContent value="news">
-                        <TickerNews news={news} />
-                    </TabsContent>
-
-                    {/* ABOUT TAB */}
-                    <TabsContent value="about" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="max-w-4xl mx-auto space-y-8">
-                            {/* Company Summary Section */}
-                            <section className="space-y-4">
-                                <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2 flex items-center gap-2">
-                                    Business Summary
-                                </h2>
-                                <div className="text-sm text-muted-foreground/90 leading-relaxed bg-muted/30 p-6 rounded-xl border border-border/50 italic">
-                                    {profile?.description || "No company description available."}
-                                </div>
-                            </section>
-
-                            {/* Background Context (if available) - Industry/Sector Details */}
-                            <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                                <div className="space-y-4 p-6 bg-muted/20 rounded-xl border border-border/40">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Classification</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground">Sector</span>
-                                            <span className="font-medium text-foreground">{profile?.sector || "N/A"}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground">Industry</span>
-                                            <span className="font-medium text-foreground">{profile?.industry || "N/A"}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4 p-6 bg-muted/20 rounded-xl border border-border/40">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Corporate Registry</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground">HQ</span>
-                                            <span className="font-medium text-foreground">{profile?.country || "N/A"}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-muted-foreground">Website</span>
-                                            {profile?.web_url ? (
-                                                <a href={profile.web_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                                                    {(() => {
-                                                        try {
-                                                            return new URL(profile.web_url).hostname;
-                                                        } catch {
-                                                            return profile.web_url.replace(/^https?:\/\//, '').split('/')[0];
-                                                        }
-                                                    })()}
-                                                </a>
-                                            ) : (
-                                                <span className="font-medium text-foreground">N/A</span>
+                                    {profile?.description && (
+                                        <div className="bg-muted/5 border border-border/40 rounded-xl p-4">
+                                            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                                                {profile.description}
+                                            </p>
+                                            {profile.web_url && (
+                                                <div className="mt-3 flex items-center gap-2 text-[10px]">
+                                                    <span className="text-muted-foreground/60 uppercase font-bold tracking-widest">Website</span>
+                                                    <a
+                                                        href={profile.web_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline font-medium"
+                                                    >
+                                                        {(() => {
+                                                            try { return new URL(profile.web_url).hostname; }
+                                                            catch { return profile.web_url.replace(/^https?:\/\//, '').split('/')[0]; }
+                                                        })()}
+                                                    </a>
+                                                </div>
                                             )}
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                            </section>
+
+                                {/* Mobile: Description - Removed as it is now in the About tab */}
+                            </div>
                         </div>
-                    </TabsContent>
-                </Tabs>
 
-                {/* --- 3. DISCUSSION (Global Footer) --- */}
-                <div className="mt-12 border-t border-border pt-8 pb-12">
-                    <div className="max-w-3xl mx-auto">
-                        <TickerDiscussion
-                            comments={socialComments}
-                            onPostComment={(content) => {
-                                if (symbol) {
-                                    postCommentMutation.mutate({ symbol, content });
-                                }
-                            }}
-                            isPosting={postCommentMutation.isPending}
-                        />
-                    </div>
-                </div>
 
-            </main>
+
+                        {/* --- 2. TABS LAYOUT --- */}
+                        <Tabs
+                            value={currentTab}
+                            onValueChange={(value) => navigate(`/ticker/${symbol}/${value}`)}
+                            className="w-full relative z-0"
+                        >
+                            <TabsList className="mb-6">
+                                <TabsTrigger value="overview">Overview</TabsTrigger>
+                                <TabsTrigger value="research">AI Research</TabsTrigger>
+                                <TabsTrigger value="financials">Financials</TabsTrigger>
+                                <TabsTrigger value="news">News</TabsTrigger>
+                            </TabsList>
+
+                            {/* OVERVIEW TAB */}
+                            <TabsContent value="overview" className="space-y-6">
+                                <TickerOverview
+                                    risk_analysis={risk_analysis}
+                                    market_data={market_data}
+                                    ratings={tickerData.ratings}
+                                />
+                            </TabsContent>
+
+                            {/* AI RESEARCH TAB */}
+                            <TabsContent value="research">
+                                <ResearchFeed
+                                    research={researchWithPlaceholder}
+                                    onTrigger={handleTriggerResearch}
+                                    isAnalyzing={isAnalyzing}
+                                    onDelete={(user?.role?.toLowerCase() === 'admin') ? handleDeleteResearch : undefined}
+                                    defaultTicker={symbol}
+                                />
+                            </TabsContent>
+
+                            {/* FINANCIALS TAB */}
+                            <TabsContent value="financials">
+                                <TickerFinancials fundamentals={fundamentals} />
+                            </TabsContent>
+
+                            {/* NEWS TAB */}
+                            <TabsContent value="news">
+                                <TickerNews news={news} />
+                            </TabsContent>
+                        </Tabs>
+
+                        {/* --- 3. DISCUSSION (Global Footer) --- */}
+                        <div className="mt-12 border-t border-border pt-8 pb-12">
+                            <div className="max-w-3xl mx-auto">
+                                <TickerDiscussion
+                                    comments={socialComments}
+                                    onPostComment={(content) => {
+                                        if (symbol) {
+                                            postCommentMutation.mutate({ symbol, content });
+                                        }
+                                    }}
+                                    isPosting={postCommentMutation.isPending}
+                                />
+                            </div>
+                        </div>
+
+                    </main>
+                );
+            })()}
         </div>
     );
 }

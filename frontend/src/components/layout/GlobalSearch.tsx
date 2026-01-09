@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { TickerLogo } from '../dashboard/TickerLogo';
+import { cn } from '../../lib/api';
 
 interface TickerResult {
     symbol: string;
@@ -10,7 +12,7 @@ interface TickerResult {
     logo_url?: string;
 }
 
-export function GlobalSearch() {
+export function GlobalSearch({ className = '' }: { className?: string }) {
     const navigate = useNavigate();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<TickerResult[]>([]);
@@ -18,6 +20,20 @@ export function GlobalSearch() {
     const [isLoading, setIsLoading] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Keyboard shortcut (CMD/CTRL + K)
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
 
     // Click outside to close
     useEffect(() => {
@@ -89,12 +105,13 @@ export function GlobalSearch() {
     };
 
     return (
-        <div className="relative w-full max-w-sm" ref={wrapperRef}>
+        <div className={cn("relative w-full", className)} ref={wrapperRef}>
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <input
+                    ref={inputRef}
                     type="text"
-                    className="w-full bg-muted/40 border border-input text-sm rounded-full pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/70"
+                    className="w-full bg-[#09090b] border border-input text-sm rounded-full pl-10 pr-16 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/70"
                     placeholder="Search tickers..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -103,13 +120,18 @@ export function GlobalSearch() {
                         if (results.length > 0) setIsOpen(true);
                     }}
                 />
-                {isLoading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-primary w-4 h-4 animate-spin" />
-                )}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                    {isLoading && (
+                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                    )}
+                    <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                        <span className="text-xs">⌘</span>K
+                    </kbd>
+                </div>
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-card/80 backdrop-blur-md border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-full mt-2 w-full bg-[#09090b] !bg-opacity-100 border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 !opacity-100">
                     <div className="py-1">
                         {results.map((ticker, index) => (
                             <button
@@ -121,23 +143,12 @@ export function GlobalSearch() {
                                 onClick={() => selectTicker(ticker)}
                                 onMouseEnter={() => setHighlightedIndex(index)}
                             >
-                                {/* Logo or Fallback Avatar */}
-                                <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
-                                    {ticker.logo_url ? (
-                                        <img
-                                            src={ticker.logo_url}
-                                            alt={ticker.symbol}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                            }}
-                                        />
-                                    ) : (
-                                        <span className="text-[10px] font-bold text-muted-foreground">
-                                            {ticker.symbol.substring(0, 2)}
-                                        </span>
-                                    )}
-                                </div>
+                                {/* Logo using TickerLogo */}
+                                <TickerLogo
+                                    symbol={ticker.symbol}
+                                    url={ticker.logo_url}
+                                    className="w-8 h-8 rounded-full border border-border flex-shrink-0"
+                                />
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">

@@ -241,15 +241,5 @@ export function useActiveResearchCount() {
     });
 }
 
-export function useWatchlists() {
-    return useQuery({
-        queryKey: ['watchlists'],
-        queryFn: async () => {
-             const res = await api.get('/watchlists');
-             return res.data || [];
-        },
-        staleTime: 1000 * 60, // 1 min
-    });
-}
 
 
