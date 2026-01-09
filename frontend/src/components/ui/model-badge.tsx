@@ -19,7 +19,7 @@ const getDisplayRarity = (rarity: string) => {
         'Purple': 'Epic',
         'Gold': 'Legendary'
     };
-    
+
     const normalized = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
     return legacyMap[normalized] || normalized;
 };
@@ -32,13 +32,13 @@ export function ModelBadge({ model, rarity, className, showIcon = true }: ModelB
     const getRarityStyles = (rarity: string) => {
         switch (rarity) {
             case 'Legendary':
-                return 'bg-yellow-500/15 text-yellow-500 border-yellow-500/30';
+                return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/40';
             case 'Epic':
-                return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+                return 'bg-purple-500/20 text-purple-400 border-purple-500/40';
             case 'Rare':
-                return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+                return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
             case 'Uncommon':
-                return 'bg-green-500/15 text-green-400 border-green-500/30';
+                return 'bg-green-500/20 text-green-400 border-green-500/40';
             default:
                 return 'bg-white/5 text-white/70 border-white/10';
         }
@@ -48,14 +48,14 @@ export function ModelBadge({ model, rarity, className, showIcon = true }: ModelB
         <Badge
             variant="outline"
             className={cn(
-                "px-1.5 py-0 h-4 md:h-5 text-[10px] font-bold lowercase border tracking-tight transition-all duration-300 whitespace-nowrap",
+                "px-1.5 py-0 h-4 md:h-5 text-[10px] font-bold border tracking-tight transition-all duration-300 whitespace-nowrap",
                 getRarityStyles(displayRarity),
                 className
             )}
         >
             <div className="flex items-center gap-1.5">
                 {showIcon && <Brain className={cn("w-2.5 h-2.5", displayRarity === 'Common' ? 'text-primary' : 'text-current')} />}
-                <span>{model}</span>
+                <span className="lowercase">{model}</span>
             </div>
         </Badge>
     );

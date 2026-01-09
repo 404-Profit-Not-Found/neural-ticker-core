@@ -8,24 +8,15 @@ import {
   Clock,
   Calendar,
   Loader2,
-  CheckCircle2,
   AlertTriangle,
   ArrowRight,
+  Newspaper,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
-import { cn } from '../lib/api';
-
-// Reusing types from ResearchPage or defining subset
-interface ResearchNoteSummary {
-  id: string;
-  tickers: string[];
-  title?: string;
-  question?: string;
-  status: 'completed' | 'pending' | 'failed' | 'processing';
-  created_at: string;
-  rarity?: string;
-}
+import { TickerLogo } from '../components/dashboard/TickerLogo';
+import { ModelBadge } from '../components/ui/model-badge';
+import type { ResearchItem } from '../types/ticker';
 
 export function ResearchListPage() {
   const navigate = useNavigate();
@@ -34,7 +25,7 @@ export function ResearchListPage() {
   const isRecent = filter === 'recent';
 
   const { data, isLoading, isError } = useQuery<{
-    data: ResearchNoteSummary[];
+    data: ResearchItem[];
     total: number;
   }>({
     queryKey: ['research-list', filter],
@@ -102,59 +93,46 @@ export function ResearchListPage() {
                 onClick={() => navigate(`/research/${note.id}`)}
               >
                 <CardContent className="p-4 flex flex-row items-start md:items-center gap-3 md:gap-4">
-                  {/* Status / Icon */}
-                  <div className="shrink-0 pt-0.5 md:pt-0">
-                    {note.status === 'completed' ? (
-                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
-                        <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
+                  {/* Icon Replacement: Ticker Logo or News */}
+                  <div className="shrink-0">
+                    {note.status === 'processing' || note.status === 'pending' ? (
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                        <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
                       </div>
                     ) : note.status === 'failed' ? (
-                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                        <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                        <AlertTriangle className="w-5 h-5 md:w-6 md:h-6" />
+                      </div>
+                    ) : (note.tickers.length > 1 || (note.title && note.title.toLowerCase().includes('news'))) ? (
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-primary/20 flex items-center justify-center text-primary-foreground">
+                        <Newspaper className="w-5 h-5 md:w-6 md:h-6" />
                       </div>
                     ) : (
-                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                        <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                      </div>
+                      <TickerLogo
+                        symbol={note.tickers[0]}
+                        className="w-10 h-10 md:w-12 md:h-12 rounded-lg"
+                      />
                     )}
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0 space-y-1.5 md:space-y-0">
+                  <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2 mb-0.5 md:mb-1">
-                      {note.tickers.map((t) => (
+                      {note.tickers.map((t: string) => (
                         <Badge
                           key={t}
                           variant="outline"
-                          className="font-bold bg-background/50 h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
+                          className="font-bold bg-muted/30 h-5 px-1.5 text-[10px] md:text-xs md:px-2"
                         >
                           {t}
                         </Badge>
                       ))}
-                      {note.rarity && (
-                        <Badge
-                          className={cn(
-                            'text-[10px] px-1.5 py-0 h-4 md:h-5 border uppercase tracking-wider',
-                            note.rarity === 'Legendary'
-                              ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                              : note.rarity === 'Epic'
-                                ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                                : note.rarity === 'Rare'
-                                  ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                                  : note.rarity === 'Uncommon'
-                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                    : 'bg-muted text-muted-foreground border-border',
-                          )}
-                          variant="outline"
-                        >
-                          {note.rarity}
-                        </Badge>
-                      )}
                     </div>
-                    <h3 className="text-sm md:text-lg font-semibold line-clamp-2 md:truncate group-hover:text-primary transition-colors leading-tight">
+                    <h3 className="text-sm md:text-base font-bold line-clamp-2 md:truncate group-hover:text-primary transition-colors leading-tight mb-1">
                       {note.title || note.question || 'Untitled Research'}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] md:text-xs text-muted-foreground">
+
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[10px] md:text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar size={10} className="md:w-3 md:h-3" />
                         <span>
@@ -167,9 +145,53 @@ export function ResearchListPage() {
                           {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <span className="capitalize px-1.5 py-0.5 rounded bg-muted/50 border border-border/50">
-                        {note.status}
-                      </span>
+
+                      <span className="text-muted-foreground hidden md:inline">•</span>
+
+                      {/* Author Section Replicating ResearchFeed */}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-muted-foreground hidden md:inline">By</span>
+                        <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                          {note.user?.avatar_url ? (
+                            <img src={note.user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[8px] md:text-[9px] font-bold text-muted-foreground uppercase">
+                              {(note.user?.nickname || note.user?.email || '?').charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-semibold text-foreground truncate max-w-[80px] md:max-w-[120px]">
+                          {note.user?.nickname || note.user?.email?.split('@')[0] || 'AI'}
+                        </span>
+                      </div>
+
+                      {/* Provider / Model */}
+                      {note.status === 'completed' && note.provider && (
+                        <>
+                          <span className="text-muted-foreground hidden md:inline">•</span>
+                          <ModelBadge
+                            model={note.models_used && note.models_used.length > 0 ? note.models_used[0] : note.provider}
+                            rarity={note.rarity}
+                            className="h-4 md:h-5 text-[9px] md:text-[10px]"
+                          />
+                        </>
+                      )}
+
+                      {/* Token usage */}
+                      {note.status === 'completed' && ((note.tokens_in ?? 0) + (note.tokens_out ?? 0)) > 0 && (
+                        <>
+                          <span className="text-muted-foreground hidden md:inline">•</span>
+                          <span className="rounded-full bg-muted/30 px-2 py-0.5 text-[10px] whitespace-nowrap">
+                            {((note.tokens_in ?? 0) + (note.tokens_out ?? 0)).toLocaleString()} tokens used
+                          </span>
+                        </>
+                      )}
+
+                      {note.status !== 'completed' && (
+                        <span className="capitalize px-1.5 py-0.5 rounded bg-muted/50 border border-border/50">
+                          {note.status}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -211,8 +233,9 @@ export function ResearchListPage() {
               </Button>
             )}
           </div>
-        )}
-      </main>
-    </div>
+        )
+        }
+      </main >
+    </div >
   );
 }
