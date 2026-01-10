@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2, PlusCircle, Database, Clock } from 'lucide-react';
-import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
+import { useRequestTicker } from '../../hooks/useTickerRequests';
+import { Sparkline } from '../ui/Sparkline';
 
 interface TickerResult {
     symbol: string;
@@ -12,7 +13,8 @@ interface TickerResult {
     exchange: string;
     logo_url?: string;
     is_locally_tracked: boolean;
-    is_queued?: boolean; // Added for UI feedback
+    is_queued?: boolean;
+    sparkline?: number[];
 }
 
 export function GlobalSearch({ className = '' }: { className?: string }) {
@@ -64,7 +66,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             setIsLoading(true);
             try {
                 const { data } = await api.get<TickerResult[]>('/tickers', {
-                    params: { search: query },
+                    params: { search: query, external: 'false' }, // Typing only searches local DB
                 });
                 if (active) {
                     setResults(data);
@@ -97,9 +99,13 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             e.preventDefault();
             if (highlightedIndex >= 0 && results[highlightedIndex]) {
                 selectTicker(results[highlightedIndex]);
-            } else if (results.length > 0) {
-                // If nothing is highlighted, select the first result
-                selectTicker(results[0]);
+            } else if (results.length > 0 && results[0].is_locally_tracked) {
+                 // If top result is local, auto-select it? Or wait for explicit highlight?
+                 // Standard behavior: select top result.
+                 selectTicker(results[0]);
+            } else {
+                 // If no local result selected/found, trigger external search
+                 performExternalSearch();
             }
         } else if (e.key === 'Escape') {
             setIsOpen(false);
@@ -113,21 +119,35 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
         setIsOpen(false);
     };
 
-    const handleAddTicker = async (e: React.MouseEvent, symbol: string) => {
-        e.stopPropagation(); // Don't navigate
+    const requestTickerMutation = useRequestTicker();
+
+    const handleRequestAdd = async (e: React.MouseEvent, symbol: string) => {
+        e.stopPropagation();
         try {
-            const res = await api.post('/tickers', { symbol });
-            
-            if (res.status === 202) {
-                setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_queued: true } : t));
-                toast.info(`${symbol} queued for background processing`);
-            } else {
-                setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_locally_tracked: true } : t));
-                toast.success(`${symbol} added to tracking`);
-            }
+            await requestTickerMutation.mutateAsync(symbol);
+            // Optimistically update UI to show as queued/requested
+            setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_queued: true } : t));
         } catch (error) {
-            console.error('Failed to add ticker', error);
-            toast.error(`Failed to add ${symbol}`);
+            console.error('Failed to request ticker', error);
+        }
+    };
+    
+    // Legacy direct add is disabled for new flow, but we keep this function if we need it for admins later?
+    // User requested "Request" flow.
+
+
+    const performExternalSearch = async () => {
+        setIsLoading(true);
+        try {
+            const { data } = await api.get<TickerResult[]>('/tickers', {
+                params: { search: query, external: 'true' },
+            });
+            setResults(data);
+            setIsOpen(true);
+        } catch (error) {
+            console.error('External search failed', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -147,6 +167,13 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                         if (results.length > 0) setIsOpen(true);
                     }}
                 />
+                
+                {/* Visual feedback or button to force external search */}
+                {results.length === 0 && query.length >= 2 && !isLoading && (
+                   <div className="absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none text-[10px] text-muted-foreground opacity-50">
+                      Press Enter to search market
+                   </div>
+                )}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                     {isLoading && (
                         <Loader2 className="w-3 h-3 animate-spin text-primary" />
@@ -180,8 +207,17 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-4">
                                         <span className="font-bold text-sm shrink-0">{ticker.symbol}</span>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {ticker.is_locally_tracked ? (
+                                        <div className="flex items-center gap-2 shrink-0 h-6">
+                                            {ticker.is_locally_tracked && ticker.sparkline && ticker.sparkline.length > 0 ? (
+                                                <div className="flex items-center gap-3">
+                                                    <Sparkline 
+                                                        data={ticker.sparkline} 
+                                                        width={60} 
+                                                        height={24} 
+                                                        className="opacity-80 group-hover:opacity-100 transition-opacity"
+                                                    />
+                                                </div>
+                                            ) : ticker.is_locally_tracked ? (
                                                 <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 whitespace-nowrap">
                                                     <Database size={10} className="opacity-70" />
                                                     Tracked
@@ -193,11 +229,12 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                                 </span>
                                             ) : (
                                                 <button
-                                                    onClick={(e) => handleAddTicker(e, ticker.symbol)}
-                                                    className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 transition-all"
+                                                    onClick={(e) => handleRequestAdd(e, ticker.symbol)}
+                                                    disabled={requestTickerMutation.isPending}
+                                                    className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 transition-all disabled:opacity-50"
                                                 >
-                                                    <PlusCircle size={10} />
-                                                    Track
+                                                    {requestTickerMutation.isPending ? <Loader2 size={10} className="animate-spin" /> : <PlusCircle size={10} />}
+                                                    Request Add
                                                 </button>
                                             )}
                                         </div>

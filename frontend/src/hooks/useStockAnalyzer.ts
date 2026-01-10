@@ -10,6 +10,8 @@ export interface StockSnapshot {
         sector?: string;
         industry?: string;
         logo_url?: string;
+        news_sentiment?: string | null;
+        news_impact_score?: number | null;
     };
     latestPrice: {
         close: number;
@@ -41,6 +43,7 @@ export interface StockSnapshot {
         analysts?: number;
         social?: number;
     };
+    sparkline?: number[];
 }
 
 export interface AnalyzerResponse {

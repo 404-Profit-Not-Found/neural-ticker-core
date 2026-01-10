@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
-import { toonToJson } from 'toon-parser';
 
 export interface QualityScore {
   score: number;
@@ -81,17 +80,13 @@ export class QualityScoringService {
 
       let scoreData: any;
       try {
-        scoreData = toonToJson(contentToParse, { strict: false });
+        const cleanContent = contentToParse
+          .trim()
+          .replace(/,\s*([}\]])/g, '$1');
+        scoreData = JSON.parse(cleanContent);
       } catch (e) {
-        // Fallback to standard JSON parse if TOON fails
-        try {
-          scoreData = JSON.parse(contentToParse);
-        } catch {
-          this.logger.error(`Failed to parse content: ${contentToParse}`);
-          throw new Error(
-            `Failed to parse response as TOON or JSON: ${e.message}`,
-          );
-        }
+        this.logger.error(`Failed to parse content: ${contentToParse}`);
+        throw new Error(`Failed to parse response as JSON: ${e.message}`);
       }
 
       // Numeric Coercion

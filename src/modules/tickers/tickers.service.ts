@@ -12,6 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
+import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { JobsService } from '../jobs/jobs.service'; // Added
@@ -27,8 +28,9 @@ export class TickersService {
     @InjectRepository(TickerEntity)
     private readonly tickerRepo: Repository<TickerEntity>,
     @InjectRepository(TickerLogoEntity)
-    @InjectRepository(TickerLogoEntity)
     private readonly logoRepo: Repository<TickerLogoEntity>,
+    @InjectRepository(PriceOhlcv)
+    private readonly ohlcvRepo: Repository<PriceOhlcv>,
     @Inject(forwardRef(() => FinnhubService))
     private readonly finnhubService: FinnhubService,
     private readonly yahooFinanceService: YahooFinanceService,
@@ -44,6 +46,12 @@ export class TickersService {
       throw new NotFoundException(`Ticker ${symbol} not found`);
     }
     return ticker;
+  }
+
+  async findOneBySymbol(symbol: string): Promise<TickerEntity | null> {
+    return this.tickerRepo.findOne({
+      where: { symbol: symbol.toUpperCase() },
+    });
   }
 
   // Alias for backward compatibility if needed, or primarily used by other services
@@ -109,7 +117,9 @@ export class TickersService {
           const statusText = (e.statusText || '').toLowerCase();
           const fullErrorString = JSON.stringify(e).toLowerCase();
 
-          this.logger.warn(`Yahoo Error for ${upperSymbol}: ${getErrorMessage(e)}`);
+          this.logger.warn(
+            `Yahoo Error for ${upperSymbol}: ${getErrorMessage(e)}`,
+          );
 
           const isRateLimit =
             (e instanceof HttpException && e.getStatus() === 429) ||
@@ -179,7 +189,7 @@ export class TickersService {
 
     // Initial background sync: Download logo, Fetch Snapshot, History and Research
     void this.jobsService.initializeTicker(savedTicker.symbol);
-    
+
     // Download logo in background
     if (savedTicker.logo_url) {
       this.downloadAndSaveLogo(savedTicker.id, savedTicker.logo_url).catch(
@@ -263,6 +273,7 @@ export class TickersService {
 
   async searchTickers(
     search?: string,
+    includeExternal = false,
   ): Promise<Partial<TickerEntity & { is_locally_tracked: boolean }>[]> {
     if (!search || search.trim() === '') {
       const all = await this.getAllTickers();
@@ -275,6 +286,7 @@ export class TickersService {
     const dbResults = await this.tickerRepo
       .createQueryBuilder('ticker')
       .select([
+        'ticker.id',
         'ticker.symbol',
         'ticker.name',
         'ticker.exchange',
@@ -294,37 +306,88 @@ export class TickersService {
       .limit(20)
       .getMany();
 
-    const mappedDbResults = dbResults.map((t) => ({
-      ...t,
-      is_locally_tracked: true,
-    }));
+    const mappedDbResults = await Promise.all(
+      dbResults.map(async (t) => {
+        // Fetch last 14 days of prices for sparkline
+        const prices = await this.ohlcvRepo.find({
+          where: { symbol_id: t.id, timeframe: '1d' },
+          order: { ts: 'DESC' },
+          take: 14,
+          select: ['close', 'ts'],
+        });
+
+        return {
+          ...t,
+          is_locally_tracked: true,
+          sparkline: prices.reverse().map((p) => p.close),
+        };
+      }),
+    );
 
     // 2. External Search (Fallback/Supplement)
-    if (search.length >= 2) {
+    if (search.length >= 2 && includeExternal) {
       try {
-        const extData = await this.finnhubService.searchSymbols(search);
-        if (extData && extData.result && Array.isArray(extData.result)) {
-          const existingSymbols = new Set(
-            mappedDbResults.map((t) => t.symbol.toUpperCase()),
-          );
+        const [finnhubResult, yahooResult] = await Promise.allSettled([
+          this.finnhubService.searchSymbols(search),
+          this.yahooFinanceService.search(search),
+        ]);
 
-          const extResults = extData.result
-            .filter(
-              (item: any) => !existingSymbols.has(item.symbol.toUpperCase()),
-            )
-            .slice(0, 10)
-            .map((item: any) => ({
-              symbol: item.symbol,
-              name: item.description,
-              exchange: item.type || 'External',
-              logo_url: null,
-              is_locally_tracked: false,
-            }));
+        const existingSymbols = new Set(
+          mappedDbResults.map((t) => t.symbol.toUpperCase()),
+        );
+        const externalResults: any[] = [];
 
-          return [...mappedDbResults, ...extResults];
+        // Process Finnhub Results
+        if (
+          finnhubResult.status === 'fulfilled' &&
+          finnhubResult.value?.result &&
+          Array.isArray(finnhubResult.value.result)
+        ) {
+          finnhubResult.value.result.forEach((item: any) => {
+            const sym = item.symbol.toUpperCase();
+            // Filter out dots if needed, but keeping them allows more matches.
+            // Just filter duplicates.
+            if (!existingSymbols.has(sym) && !sym.includes('.')) {
+              existingSymbols.add(sym); // Add to set so Yahoo doesn't duplicate it
+              externalResults.push({
+                symbol: item.symbol,
+                name: item.description,
+                exchange: item.type || 'External',
+                logo_url: null,
+                is_locally_tracked: false,
+                sparkline: null,
+              });
+            }
+          });
         }
+
+        // Process Yahoo Results
+        if (
+          yahooResult.status === 'fulfilled' &&
+          yahooResult.value?.quotes &&
+          Array.isArray(yahooResult.value.quotes)
+        ) {
+          yahooResult.value.quotes.forEach((item: any) => {
+            const sym = item.symbol.toUpperCase();
+            if (!existingSymbols.has(sym)) {
+              existingSymbols.add(sym);
+              externalResults.push({
+                symbol: item.symbol,
+                name: item.shortname || item.longname || item.symbol,
+                exchange: item.exchDisp || item.exchange || 'External',
+                logo_url: null,
+                is_locally_tracked: false,
+                sparkline: null,
+              });
+            }
+          });
+        }
+
+        // Return combined (limit external results to avoid huge payload? 20 is safe)
+        return [...mappedDbResults, ...externalResults.slice(0, 20)];
       } catch (err) {
-        this.logger.error(`Finnhub search failed: ${getErrorMessage(err)}`);
+        this.logger.error(`External search failed: ${getErrorMessage(err)}`);
+        // If external fails, just return strict DB results
       }
     }
 
@@ -466,7 +529,9 @@ export class TickersService {
           if (
             getErrorMessage(err) &&
             (getErrorMessage(err).toLowerCase().includes('429') ||
-              getErrorMessage(err).toLowerCase().includes('too many requests') ||
+              getErrorMessage(err)
+                .toLowerCase()
+                .includes('too many requests') ||
               getErrorMessage(err).toLowerCase().includes('crumb') ||
               getErrorMessage(err).toLowerCase().includes('cookie'))
           ) {
@@ -486,7 +551,9 @@ export class TickersService {
           if (
             getErrorMessage(err) &&
             (getErrorMessage(err).toLowerCase().includes('429') ||
-              getErrorMessage(err).toLowerCase().includes('too many requests') ||
+              getErrorMessage(err)
+                .toLowerCase()
+                .includes('too many requests') ||
               getErrorMessage(err).toLowerCase().includes('crumb') ||
               getErrorMessage(err).toLowerCase().includes('cookie'))
           ) {
@@ -495,7 +562,9 @@ export class TickersService {
               429,
             );
           }
-          this.logger.warn(`Yahoo Quote failed for ${symbol}: ${getErrorMessage(err)}`);
+          this.logger.warn(
+            `Yahoo Quote failed for ${symbol}: ${getErrorMessage(err)}`,
+          );
           return null; // Return null to continue if just quote fails
         });
 

@@ -6,28 +6,30 @@ import { getErrorMessage } from '../../utils/error.util';
 export class YahooFinanceService implements OnModuleInit {
   private readonly logger = new Logger(YahooFinanceService.name);
   private yahoo = new YahooFinance({
-    // @ts-ignore - suppressNotices exists in v3.11.2 but might still have type mismatches in some environments
     suppressNotices: ['yahooSurvey', 'ripHistorical'],
-    // @ts-ignore - fetchOptions is supported since v3.11.0
     fetchOptions: {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://finance.yahoo.com/',
-        'Connection': 'keep-alive',
+        Referer: 'https://finance.yahoo.com/',
+        Connection: 'keep-alive',
       },
     },
   });
 
   onModuleInit() {
     try {
-      // @ts-ignore - explicitly set internal env to be safe as constructor options might be ignored in some builds
+      // @ts-expect-error - explicitly set internal env to be safe as constructor options might be ignored in some builds
       this.yahoo._env.suppressNotices = ['yahooSurvey', 'ripHistorical'];
-    } catch (e) {
+    } catch {
       // fail silently
     }
-    this.logger.log('Yahoo Finance service initialized with suppressed notices and spoofed User-Agent');
+    this.logger.log(
+      'Yahoo Finance service initialized with suppressed notices and spoofed User-Agent',
+    );
   }
 
   /**

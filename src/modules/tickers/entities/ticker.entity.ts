@@ -144,7 +144,10 @@ export class TickerEntity {
   @Column({ type: 'text', nullable: true })
   news_summary: string;
 
-  @ApiProperty({ description: 'Sentiment: BULLISH, BEARISH, or NEUTRAL', required: false })
+  @ApiProperty({
+    description: 'Sentiment: BULLISH, BEARISH, or NEUTRAL',
+    required: false,
+  })
   @Column({ type: 'text', nullable: true })
   news_sentiment: string;
 
@@ -152,10 +155,12 @@ export class TickerEntity {
   @Column({ type: 'integer', nullable: true })
   news_impact_score: number;
 
-  @ApiProperty({ description: 'Timestamp of the last news analysis', required: false })
+  @ApiProperty({
+    description: 'Timestamp of the last news analysis',
+    required: false,
+  })
   @Column({ type: 'timestamptz', nullable: true })
   last_news_update: Date;
-
 
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })

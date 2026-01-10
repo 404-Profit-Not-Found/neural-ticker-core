@@ -27,6 +27,8 @@ import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
 import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils';
 import { VerdictBadge } from "../ticker/VerdictBadge";
+import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
+import { Sparkline } from "../ui/Sparkline";
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -169,6 +171,50 @@ export function AnalyzerTable({
       },
     }),
 
+
+    // 2.5 Sparkline
+    columnHelper.accessor('sparkline', {
+      header: 'Trend (14d)',
+      cell: (info) => {
+        const data = info.getValue();
+        if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+        return (
+          <div className="w-[100px] h-8 flex items-center justify-center">
+            <Sparkline 
+              data={data} 
+              width={100} 
+              height={32} 
+              className="opacity-80 group-hover:opacity-100 transition-opacity"
+            />
+          </div>
+        );
+      },
+    }),
+
+    // 2.75 52-Week Range
+    columnHelper.display({
+      id: 'fifty_two_week_range',
+      header: '52-Week Range',
+      cell: (info) => {
+        const row = info.row.original;
+        const low = row.fundamentals?.fifty_two_week_low;
+        const high = row.fundamentals?.fifty_two_week_high;
+        const price = row.latestPrice?.close;
+
+        if (!low || !high || !price) return <span className="text-muted-foreground text-xs">-</span>;
+        
+        return (
+            <div className="w-[180px]">
+                <FiftyTwoWeekRange 
+                    low={Number(low)} 
+                    high={Number(high)} 
+                    current={price} 
+                    showLabels={true}
+                />
+            </div>
+        );
+      },
+    }),
 
     // 3. P/E
     columnHelper.accessor((row) => row.fundamentals.pe_ttm, {

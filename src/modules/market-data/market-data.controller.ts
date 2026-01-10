@@ -114,4 +114,39 @@ export class MarketDataController {
       return [];
     });
   }
+  @ApiOperation({ summary: 'Get Market Status' })
+  @ApiResponse({ status: 200, description: 'Market Status Object' })
+  @Get('status')
+  async getMarketStatus(@Query('exchange') exchange: string = 'US') {
+    const status = await this.service.getMarketStatus(exchange);
+    // If Finnhub returns null (access restricted), return a time-based fallback
+    if (!status) {
+      return this.getMarketStatusFallback(exchange);
+    }
+    return status;
+  }
+
+  private getMarketStatusFallback(exchange: string) {
+    // Simple heuristic for US market: Mon-Fri, 9:30 AM - 4:00 PM ET
+    const now = new Date();
+    const nyOptions = { timeZone: 'America/New_York' };
+    const nyTimeStr = now.toLocaleString('en-US', nyOptions);
+    const nyTime = new Date(nyTimeStr);
+    const day = nyTime.getDay();
+    const hours = nyTime.getHours();
+    const minutes = nyTime.getMinutes();
+    const timeInMinutes = hours * 60 + minutes;
+
+    const isWeekday = day >= 1 && day <= 5;
+    const isMarketHours = timeInMinutes >= 570 && timeInMinutes < 960; // 9:30 AM - 4:00 PM
+    const isOpen = isWeekday && isMarketHours;
+
+    return {
+      exchange,
+      isOpen,
+      session: isOpen ? 'market' : 'closed',
+      timezone: 'America/New_York',
+      fallback: true, // Indicate this is a calculated fallback
+    };
+  }
 }

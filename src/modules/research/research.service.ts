@@ -31,7 +31,6 @@ export interface ResearchEvent {
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
-import { toonToJson } from 'toon-parser';
 
 @Injectable()
 export class ResearchService implements OnModuleInit {
@@ -498,18 +497,15 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
           let data: any;
           try {
-            data = toonToJson(contentToParse, { strict: false });
+            const cleanContent = contentToParse
+              .trim()
+              .replace(/,\s*([}\]])/g, '$1');
+            data = JSON.parse(cleanContent);
           } catch (e) {
-            // Fallback to standard JSON parse if TOON fails
-            try {
-              data = JSON.parse(contentToParse);
-            } catch {
-              this.logger.warn(
-                `Failed to parse extracted data for ${ticker} via TOON or JSON`,
-                e,
-              );
-              continue; // Skip to next ticker or exit block
-            }
+            this.logger.warn(
+              `Failed to parse extracted data for ${ticker}: ${e.message}`,
+            );
+            continue;
           }
 
           let descriptionFound = false;
@@ -1059,26 +1055,68 @@ Title:`;
 
       // 5. PARSE & UPDATE TICKERS (The Smart News Integration)
       try {
-        const jsonMatch = result.answerMarkdown.match(/```json\n([\s\S]*?)\n```/) || result.answerMarkdown.match(/\{[\s\S]*\}/);
+        const jsonMatch =
+          saved.answer_markdown.match(/```json\s*([\s\S]*?)\s*```/) ||
+          saved.answer_markdown.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
-            const parsed = JSON.parse(jsonStr);
-            
-            if (parsed.items && Array.isArray(parsed.items)) {
-                this.logger.log(`Found ${parsed.items.length} news items to sync to DB...`);
-                for (const item of parsed.items) {
-                    if (item.symbol && item.impact_score) {
-                        await this.marketDataService.updateTickerNews(item.symbol, {
-                            sentiment: item.sentiment,
-                            score: item.impact_score,
-                            summary: item.summary
-                        });
-                    }
+          const jsonStr = (jsonMatch[1] || jsonMatch[0])
+            .trim()
+            .replace(/,\s*([}\]])/g, '$1'); // Basic cleanup for trailing commas
+
+          const parsed = JSON.parse(jsonStr);
+
+          if (parsed && parsed.items && Array.isArray(parsed.items)) {
+            this.logger.log(
+              `Found ${parsed.items.length} news items to sync to DB for digest ${saved.id}...`,
+            );
+            for (const item of parsed.items) {
+              if (item.symbol && item.impact_score !== undefined) {
+                // HANDLE SPLIT SYMBOLS (e.g. "NVO / LLY")
+                const symbols: string[] = item.symbol
+                  .split(/[/, &]+/) // Split by slash, comma, space, ampersand
+                  .map((s: string) => s.trim())
+                  .filter((s: string) => s.length > 0 && s !== 'AND' && s !== '&');
+
+                for (const sym of symbols) {
+                  try {
+                    await this.marketDataService.updateTickerNews(sym, {
+                      sentiment: item.sentiment || 'NEUTRAL',
+                      score: Number(item.impact_score),
+                      summary: item.summary || '',
+                    });
+                  } catch (err) {
+                    this.logger.warn(
+                      `Failed to update ticker news for ${sym}: ${err.message}`,
+                    );
+                  }
                 }
+              }
             }
+          }
+
+          // 6. STRIP JSON FROM PUBLIC VIEW
+          // Remove the JSON block and any trailing "JSON Section" headers
+          let cleanMarkdown = saved.answer_markdown
+            .replace(/```json[\s\S]*?```/g, '') // Remove code blocks
+            .replace(/\[JSON Section\].*$/is, '') // Remove everything after the JSON section header
+            .trim();
+
+          // If the LLM left trailing artifacts like "---" or "Output:", clean them up
+          cleanMarkdown = cleanMarkdown.replace(/\n---\s*$/g, '').trim();
+
+          if (cleanMarkdown !== saved.answer_markdown) {
+            await this.noteRepo.update(saved.id, {
+              answer_markdown: cleanMarkdown,
+            });
+            saved.answer_markdown = cleanMarkdown;
+            this.logger.log(`Stripped JSON metadata from digest ${saved.id}`);
+          }
         }
       } catch (parseErr) {
-        this.logger.warn('Failed to parse structured news data from digest', parseErr);
+        this.logger.warn(
+          'Failed to parse structured news data from digest',
+          parseErr,
+        );
       }
 
       return saved;

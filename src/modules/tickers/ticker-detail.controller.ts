@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Inject, forwardRef } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
@@ -49,7 +56,7 @@ export class TickerDetailController {
           .getHistory(
             symbol,
             '1d',
-            new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+            new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString(),
             new Date().toISOString(),
           )
           .catch(() => []),
@@ -138,7 +145,17 @@ export class TickerDetailController {
         score: ticker.news_impact_score,
         summary: ticker.news_summary,
         updated_at: ticker.last_news_update,
-      }
+      },
     };
+  }
+
+  @ApiOperation({ summary: 'Trigger background 5-year history sync' })
+  @Post(':symbol/sync')
+  syncHistory(@Param('symbol') symbol: string) {
+    // Fire and forget (or await if fast enough? Better F&F for UI responsiveness)
+    this.marketDataService
+      .syncTickerHistory(symbol, 5)
+      .catch((e) => console.error(e));
+    return { status: 'ok', message: 'Sync started' };
   }
 }

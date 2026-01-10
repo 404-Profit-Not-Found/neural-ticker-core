@@ -54,6 +54,8 @@ interface MarketSnapshot {
         dividend_yield?: number;
         beta?: number;
         consensus_rating?: string;
+        fifty_two_week_high?: number;
+        fifty_two_week_low?: number;
     };
     aiAnalysis?: {
         overall_score: number;
@@ -68,7 +70,7 @@ interface MarketSnapshot {
         analysts?: number;
         social?: number;
     };
-
+    sparkline?: number[];
 }
 
 // Constant empty arrays
@@ -223,6 +225,9 @@ export function WatchlistTable() {
                     price: price,
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
+                    marketCap: fundamentals.market_cap ?? null,
+                    fiftyTwoWeekHigh: fundamentals.fifty_two_week_high ?? null,
+                    fiftyTwoWeekLow: fundamentals.fifty_two_week_low ?? null,
                     potentialUpside: potentialUpside,
                     potentialDownside: potentialDownside,
                     riskScore: safeRiskScore,
@@ -233,7 +238,8 @@ export function WatchlistTable() {
                     researchCount: s.counts?.research || 0,
                     analystCount: s.counts?.analysts || 0,
                     socialCount: s.counts?.social || 0,
-                    itemId: watchlistItem?.id
+                    itemId: watchlistItem?.id,
+                    sparkline: s.sparkline
                 };
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);

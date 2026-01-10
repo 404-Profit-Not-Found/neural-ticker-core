@@ -24,7 +24,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -37,7 +37,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.quote(symbol, (error: any, data: any) => {
         if (error) {
           this.handleError(error, symbol);
-          return reject(new Error(error));
+          return reject(new Error(getErrorMessage(error)));
         }
         resolve(data);
       });
@@ -53,7 +53,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -69,7 +69,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, 'general-news');
-            return reject(error);
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -85,7 +85,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -98,7 +98,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.stockSymbols(exchange, {}, (error: any, data: any) => {
         if (error) {
           this.handleError(error, exchange);
-          return reject(new Error(error));
+          return reject(new Error(getErrorMessage(error)));
         }
         resolve(data);
       });
@@ -120,7 +120,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(error);
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -140,12 +140,29 @@ export class FinnhubService implements OnModuleInit {
     });
   }
 
+  async getMarketStatus(exchange: string): Promise<any> {
+    return new Promise((resolve) => {
+      this.finnhubClient.marketStatus({ exchange }, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, 'marketStatus');
+          // Gracefully return null when access is restricted
+          return resolve(null);
+        }
+        resolve(data);
+      });
+    });
+  }
+
   private handleError(error: any, context?: string) {
     const msg = getErrorMessage(error);
     const logMsg = `Finnhub API Error [${context}]: ${msg}`;
-    
+
     // Downgrade noise for common restricted access errors (where we usually fallback)
-    if (msg.toLowerCase().includes('access') || msg.toLowerCase().includes('restricted') || msg.toLowerCase().includes('plan')) {
+    if (
+      msg.toLowerCase().includes('access') ||
+      msg.toLowerCase().includes('restricted') ||
+      msg.toLowerCase().includes('plan')
+    ) {
       this.logger.warn(logMsg);
     } else {
       this.logger.error(logMsg);

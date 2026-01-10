@@ -52,14 +52,8 @@ export class JobsService {
       await this.marketDataService.getSnapshot(symbol);
 
       // 2. History
-      const to = new Date();
-      const from = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-      await this.marketDataService.getHistory(
-        symbol,
-        '1d',
-        from.toISOString(),
-        to.toISOString(),
-      );
+      // 2. History (5 years)
+      await this.marketDataService.syncTickerHistory(symbol, 5);
 
       // 3. Queue Research
       this.logger.log(`Queueing initial research for ${symbol}...`);
@@ -73,10 +67,12 @@ export class JobsService {
       // Process if not too busy, or let a separate worker handle it.
       // Here we process immediately since it's a "fresh add" event.
       await this.researchService.processTicket(note.id);
-      
+
       this.logger.log(`Initialization complete for ${symbol}`);
     } catch (err: any) {
-      this.logger.error(`Failed to initialize ticker ${symbol}: ${err.message}`);
+      this.logger.error(
+        `Failed to initialize ticker ${symbol}: ${err.message}`,
+      );
     }
   }
 
@@ -94,14 +90,8 @@ export class JobsService {
           await this.marketDataService.getSnapshot(ticker.symbol);
 
           // 2. Sync History (180 days for charts)
-          const to = new Date();
-          const from = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-          await this.marketDataService.getHistory(
-            ticker.symbol,
-            '1d',
-            from.toISOString(),
-            to.toISOString(),
-          );
+          // 2. Sync History (5 years)
+          await this.marketDataService.syncTickerHistory(ticker.symbol, 5);
 
           this.logger.debug(`Synced snapshot and history for ${ticker.symbol}`);
         } catch (err: any) {

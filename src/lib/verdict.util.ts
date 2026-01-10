@@ -25,8 +25,8 @@ export interface VerdictInput {
   consensus?: string; // "Strong Buy", "Hold", etc.
   overallScore?: number | null; // 0-10 (Neural Score)
   peRatio: number | null;
-  newsSentiment?: string | null;  // New
-  newsImpact?: number | null;     // New
+  newsSentiment?: string | null; // New
+  newsImpact?: number | null; // New
 }
 
 /**
@@ -45,7 +45,7 @@ export interface VerdictInput {
  * < 45: Sell
  */
 export function calculateAiRating(input: VerdictInput): RatingResult {
-  const { risk, upside, consensus, overallScore, peRatio, newsSentiment, newsImpact } = input;
+  const { risk, upside, consensus, overallScore, peRatio } = input;
   const downside = input.downside ?? 0;
 
   let score = 50; // Base Score
@@ -65,8 +65,10 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
 
   // 4. Neural Score Bonus (Weight Increased)
   if (overallScore) {
-    if (overallScore >= 8) score += 20; // Was +10
-    else if (overallScore >= 6) score += 10; // Was +5
+    if (overallScore >= 8)
+      score += 20; // Was +10
+    else if (overallScore >= 6)
+      score += 10; // Was +5
     else if (overallScore <= 4) score -= 10; // Was -5
   }
 
@@ -80,18 +82,21 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
 
   // 6. Smart News Integration (High Impact Only)
   if (input.newsImpact && input.newsImpact >= 8 && input.newsSentiment) {
-      if (input.newsSentiment === 'BULLISH') score += 15; // Major Catalyst
-      else if (input.newsSentiment === 'BEARISH') score -= 15; // Major Risk
+    if (input.newsSentiment === 'BULLISH')
+      score += 15; // Major Catalyst
+    else if (input.newsSentiment === 'BEARISH') score -= 15; // Major Risk
   } else if (input.newsImpact && input.newsImpact >= 5 && input.newsSentiment) {
-      if (input.newsSentiment === 'BULLISH') score += 5;
-      else if (input.newsSentiment === 'BEARISH') score -= 5;
+    if (input.newsSentiment === 'BULLISH') score += 5;
+    else if (input.newsSentiment === 'BEARISH') score -= 5;
   }
 
   // 7. P/E Ratio Impact (Value Investing) - Only reward value, don't punish growth/pre-revenue
   if (typeof peRatio === 'number' && peRatio > 0) {
     // Positive P/E = profitable company
-    if (peRatio <= 10) score += 20; // Exceptional Value
-    else if (peRatio <= 15) score += 15; // Great Value
+    if (peRatio <= 10)
+      score += 20; // Exceptional Value
+    else if (peRatio <= 15)
+      score += 15; // Great Value
     else if (peRatio <= 25) score += 5; // Fair Value
     // Higher P/E = no bonus, but no penalty either
   }

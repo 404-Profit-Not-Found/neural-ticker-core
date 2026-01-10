@@ -1,0 +1,43 @@
+[dotenv@17.2.3] injecting env (15) from .env -- tip: ≡ƒöæ add access controls to secrets: https://dotenvx.com/ops
+Γä╣∩╕Å  Finnhub API Key found (starts with d4nf)
+≡ƒÜÇ Starting Market Data Benchmark...
+-----------------------------------
+
+Testing Symbol: AAPL
+[Yahoo] Fetching AAPL for 10 years...
+   Γ£à [Yahoo] AAPL (10y): 2515 candles in 302ms
+      Oldest: 2016-01-11
+[Finnhub] Fetching AAPL for 10 years...
+
+Testing Symbol: MSFT
+[Yahoo] Fetching MSFT for 10 years...
+   Γ£à [Yahoo] MSFT (10y): 2515 candles in 183ms
+      Oldest: 2016-01-11
+[Finnhub] Fetching MSFT for 10 years...
+
+Testing Symbol: TSLA
+[Yahoo] Fetching TSLA for 10 years...
+   Γ£à [Yahoo] TSLA (10y): 2515 candles in 124ms
+      Oldest: 2016-01-11
+[Finnhub] Fetching TSLA for 10 years...
+
+Testing Symbol: NVDA
+[Yahoo] Fetching NVDA for 10 years...
+   Γ£à [Yahoo] NVDA (10y): 2515 candles in 176ms
+      Oldest: 2016-01-11
+[Finnhub] Fetching NVDA for 10 years...
+
+Testing Symbol: EURUSD=X
+[Yahoo] Fetching EURUSD=X for 10 years...
+   Γ£à [Yahoo] EURUSD=X (10y): 2602 candles in 220ms
+      Oldest: 2016-01-11
+[Finnhub] Fetching EURUSD=X for 10 years...
+
+Testing Symbol: BTC-USD
+[Yahoo] Fetching BTC-USD for 10 years...
+   Γ£à [Yahoo] BTC-USD (10y): 3654 candles in 167ms
+      Oldest: 2016-01-10
+[Finnhub] Fetching BTC-USD for 10 years...
+
+-----------------------------------
+Γ£à Benchmark Complete

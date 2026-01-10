@@ -149,7 +149,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span>Impact:</span>
+                            <span>News Impact:</span>
                             <span className={cn("font-medium",
                                 (newsImpact || 0) >= 8 ? "text-yellow-500 font-bold" : "text-muted-foreground"
                             )}>

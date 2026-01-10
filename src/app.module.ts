@@ -30,6 +30,7 @@ import { ProxyModule } from './modules/proxy/proxy.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
 import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
+import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.module';
 import configuration from './config/configuration';
 
 // ...
@@ -45,7 +46,6 @@ import configuration from './config/configuration';
 
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', '..', 'client'),
-      exclude: [new RegExp('^/api/') as any],
     }),
 
     // Global Rate Limiting: 100 requests per minute per IP
@@ -107,6 +107,7 @@ import configuration from './config/configuration';
     NotificationsModule,
     PortfolioModule,
     YahooFinanceModule,
+    TickerRequestsModule,
   ],
   controllers: [AppController],
   providers: [

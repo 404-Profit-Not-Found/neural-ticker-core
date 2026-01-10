@@ -122,6 +122,7 @@ describe('MarketDataService', () => {
     getCompanyProfile: jest.fn(),
     getCompanyNews: jest.fn(),
     getBasicFinancials: jest.fn(),
+    getMarketStatus: jest.fn(),
   };
   const mockYahooService = {
     getQuote: jest.fn(),
@@ -234,6 +235,7 @@ describe('MarketDataService', () => {
     mockFinnhubService.getCompanyProfile.mockReset();
     mockFinnhubService.getCompanyNews.mockReset();
     mockFinnhubService.getBasicFinancials.mockReset();
+    mockFinnhubService.getMarketStatus.mockReset();
 
     mockAnalystRatingRepo.find.mockResolvedValue([]);
     mockAnalystRatingRepo.count.mockResolvedValue(0);

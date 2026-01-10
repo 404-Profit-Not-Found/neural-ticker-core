@@ -51,10 +51,15 @@ export class TickersController {
       example: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ' }],
     },
   })
-  @Public()
   @Get()
-  getAll(@Query('search') search?: string) {
-    return this.tickersService.searchTickers(search);
+  getAll(
+    @Query('search') search: string,
+    @Query('external') external: string,
+    @Req() req: any,
+  ) {
+    const isPro = req.user?.tier === 'pro' || req.user?.role === 'admin';
+    const shouldSearchExternal = isPro && external === 'true';
+    return this.tickersService.searchTickers(search, shouldSearchExternal);
   }
 
   @ApiOperation({

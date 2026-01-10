@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     Loader2,
     TrendingUp,
@@ -28,6 +28,7 @@ import { VerdictBadge } from '../components/ticker/VerdictBadge';
 import { calculateLiveUpside, getBasePriceFromScenarios } from '../lib/rating-utils';
 import { ResearchFeed } from '../components/ticker/ResearchFeed';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
+import { FiftyTwoWeekRange } from '../components/dashboard/FiftyTwoWeekRange';
 import { TickerOverview } from '../components/ticker/TickerOverview';
 import { TickerFinancials } from '../components/ticker/TickerFinancials';
 import { TickerNews } from '../components/ticker/TickerNews';
@@ -54,7 +55,13 @@ export function TickerDetail() {
     const { symbol, tab } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    
+
+    
+
+    
     const [localResearchRunning, setLocalResearchRunning] = useState(false);
+
     const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [placeholderId, setPlaceholderId] = useState<string | null>(null);
     const [placeholderTimestamp, setPlaceholderTimestamp] = useState<string | null>(null);
@@ -93,6 +100,26 @@ export function TickerDetail() {
 
     // -- Hooks --
     const { data: tickerData, isLoading: isLoadingDetails } = useTickerDetails(symbol);
+
+    // Extra-aggressive scroll reset: when data finishes loading for a new symbol
+    // This ensures that even if async content expands the page, we force top-of-page.
+    useEffect(() => {
+        if (!isLoadingDetails && tickerData) {
+            // Triple reset to fight browser "memory"
+            window.scrollTo(0, 0);
+            requestAnimationFrame(() => window.scrollTo(0, 0));
+            const timer = setTimeout(() => window.scrollTo(0, 0), 150);
+            return () => clearTimeout(timer);
+        }
+    }, [isLoadingDetails, symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Trigger background sync for 5-year history
+    useEffect(() => {
+        if (symbol) {
+            api.post(`/tickers/${symbol}/sync`).catch(err => console.error('Background sync trigger failed', err));
+        }
+    }, [symbol]);
+
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
@@ -231,7 +258,7 @@ export function TickerDetail() {
             <Header />
 
             {isLoadingDetails ? (
-                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
                     <Loader2 className="animate-spin w-8 h-8 text-primary" />
                     <div className="text-muted-foreground animate-pulse text-sm">Loading Terminal Data...</div>
                 </main>
@@ -246,7 +273,7 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 return (
-                    <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
+                    <main key={symbol} className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
 
                         {/* --- 1. HERO HEADER --- */}
                         <div className="relative z-30 space-y-4 pb-4 md:pb-6">
@@ -278,12 +305,16 @@ export function TickerDetail() {
                             {/* --- DESKTOP LAYOUT --- */}
                             <div className="hidden md:block space-y-6">
                                 {/* Row 1: Identity & Actions */}
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between py-2 mb-2">
                                     {/* Left: Identity */}
                                     <div className="flex items-center gap-4">
-                                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
+                                        <Link 
+                                            to="/dashboard" 
+                                            aria-label="Back to dashboard"
+                                            className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center"
+                                        >
                                             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                                        </Button>
+                                        </Link>
                                         <div
                                             className="relative w-14 h-14 shrink-0"
                                             onDoubleClick={handleLogoDoubleClick}
@@ -418,6 +449,22 @@ export function TickerDetail() {
                                                 />
                                             </div>
                                         )}
+
+                                        {/* 52-Week Range (Desktop) */}
+                                        {fundamentals?.fifty_two_week_high && market_data?.price && (
+                                            <div className="pt-4 mt-2 border-t border-border/50">
+                                                <div className="flex items-center justify-between mb-1.5 opacity-70">
+                                                    <span className="text-[10px] uppercase font-bold tracking-wider">52W Range</span>
+                                                </div>
+                                                <FiftyTwoWeekRange
+                                                    low={fundamentals.fifty_two_week_low || 0}
+                                                    high={fundamentals.fifty_two_week_high || 0}
+                                                    current={market_data.price}
+                                                    showLabels={true}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Chart Area */}
@@ -435,13 +482,17 @@ export function TickerDetail() {
                                 </div>
                             </div>
 
-                            {/* --- MOBILE LAYOUT (Unchanged structure, ensuring compatibility) --- */}
-                            <div className="md:hidden">
+                            {/* --- MOBILE LAYOUT --- */}
+                            <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
-                                <div className="flex items-start gap-3 pr-24">
-                                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
+                                <div className="flex items-start gap-3 pr-24 relative">
+                                    <Link 
+                                        to="/dashboard" 
+                                        aria-label="Back to dashboard"
+                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center"
+                                    >
                                         <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                                    </Button>
+                                    </Link>
 
                                     <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 
@@ -511,6 +562,19 @@ export function TickerDetail() {
                                     )}
                                 </div>
 
+                                {/* Mobile: 52-Week Range */}
+                                {fundamentals?.fifty_two_week_high && market_data?.price && (
+                                    <div className="md:hidden px-4 mt-4">
+                                         <FiftyTwoWeekRange
+                                            low={fundamentals.fifty_two_week_low || 0}
+                                            high={fundamentals.fifty_two_week_high || 0}
+                                            current={market_data.price}
+                                            showLabels={true}
+                                        />
+                                    </div>
+                                )}
+
+
                                 {/* Mobile: Chart Area */}
                                 <div className="md:hidden mt-6 space-y-4">
                                     <div className="h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
@@ -549,6 +613,7 @@ export function TickerDetail() {
                                     ratings={tickerData.ratings}
                                     profile={profile}
                                     news={tickerData.news}
+                                    fundamentals={fundamentals || undefined}
                                 />
                             </TabsContent>
 

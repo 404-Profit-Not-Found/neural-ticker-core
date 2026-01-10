@@ -4,6 +4,7 @@ import { ScenarioCards } from './ScenarioCards';
 import type { TickerData } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
+
 import { AnalystRatingsTable } from './AnalystRatingsTable';
 
 interface TickerOverviewProps {
@@ -12,6 +13,7 @@ interface TickerOverviewProps {
     ratings?: TickerData['ratings'];
     profile: TickerData['profile'];
     news?: TickerData['news'];
+    fundamentals?: TickerData['fundamentals'];
 }
 
 export function TickerOverview({ risk_analysis, market_data, ratings, profile, news }: TickerOverviewProps) {
@@ -38,40 +40,71 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
         <div className="flex flex-col gap-6">
             {/* Breaking News Alert */}
             {news && (news.score || 0) >= 5 && isFresh && (
-                <section className={`rounded-xl border p-4 ${
-                    news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20' :
-                    news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20' :
-                    'bg-blue-500/10 border-blue-500/20'
+                <section className={`relative rounded-xl border p-0.5 overflow-hidden group ${
+                    news.sentiment === 'BULLISH' ? 'border-emerald-500/30' :
+                    news.sentiment === 'BEARISH' ? 'border-red-500/30' :
+                    'border-blue-500/30'
                 }`}>
-                    <div className="flex items-start gap-3">
-                         <div className={`mt-0.5 p-1.5 rounded-full ${
-                            news.sentiment === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-600' :
-                            news.sentiment === 'BEARISH' ? 'bg-red-500/20 text-red-600' :
-                            'bg-blue-500/20 text-blue-600'
-                         }`}>
-                            <Zap size={16} className="fill-current" />
-                         </div>
-                         <div className="space-y-1">
-                            <h3 className={`text-sm font-bold flex items-center gap-2 ${
-                                news.sentiment === 'BULLISH' ? 'text-emerald-500' :
-                                news.sentiment === 'BEARISH' ? 'text-red-500' :
-                                'text-blue-500'
-                            }`}>
-                                {news.score && (news.score >= 8) ? 'BREAKING NEWS' : 'MARKET NEWS'}
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded border border-current opacity-80`}>
-                                    Impact: {news.score}/10
-                                </span>
-                                <span className="text-[10px] font-normal opacity-60 ml-auto">
-                                    {timeAgo}
-                                </span>
-                            </h3>
-                            <p className="text-sm text-foreground/90 leading-snug">
-                                {news.summary}
-                            </p>
-                         </div>
+                     {/* Animated Gradient Border/Glow Background */}
+                    <div className={`absolute inset-0 opacity-20 ${
+                        news.sentiment === 'BULLISH' ? 'bg-gradient-to-r from-emerald-500 via-transparent to-transparent' :
+                        news.sentiment === 'BEARISH' ? 'bg-gradient-to-r from-red-500 via-transparent to-transparent' :
+                        'bg-gradient-to-r from-blue-500 via-transparent to-transparent'
+                    }`} />
+                    
+                    <div className={`relative rounded-[10px] p-4 ${
+                         news.sentiment === 'BULLISH' ? 'bg-emerald-950/10' :
+                         news.sentiment === 'BEARISH' ? 'bg-red-950/10' :
+                         'bg-blue-950/10'
+                    }`}>
+                         {/* Scanline/Grid Effect */}
+                        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:16px_16px] [mask-image:linear-gradient(to_right,black,transparent)] pointer-events-none" />
+
+                        <div className="relative flex items-start gap-4 z-10">
+                             {/* Icon Box */}
+                             <div className={`shrink-0 p-2 rounded-lg border shadow-[0_0_15px_-3px_var(--shadow-color)] ${
+                                news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 [--shadow-color:theme(colors.emerald.500)]' :
+                                news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-500 [--shadow-color:theme(colors.red.500)]' :
+                                'bg-blue-500/10 border-blue-500/20 text-blue-500 [--shadow-color:theme(colors.blue.500)]'
+                             }`}>
+                                <Zap size={20} className="fill-current animate-pulse" />
+                             </div>
+
+                             <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${
+                                        news.sentiment === 'BULLISH' ? 'text-emerald-400' :
+                                        news.sentiment === 'BEARISH' ? 'text-red-400' :
+                                        'text-blue-400'
+                                    }`}>
+                                        {news.score && (news.score >= 8) ? 'Breaking News' : 'Market Update'}
+                                    </h3>
+                                    
+                                    <div className="flex items-center gap-2 ml-auto">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shadow-sm ${
+                                             news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                             news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                                             'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                                        }`}>
+                                            IMPACT {news.score}/10
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground font-mono">
+                                            {timeAgo}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-sm md:text-base text-foreground/90 font-medium leading-relaxed">
+                                    {news.summary}
+                                </p>
+                             </div>
+                        </div>
                     </div>
                 </section>
             )}
+
+
+
             {/* About Section */}
             {profile?.description && (
                 <section className="space-y-3">

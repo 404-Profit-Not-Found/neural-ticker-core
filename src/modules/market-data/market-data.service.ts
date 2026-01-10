@@ -1,12 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  HttpException,
-  Inject,
-  forwardRef,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { getErrorMessage } from '../../utils/error.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
@@ -124,7 +116,16 @@ export class MarketDataService {
     return promise;
   }
 
-  private async performGetSnapshot(symbol: string) {
+  async refreshMarketData(symbol: string) {
+    return this.performGetSnapshot(symbol.toUpperCase(), {
+      force: true,
+    } as any);
+  }
+
+  private async performGetSnapshot(
+    symbol: string,
+    options: { updateIfStale?: boolean } = { updateIfStale: true },
+  ) {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
 
     // Configurable stale thresholds
@@ -159,26 +160,19 @@ export class MarketDataService {
 
     let source = 'database';
 
-    if (isPriceStale || isFundamentalsStale) {
-      this.logger.log(
-        `Data stale for ${symbol} (Price: ${isPriceStale}, Fundamentals: ${isFundamentalsStale}). Fetching from Finnhub...`,
-      );
-      try {
-        const [quote, profile, financials] = await Promise.all([
-          this.finnhubService.getQuote(symbol),
-          this.finnhubService.getCompanyProfile(symbol),
-          this.finnhubService.getBasicFinancials(symbol),
-        ]);
+    if (
+      (isPriceStale || isFundamentalsStale || (options as any).force) &&
+      options.updateIfStale !== false
+    ) {
+      // Check if this is a non-US stock (has exchange suffix like .DE, .L, .PA)
+      // Finnhub free tier doesn't support non-US stocks, skip directly to Yahoo
+      const isNonUSStock = symbol.includes('.');
 
-        source = 'finnhub';
-
-        // Check if Finnhub returned actually usable data
-        const isFinnhubRestricted = !quote || quote.c === 0;
-
-        if (isFinnhubRestricted) {
-          this.logger.warn(
-            `Finnhub data restricted for ${symbol}, fetching from Yahoo Finance...`,
-          );
+      if (isNonUSStock) {
+        this.logger.log(
+          `Non-US stock ${symbol} detected, skipping Finnhub (not supported on free tier). Using Yahoo Finance...`,
+        );
+        try {
           const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
           if (yahooData) {
             source = 'yahoo';
@@ -188,7 +182,9 @@ export class MarketDataService {
                 yahooData.quote,
               );
               latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
-                this.logger.warn(`Failed to save Yahoo candle: ${getErrorMessage(e)}`);
+                this.logger.warn(
+                  `Failed to save Yahoo candle: ${getErrorMessage(e)}`,
+                );
                 return latestCandle;
               });
             }
@@ -201,96 +197,197 @@ export class MarketDataService {
               );
             }
           }
-        } else {
-          // Normal Finnhub path
-          if (quote) {
-            const newCandle = this.ohlcvRepo.create({
-              symbol_id: tickerEntity.id,
-              ts: new Date(quote.t * 1000),
-              timeframe: '1d',
-              open: quote.o,
-              high: quote.h,
-              low: quote.l,
-              close: quote.c,
-              prevClose: quote.pc,
-              volume: 0,
-              source: 'finnhub_quote',
-            });
-            await this.ohlcvRepo
-              .save(newCandle)
-              .catch((e) =>
-                this.logger.warn(`Failed to save candle: ${getErrorMessage(e)}`),
-              );
-            latestCandle = newCandle;
-          }
+        } catch (yahooErr) {
+          this.logger.warn(
+            `Yahoo Finance failed for ${symbol}: ${getErrorMessage(yahooErr)}`,
+          );
+        }
+      } else {
+        // US stock path - try Finnhub first
+        this.logger.log(
+          `Data stale for ${symbol} (Price: ${isPriceStale}, Fundamentals: ${isFundamentalsStale}). Fetching from Finnhub...`,
+        );
+        try {
+          // Fetch in parallel but handle failures individually to avoid "all or nothing"
+          const [quoteResult, profileResult, financialsResult] =
+            await Promise.allSettled([
+              this.finnhubService.getQuote(symbol),
+              this.finnhubService.getCompanyProfile(symbol),
+              this.finnhubService.getBasicFinancials(symbol),
+            ]);
 
-          if (profile || financials?.metric) {
-            const metrics = financials?.metric || {};
-            const entity =
-              fundamentals ||
-              this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
+          const quote =
+            quoteResult.status === 'fulfilled' ? quoteResult.value : null;
+          const profile =
+            profileResult.status === 'fulfilled' ? profileResult.value : null;
+          const financials =
+            financialsResult.status === 'fulfilled'
+              ? financialsResult.value
+              : null;
 
-            if (profile) {
-              entity.market_cap = profile.marketCapitalization;
-              entity.sector = profile.finnhubIndustry;
-            }
+          // Log warnings for specific failures
+          if (quoteResult.status === 'rejected')
+            this.logger.warn(
+              `Finnhub quote failed: ${getErrorMessage(quoteResult.reason)}`,
+            );
+          if (profileResult.status === 'rejected')
+            this.logger.warn(
+              `Finnhub profile failed: ${getErrorMessage(profileResult.reason)}`,
+            );
+          if (financialsResult.status === 'rejected')
+            this.logger.warn(
+              `Finnhub financials failed: ${getErrorMessage(financialsResult.reason)}`,
+            );
 
-            if (metrics) {
-              if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
-              if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
-              if (metrics.beta) entity.beta = metrics.beta;
-              if (metrics.dividendYieldIndicatedAnnual)
-                entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
-            }
+          source = 'finnhub';
 
-            // Optional: Enrich with Yahoo even if Finnhub worked, if we want "depth"
-            try {
-              const yahooSummary =
-                await this.yahooFinanceService.getSummary(symbol);
-              if (yahooSummary) {
-                await this.applyYahooEnrichment(
+          // Check if Finnhub returned actually usable data
+          const isFinnhubRestricted = !quote || quote.c === 0;
+
+          if (isFinnhubRestricted) {
+            this.logger.warn(
+              `Finnhub data restricted for ${symbol}, fetching from Yahoo Finance...`,
+            );
+            const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
+            if (yahooData) {
+              source = 'yahoo';
+              if (yahooData.quote) {
+                const newCandle = this.saveYahooQuoteAsCandle(
                   tickerEntity.id,
-                  entity,
-                  yahooSummary,
+                  yahooData.quote,
+                );
+                latestCandle = await this.ohlcvRepo
+                  .save(newCandle)
+                  .catch((e) => {
+                    this.logger.warn(
+                      `Failed to save Yahoo candle: ${getErrorMessage(e)}`,
+                    );
+                    return latestCandle;
+                  });
+              }
+              if (yahooData.summary) {
+                fundamentals = await this.applyYahooEnrichment(
+                  tickerEntity.id,
+                  fundamentals,
+                  yahooData.summary,
+                  yahooData.quote,
                 );
               }
-            } catch (ye) {
-              this.logger.debug(
-                `Background Yahoo enrichment skipped for ${symbol}: ${getErrorMessage(ye)}`,
-              );
+            }
+          } else {
+            // Normal Finnhub path
+            if (quote) {
+              const newCandle = this.ohlcvRepo.create({
+                symbol_id: tickerEntity.id,
+                ts: new Date(quote.t * 1000),
+                timeframe: '1d',
+                open: quote.o,
+                high: quote.h,
+                low: quote.l,
+                close: quote.c,
+                prevClose: quote.pc,
+                volume: 0,
+                source: 'finnhub_quote',
+              });
+              await this.ohlcvRepo
+                .save(newCandle)
+                .catch((e) =>
+                  this.logger.warn(
+                    `Failed to save candle: ${getErrorMessage(e)}`,
+                  ),
+                );
+              latestCandle = newCandle;
             }
 
-            entity.updated_at = new Date();
-            await this.fundamentalsRepo.save(entity);
-            fundamentals = entity;
+            if (profile || financials?.metric) {
+              const metrics = financials?.metric || {};
+              const entity =
+                fundamentals ||
+                this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
+
+              if (profile) {
+                entity.market_cap = profile.marketCapitalization;
+                entity.sector = profile.finnhubIndustry;
+              }
+
+              if (metrics) {
+                if (metrics.peTTM) entity.pe_ttm = metrics.peTTM;
+                if (metrics.epsTTM) entity.eps_ttm = metrics.epsTTM;
+                if (metrics.beta) entity.beta = metrics.beta;
+                if (metrics.dividendYieldIndicatedAnnual)
+                  entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
+
+                // Map 52-Week Range (Finnhub) - Verify currency consistency
+                // If the 52-week low is significantly higher than current price, or high is lower, it's likely a currency mismatch (e.g. DKK vs USD for NVO)
+                const fhHigh = metrics['52WeekHigh'];
+                const fhLow = metrics['52WeekLow'];
+                const currentPrice = quote.c;
+
+                if (fhHigh && fhLow && currentPrice) {
+                  // Allow 20% buffer for volatility/timing differences
+                  const isLowValid = fhLow <= currentPrice * 1.2;
+                  const isHighValid = fhHigh >= currentPrice * 0.8;
+
+                  if (isLowValid && isHighValid) {
+                    entity.fifty_two_week_high = fhHigh;
+                    entity.fifty_two_week_low = fhLow;
+                  } else {
+                    this.logger.warn(
+                      `Ignored Finnhub 52-week range for ${symbol} due to plausible currency mismatch. Current: ${currentPrice}, Range: ${fhLow}-${fhHigh}`,
+                    );
+                  }
+                }
+              }
+
+              // Optional: Enrich with Yahoo even if Finnhub worked, if we want "depth"
+              try {
+                const yahooSummary =
+                  await this.yahooFinanceService.getSummary(symbol);
+                if (yahooSummary) {
+                  await this.applyYahooEnrichment(
+                    tickerEntity.id,
+                    entity,
+                    yahooSummary,
+                  );
+                }
+              } catch (ye) {
+                this.logger.debug(
+                  `Background Yahoo enrichment skipped for ${symbol}: ${getErrorMessage(ye)}`,
+                );
+              }
+
+              entity.updated_at = new Date();
+              await this.fundamentalsRepo.save(entity);
+              fundamentals = entity;
+            }
           }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `Failed to refresh data for ${symbol} via Finnhub: ${getErrorMessage(error)}. Triggering Yahoo fallback...`,
-        );
-        const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
-        if (yahooData) {
-          source = 'yahoo';
-          if (yahooData.quote) {
-            const newCandle = this.saveYahooQuoteAsCandle(
-              tickerEntity.id,
-              yahooData.quote,
-            );
-            latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
-              this.logger.warn(
-                `Failed to save Yahoo fallback candle: ${getErrorMessage(e)}`,
+        } catch (error) {
+          this.logger.warn(
+            `Failed to refresh data for ${symbol} via Finnhub: ${getErrorMessage(error)}. Triggering Yahoo fallback...`,
+          );
+          const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
+          if (yahooData) {
+            source = 'yahoo';
+            if (yahooData.quote) {
+              const newCandle = this.saveYahooQuoteAsCandle(
+                tickerEntity.id,
+                yahooData.quote,
               );
-              return latestCandle;
-            });
-          }
-          if (yahooData.summary) {
-            fundamentals = await this.applyYahooEnrichment(
-              tickerEntity.id,
-              fundamentals,
-              yahooData.summary,
-              yahooData.quote,
-            );
+              latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
+                this.logger.warn(
+                  `Failed to save Yahoo fallback candle: ${getErrorMessage(e)}`,
+                );
+                return latestCandle;
+              });
+            }
+            if (yahooData.summary) {
+              fundamentals = await this.applyYahooEnrichment(
+                tickerEntity.id,
+                fundamentals,
+                yahooData.summary,
+                yahooData.quote,
+              );
+            }
           }
         }
       }
@@ -368,18 +465,45 @@ export class MarketDataService {
         }),
       ]);
 
+    // Fetch linked research note if available
+    let researchNoteTitle = aiAnalysis?.metadata?.summary;
+    if (aiAnalysis?.research_note_id && !researchNoteTitle) {
+      const note = await this.researchNoteRepo.findOne({
+        where: { id: aiAnalysis.research_note_id },
+        select: ['id', 'title'],
+      });
+      if (note) researchNoteTitle = note.title;
+    }
+
+    // Fetch last 14 days of prices for sparkline
+    const sparklinePrices = await this.ohlcvRepo.find({
+      where: { symbol_id: tickerEntity.id, timeframe: '1d' },
+      order: { ts: 'DESC' },
+      take: 14,
+      select: ['close', 'ts'],
+    });
+
     return {
       ticker: tickerEntity,
       latestPrice: latestCandle,
       fundamentals,
       aiAnalysis,
       source,
+      news: aiAnalysis
+        ? {
+            sentiment: aiAnalysis.sentiment,
+            score: aiAnalysis.overall_score,
+            summary: researchNoteTitle || 'AI Risk Analysis Update',
+            updated_at: aiAnalysis.created_at,
+          }
+        : null,
       counts: {
         news: newsItems.length,
         research: researchCount,
         analysts: analystCount,
         social: socialCount,
       },
+      sparkline: sparklinePrices.reverse().map((p) => p.close),
     };
   }
 
@@ -397,12 +521,15 @@ export class MarketDataService {
       const chunk = uniqueSymbols.slice(i, i + chunkSize);
       const chunkResults = await Promise.all(
         chunk.map((symbol) =>
-          this.getSnapshot(symbol).catch((e) => {
-            this.logger.error(
-              `Failed to get snapshot for ${symbol}: ${getErrorMessage(e)}`,
-            );
-            return { symbol, error: getErrorMessage(e) };
-          }),
+          this.performGetSnapshot(symbol, { updateIfStale: false }).catch(
+            (e) => {
+              // Disable auto-update for bulk
+              this.logger.error(
+                `Failed to get snapshot for ${symbol}: ${getErrorMessage(e)}`,
+              );
+              return { symbol, error: getErrorMessage(e) };
+            },
+          ),
         ),
       );
       results.push(...chunkResults);
@@ -424,12 +551,122 @@ export class MarketDataService {
       return existing;
     }
 
-    const promise = this.performGetHistory(symbol, interval, fromStr, toStr).finally(() => {
+    const promise = this.performGetHistory(
+      symbol,
+      interval,
+      fromStr,
+      toStr,
+    ).finally(() => {
       this.historyRequests.delete(key);
     });
 
     this.historyRequests.set(key, promise);
     return promise;
+  }
+
+  /**
+   * Robustly syncs ticker history for a given number of years.
+   * Checks DB coverage first to avoid unnecessary API calls.
+   * Uses Yahoo Finance as the primary source for deep history.
+   * Performs bulk upsert to prevent duplicates.
+   */
+  async syncTickerHistory(symbol: string, years: number = 5): Promise<void> {
+    const ticker = await this.tickersService.getTicker(symbol);
+    if (!ticker) {
+      this.logger.warn(`Cannot sync history: Ticker ${symbol} not found`);
+      return;
+    }
+
+    const to = new Date();
+    const from = new Date();
+    from.setFullYear(from.getFullYear() - years);
+
+    // 1. Check DB Coverage
+    // Count expected trading days (rough approx: 252 days per year * 5/7 adjustment is overkill, just ~250/yr)
+    // 5 years = ~1250 trading days.
+    const expectedDays = years * 250;
+
+    const dbCount = await this.ohlcvRepo.count({
+      where: {
+        symbol_id: ticker.id,
+        timeframe: '1d',
+        ts: Between(from, to),
+      },
+    });
+
+    const coverageRatio = dbCount / expectedDays;
+    this.logger.debug(
+      `History coverage for ${symbol} (${years}y): ${dbCount}/${expectedDays} (${(coverageRatio * 100).toFixed(1)}%)`,
+    );
+
+    // If we have > 70% of data, we consider it "synced enough" to not trigger a full re-download.
+    // Ideally we'd check for specific gaps, but this is a good heuristic for MVP.
+    // Exception: If the latest data is stale (checked separately via getSnapshot normally),
+    // but here we focus on bulk history.
+    if (coverageRatio > 0.7) {
+      this.logger.debug(
+        `Skipping full history sync for ${symbol} (Good coverage)`,
+      );
+      return;
+    }
+
+    this.logger.log(
+      `Syncing full history for ${symbol} (${years}y) from Yahoo...`,
+    );
+
+    // 2. Fetch from Yahoo
+    try {
+      // Fetch specifically using Yahoo Service directly or via helper
+      const candles = await this.yahooFinanceService.getHistorical(
+        symbol,
+        from,
+        to,
+        '1d',
+      );
+      if (!candles || candles.length === 0) {
+        this.logger.warn(`No history returned from Yahoo for ${symbol}`);
+        return;
+      }
+
+      // 3. Transform and Upsert
+      const entities = candles.map((c: any) => {
+        // Yahoo format: { date, open, high, low, close, adjClose, volume }
+        return this.ohlcvRepo.create({
+          symbol_id: ticker.id,
+          timeframe: '1d',
+          ts: c.date,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
+          source: 'yahoo_history_sync',
+          inserted_at: new Date(),
+        });
+      });
+
+      // Filter out invalid records (e.g. null prices)
+      const validEntities = entities.filter(
+        (e: any) => e.close !== null && e.close !== undefined,
+      );
+
+      if (validEntities.length === 0) return;
+
+      // Bulk Upsert using TypeORM
+      // Conflict on [symbol_id, timeframe, ts]
+      await this.ohlcvRepo.upsert(validEntities, [
+        'symbol_id',
+        'timeframe',
+        'ts',
+      ]);
+
+      this.logger.log(`Upserted ${validEntities.length} candles for ${symbol}`);
+    } catch (e) {
+      this.logger.error(
+        `Failed to sync history for ${symbol}: ${e.message}`,
+        e,
+      );
+    }
   }
 
   private async performGetHistory(
@@ -453,10 +690,23 @@ export class MarketDataService {
       order: { ts: 'ASC' },
     });
 
-    // If we have some data and it's somewhat recent, return it
-    // For MVP, if we have ANY data in the range, we return it.
-    // In production, we'd check for gaps.
-    if (dbData.length > 50) {
+    // Smart Coverage Check
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysRequested = (to.getTime() - from.getTime()) / msPerDay;
+    const coverageRatio = daysRequested > 0 ? dbData.length / daysRequested : 0;
+
+    // If we have > 50% of the days (considering weekends/holidays, 50% of total calendar days is roughly ~70% of business days),
+    // we return the DB data.
+    if (coverageRatio > 0.4) {
+      // 0.4 * 365 = 146 days per year (Trading days ~252. 146/252 = ~57% of trading days).
+      // Actually, let's just trigger a background sync check if it looks sparse,
+      // but return what we have to be fast.
+      if (coverageRatio < 0.6) {
+        // Fire and forget sync if data feels "thin", but don't block
+        this.syncTickerHistory(symbol, 5).catch((e) =>
+          this.logger.error(`Bg sync failed: ${e.message}`),
+        );
+      }
       return dbData;
     }
 
@@ -469,9 +719,13 @@ export class MarketDataService {
     const toUnix = Math.floor(to.getTime() / 1000);
 
     try {
-      // Map interval to Finnhub resolution
       const resolution =
         interval === '1d' ? 'D' : interval === '1wk' ? 'W' : 'M';
+
+      this.logger.debug(
+        `Finnhub Request: ${symbol} Res: ${resolution} From: ${fromUnix} To: ${toUnix}`,
+      );
+
       const finnhubHistory = await this.finnhubService.getHistorical(
         symbol,
         resolution,
@@ -518,7 +772,9 @@ export class MarketDataService {
           }));
         }
       } catch (ye) {
-        this.logger.error(`Yahoo history fallback failed: ${getErrorMessage(ye)}`);
+        this.logger.error(
+          `Yahoo history fallback failed: ${getErrorMessage(ye)}`,
+        );
       }
     }
 
@@ -561,10 +817,14 @@ export class MarketDataService {
       await this.ohlcvRepo.save(entities, { chunk: 100 }).catch((e) => {
         // On conflict do nothing or update?
         // For simplicity with sqlite/postgres mix, we just catch and log
-        this.logger.debug(`Batch save history partially failed: ${getErrorMessage(e)}`);
+        this.logger.debug(
+          `Batch save history partially failed: ${getErrorMessage(e)}`,
+        );
       });
     } catch (e) {
-      this.logger.error(`Failed to save historical data: ${getErrorMessage(e)}`);
+      this.logger.error(
+        `Failed to save historical data: ${getErrorMessage(e)}`,
+      );
     }
   }
 
@@ -615,7 +875,9 @@ export class MarketDataService {
       try {
         news = await this.fetchNewsFromYahoo(symbol);
       } catch (yError) {
-        this.logger.error(`Yahoo news fallback also failed: ${getErrorMessage(yError)}`);
+        this.logger.error(
+          `Yahoo news fallback also failed: ${getErrorMessage(yError)}`,
+        );
         throw error; // Re-throw original error if fallback fails
       }
     }
@@ -706,7 +968,9 @@ export class MarketDataService {
         return news.length;
       }
     } catch (e) {
-      this.logger.error(`News sync failed for ${symbol}: ${getErrorMessage(e)}`);
+      this.logger.error(
+        `News sync failed for ${symbol}: ${getErrorMessage(e)}`,
+      );
       throw e;
     }
     return 0;
@@ -1344,57 +1608,70 @@ export class MarketDataService {
     const total = await qb.getCount();
 
     return {
-      items: entities.map((t: any) => {
-        // Fix: raw result matching. raw array corresponds to entities order in TypeORM usually,
-        // but strict matching by ID is safer.
-        const rawData = raw.find((r) => r.ticker_id === t.id);
+      items: await Promise.all(
+        entities.map(async (t: any) => {
+          const rawData = raw.find((r) => r.ticker_id === t.id);
 
-        const analystCount = rawData ? parseInt(rawData.analyst_count, 10) : 0;
-        const researchCount = rawData
-          ? parseInt(rawData.research_count, 10)
-          : 0;
-        const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
-        const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
-        const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
+          const analystCount = rawData
+            ? parseInt(rawData.analyst_count, 10)
+            : 0;
+          const researchCount = rawData
+            ? parseInt(rawData.research_count, 10)
+            : 0;
+          const socialCount = rawData ? parseInt(rawData.social_count, 10) : 0;
+          const newsCount = rawData ? parseInt(rawData.news_count, 10) : 0;
+          const changePct = rawData ? parseFloat(rawData.price_change_pct) : 0;
 
-        // Inject change into latestPrice
-        const latestPriceWithChange = t.latestPrice
-          ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
-          : null;
+          // Fetch last 14 days of prices for sparkline
+          const prices = await this.ohlcvRepo.find({
+            where: { symbol_id: t.id, timeframe: '1d' },
+            order: { ts: 'DESC' },
+            take: 14,
+            select: ['close', 'ts'],
+          });
 
-        return {
-          ticker: {
-            id: t.id,
-            symbol: t.symbol,
-            name: t.name,
-            exchange: t.exchange,
-            logo_url: t.logo_url,
-            // Fallback strategy for sector/industry
-            sector:
-              t.sector || t.fund?.sector || t.finnhub_industry || 'Unknown',
-            industry: t.industry || t.finnhub_industry,
-          },
-          latestPrice: latestPriceWithChange,
-          fundamentals: t.fund || {},
-          aiAnalysis: t.latestRisk
-            ? {
-                ...t.latestRisk,
-                bear_price: rawData?.bear_price
-                  ? parseFloat(rawData.bear_price)
-                  : null,
-                base_price: rawData?.base_price
-                  ? parseFloat(rawData.base_price)
-                  : null,
-              }
-            : null,
-          counts: {
-            analysts: analystCount,
-            research: researchCount,
-            social: socialCount,
-            news: newsCount,
-          },
-        };
-      }),
+          // Inject change into latestPrice
+          const latestPriceWithChange = t.latestPrice
+            ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
+            : null;
+
+          return {
+            ticker: {
+              id: t.id,
+              symbol: t.symbol,
+              name: t.name,
+              exchange: t.exchange,
+              logo_url: t.logo_url,
+              news_sentiment: t.news_sentiment,
+              news_impact_score: t.news_impact_score,
+              // Fallback strategy for sector/industry
+              sector:
+                t.sector || t.fund?.sector || t.finnhub_industry || 'Unknown',
+              industry: t.industry || t.finnhub_industry,
+            },
+            latestPrice: latestPriceWithChange,
+            fundamentals: t.fund || {},
+            aiAnalysis: t.latestRisk
+              ? {
+                  ...t.latestRisk,
+                  bear_price: rawData?.bear_price
+                    ? parseFloat(rawData.bear_price)
+                    : null,
+                  base_price: rawData?.base_price
+                    ? parseFloat(rawData.base_price)
+                    : null,
+                }
+              : null,
+            counts: {
+              analysts: analystCount,
+              research: researchCount,
+              social: socialCount,
+              news: newsCount,
+            },
+            sparkline: prices.reverse().map((p) => p.close),
+          };
+        }),
+      ),
       meta: {
         total,
         page,
@@ -1458,8 +1735,9 @@ export class MarketDataService {
         latestPrice: price
           ? {
               close: price.close,
+              change: price.prevClose ? price.close - price.prevClose : 0,
               changePercent: changePercent, // Map calculated change
-              prevClose: price.prevClose,
+              prevClose: price.prevClose, // Keep for reference
             }
           : null,
         riskAnalysis: risk
@@ -1476,8 +1754,13 @@ export class MarketDataService {
     symbol: string,
     data: { sentiment: string; score: number; summary: string },
   ) {
-    const ticker = await this.tickerRepo.findOne({ where: { symbol } });
-    if (!ticker) return;
+    const ticker = await this.tickerRepo.findOne({
+      where: { symbol: symbol.trim().toUpperCase() },
+    });
+    if (!ticker) {
+      this.logger.debug(`Could not find ticker during news update: ${symbol}`);
+      return;
+    }
 
     ticker.news_sentiment = data.sentiment;
     ticker.news_impact_score = Math.round(data.score); // Ensure integer column compatibility
@@ -1528,7 +1811,14 @@ export class MarketDataService {
 
     if (summary.defaultKeyStatistics) {
       const stats = summary.defaultKeyStatistics;
-      if (stats.forwardPE) entity.pe_ttm = stats.forwardPE;
+      if (stats.forwardPE) entity.forward_pe = stats.forwardPE;
+      if (stats.trailingPE) entity.trailing_pe = stats.trailingPE;
+      // Map to standard pe_ttm if missing
+      if (!entity.pe_ttm && stats.trailingPE) entity.pe_ttm = stats.trailingPE;
+
+      if (stats.sharesOutstanding)
+        entity.shares_outstanding = stats.sharesOutstanding;
+
       if (stats.trailingEps) entity.eps_ttm = stats.trailingEps;
       if (stats.beta) entity.beta = stats.beta;
       if (stats.priceToBook) entity.price_to_book = stats.priceToBook;
@@ -1551,12 +1841,55 @@ export class MarketDataService {
       if (fin.quickRatio) entity.quick_ratio = fin.quickRatio;
     }
 
+    // Map 52-Week High/Low (usually in summaryDetail)
+    if (summary.summaryDetail) {
+      const detail = summary.summaryDetail;
+      if (detail.fiftyTwoWeekHigh)
+        entity.fifty_two_week_high = detail.fiftyTwoWeekHigh;
+      if (detail.fiftyTwoWeekLow)
+        entity.fifty_two_week_low = detail.fiftyTwoWeekLow;
+    }
+
     if (quote) {
       if (quote.marketCap) entity.market_cap = quote.marketCap;
+      // Fallback if not in summary
+      if (!entity.fifty_two_week_high && quote.fiftyTwoWeekHigh)
+        entity.fifty_two_week_high = quote.fiftyTwoWeekHigh;
+      if (!entity.fifty_two_week_low && quote.fiftyTwoWeekLow)
+        entity.fifty_two_week_low = quote.fiftyTwoWeekLow;
     }
+
+    // Store full raw metadata
+    entity.yahoo_metadata = {
+      summary,
+      quote,
+      updated_at: new Date(),
+    };
 
     entity.updated_at = new Date();
     return await this.fundamentalsRepo.save(entity);
+  }
+  private marketStatusCache: { data: any; expiry: number } | null = null;
+  private static readonly MARKET_STATUS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  async getMarketStatus(exchange: string): Promise<any> {
+    // Check cache first
+    if (
+      this.marketStatusCache &&
+      this.marketStatusCache.expiry > Date.now()
+    ) {
+      return this.marketStatusCache.data;
+    }
+
+    const result = await this.finnhubService.getMarketStatus(exchange);
+    
+    // Cache the result (even if null, to prevent repeated failed calls)
+    this.marketStatusCache = {
+      data: result,
+      expiry: Date.now() + MarketDataService.MARKET_STATUS_CACHE_TTL,
+    };
+
+    return result;
   }
 }
 

@@ -141,6 +141,10 @@ export interface TickerData {
         runway_years?: number;
         consensus_rating?: string;
         target_price_avg?: number;
+        
+        // Market Context
+        fifty_two_week_high?: number;
+        fifty_two_week_low?: number;
     } | null;
     notes: ResearchItem[]; // Ensuring notes is present
     ratings?: AnalystRating[];

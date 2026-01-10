@@ -16,7 +16,7 @@ export function getErrorMessage(error: any): string {
         : responseData.message;
     }
     if (responseData.error) {
-       return typeof responseData.error === 'object'
+      return typeof responseData.error === 'object'
         ? JSON.stringify(responseData.error)
         : responseData.error;
     }

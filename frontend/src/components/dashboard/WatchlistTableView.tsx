@@ -32,6 +32,8 @@ import { TickerLogo } from './TickerLogo';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 import { VerdictBadge } from "../ticker/VerdictBadge";
+import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
+import { Sparkline } from "../ui/Sparkline";
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -42,6 +44,9 @@ export interface TickerData {
     price: number;
     change: number;
     pe: number | null;
+    marketCap: number | null;
+    fiftyTwoWeekHigh: number | null;
+    fiftyTwoWeekLow: number | null;
     potentialUpside: number | null;
     riskScore: number | null;
     overallScore: number | null;
@@ -53,6 +58,7 @@ export interface TickerData {
     socialCount: number;
     potentialDownside: number | null;
     itemId?: string;
+    sparkline?: number[];
 }
 
 interface WatchlistTableViewProps {
@@ -174,6 +180,44 @@ export function WatchlistTableView({
                                </div>
                             ) : <span className="text-xs text-muted-foreground">-</span>}
                         </div>
+                    );
+                },
+            }),
+
+            // 2.5 Sparkline
+            columnHelper.accessor('sparkline', {
+                header: 'Trend (14d)',
+                cell: (info) => {
+                    const data = info.getValue();
+                    if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+                    return (
+                        <div className="w-[100px] h-8 flex items-center justify-center">
+                            <Sparkline 
+                                data={data} 
+                                width={100} 
+                                height={32} 
+                                className="opacity-80 group-hover:opacity-100 transition-opacity"
+                            />
+                        </div>
+                    );
+                },
+            }),
+
+            // 3. 52-Week Range
+            columnHelper.accessor((row) => row.price, {
+                id: '52_week_range',
+                header: '52 Wk Range',
+                cell: (info) => {
+                    const row = info.row.original;
+                    if (!row.fiftyTwoWeekHigh || !row.fiftyTwoWeekLow) return <span className="text-muted-foreground text-xs">-</span>;
+
+                    return (
+                        <FiftyTwoWeekRange 
+                            low={row.fiftyTwoWeekLow} 
+                            high={row.fiftyTwoWeekHigh} 
+                            current={row.price} 
+                            showLabels={true}
+                        />
                     );
                 },
             }),

@@ -471,7 +471,7 @@ export function AdminConsole() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                                    onClick={() => handleRevoke(item.email)}
+                                                                    onClick={() => handleRevoke(item)}
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </Button>
