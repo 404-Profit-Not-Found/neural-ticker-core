@@ -1,0 +1,94 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/brani/Documents/GitHub/neural-ticker-core/frontend[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [31mΓ¥»[39m src/lib/rating-utils.test.ts [2m([22m[2m20 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 23[2mms[22m[39m
+[31m   [31m├ù[31m Rating Utilities[2m > [22mcalculateAiRating - Probability-Weighted Mode[2m > [22mshould handle moderate news impact (5-7)[90m 11[2mms[22m[31m[39m
+[31m     ΓåÆ expected 63 to be 50 // Object.is equality[39m
+ [32mΓ£ô[39m src/pages/AnalyzerPage.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[90m 94[2mms[22m[39m
+ [32mΓ£ô[39m src/pages/Dashboard.test.tsx [2m([22m[2m7 tests[22m[2m | [22m[33m4 skipped[39m[2m)[22m[90m 289[2mms[22m[39m
+ [2m[90mΓåô[39m[22m src/components/dashboard/WatchlistTable.sorting.test.tsx [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [2m[90mΓåô[39m[22m src/components/dashboard/WatchlistGridView.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m
+ [32mΓ£ô[39m src/hooks/useWatchlist.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 720[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI GET call #1: /watchlists
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mInitial API calls: 1
+
+ [32mΓ£ô[39m src/components/analyzer/AnalyzerTable.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[90m 124[2mms[22m[39m
+ [32mΓ£ô[39m src/hooks/useTicker.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 862[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI GET call #2: /tickers?search=AA
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI GET call #3: /tickers?search=AAP
+
+ [32mΓ£ô[39m src/components/layout/GlobalSearch.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 756[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GlobalSearch[2m > [22mcalls api with debounced query [33m344[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GlobalSearch[2m > [22mdisplays results and navigates on click [33m347[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI GET call #4: /tickers?search=AAPL
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI calls during typing: 3
+Total API calls after typing: 4
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not search with single character
+[22m[39mAPI GET call #1: /watchlists
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not search with single character
+[22m[39mTotal API calls after typing: 1
+
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.typing.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1264[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Typing Performance Test[2m > [22mshould not make excessive API calls when typing in search box [33m803[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Typing Performance Test[2m > [22mshould not search with single character [33m458[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.simple.test.tsx[2m > [22m[2mWatchlistTable - Simple Render Test[2m > [22m[2mshould render empty watchlist without excessive API calls
+[22m[39mAPI GET call #1: /watchlists
+
+ [32mΓ£ô[39m src/lib/rating-logic.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.infinite-loop.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2196[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop with empty watchlist [33m362[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop when searching with no results [33m635[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop when adding ticker to empty watchlist [33m637[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Infinite Loop Prevention[2m > [22mshould handle rapid state changes without infinite loops [33m370[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.simple.test.tsx[2m > [22m[2mWatchlistTable - Simple Render Test[2m > [22m[2mshould render empty watchlist without excessive API calls
+[22m[39mFinal API call count: 1
+Total API calls: 1
+
+ [32mΓ£ô[39m src/hooks/useStockAnalyzer.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 171[2mms[22m[39m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.simple.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 663[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Simple Render Test[2m > [22mshould render empty watchlist without excessive API calls [33m660[2mms[22m[39m
+ [32mΓ£ô[39m src/components/ticker/ResearchFeed.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 194[2mms[22m[39m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 422[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable[2m > [22mrenders delete watchlist button when a list is active [33m327[2mms[22m[39m
+ [2m[90mΓåô[39m[22m src/components/layout/Header.nav.test.tsx [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.interaction.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 481[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Interaction Freeze[2m > [22mshould not freeze when clicking document body [33m479[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/lib/rating-utils.test.ts > Rating Utilities > calculateAiRating - Probability-Weighted Mode > should handle moderate news impact (5-7)
+AssertionError: expected 63 to be 50 // Object.is equality
+
+- Expected
++ Received
+
+- 50
++ 63
+
+ Γ¥» src/lib/rating-utils.test.ts:203:35
+    201| 
+    202|       // Base for 5/20/null is around 45
+    203|       expect(bullishResult.score).toBe(50); // 45 + 5
+       |                                   ^
+    204|       expect(bearishResult.score).toBe(40); // 45 - 5
+    205|     });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (18)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m75 passed[39m[22m[2m | [22m[33m14 skipped[39m[90m (90)[39m
+[2m   Start at [22m 00:49:49
+[2m   Duration [22m 7.81s[2m (transform 2.13s, setup 3.64s, collect 13.99s, tests 8.26s, environment 24.35s, prepare 3.72s)[22m
+

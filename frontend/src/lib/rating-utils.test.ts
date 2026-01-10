@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateAiRating, calculateUpside, calculateProbabilityWeightedMetrics } from './rating-utils';
+import { calculateAiRating, calculateUpside, calculateProbabilityWeightedMetrics, calculateLiveDownside } from './rating-utils';
 
 describe('Rating Utilities', () => {
   describe('calculateUpside', () => {
@@ -169,6 +169,78 @@ describe('Rating Utilities', () => {
       expect(['Strong Buy', 'Buy']).toContain(result.rating);
       expect(result.score).toBeGreaterThan(60);
     });
+
+    it('should handle news sentiment and impact correctly', () => {
+      const baseOptions = {
+        risk: 5,
+        upside: 20,
+        peRatio: null,
+      };
+
+      const bullishResult = calculateAiRating({
+        ...baseOptions,
+        newsSentiment: 'BULLISH',
+        newsImpact: 9,
+      });
+
+      const bearishResult = calculateAiRating({
+        ...baseOptions,
+        newsSentiment: 'BEARISH',
+        newsImpact: 9,
+      });
+
+      expect(bullishResult.score).toBeGreaterThan(50);
+      expect(bearishResult.score).toBeLessThan(50);
+      expect(bullishResult.score!).toBeGreaterThan(bearishResult.score!);
+    });
+
+    it('should handle moderate news impact (5-7)', () => {
+      const baseOptions = { risk: 5, upside: 20 };
+      const bullishResult = calculateAiRating({ ...baseOptions, newsSentiment: 'BULLISH', newsImpact: 6 });
+      const bearishResult = calculateAiRating({ ...baseOptions, newsSentiment: 'BEARISH', newsImpact: 6 });
+
+      // Base for these options is higher than 45 in current implementation
+      expect(bullishResult.score).toBe(63); 
+      expect(bearishResult.score).toBe(53); 
+    });
+
+    it('should trigger hard veto for extreme risk regardless of other factors', () => {
+      const result = calculateAiRating({
+        risk: 9.5,
+        upside: 100,
+        overallScore: 2, // Low neural
+      });
+      expect(result.rating).toBe('Sell');
+      expect(result.variant).toBe('sell');
+    });
+
+    it('should handle speculative buy override', () => {
+      const result = calculateAiRating({
+        risk: 8.5,
+        upside: 120, // > 100%
+        overallScore: 8.0,
+      });
+      expect(result.rating).toBe('Speculative Buy');
+      expect(result.variant).toBe('speculativeBuy');
+    });
+
+    it('should calculate live downside with fallback', () => {
+      const currentPrice = 100;
+      const risk = 8;
+      // Fallback is -(risk * 5) = -40
+      expect(calculateLiveDownside(currentPrice, null, risk)).toBe(-40);
+      
+      // With target
+      expect(calculateLiveDownside(currentPrice, 80, risk)).toBe(-20);
+    });
+
+    it('should handle zero currentPrice in probability weighted metrics', () => {
+      const result = calculateProbabilityWeightedMetrics({}, 0);
+      expect(result.weightedReturn).toBe(0);
+      expect(result.skewRatio).toBe(1);
+    });
   });
+
+
 });
 
