@@ -287,7 +287,7 @@ export class UsersService {
     for (const u of users) {
       // Skip revoked users - they should not appear in admin list
       if (u.role === 'revoked') continue;
-      
+
       const existing = identityMap.get(u.email) || {};
 
       let status = 'ACTIVE';

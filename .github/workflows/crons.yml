@@ -6,6 +6,8 @@ on:
     - cron: '0 0 * * *'
     # Hourly (Risk Scanner, Posts Sync)
     - cron: '0 * * * *'
+    # Every 30 mins during market hours (6 AM - 9 PM UTC covers both EU and US)
+    - cron: '*/30 6-21 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -33,3 +35,12 @@ jobs:
 
       - name: Trigger Research Cleanup (Zombie Tickets)
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
+  # Light snapshot sync every 30 mins during market hours (Mon-Fri, 6 AM - 9 PM UTC)
+  snapshot-sync:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: github.event.schedule == '*/30 6-21 * * 1-5'
+    steps:
+      - name: Trigger Snapshot Sync
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-snapshots -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"

@@ -70,14 +70,14 @@ describe('GlobalSearch', () => {
         // Wait for debounce (300ms)
         await waitFor(() => {
             expect(api.get).toHaveBeenCalledWith('/tickers', {
-                params: { search: 'NVDA' },
+                params: { search: 'NVDA', external: 'false' },
             });
         }, { timeout: 1000 });
     });
 
     it('displays results and navigates on click', async () => {
         const mockResults = [
-            { symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ' }
+            { symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', is_locally_tracked: true }
         ];
         (api.get as Mock).mockResolvedValue({ data: mockResults });
 
@@ -85,9 +85,9 @@ describe('GlobalSearch', () => {
         const input = screen.getByPlaceholderText(/search tickers/i);
         fireEvent.change(input, { target: { value: 'AAPL' } });
 
-        await waitFor(() => screen.getByText('Apple Inc'));
+        await waitFor(() => expect(screen.getByText('Apple Inc')).toBeDefined());
 
-        const resultButton = screen.getByText('AAPL').closest('button');
+        const resultButton = screen.getByText('AAPL').closest('div');
         fireEvent.click(resultButton!);
 
         expect(mockNavigate).toHaveBeenCalledWith('/ticker/AAPL');

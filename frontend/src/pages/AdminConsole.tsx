@@ -604,22 +604,25 @@ export function AdminConsole() {
                                                                 <PopoverContent className="w-40 p-2" align="start">
                                                                     <div className="flex flex-col gap-1">
                                                                         <button
-                                                                            onClick={() => handleUpdateTier(item.id, 'free')}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'free' ? 'bg-muted' : ''}`}
+                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'free')}
+                                                                            disabled={!item.id}
+                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'free' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                         >
                                                                             <UserCircle size={14} className="text-zinc-400" />
                                                                             Free
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => handleUpdateTier(item.id, 'pro')}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'pro' ? 'bg-muted' : ''}`}
+                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'pro')}
+                                                                            disabled={!item.id}
+                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'pro' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                         >
                                                                             <Sparkles size={14} className="text-purple-400" />
                                                                             Pro
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => handleUpdateTier(item.id, 'whale')}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'whale' ? 'bg-muted' : ''}`}
+                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'whale')}
+                                                                            disabled={!item.id}
+                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'whale' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                         >
                                                                             <Crown size={14} className="text-amber-400" />
                                                                             Whale

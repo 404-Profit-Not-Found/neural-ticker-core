@@ -503,7 +503,7 @@ export class MarketDataService {
         analysts: analystCount,
         social: socialCount,
       },
-      sparkline: sparklinePrices.reverse().map((p) => p.close),
+      sparkline: (sparklinePrices || []).reverse().map((p) => p.close),
     };
   }
 
@@ -1668,7 +1668,7 @@ export class MarketDataService {
               social: socialCount,
               news: newsCount,
             },
-            sparkline: prices.reverse().map((p) => p.close),
+            sparkline: (prices || []).reverse().map((p) => p.close),
           };
         }),
       ),
@@ -1874,15 +1874,12 @@ export class MarketDataService {
 
   async getMarketStatus(exchange: string): Promise<any> {
     // Check cache first
-    if (
-      this.marketStatusCache &&
-      this.marketStatusCache.expiry > Date.now()
-    ) {
+    if (this.marketStatusCache && this.marketStatusCache.expiry > Date.now()) {
       return this.marketStatusCache.data;
     }
 
     const result = await this.finnhubService.getMarketStatus(exchange);
-    
+
     // Cache the result (even if null, to prevent repeated failed calls)
     this.marketStatusCache = {
       data: result,

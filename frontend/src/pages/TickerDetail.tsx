@@ -641,17 +641,15 @@ export function TickerDetail() {
 
                         {/* --- 3. DISCUSSION (Global Footer) --- */}
                         <div className="mt-12 border-t border-border pt-8 pb-12">
-                            <div className="max-w-3xl mx-auto">
-                                <TickerDiscussion
-                                    comments={socialComments}
-                                    onPostComment={(content) => {
-                                        if (symbol) {
-                                            postCommentMutation.mutate({ symbol, content });
-                                        }
-                                    }}
-                                    isPosting={postCommentMutation.isPending}
-                                />
-                            </div>
+                            <TickerDiscussion
+                                comments={socialComments}
+                                onPostComment={(content) => {
+                                    if (symbol) {
+                                        postCommentMutation.mutate({ symbol, content });
+                                    }
+                                }}
+                                isPosting={postCommentMutation.isPending}
+                            />
                         </div>
 
                     </main>

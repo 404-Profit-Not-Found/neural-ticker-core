@@ -24,6 +24,7 @@ describe('ResearchController', () => {
   const mockMarketDataService = {
     dedupeAnalystRatings: jest.fn(),
     syncCompanyNews: jest.fn(),
+    refreshMarketData: jest.fn(),
   };
   const mockCreditService = {
     getModelCost: jest.fn(),

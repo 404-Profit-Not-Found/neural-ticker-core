@@ -140,16 +140,35 @@ export class FinnhubService implements OnModuleInit {
     });
   }
 
+  private marketStatusCache: Record<string, { data: any; timestamp: number }> =
+    {};
+  private readonly CACHE_TTL = 60 * 1000; // 1 minute
+
   async getMarketStatus(exchange: string): Promise<any> {
+    // Standardize exchange (Finnhub free tier primarily supports US)
+    const targetExchange = exchange === 'US' ? 'US' : 'US';
+
+    const cached = this.marketStatusCache[targetExchange];
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.data;
+    }
+
     return new Promise((resolve) => {
-      this.finnhubClient.marketStatus({ exchange }, (error: any, data: any) => {
-        if (error) {
-          this.handleError(error, 'marketStatus');
-          // Gracefully return null when access is restricted
-          return resolve(null);
-        }
-        resolve(data);
-      });
+      this.finnhubClient.marketStatus(
+        { exchange: targetExchange },
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, `marketStatus-${targetExchange}`);
+            // Gracefully return null when access is restricted
+            return resolve(null);
+          }
+          this.marketStatusCache[targetExchange] = {
+            data,
+            timestamp: Date.now(),
+          };
+          resolve(data);
+        },
+      );
     });
   }
 

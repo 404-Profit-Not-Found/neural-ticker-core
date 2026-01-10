@@ -10,7 +10,7 @@ interface User {
     view_mode?: string;
     theme?: string;
     role: string;
-    tier: 'free' | 'pro' | 'admin';
+    tier: 'free' | 'pro' | 'whale' | 'admin';
     credits_balance?: number;
     avatar_url: string;
 }

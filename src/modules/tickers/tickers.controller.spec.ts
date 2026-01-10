@@ -36,20 +36,34 @@ describe('TickersController', () => {
       const tickers = [{ symbol: 'AAPL' }, { symbol: 'GOOGL' }];
       mockTickersService.searchTickers.mockResolvedValue(tickers);
 
-      const result = await controller.getAll();
+      const result = await controller.getAll(
+        undefined as any,
+        undefined as any,
+        {} as any,
+      );
 
       expect(result).toEqual(tickers);
-      expect(mockTickersService.searchTickers).toHaveBeenCalledWith(undefined);
+      expect(mockTickersService.searchTickers).toHaveBeenCalledWith(
+        undefined,
+        false,
+      );
     });
 
     it('should search tickers with query', async () => {
       const tickers = [{ symbol: 'AAPL' }];
       mockTickersService.searchTickers.mockResolvedValue(tickers);
 
-      const result = await controller.getAll('AAP');
+      const result = await controller.getAll(
+        'AAP',
+        undefined as any,
+        {} as any,
+      );
 
       expect(result).toEqual(tickers);
-      expect(mockTickersService.searchTickers).toHaveBeenCalledWith('AAP');
+      expect(mockTickersService.searchTickers).toHaveBeenCalledWith(
+        'AAP',
+        false,
+      );
     });
   });
 

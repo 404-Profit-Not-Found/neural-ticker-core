@@ -1075,7 +1075,9 @@ Title:`;
                 const symbols: string[] = item.symbol
                   .split(/[/, &]+/) // Split by slash, comma, space, ampersand
                   .map((s: string) => s.trim())
-                  .filter((s: string) => s.length > 0 && s !== 'AND' && s !== '&');
+                  .filter(
+                    (s: string) => s.length > 0 && s !== 'AND' && s !== '&',
+                  );
 
                 for (const sym of symbols) {
                   try {

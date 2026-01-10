@@ -16,6 +16,8 @@ import { Repository, LessThanOrEqual } from 'typeorm'; // Added
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
+  // In-app crons only run in development - GitHub Actions handles production crons
+  private readonly isDevMode = process.env.NODE_ENV !== 'production';
 
   constructor(
     private readonly riskRewardService: RiskRewardService, // Added back
@@ -77,6 +79,11 @@ export class JobsService {
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  private async syncDailyCandlesCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.syncDailyCandles();
+  }
+
   async syncDailyCandles() {
     this.logger.log('Starting daily candle sync...');
     try {
@@ -106,7 +113,143 @@ export class JobsService {
     }
   }
 
+  // --- LIGHT SNAPSHOT SYNC (Prices only, no history) ---
+  @Cron(CronExpression.EVERY_30_MINUTES)
+  private async syncSnapshotsCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.syncSnapshots();
+  }
+
+  /**
+   * Check if a market is open based on exchange/region
+   * @param exchange - Exchange code (e.g., 'US', 'LSE', 'XETRA', 'PA')
+   */
+  private isMarketOpenForExchange(exchange?: string): boolean {
+    const now = new Date();
+    const day = now.getUTCDay();
+
+    // Weekend check (0 = Sunday, 6 = Saturday)
+    if (day === 0 || day === 6) return false;
+
+    // Determine region from exchange
+    const euExchanges = [
+      'LSE',
+      'XETRA',
+      'PA',
+      'AS',
+      'MC',
+      'MI',
+      'SW',
+      'VI',
+      'BR',
+      'HE',
+      'CO',
+      'ST',
+      'OL',
+    ];
+    const isEU =
+      exchange && euExchanges.some((e) => exchange.toUpperCase().includes(e));
+
+    if (isEU) {
+      // EU markets: 8:00 AM - 4:30 PM CET (7:00 - 15:30 UTC in winter, 6:00 - 14:30 UTC in summer)
+      // Using approximate UTC times to avoid DST complexity
+      const cetTime = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }),
+      );
+      const hours = cetTime.getHours();
+      const minutes = cetTime.getMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+      const marketOpen = 8 * 60; // 8:00 AM CET
+      const marketClose = 16 * 60 + 30; // 4:30 PM CET
+      return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+    } else {
+      // US markets: 9:30 AM - 4:00 PM ET
+      const etTime = new Date(
+        now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      );
+      const hours = etTime.getHours();
+      const minutes = etTime.getMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+      const marketOpen = 9 * 60 + 30; // 9:30 AM ET
+      const marketClose = 16 * 60; // 4:00 PM ET
+      return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+    }
+  }
+
+  /**
+   * Check if any major market is currently open (US or EU)
+   */
+  private isAnyMarketOpen(): boolean {
+    return (
+      this.isMarketOpenForExchange('US') || this.isMarketOpenForExchange('LSE')
+    );
+  }
+
+  /**
+   * Light sync - only fetches current price snapshots for all tickers.
+   * Much faster than syncDailyCandles since it skips history.
+   * Syncs tickers only when their respective market is open.
+   */
+  async syncSnapshots(force = false) {
+    // Check if any market is open (unless forced via HTTP call)
+    if (!force && !this.isAnyMarketOpen()) {
+      this.logger.log('All markets are closed. Skipping snapshot sync.');
+      return {
+        success: 0,
+        failed: 0,
+        skipped: true,
+        reason: 'All markets closed',
+      };
+    }
+
+    this.logger.log('Starting light snapshot sync (prices only)...');
+    try {
+      const tickers = await this.tickersService.getAllTickers();
+      this.logger.log(`Found ${tickers.length} tickers total.`);
+
+      let success = 0;
+      let failed = 0;
+      let skippedMarketClosed = 0;
+
+      for (const ticker of tickers) {
+        if (!ticker.symbol) continue;
+
+        // Check if this ticker's market is open
+        const exchange = (ticker as any).exchange || 'US'; // Default to US if unknown
+        if (!force && !this.isMarketOpenForExchange(exchange)) {
+          skippedMarketClosed++;
+          continue;
+        }
+
+        try {
+          // getSnapshot already uses Finnhub with Yahoo fallback internally
+          await this.marketDataService.getSnapshot(ticker.symbol);
+          success++;
+        } catch (err: any) {
+          failed++;
+          this.logger.warn(
+            `Snapshot failed for ${ticker.symbol}: ${err.message}`,
+          );
+        }
+        // Shorter delay since it's just snapshots (500ms)
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      this.logger.log(
+        `Snapshot sync complete. Success: ${success}, Failed: ${failed}, Skipped (market closed): ${skippedMarketClosed}`,
+      );
+      return { success, failed, skipped: false };
+    } catch (e) {
+      this.logger.error('Snapshot sync failed globally', e);
+      throw e;
+    }
+  }
   @Cron(CronExpression.EVERY_WEEK)
+  private async runRiskRewardScannerCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.runRiskRewardScanner();
+  }
+
   async runRiskRewardScanner() {
     this.logger.log('Starting Periodic Risk/Reward Scanner (Low Tier)...');
     try {
@@ -227,8 +370,13 @@ export class JobsService {
   // I will use `replace_file_content` to add imports at top, then method at bottom.
 
   @Cron(CronExpression.EVERY_5_MINUTES)
+  private async runDailyDigestCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.runDailyDigest();
+  }
+
   async runDailyDigest() {
-    this.logger.log('Starting News Digest Generation (5-min cycle)...');
+    this.logger.log('Starting News Digest Generation...');
     // For cron, we might want to generate for ALL users? Or just a system global one?
     // The current requirement was "personalized per user".
     // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
@@ -250,6 +398,11 @@ export class JobsService {
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
+  private async processPendingRequestsCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.processPendingRequests();
+  }
+
   async processPendingRequests() {
     this.logger.debug('Checking for pending async requests...');
 

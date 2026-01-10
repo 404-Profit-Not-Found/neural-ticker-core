@@ -117,7 +117,11 @@ export class ResearchNote {
   @Column({ type: 'text', nullable: true })
   rarity: string | null;
 
-  @ManyToOne('User', 'research_notes', { eager: true, nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne('User', 'research_notes', {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'user_id' })
   user: any;
 

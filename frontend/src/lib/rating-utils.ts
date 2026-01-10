@@ -220,16 +220,45 @@ export function calculateAiRating(
         newsImpact = newsImpactArg;
     }
 
-    let score = 50; // Base Score
-    const effectiveUpside = upside; // For compatibility with speculative buy check
+    // NEW: Probability-Weighted integration
+    let weightedUpside = upside;
+    const weightedDownside = downside;
+    let skewBonus = 0;
 
-    // 1. Upside Impact (Max +30)
-    const cappedUpside = Math.min(upside, 100); 
-    score += Math.max(0, cappedUpside * 0.4); 
+    if (typeof riskOrInput === 'object' && riskOrInput.scenarios && riskOrInput.currentPrice) {
+        const metrics = calculateProbabilityWeightedMetrics(riskOrInput.scenarios, riskOrInput.currentPrice);
+        
+        // We use loss-adjusted return for the main score impact
+        weightedUpside = metrics.lossAdjustedReturn;
+        
+        // Downside is already factored into lossAdjustedReturn, but we can extract separate downside 
+        // impact for the verdict logic if needed. For now, weightedUpside is the primary driver.
+        
+        // Skew Bonus: Reward favorable asymmetry (Skew > 1.5)
+        if (metrics.skewRatio > 1.5) {
+            skewBonus = Math.min(10, (metrics.skewRatio - 1.5) * 5);
+        } else if (metrics.skewRatio < 0.6) {
+            // Penalty for unfavorable skew (downside risk significantly higher than upside potential)
+            skewBonus = -10; 
+        }
+    }
+
+    let score = 50; // Base Score
+    const effectiveUpside = weightedUpside;
+
+    // 1. Upside Impact (Max +40)
+    // If it's probability-weighted, we allow it to drive the score more directly
+    const cappedUpside = Math.min(Math.max(-50, weightedUpside), 100); 
+    score += cappedUpside * 0.4; 
     
     // 2. Downside Impact (Max -40) - LOSS AVERSION
-    const absDownside = Math.abs(downside);
-    score -= Math.min(40, absDownside * 0.8);
+    // If weighted, downside is already partially in the lossAdjustedReturn, 
+    // but we can still penalize high catastrophic downside if explicitly passed.
+    const absDownside = Math.abs(weightedDownside);
+    score -= Math.min(40, absDownside * 0.4);
+
+    // 2.5 Add Skew Bonus
+    score += skewBonus;
 
     // 3. Risk Penalty / Bonus
     if (risk >= 8) score -= 20;      // Extreme penalty for high risk

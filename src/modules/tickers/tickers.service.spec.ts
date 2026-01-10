@@ -10,6 +10,8 @@ import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { JobsService } from '../jobs/jobs.service';
 
+import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
+
 describe('TickersService', () => {
   let service: TickersService;
 
@@ -36,10 +38,11 @@ describe('TickersService', () => {
 
   const mockTickerRepo = {
     findOne: jest.fn(),
-    create: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
     save: jest.fn(),
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
     find: jest.fn(),
+    count: jest.fn(),
   };
 
   const mockLogoRepo = {
@@ -48,11 +51,20 @@ describe('TickersService', () => {
     save: jest.fn(),
   };
 
+  const mockOhlcvRepo = {
+    find: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
+    save: jest.fn(),
+    count: jest.fn(),
+  };
+
   const mockFinnhubService = {
     getCompanyProfile: jest.fn(),
+    searchSymbols: jest.fn(),
   };
   const mockYahooService = {
     getSummary: jest.fn(),
+    search: jest.fn(),
   };
 
   const mockHttpService = {
@@ -61,6 +73,7 @@ describe('TickersService', () => {
 
   const mockJobsService = {
     queueRequest: jest.fn(),
+    initializeTicker: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -74,6 +87,10 @@ describe('TickersService', () => {
         {
           provide: getRepositoryToken(TickerLogoEntity),
           useValue: mockLogoRepo,
+        },
+        {
+          provide: getRepositoryToken(PriceOhlcv),
+          useValue: mockOhlcvRepo,
         },
         {
           provide: FinnhubService,

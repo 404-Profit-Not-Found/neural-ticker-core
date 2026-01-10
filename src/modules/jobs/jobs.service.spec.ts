@@ -22,6 +22,7 @@ describe('JobsService', () => {
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
     getHistory: jest.fn().mockResolvedValue([]),
+    syncTickerHistory: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockResearchService = {
