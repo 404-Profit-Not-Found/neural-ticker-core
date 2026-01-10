@@ -9,6 +9,7 @@ const mockFinnhubClient = {
   companyNews: jest.fn(),
   marketNews: jest.fn(),
   companyBasicFinancials: jest.fn(),
+  marketStatus: jest.fn(),
 };
 
 jest.mock('finnhub', () => ({
@@ -106,6 +107,29 @@ describe('FinnhubService', () => {
         '2023-12-31',
         expect.any(Function),
       );
+    });
+  });
+
+  describe('getMarketStatus', () => {
+    it('should return market status and cache it', async () => {
+      const mockData = { exchange: 'US', isOpen: true };
+      mockFinnhubClient.marketStatus = jest.fn().mockImplementation((params: any, cb: any) => cb(null, mockData));
+
+      const result = await service.getMarketStatus('US');
+      expect(result).toEqual(mockData);
+      expect(mockFinnhubClient.marketStatus).toHaveBeenCalledTimes(1);
+
+      // Call again, should use cache
+      const cachedResult = await service.getMarketStatus('US');
+      expect(cachedResult).toEqual(mockData);
+      expect(mockFinnhubClient.marketStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle API error gracefully for market status', async () => {
+      mockFinnhubClient.marketStatus = jest.fn().mockImplementation((params: any, cb: any) => cb(new Error('Forbidden')));
+
+      const result = await service.getMarketStatus('US');
+      expect(result).toBeNull();
     });
   });
 });

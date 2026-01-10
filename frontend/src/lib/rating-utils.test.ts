@@ -169,6 +169,30 @@ describe('Rating Utilities', () => {
       expect(['Strong Buy', 'Buy']).toContain(result.rating);
       expect(result.score).toBeGreaterThan(60);
     });
+
+    it('should handle news sentiment and impact correctly', () => {
+      const baseOptions = {
+        risk: 5,
+        upside: 20,
+        peRatio: null,
+      };
+
+      const bullishResult = calculateAiRating({
+        ...baseOptions,
+        newsSentiment: 'BULLISH',
+        newsImpact: 9,
+      });
+
+      const bearishResult = calculateAiRating({
+        ...baseOptions,
+        newsSentiment: 'BEARISH',
+        newsImpact: 9,
+      });
+
+      expect(bullishResult.score).toBeGreaterThan(50);
+      expect(bearishResult.score).toBeLessThan(50);
+      expect(bullishResult.score!).toBeGreaterThan(bearishResult.score!);
+    });
   });
 });
 
