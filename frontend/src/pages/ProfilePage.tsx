@@ -97,8 +97,11 @@ export function ProfilePage() {
                             <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
                                 {nickname || user?.name || 'Trader'}
                             </h1>
-                            {profile?.tier === 'pro' && (
+                            {(profile?.tier === 'pro' || profile?.tier === 'admin' || profile?.role === 'admin') && (
                                 <Badge className="bg-gradient-to-r from-violet-600 to-fuchsia-600 border-0">PRO</Badge>
+                            )}
+                            {profile?.tier === 'whale' && (
+                                <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 border-0 text-black">WHALE</Badge>
                             )}
                         </div>
                         <p className="text-muted-foreground font-mono text-sm mt-1">{user?.email}</p>

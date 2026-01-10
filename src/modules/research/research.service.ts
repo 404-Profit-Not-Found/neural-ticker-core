@@ -31,7 +31,6 @@ export interface ResearchEvent {
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
-import { toonToJson } from 'toon-parser';
 
 @Injectable()
 export class ResearchService implements OnModuleInit {
@@ -252,7 +251,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       this.logger.log(
         `[Research] Generating note for ${note.tickers.join(', ')}...`,
       );
-      this.logger.log(`[Research] Numeric Context: ${JSON.stringify(context)}`);
+      // this.logger.log(`[Research] Numeric Context: ${JSON.stringify(context)}`);
 
       const result = await this.llmService.generateResearch({
         question: note.question + dataRequirements,
@@ -498,18 +497,15 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
           let data: any;
           try {
-            data = toonToJson(contentToParse, { strict: false });
+            const cleanContent = contentToParse
+              .trim()
+              .replace(/,\s*([}\]])/g, '$1');
+            data = JSON.parse(cleanContent);
           } catch (e) {
-            // Fallback to standard JSON parse if TOON fails
-            try {
-              data = JSON.parse(contentToParse);
-            } catch {
-              this.logger.warn(
-                `Failed to parse extracted data for ${ticker} via TOON or JSON`,
-                e,
-              );
-              continue; // Skip to next ticker or exit block
-            }
+            this.logger.warn(
+              `Failed to parse extracted data for ${ticker}: ${e.message}`,
+            );
+            continue;
           }
 
           let descriptionFound = false;
@@ -996,22 +992,40 @@ Title:`;
             Using available news, identify Top Market Movers or Thematic Stories.
             
             STRICT RULES:
-            1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
+            1. Select only the TOP 3-5 most profound stories.
             2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
-            3. Label Sentiment as **BULLISH**, **BEARISH**, or **MIXED**.
+            3. Label Sentiment as **BULLISH**, **BEARISH**, or **NEUTRAL**.
             4. SORT stories by Impact Index (Descending).
-            5. Use **Markdown** formatting for the digest use --- to separate sections.
-
-            Style Guide:
-            - Headlines: **[SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]**
-            - ** Headline text**
-            - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
-            - Tone: Bloomberg/Terminal. Concise. No fluff.
-            - **DO NOT** include a main title/header (e.g., 'Daily Smart News Digest'). Start directly with the Market Pulse.
-            - Structure:
-              1. Market Pulse (1-2 sentences).
-              2. Sections for each Key Story.
-                 - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
+            5. **CRITICAL**: END the response with a JSON block containing the structured data.
+            
+            Structure:
+            
+            [Markdown Section]
+            ## Market Pulse
+            (1-2 sentences on macro mood)
+            
+            ---
+            
+            ## Key Stories
+            
+            ### [SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]
+            **Headline**
+            - **The Why**: ...
+            - **Risk/Catalyst**: ...
+            
+            [JSON Section]
+            \`\`\`json
+            {
+              "items": [
+                {
+                  "symbol": "NVDA",
+                  "sentiment": "BULLISH",
+                  "impact_score": 10,
+                  "summary": "Blackwell chips sold out until 2026."
+                }
+              ]
+            }
+            \`\`\`
         `;
 
       // 3. Call LLM
@@ -1038,6 +1052,75 @@ Title:`;
 
       const saved = await this.noteRepo.save(savedPending);
       this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+
+      // 5. PARSE & UPDATE TICKERS (The Smart News Integration)
+      try {
+        const jsonMatch =
+          saved.answer_markdown.match(/```json\s*([\s\S]*?)\s*```/) ||
+          saved.answer_markdown.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = (jsonMatch[1] || jsonMatch[0])
+            .trim()
+            .replace(/,\s*([}\]])/g, '$1'); // Basic cleanup for trailing commas
+
+          const parsed = JSON.parse(jsonStr);
+
+          if (parsed && parsed.items && Array.isArray(parsed.items)) {
+            this.logger.log(
+              `Found ${parsed.items.length} news items to sync to DB for digest ${saved.id}...`,
+            );
+            for (const item of parsed.items) {
+              if (item.symbol && item.impact_score !== undefined) {
+                // HANDLE SPLIT SYMBOLS (e.g. "NVO / LLY")
+                const symbols: string[] = item.symbol
+                  .split(/[/, &]+/) // Split by slash, comma, space, ampersand
+                  .map((s: string) => s.trim())
+                  .filter(
+                    (s: string) => s.length > 0 && s !== 'AND' && s !== '&',
+                  );
+
+                for (const sym of symbols) {
+                  try {
+                    await this.marketDataService.updateTickerNews(sym, {
+                      sentiment: item.sentiment || 'NEUTRAL',
+                      score: Number(item.impact_score),
+                      summary: item.summary || '',
+                    });
+                  } catch (err) {
+                    this.logger.warn(
+                      `Failed to update ticker news for ${sym}: ${err.message}`,
+                    );
+                  }
+                }
+              }
+            }
+          }
+
+          // 6. STRIP JSON FROM PUBLIC VIEW
+          // Remove the JSON block and any trailing "JSON Section" headers
+          let cleanMarkdown = saved.answer_markdown
+            .replace(/```json[\s\S]*?```/g, '') // Remove code blocks
+            .replace(/\[JSON Section\].*$/is, '') // Remove everything after the JSON section header
+            .trim();
+
+          // If the LLM left trailing artifacts like "---" or "Output:", clean them up
+          cleanMarkdown = cleanMarkdown.replace(/\n---\s*$/g, '').trim();
+
+          if (cleanMarkdown !== saved.answer_markdown) {
+            await this.noteRepo.update(saved.id, {
+              answer_markdown: cleanMarkdown,
+            });
+            saved.answer_markdown = cleanMarkdown;
+            this.logger.log(`Stripped JSON metadata from digest ${saved.id}`);
+          }
+        }
+      } catch (parseErr) {
+        this.logger.warn(
+          'Failed to parse structured news data from digest',
+          parseErr,
+        );
+      }
+
       return saved;
     } catch (e) {
       this.logger.error('Failed to generate personalized digest', e);

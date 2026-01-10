@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { JobsService } from './jobs.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { ResearchService } from '../research/research.service';
+import { RequestQueue } from './entities/request-queue.entity';
 
 describe('JobsService', () => {
   let service: JobsService;
@@ -19,12 +21,22 @@ describe('JobsService', () => {
 
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
+    getHistory: jest.fn().mockResolvedValue([]),
+    syncTickerHistory: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockResearchService = {
     failStuckTickets: jest.fn(),
     createResearchTicket: jest.fn(),
     processTicket: jest.fn(),
+    getOrGenerateDailyDigest: jest.fn(),
+  };
+
+  const mockRequestQueueRepo = {
+    find: jest.fn().mockResolvedValue([]),
+    save: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -35,6 +47,10 @@ describe('JobsService', () => {
         { provide: TickersService, useValue: mockTickersService },
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: ResearchService, useValue: mockResearchService },
+        {
+          provide: getRepositoryToken(RequestQueue),
+          useValue: mockRequestQueueRepo,
+        },
       ],
     }).compile();
 

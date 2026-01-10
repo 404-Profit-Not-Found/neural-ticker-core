@@ -14,7 +14,6 @@ import {
     ArrowDownRight,
     ArrowUp,
     ArrowDown,
-    Bot,
     Brain,
     ShieldCheck,
     AlertTriangle,
@@ -32,6 +31,9 @@ import { cn } from '../../lib/api';
 import { TickerLogo } from './TickerLogo';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
+import { VerdictBadge } from "../ticker/VerdictBadge";
+import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
+import { Sparkline } from "../ui/Sparkline";
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -43,6 +45,8 @@ export interface TickerData {
     change: number;
     pe: number | null;
     marketCap: number | null;
+    fiftyTwoWeekHigh: number | null;
+    fiftyTwoWeekLow: number | null;
     potentialUpside: number | null;
     riskScore: number | null;
     overallScore: number | null;
@@ -54,6 +58,7 @@ export interface TickerData {
     socialCount: number;
     potentialDownside: number | null;
     itemId?: string;
+    sparkline?: number[];
 }
 
 interface WatchlistTableViewProps {
@@ -179,24 +184,44 @@ export function WatchlistTableView({
                 },
             }),
 
-             // 3. Market Cap
-            columnHelper.accessor((row) => row.marketCap, {
-                id: 'market_cap',
-                header: 'Mkt Cap',
+            // 2.5 Sparkline
+            columnHelper.accessor('sparkline', {
+                header: 'Trend (14d)',
                 cell: (info) => {
-                    const val = info.getValue();
-                    // Hide if 0 or null/undefined
-                    if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
-                    
-                    const formatCap = (n: number) => {
-                    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-                    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-                    return (n / 1e6).toFixed(2) + 'M';
-                    };
-
-                    return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
+                    const data = info.getValue();
+                    if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+                    return (
+                        <div className="w-[100px] h-8 flex items-center justify-center">
+                            <Sparkline 
+                                data={data} 
+                                width={100} 
+                                height={32} 
+                                className="opacity-80 group-hover:opacity-100 transition-opacity"
+                            />
+                        </div>
+                    );
                 },
             }),
+
+            // 3. 52-Week Range
+            columnHelper.accessor((row) => row.price, {
+                id: '52_week_range',
+                header: '52 Wk Range',
+                cell: (info) => {
+                    const row = info.row.original;
+                    if (!row.fiftyTwoWeekHigh || !row.fiftyTwoWeekLow) return <span className="text-muted-foreground text-xs">-</span>;
+
+                    return (
+                        <FiftyTwoWeekRange 
+                            low={row.fiftyTwoWeekLow} 
+                            high={row.fiftyTwoWeekHigh} 
+                            current={row.price} 
+                            showLabels={true}
+                        />
+                    );
+                },
+            }),
+
 
             // 4. P/E
             columnHelper.accessor((row) => row.pe, {
@@ -276,21 +301,23 @@ export function WatchlistTableView({
                 id: 'ai_rating',
                 header: 'AI Rating',
                 cell: (info) => {
-                    const rating = info.getValue() as string;
-                    if (!rating || rating === '-') return <span className="text-muted-foreground">-</span>;
-
-                    let variant: "default" | "strongBuy" | "buy" | "hold" | "sell" | "speculativeBuy" | "outline" = "outline";
-                    if (rating === 'Strong Buy') variant = 'strongBuy';
-                    else if (rating === 'Buy') variant = 'buy';
-                    else if (rating === 'Hold') variant = 'hold';
-                    else if (rating === 'Sell') variant = 'sell';
-                    else if (rating === 'Speculative Buy') variant = 'speculativeBuy';
-
+                    const row = info.row.original;
+                    // Ensure we have values
+                    const risk = row.riskScore ?? 0;
+                    const upside = row.potentialUpside ?? 0;
+                    const downside = row.potentialDownside ?? 0;
+                    
                     return (
-                        <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
-                            <Bot size={12} className="opacity-80" />
-                            {rating}
-                        </Badge>
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <VerdictBadge 
+                                risk={risk}
+                                upside={upside}
+                                downside={downside}
+                                consensus={row.rating}
+                                overallScore={row.overallScore}
+                                pe={row.pe}
+                            />
+                        </div>
                     );
                 },
             }),

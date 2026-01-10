@@ -1,6 +1,6 @@
 {
   "name": "neural-ticker-core",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "agentic market research",
   "author": "branislavlang@gmail.com",
   "private": true,
@@ -9,7 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "npx -y kill-port 3000 && nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -55,7 +55,7 @@
     "swagger-ui-express": "^5.0.1",
     "toon-parser": "^1.1.1",
     "typeorm": "^0.3.28",
-    "yahoo-finance2": "^3.10.2"
+    "yahoo-finance2": "^3.11.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

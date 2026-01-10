@@ -1,11 +1,11 @@
-import { Trash2, Edit2, ArrowUp, ArrowDown, ShieldCheck, AlertTriangle, Flame, Bot, Brain, Newspaper, MessageCircle } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, ShieldCheck, AlertTriangle, Flame, Brain, Newspaper, MessageCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
 import { TickerLogo } from '../dashboard/TickerLogo';
-import { Badge } from '../ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
+import { calculateLiveUpside } from '../../lib/rating-utils';
+import { VerdictBadge } from "../ticker/VerdictBadge";
 
 export interface Position {
     id: string;
@@ -27,7 +27,6 @@ export interface Position {
         industry?: string;
     };
     fundamentals?: {
-        market_cap?: number;
         pe_ttm?: number;
         consensus_rating?: string;
         sector?: string;
@@ -61,12 +60,6 @@ const formatCurrency = (val: number) =>
 const formatPct = (val: number) =>
     `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
-const formatCap = (n: number) => {
-    if (!n) return '-';
-    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-    return (n / 1e6).toFixed(2) + 'M';
-};
 
 export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
@@ -198,13 +191,6 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
         // --- NEW ANALYZER COLUMNS ---
 
-        // 6. Market Cap
-        columnHelper.accessor(row => row.fundamentals?.market_cap, {
-            id: 'mkt_cap',
-            header: () => <span className="hidden md:inline">Mkt Cap</span>,
-            cell: (info) => <span className="hidden md:inline text-xs font-mono text-muted-foreground">{formatCap(Number(info.getValue()))}</span>
-        }),
-
         // 7. P/E
         columnHelper.accessor(row => row.fundamentals?.pe_ttm, {
             id: 'pe',
@@ -260,7 +246,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             cell: (info) => {
                 const basePrice = info.getValue();
                 const price = info.row.original.current_price;
-                const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
+                const upside = calculateLiveUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
                 const isPositive = upside > 0;
                 return (
                     <div className={cn('hidden md:flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
@@ -277,24 +263,35 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: () => <span className="hidden md:inline">AI Rating</span>,
             cell: (info) => {
                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-                let rating = 'Hold';
-                let variant: RatingVariant = 'outline';
-
-                if (riskRaw !== undefined) {
-                    const risk = Number(riskRaw);
-                    const price = info.row.original.current_price;
-                    const upside = calculateUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
-                    const overallScore = info.row.original.aiAnalysis?.overall_score;
-                    const result = calculateAiRating(risk, upside, overallScore);
-                    rating = result.rating;
-                    variant = result.variant;
+                const risk = typeof riskRaw === 'number' ? riskRaw : 0;
+                const price = info.row.original.current_price;
+                
+                // Calculate Upside/Downside for the badge
+                const upside = calculateLiveUpside(
+                    price, 
+                    info.row.original.aiAnalysis?.base_price, 
+                    info.row.original.aiAnalysis?.upside_percent
+                );
+                
+                let downside = 0;
+                const bearPrice = info.row.original.aiAnalysis?.bear_price;
+                if (typeof bearPrice === 'number' && price > 0) {
+                    downside = ((bearPrice - price) / price) * 100;
+                } else if (risk > 0) {
+                    downside = -(risk * 2.5); // Fallback estimate
                 }
 
                 return (
-                    <Badge variant={variant} className="hidden md:flex whitespace-nowrap h-6 px-2 gap-1.5 cursor-default w-fit">
-                        <Bot size={12} />
-                        {rating}
-                    </Badge>
+                    <div className="hidden md:block">
+                        <VerdictBadge 
+                            risk={risk}
+                            upside={upside}
+                            downside={downside}
+                            overallScore={info.row.original.aiAnalysis?.overall_score}
+                            consensus={info.row.original.fundamentals?.consensus_rating}
+                            pe={info.row.original.fundamentals?.pe_ttm}
+                        />
+                    </div>
                 );
             }
         }),

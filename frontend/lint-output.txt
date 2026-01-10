@@ -1,6 +1,0 @@
-
-C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\analyzer\AnalyzerTable.test.tsx
-  22:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-
-Γ£û 1 problem (1 error, 0 warnings)
-

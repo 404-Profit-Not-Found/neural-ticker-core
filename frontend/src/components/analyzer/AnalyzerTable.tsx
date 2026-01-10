@@ -8,7 +8,6 @@ import {
   List,
   ArrowUp,
   ArrowDown,
-  Bot,
   Brain,
   Newspaper,
   ShieldCheck,
@@ -26,7 +25,10 @@ import { AnalyzerGridView } from './AnalyzerGridView';
 import { Badge } from '../ui/badge';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
-import { calculateAiRating, calculateUpside, type RatingVariant } from '../../lib/rating-utils';
+import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils';
+import { VerdictBadge } from "../ticker/VerdictBadge";
+import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
+import { Sparkline } from "../ui/Sparkline";
 
 import { type AnalyzerFilters } from './FilterBar';
 
@@ -48,14 +50,14 @@ export function AnalyzerTable({
   const [pageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'market_cap', desc: true },
+    { id: 'ai_rating', desc: true },
   ]);
 
   // Fetch Data
   const { data, isLoading } = useStockAnalyzer({
     page,
     limit: pageSize,
-    sortBy: sorting[0]?.id || 'market_cap',
+    sortBy: sorting[0]?.id || 'ai_rating',
     sortDir: sorting[0]?.desc ? 'DESC' : 'ASC',
     search,
     // Pass filters
@@ -169,26 +171,52 @@ export function AnalyzerTable({
       },
     }),
 
-    // 3. Market Cap
-    columnHelper.accessor((row) => row.fundamentals.market_cap, {
-      id: 'market_cap',
-      header: 'Mkt Cap',
+
+    // 2.5 Sparkline
+    columnHelper.accessor('sparkline', {
+      header: 'Trend (14d)',
       cell: (info) => {
-        const val = info.getValue();
-        // Hide if 0 or null/undefined
-        if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
-
-        const formatCap = (n: number) => {
-          if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-          if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-          return (n / 1e6).toFixed(2) + 'M';
-        };
-
-        return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
+        const data = info.getValue();
+        if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+        return (
+          <div className="w-[100px] h-8 flex items-center justify-center">
+            <Sparkline 
+              data={data} 
+              width={100} 
+              height={32} 
+              className="opacity-80 group-hover:opacity-100 transition-opacity"
+            />
+          </div>
+        );
       },
     }),
 
-    // 4. P/E
+    // 2.75 52-Week Range
+    columnHelper.display({
+      id: 'fifty_two_week_range',
+      header: '52-Week Range',
+      cell: (info) => {
+        const row = info.row.original;
+        const low = row.fundamentals?.fifty_two_week_low;
+        const high = row.fundamentals?.fifty_two_week_high;
+        const price = row.latestPrice?.close;
+
+        if (!low || !high || !price) return <span className="text-muted-foreground text-xs">-</span>;
+        
+        return (
+            <div className="w-[180px]">
+                <FiftyTwoWeekRange 
+                    low={Number(low)} 
+                    high={Number(high)} 
+                    current={price} 
+                    showLabels={true}
+                />
+            </div>
+        );
+      },
+    }),
+
+    // 3. P/E
     columnHelper.accessor((row) => row.fundamentals.pe_ttm, {
       id: 'pe_ttm',
       header: 'P/E',
@@ -249,7 +277,7 @@ export function AnalyzerTable({
       cell: (info) => {
         const basePrice = info.getValue();
         const price = info.row.original.latestPrice?.close ?? 0;
-        const upside = calculateUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
+        const upside = calculateLiveUpside(price, basePrice, info.row.original.aiAnalysis?.upside_percent);
         const isPositive = upside > 0;
 
         return (
@@ -296,25 +324,35 @@ export function AnalyzerTable({
       cell: (info) => {
         // Use financial_risk instead of overall_score to align with the visible Risk column
         const riskRaw = info.row.original.aiAnalysis?.financial_risk;
-        let rating = 'Hold';
-        let variant: RatingVariant = 'outline';
 
         if (riskRaw !== undefined) {
           const risk = Number(riskRaw);
           const price = info.row.original.latestPrice?.close ?? 0;
-          const upside = calculateUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+          const upside = calculateLiveUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
+          
+          let downside = 0;
+          const bearPrice = info.row.original.aiAnalysis?.bear_price;
+          if (typeof bearPrice === 'number' && price > 0) {
+             downside = ((bearPrice - price) / price) * 100;
+          } else {
+             downside = -(risk * 5);
+          }
+
           const overallScore = info.row.original.aiAnalysis?.overall_score;
-          const result = calculateAiRating(risk, upside, overallScore);
-          rating = result.rating;
-          variant = result.variant;
+
+          return (
+            <VerdictBadge 
+                risk={risk}
+                upside={upside}
+                downside={downside}
+                consensus={info.row.original.fundamentals?.consensus_rating ? String(info.row.original.fundamentals.consensus_rating) : undefined}
+                overallScore={overallScore}
+                pe={info.row.original.fundamentals?.pe_ttm}
+            />
+          );
         }
 
-        return (
-          <Badge variant={variant} className="whitespace-nowrap h-6 px-2 gap-1.5 cursor-default">
-            <Bot size={12} />
-            {rating}
-          </Badge>
-        );
+        return <span className="text-muted-foreground">-</span>;
       }
     }),
 

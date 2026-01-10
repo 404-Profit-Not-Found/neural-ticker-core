@@ -13,7 +13,7 @@ export interface UserProfile {
   email: string;
   full_name: string;
   role: string;
-  tier: 'free' | 'pro' | 'admin';
+  tier: 'free' | 'pro' | 'whale' | 'admin';
   credits_balance: number;
   credits_reset_at: string | null;
   credit_transactions: CreditTransaction[];

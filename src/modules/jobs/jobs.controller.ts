@@ -37,6 +37,16 @@ export class JobsController {
     return { message: 'Daily candle sync completed' };
   }
 
+  @Post('sync-snapshots')
+  @ApiOperation({ summary: 'Trigger light snapshot sync - prices only (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Snapshot sync completed' })
+  async syncSnapshots(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    const result = await this.jobsService.syncSnapshots();
+    return { message: 'Snapshot sync completed', stats: result };
+  }
+
   @Post('run-risk-reward-scanner')
   @ApiOperation({ summary: 'Trigger risk/reward scanner (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })

@@ -30,7 +30,7 @@ interface ResearchNote {
         id: string;
         symbol: string;
         name: string;
-        latestPrice?: { close: number; changePercent?: number };
+        latestPrice?: { close: number; changePercent?: number; change?: number };
         riskAnalysis?: { overall_score: number; financial_risk?: number };
     }[];
     models_used?: string[];
@@ -152,13 +152,14 @@ export function NewsFeed() {
                             {digest.relatedTickers && digest.relatedTickers.length > 0 && (
                                 <div className="mb-6 pb-4 border-b border-border/50">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number }; riskAnalysis?: { overall_score: number; financial_risk?: number } }) => (
+                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number; change?: number }; riskAnalysis?: { overall_score: number; financial_risk?: number } }) => (
                                             <MiniTickerTile
                                                 key={t.id}
                                                 symbol={t.symbol}
                                                 company={t.name}
                                                 price={Number(t.latestPrice?.close || 0)}
                                                 change={Number(t.latestPrice?.changePercent || 0)}
+                                                changeAmount={Number(t.latestPrice?.change || 0)}
                                                 riskScore={t.riskAnalysis?.financial_risk ?? t.riskAnalysis?.overall_score ?? 0}
                                                 href={`/ticker/${t.symbol}`}
                                             />
@@ -188,7 +189,14 @@ export function NewsFeed() {
                                     }}
                                     remarkPlugins={[remarkGfm]}
                                 >
-                                    {digest.answer_markdown || "No content available."}
+                                    {(() => {
+                                        const raw = digest.answer_markdown || "No content available.";
+                                        // Cleanup JSON blocks and legacy markers
+                                        return raw
+                                            .replace(/```json[\s\S]*?```/g, '')
+                                            .replace(/\[JSON Section\].*$/is, '')
+                                            .trim();
+                                    })()}
                                 </ReactMarkdown>
                             </article>
 

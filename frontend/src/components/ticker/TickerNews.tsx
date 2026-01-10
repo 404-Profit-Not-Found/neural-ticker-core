@@ -1,4 +1,5 @@
 
+import { useMemo } from 'react';
 import { Newspaper } from 'lucide-react';
 import type { NewsItem } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -8,17 +9,25 @@ interface TickerNewsProps {
 }
 
 export function TickerNews({ news }: TickerNewsProps) {
+    const sortedNews = useMemo(() => {
+        if (!news) return [];
+        // Sort descending (newest first) and take top 10
+        return [...news]
+            .sort((a, b) => b.datetime - a.datetime)
+            .slice(0, 10);
+    }, [news]);
+
     return (
         <Card className="h-full flex flex-col overflow-hidden">
             <CardHeader className="py-4 border-b border-border bg-muted/10">
                 <CardTitle className="font-bold text-sm flex items-center gap-2">
-                    <Newspaper className="w-4 h-4 text-primary" /> Global News Feed
+                    <Newspaper className="w-4 h-4 text-primary" /> Most Recent News (Top 10)
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-y-auto">
                 <div className="divide-y divide-border/50">
-                    {news && news.length > 0 ? (
-                        news.map((item) => (
+                    {sortedNews && sortedNews.length > 0 ? (
+                        sortedNews.map((item) => (
                             <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                                 <a
                                     href={item.url}
@@ -38,8 +47,24 @@ export function TickerNews({ news }: TickerNewsProps) {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">
                                                     {(() => {
-                                                        const d = new Date(item.datetime * 1000);
-                                                        return isNaN(d.getTime()) ? 'Recently' : d.toLocaleDateString();
+                                                        let d: Date;
+                                                        if (typeof item.datetime === 'string') {
+                                                            d = new Date(item.datetime);
+                                                        } else {
+                                                            // Assume seconds if < 10000000000, else ms
+                                                            if (item.datetime < 10000000000) d = new Date(item.datetime * 1000);
+                                                            else d = new Date(item.datetime);
+                                                        }
+                                                        
+                                                        if (isNaN(d.getTime())) return 'Recently';
+
+                                                        // Format: "Jan 10, 14:00"
+                                                        return d.toLocaleDateString(undefined, { 
+                                                            month: 'short', 
+                                                            day: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        });
                                                     })()}
                                                 </span>
                                                 <span className="text-muted-foreground text-xs">•</span>

@@ -17,6 +17,16 @@ describe('AuthController', () => {
     last_login: new Date(),
     created_at: new Date(),
     updated_at: new Date(),
+    role: 'user',
+    tier: 'free',
+    credits_balance: 100,
+    credits_reset_at: new Date(),
+    credit_transactions: [],
+    watchlists: [],
+    preferences: {},
+    nickname: 'TestNickname',
+    view_mode: 'PRO',
+    theme: 'dark',
   };
 
   const mockAuthService = {
@@ -154,17 +164,33 @@ describe('AuthController', () => {
       mockAuthService.localDevLogin.mockResolvedValue(mockResult);
 
       const body = { email: 'dev@test.com' };
-      const result = await controller.devLogin(body);
+      const res = {
+        cookie: jest.fn().mockReturnThis(),
+      };
+      const result = await controller.devLogin(body, res as any);
 
       expect(mockAuthService.localDevLogin).toHaveBeenCalledWith(
         'dev@test.com',
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        'authentication',
+        'dev-token',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'lax',
+        }),
       );
       expect(result).toEqual(mockResult);
     });
 
     it('should throw if email missing', async () => {
       const body = { email: '' };
-      await expect(controller.devLogin(body)).rejects.toThrow('Email required');
+      const res = {
+        cookie: jest.fn().mockReturnThis(),
+      };
+      await expect(controller.devLogin(body, res as any)).rejects.toThrow(
+        'Email required',
+      );
     });
   });
 

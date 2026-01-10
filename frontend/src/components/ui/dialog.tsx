@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils"
 
 import { createPortal } from "react-dom"
 
+// Basic Dialog component using a simplified portal approach matching the project's style
 const Dialog = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement> & { open?: boolean; onOpenChange?: (open: boolean) => void }
@@ -13,21 +14,21 @@ const Dialog = React.forwardRef<
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6" {...props}>
             <div
-                className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-all duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in"
+                className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-all duration-100"
                 onClick={() => onOpenChange?.(false)}
             />
             <div
                 ref={ref}
                 style={{ backgroundColor: '#1c1c1c' }}
                 className={cn(
-                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-zinc-900 p-6 text-left shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95 data-[state=open]:fade-in-0",
+                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-zinc-900 p-6 text-left shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95",
                     className
                 )}
             >
                 {children}
                 <button
                     onClick={() => onOpenChange?.(false)}
-                    className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                    className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
                 >
                     <X className="h-4 w-4" />
                     <span className="sr-only">Close</span>
@@ -50,8 +51,22 @@ const DialogHeader = ({
 )
 DialogHeader.displayName = "DialogHeader"
 
+const DialogFooter = ({
+    className,
+    ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+    <div
+        className={cn(
+            "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+            className
+        )}
+        {...props}
+    />
+)
+DialogFooter.displayName = "DialogFooter"
+
 const DialogTitle = React.forwardRef<
-    HTMLParagraphElement,
+    HTMLHeadingElement,
     React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
     <h3
@@ -77,18 +92,9 @@ const DialogDescription = React.forwardRef<
 ))
 DialogDescription.displayName = "DialogDescription"
 
-const DialogFooter = ({
-    className,
-    ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-    <div
-        className={cn(
-            "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-            className
-        )}
-        {...props}
-    />
-)
-DialogFooter.displayName = "DialogFooter"
+// Shim for APIs used by other components
+const DialogContent = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={className} {...props}>{children}</div>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DialogTrigger = ({ children }: any) => <>{children}</>
 
-export { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter }
+export { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger }

@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     Loader2,
     TrendingUp,
@@ -9,14 +9,26 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import {
+    Dialog,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { toast } from "sonner";
 import { api } from '../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { tickerKeys } from '../hooks/useTicker';
 import { Header } from '../components/layout/Header';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { RiskLight } from '../components/ticker/RiskLight';
+import { VerdictBadge } from '../components/ticker/VerdictBadge';
+import { calculateLiveUpside, getBasePriceFromScenarios } from '../lib/rating-utils';
 import { ResearchFeed } from '../components/ticker/ResearchFeed';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
+import { FiftyTwoWeekRange } from '../components/dashboard/FiftyTwoWeekRange';
 import { TickerOverview } from '../components/ticker/TickerOverview';
 import { TickerFinancials } from '../components/ticker/TickerFinancials';
 import { TickerNews } from '../components/ticker/TickerNews';
@@ -43,10 +55,41 @@ export function TickerDetail() {
     const { symbol, tab } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    
+
+    
+
+    
     const [localResearchRunning, setLocalResearchRunning] = useState(false);
+
     const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [placeholderId, setPlaceholderId] = useState<string | null>(null);
     const [placeholderTimestamp, setPlaceholderTimestamp] = useState<string | null>(null);
+
+    // Secret Logo Upload State
+    const [isLogoUploadOpen, setIsLogoUploadOpen] = useState(false);
+    const [logoUploadUrl, setLogoUploadUrl] = useState('');
+
+    const handleLogoDoubleClick = () => {
+        // Simple "secret" check - mostly just UI obscurity.
+        // Real auth happens on backend.
+        setLogoUploadUrl(tickerData?.profile?.image || ''); // Use tickerData.profile.image for current logo
+        setIsLogoUploadOpen(true);
+    };
+
+    const handleLogoUpdate = async () => {
+        if (!symbol || !logoUploadUrl) return;
+        try {
+            await api.patch(`/tickers/${symbol}`, { logo_url: logoUploadUrl });
+            // Invalidate query to refetch ticker details and update logo
+            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
+            setIsLogoUploadOpen(false);
+            toast.success('Logo updated');
+        } catch (err) {
+            console.error('Failed to update logo', err);
+            toast.error('Failed to update logo (Admin only)');
+        }
+    };
     const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
     const [isSyncing, setIsSyncing] = useState(false);
     const queryClient = useQueryClient();
@@ -57,6 +100,26 @@ export function TickerDetail() {
 
     // -- Hooks --
     const { data: tickerData, isLoading: isLoadingDetails } = useTickerDetails(symbol);
+
+    // Extra-aggressive scroll reset: when data finishes loading for a new symbol
+    // This ensures that even if async content expands the page, we force top-of-page.
+    useEffect(() => {
+        if (!isLoadingDetails && tickerData) {
+            // Triple reset to fight browser "memory"
+            window.scrollTo(0, 0);
+            requestAnimationFrame(() => window.scrollTo(0, 0));
+            const timer = setTimeout(() => window.scrollTo(0, 0), 150);
+            return () => clearTimeout(timer);
+        }
+    }, [isLoadingDetails, symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Trigger background sync for 5-year history
+    useEffect(() => {
+        if (symbol) {
+            api.post(`/tickers/${symbol}/sync`).catch(err => console.error('Background sync trigger failed', err));
+        }
+    }, [symbol]);
+
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
@@ -195,7 +258,7 @@ export function TickerDetail() {
             <Header />
 
             {isLoadingDetails ? (
-                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
                     <Loader2 className="animate-spin w-8 h-8 text-primary" />
                     <div className="text-muted-foreground animate-pulse text-sm">Loading Terminal Data...</div>
                 </main>
@@ -210,7 +273,7 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 return (
-                    <main className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
+                    <main key={symbol} className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
 
                         {/* --- 1. HERO HEADER --- */}
                         <div className="relative z-30 space-y-4 pb-4 md:pb-6">
@@ -242,19 +305,57 @@ export function TickerDetail() {
                             {/* --- DESKTOP LAYOUT --- */}
                             <div className="hidden md:block space-y-6">
                                 {/* Row 1: Identity & Actions */}
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between py-2 mb-2">
                                     {/* Left: Identity */}
                                     <div className="flex items-center gap-4">
-                                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-10 w-10 shrink-0">
+                                        <Link 
+                                            to="/dashboard" 
+                                            aria-label="Back to dashboard"
+                                            className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center"
+                                        >
                                             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                                        </Button>
-                                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-14 h-14 shrink-0 rounded-lg" />
+                                        </Link>
+                                        <div
+                                            className="relative w-14 h-14 shrink-0"
+                                            onDoubleClick={handleLogoDoubleClick}
+                                            title="Double-click to update logo (Admin)"
+                                        >
+                                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-full h-full object-contain" />
+                                        </div>
                                         <div>
                                             <div className="flex items-center gap-3">
                                                 <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                                <span className="bg-muted px-2 py-0.5 rounded text-[11px] font-bold text-muted-foreground uppercase tracking-wide border border-border/50">
-                                                    {profile?.exchange}
-                                                </span>
+
+                                                {(() => {
+                                                    if (!risk_analysis) return null;
+                                                    const liveUpside = calculateLiveUpside(
+                                                        market_data.price,
+                                                        getBasePriceFromScenarios(risk_analysis.scenarios),
+                                                        risk_analysis.upside_percent
+                                                    );
+                                                    
+                                                    // Extract Bear Price
+                                                    const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
+                                                    const bearPrice = bearScenario ? Number(bearScenario.price_mid) : undefined;
+                                                    
+                                                    const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
+                                                        ? ((bearPrice - market_data.price) / market_data.price) * 100
+                                                        : -(risk_analysis.financial_risk * 5); // Fallback
+
+                                                    return (
+                                                        <VerdictBadge
+                                                            risk={risk_analysis.financial_risk}
+                                                            upside={liveUpside}
+                                                            downside={liveDownside}
+                                                            consensus={fundamentals?.consensus_rating}
+                                                            overallScore={risk_analysis.overall_score}
+                                                            pe={fundamentals?.pe_ratio}
+                                                            newsSentiment={tickerData.news?.sentiment}
+                                                            newsImpact={tickerData.news?.score}
+                                                        />
+                                                    );
+                                                })()}
+
                                             </div>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
@@ -333,7 +434,7 @@ export function TickerDetail() {
                                         </div>
 
                                         {risk_analysis && (
-                                            <div className="pt-2 border-t border-border/50">
+                                            <div className="pt-2 border-t border-border/50 flex items-center">
                                                 <RiskLight
                                                     score={risk_analysis.overall_score}
                                                     reasoning={risk_analysis.summary}
@@ -348,9 +449,25 @@ export function TickerDetail() {
                                                 />
                                             </div>
                                         )}
+
+                                        {/* 52-Week Range (Desktop) */}
+                                        {fundamentals?.fifty_two_week_high && market_data?.price && (
+                                            <div className="pt-4 mt-2 border-t border-border/50">
+                                                <div className="flex items-center justify-between mb-1.5 opacity-70">
+                                                    <span className="text-[10px] uppercase font-bold tracking-wider">52W Range</span>
+                                                </div>
+                                                <FiftyTwoWeekRange
+                                                    low={fundamentals.fifty_two_week_low || 0}
+                                                    high={fundamentals.fifty_two_week_high || 0}
+                                                    current={market_data.price}
+                                                    showLabels={true}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Chart Area & Summary */}
+                                    {/* Chart Area */}
                                     <div className="flex-1 space-y-4">
                                         <div className="min-h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden group">
                                             {market_data?.history && market_data.history.length > 0 ? (
@@ -361,47 +478,56 @@ export function TickerDetail() {
                                                 </div>
                                             )}
                                         </div>
-
-                                        {profile?.description && (
-                                            <div className="bg-muted/5 border border-border/40 rounded-xl p-4">
-                                                <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-4">
-                                                    {profile.description}
-                                                </p>
-                                                {profile.web_url && (
-                                                    <div className="mt-3 flex items-center gap-2 text-[10px]">
-                                                        <span className="text-muted-foreground/60 uppercase font-bold tracking-widest">Website</span>
-                                                        <a
-                                                            href={profile.web_url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-primary hover:underline font-medium"
-                                                        >
-                                                            {(() => {
-                                                                try { return new URL(profile.web_url).hostname; }
-                                                                catch { return profile.web_url.replace(/^https?:\/\//, '').split('/')[0]; }
-                                                            })()}
-                                                        </a>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* --- MOBILE LAYOUT (Unchanged structure, ensuring compatibility) --- */}
-                            <div className="md:hidden">
+                            {/* --- MOBILE LAYOUT --- */}
+                            <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
-                                <div className="flex items-start gap-3 pr-24">
-                                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1">
+                                <div className="flex items-start gap-3 pr-24 relative">
+                                    <Link 
+                                        to="/dashboard" 
+                                        aria-label="Back to dashboard"
+                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center"
+                                    >
                                         <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                                    </Button>
+                                    </Link>
 
                                     <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                            {(() => {
+                                                if (!risk_analysis) return null;
+                                                const liveUpside = calculateLiveUpside(
+                                                    market_data.price,
+                                                    getBasePriceFromScenarios(risk_analysis.scenarios),
+                                                    risk_analysis.upside_percent
+                                                );
+                                                
+                                                const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
+                                                const bearPrice = bearScenario && bearScenario.price_mid ? Number(bearScenario.price_mid) : undefined;
+                                                
+                                                const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
+                                                    ? ((bearPrice - market_data.price) / market_data.price) * 100
+                                                    : -(risk_analysis.financial_risk * 5);
+
+                                                return (
+                                                    <VerdictBadge
+                                                        risk={risk_analysis.financial_risk}
+                                                        upside={liveUpside}
+                                                        downside={liveDownside}
+                                                        consensus={fundamentals?.consensus_rating}
+                                                        overallScore={risk_analysis.overall_score}
+                                                        pe={fundamentals?.pe_ratio} 
+                                                        newsSentiment={tickerData.news?.sentiment}
+                                                        newsImpact={tickerData.news?.score}
+                                                    />
+                                                );
+                                            })()}
+
                                         </div>
                                         <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
                                             {profile?.name}
@@ -436,7 +562,20 @@ export function TickerDetail() {
                                     )}
                                 </div>
 
-                                {/* Mobile: Chart Area & Summary */}
+                                {/* Mobile: 52-Week Range */}
+                                {fundamentals?.fifty_two_week_high && market_data?.price && (
+                                    <div className="md:hidden px-4 mt-4">
+                                         <FiftyTwoWeekRange
+                                            low={fundamentals.fifty_two_week_low || 0}
+                                            high={fundamentals.fifty_two_week_high || 0}
+                                            current={market_data.price}
+                                            showLabels={true}
+                                        />
+                                    </div>
+                                )}
+
+
+                                {/* Mobile: Chart Area */}
                                 <div className="md:hidden mt-6 space-y-4">
                                     <div className="h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
                                         {market_data?.history && market_data.history.length > 0 ? (
@@ -447,33 +586,7 @@ export function TickerDetail() {
                                             </div>
                                         )}
                                     </div>
-
-                                    {profile?.description && (
-                                        <div className="bg-muted/5 border border-border/40 rounded-xl p-4">
-                                            <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                                                {profile.description}
-                                            </p>
-                                            {profile.web_url && (
-                                                <div className="mt-3 flex items-center gap-2 text-[10px]">
-                                                    <span className="text-muted-foreground/60 uppercase font-bold tracking-widest">Website</span>
-                                                    <a
-                                                        href={profile.web_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-primary hover:underline font-medium"
-                                                    >
-                                                        {(() => {
-                                                            try { return new URL(profile.web_url).hostname; }
-                                                            catch { return profile.web_url.replace(/^https?:\/\//, '').split('/')[0]; }
-                                                        })()}
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
-
-                                {/* Mobile: Description - Removed as it is now in the About tab */}
                             </div>
                         </div>
 
@@ -498,6 +611,9 @@ export function TickerDetail() {
                                     risk_analysis={risk_analysis}
                                     market_data={market_data}
                                     ratings={tickerData.ratings}
+                                    profile={profile}
+                                    news={tickerData.news}
+                                    fundamentals={fundamentals || undefined}
                                 />
                             </TabsContent>
 
@@ -525,22 +641,43 @@ export function TickerDetail() {
 
                         {/* --- 3. DISCUSSION (Global Footer) --- */}
                         <div className="mt-12 border-t border-border pt-8 pb-12">
-                            <div className="max-w-3xl mx-auto">
-                                <TickerDiscussion
-                                    comments={socialComments}
-                                    onPostComment={(content) => {
-                                        if (symbol) {
-                                            postCommentMutation.mutate({ symbol, content });
-                                        }
-                                    }}
-                                    isPosting={postCommentMutation.isPending}
-                                />
-                            </div>
+                            <TickerDiscussion
+                                comments={socialComments}
+                                onPostComment={(content) => {
+                                    if (symbol) {
+                                        postCommentMutation.mutate({ symbol, content });
+                                    }
+                                }}
+                                isPosting={postCommentMutation.isPending}
+                            />
                         </div>
 
                     </main>
                 );
             })()}
+            {/* Secret Admin Logo Upload Dialog */}
+            <Dialog open={isLogoUploadOpen} onOpenChange={setIsLogoUploadOpen}>
+                <div className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Update Logo (Admin)</DialogTitle>
+                        <DialogDescription>
+                            Enter a direct URL to a PNG/JPG image for {symbol}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Input
+                            id="logo-url"
+                            placeholder="https://example.com/logo.png"
+                            value={logoUploadUrl}
+                            onChange={(e) => setLogoUploadUrl(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsLogoUploadOpen(false)}>Cancel</Button>
+                        <Button onClick={handleLogoUpdate}>Save Logo</Button>
+                    </DialogFooter>
+                </div>
+            </Dialog>
         </div>
     );
 }

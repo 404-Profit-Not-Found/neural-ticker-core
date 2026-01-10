@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getErrorMessage } from '../../utils/error.util';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const finnhub = require('finnhub');
@@ -23,7 +24,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -36,7 +37,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.quote(symbol, (error: any, data: any) => {
         if (error) {
           this.handleError(error, symbol);
-          return reject(new Error(error));
+          return reject(new Error(getErrorMessage(error)));
         }
         resolve(data);
       });
@@ -52,7 +53,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -68,7 +69,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, 'general-news');
-            return reject(new Error(error));
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -84,7 +85,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -97,7 +98,7 @@ export class FinnhubService implements OnModuleInit {
       this.finnhubClient.stockSymbols(exchange, {}, (error: any, data: any) => {
         if (error) {
           this.handleError(error, exchange);
-          return reject(new Error(error));
+          return reject(new Error(getErrorMessage(error)));
         }
         resolve(data);
       });
@@ -119,7 +120,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(new Error(getErrorMessage(error)));
           }
           resolve(data);
         },
@@ -127,9 +128,63 @@ export class FinnhubService implements OnModuleInit {
     });
   }
 
+  async searchSymbols(query: string): Promise<any> {
+    return new Promise((resolve) => {
+      this.finnhubClient.symbolSearch(query, {}, (error: any, data: any) => {
+        if (error) {
+          this.handleError(error, 'symbolSearch');
+          return resolve({ result: [] }); // Fail gracefully for search
+        }
+        resolve(data);
+      });
+    });
+  }
+
+  private marketStatusCache: Record<string, { data: any; timestamp: number }> =
+    {};
+  private readonly CACHE_TTL = 60 * 1000; // 1 minute
+
+  async getMarketStatus(exchange: string): Promise<any> {
+    // Standardize exchange (Finnhub free tier primarily supports US)
+    const targetExchange = exchange === 'US' ? 'US' : 'US';
+
+    const cached = this.marketStatusCache[targetExchange];
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.data;
+    }
+
+    return new Promise((resolve) => {
+      this.finnhubClient.marketStatus(
+        { exchange: targetExchange },
+        (error: any, data: any) => {
+          if (error) {
+            this.handleError(error, `marketStatus-${targetExchange}`);
+            // Gracefully return null when access is restricted
+            return resolve(null);
+          }
+          this.marketStatusCache[targetExchange] = {
+            data,
+            timestamp: Date.now(),
+          };
+          resolve(data);
+        },
+      );
+    });
+  }
+
   private handleError(error: any, context?: string) {
-    this.logger.error(
-      `Finnhub API Error [${context}]: ${error.message || error}`,
-    );
+    const msg = getErrorMessage(error);
+    const logMsg = `Finnhub API Error [${context}]: ${msg}`;
+
+    // Downgrade noise for common restricted access errors (where we usually fallback)
+    if (
+      msg.toLowerCase().includes('access') ||
+      msg.toLowerCase().includes('restricted') ||
+      msg.toLowerCase().includes('plan')
+    ) {
+      this.logger.warn(logMsg);
+    } else {
+      this.logger.error(logMsg);
+    }
   }
 }

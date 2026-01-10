@@ -139,6 +139,29 @@ export class TickerEntity {
   @Column({ type: 'jsonb', nullable: true })
   finnhub_raw: Record<string, any>;
 
+  // --- Smart News Integration ---
+  @ApiProperty({ description: 'AI Summary of latest news', required: false })
+  @Column({ type: 'text', nullable: true })
+  news_summary: string;
+
+  @ApiProperty({
+    description: 'Sentiment: BULLISH, BEARISH, or NEUTRAL',
+    required: false,
+  })
+  @Column({ type: 'text', nullable: true })
+  news_sentiment: string;
+
+  @ApiProperty({ description: 'Impact Score (0-10)', required: false })
+  @Column({ type: 'integer', nullable: true })
+  news_impact_score: number;
+
+  @ApiProperty({
+    description: 'Timestamp of the last news analysis',
+    required: false,
+  })
+  @Column({ type: 'timestamptz', nullable: true })
+  last_news_update: Date;
+
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

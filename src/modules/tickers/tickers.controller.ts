@@ -51,10 +51,15 @@ export class TickersController {
       example: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ' }],
     },
   })
-  @Public()
   @Get()
-  getAll(@Query('search') search?: string) {
-    return this.tickersService.searchTickers(search);
+  getAll(
+    @Query('search') search: string,
+    @Query('external') external: string,
+    @Req() req: any,
+  ) {
+    const isPro = req.user?.tier === 'pro' || req.user?.role === 'admin';
+    const shouldSearchExternal = isPro && external === 'true';
+    return this.tickersService.searchTickers(search, shouldSearchExternal);
   }
 
   @ApiOperation({
@@ -105,19 +110,21 @@ export class TickersController {
   }
 
   @ApiOperation({
-    summary: 'Admin: Search tickers (includes hidden)',
-    description: 'Returns a list of tickers including hidden ones. Admin only.',
+    summary: 'Admin: Search tickers',
+    description: 'Search tickers including hidden ones. Admin only.',
   })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    description: 'Filter by symbol or name prefix',
-  })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'missing_logo', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'List of tickers.' })
   @UseGuards(RolesGuard)
   @Roles('admin')
   @Get('admin/search')
-  searchTickersAdmin(@Query('search') search?: string) {
-    return this.tickersService.searchTickersAdmin(search);
+  adminSearch(
+    @Query('search') search?: string,
+    @Query('missing_logo') missingLogo?: string,
+  ) {
+    const isMissingLogo = missingLogo === 'true';
+    return this.tickersService.searchTickersAdmin(search, isMissingLogo);
   }
 
   @ApiOperation({
@@ -137,9 +144,34 @@ export class TickersController {
   })
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
   @Public()
+  @ApiOperation({
+    summary: 'Ensure ticker exists (Body Payload)',
+    description: 'Safe alternative for symbols with special chars (dots).',
+  })
+  @ApiBody({
+    schema: { type: 'object', properties: { symbol: { type: 'string' } } },
+  })
+  @ApiResponse({ status: 201, description: 'Ticker ensured/created.' })
+  @ApiResponse({
+    status: 202,
+    description: 'Ticker addition queued due to rate limiting.',
+  }) // Added
+  @Public()
+  @Post()
+  ensureBody(@Body('symbol') symbol: string) {
+    if (!symbol) return;
+    return this.tickersService.ensureTicker(symbol.trim());
+  }
+
+  @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
+  @ApiResponse({
+    status: 202,
+    description: 'Ticker addition queued due to rate limiting.',
+  }) // Added
+  @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
-    return this.tickersService.ensureTicker(symbol);
+    return this.tickersService.ensureTicker(symbol.trim());
   }
 
   @ApiOperation({
@@ -162,7 +194,24 @@ export class TickersController {
   @Roles('admin')
   @Patch(':symbol/hidden')
   setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
-    return this.tickersService.setTickerHidden(symbol, hidden);
+    return this.tickersService.setTickerHidden(symbol.trim(), hidden);
+  }
+
+  @ApiOperation({
+    summary: 'Admin: Update ticker logo',
+    description: 'Updates the logo URL for a ticker. Admin only.',
+  })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiBody({ schema: { properties: { logo_url: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: 'Ticker updated.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Patch(':symbol')
+  updateTicker(
+    @Param('symbol') symbol: string,
+    @Body('logo_url') logoUrl: string,
+  ) {
+    return this.tickersService.updateLogo(symbol.trim(), logoUrl);
   }
 
   @ApiOperation({
@@ -209,6 +258,6 @@ export class TickersController {
   @Get(':symbol')
   get(@Req() req: any, @Param('symbol') symbol: string) {
     const isAdmin = req.user?.role === 'admin';
-    return this.tickersService.getTicker(symbol, isAdmin);
+    return this.tickersService.getTicker(symbol.trim(), isAdmin);
   }
 }

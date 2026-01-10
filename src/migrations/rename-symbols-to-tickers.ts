@@ -56,6 +56,7 @@ if (connectionUrl) {
 
 const dataSource = new DataSource(dataSourceConfig);
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function migrate() {
   console.log('Initializing DataSource...');
   try {
@@ -72,7 +73,7 @@ async function migrate() {
   await queryRunner.connect();
 
   try {
-    console.log('Checking tables...');
+    // console.log('Checking tables...');
 
     // Check if 'symbols' table exists
     const symbolsExists = await queryRunner.hasTable('symbols');
@@ -105,9 +106,7 @@ async function migrate() {
         }
       }
     } else {
-      console.log(
-        "'symbols' table does not exist. Migration skipped (already done?).",
-      );
+      // symbols table does not exist, skip
     }
   } catch (error) {
     console.error('Migration failed:', error);
@@ -117,7 +116,7 @@ async function migrate() {
   }
 }
 
-migrate().catch((err) => {
-  console.error('Migration failed', err);
-  process.exit(1);
-});
+// migrate().catch((err) => {
+//   console.error('Migration failed', err);
+//   process.exit(1);
+// });

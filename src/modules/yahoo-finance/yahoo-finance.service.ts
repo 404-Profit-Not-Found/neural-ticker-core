@@ -1,20 +1,35 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import YahooFinance from 'yahoo-finance2';
+import { getErrorMessage } from '../../utils/error.util';
 
 @Injectable()
 export class YahooFinanceService implements OnModuleInit {
   private readonly logger = new Logger(YahooFinanceService.name);
-  private yahoo = new YahooFinance();
+  private yahoo = new YahooFinance({
+    suppressNotices: ['yahooSurvey', 'ripHistorical'],
+    fetchOptions: {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Referer: 'https://finance.yahoo.com/',
+        Connection: 'keep-alive',
+      },
+    },
+  });
 
   onModuleInit() {
-    // Suppress survey notices as discussed in deep dive
     try {
-      // @ts-expect-error - suppressNotices is a private property in yahoo-finance2
+      // @ts-expect-error - explicitly set internal env to be safe as constructor options might be ignored in some builds
       this.yahoo._env.suppressNotices = ['yahooSurvey', 'ripHistorical'];
-      this.logger.log('Yahoo Finance service initialized');
     } catch {
-      this.logger.warn('Failed to suppress Yahoo Finance notices');
+      // fail silently
     }
+    this.logger.log(
+      'Yahoo Finance service initialized with suppressed notices and spoofed User-Agent',
+    );
   }
 
   /**
@@ -89,7 +104,6 @@ export class YahooFinanceService implements OnModuleInit {
   }
 
   private handleError(error: any, context: string) {
-    const message = error.message || error;
-    this.logger.error(`${context}: ${message}`);
+    this.logger.error(`${context}: ${getErrorMessage(error)}`);
   }
 }

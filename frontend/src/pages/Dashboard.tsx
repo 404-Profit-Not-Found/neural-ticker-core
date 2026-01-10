@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
   type ComponentType,
 } from 'react';
@@ -23,6 +24,7 @@ import {
 import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
+import { MarketStatus } from '../components/dashboard/MarketStatus';
 import { calculateAiRating, calculateUpside } from '../lib/rating-utils';
 
 function StatPill({
@@ -125,6 +127,8 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     change: Number(item.latestPrice?.change ?? 0),
     pe: Number(item.fundamentals?.pe_ratio ?? 0) || null,
     marketCap: Number(item.fundamentals?.market_cap ?? 0) || null,
+    fiftyTwoWeekHigh: Number(item.fundamentals?.fifty_two_week_high ?? 0) || null,
+    fiftyTwoWeekLow: Number(item.fundamentals?.fifty_two_week_low ?? 0) || null,
     potentialUpside,
     potentialDownside,
     riskScore: risk,
@@ -136,6 +140,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     socialCount: item.counts?.social || 0,
     overallScore: item.aiAnalysis?.overall_score ?? null,
     itemId: item.ticker.id,
+    sparkline: item.sparkline,
   };
 }
 
@@ -172,7 +177,6 @@ export function Dashboard() {
           <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-30">
-            <div className="space-y-4 max-w-3xl">
               <div className="flex items-center gap-3">
                 <Brain className="w-10 h-10 text-primary" />
                 <div>
@@ -180,6 +184,10 @@ export function Dashboard() {
                   <p className="text-sm text-muted-foreground mt-1">Stocks, risks, news, chat ...</p>
                 </div>
               </div>
+
+            
+            <div className="flex flex-col items-end gap-2">
+                 <MarketStatus />
             </div>
           </div>
 
@@ -211,8 +219,24 @@ export function Dashboard() {
   );
 }
 
+const STORAGE_KEY = 'NEURAL_TICKER_DASHBOARD_MODE';
+type Category = 'yolo' | 'conservative' | 'shorts';
+
 function TopOpportunitiesSection() {
-  const [category, setCategory] = useState<'yolo' | 'conservative' | 'shorts'>('yolo');
+  const [category, setCategory] = useState<Category>(() => {
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === 'yolo' || saved === 'conservative' || saved === 'shorts') {
+            return saved;
+        }
+    }
+    return 'yolo';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, category);
+  }, [category]);
+
   const navigate = useNavigate();
 
   const analyzerParams: AnalyzerParams = {

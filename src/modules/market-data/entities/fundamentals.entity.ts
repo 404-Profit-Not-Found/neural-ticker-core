@@ -18,6 +18,16 @@ export class Fundamentals {
   })
   market_cap: number;
 
+  @ApiProperty({ example: 16000000000, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 24,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  shares_outstanding: number;
+
   @ApiProperty({ example: 28.5, required: false })
   @Column({
     type: 'numeric',
@@ -27,6 +37,26 @@ export class Fundamentals {
     transformer: new ColumnNumericTransformer(),
   })
   pe_ttm: number;
+
+  @ApiProperty({ example: 25.5, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 18,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  trailing_pe: number;
+
+  @ApiProperty({ example: 30.2, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 18,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  forward_pe: number;
 
   @ApiProperty({ example: 6.5, required: false })
   @Column({
@@ -279,6 +309,34 @@ export class Fundamentals {
   @ApiProperty({ example: 'Technology', required: false })
   @Column({ type: 'text', nullable: true })
   sector: string;
+
+  // --- Yahoo / Market Context ---
+  @ApiProperty({ example: 180.5, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 18,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  fifty_two_week_high: number;
+
+  @ApiProperty({ example: 120.0, required: false })
+  @Column({
+    type: 'numeric',
+    precision: 18,
+    scale: 4,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  fifty_two_week_low: number;
+
+  @ApiProperty({
+    description: 'Full raw metadata from Yahoo Finance',
+    required: false,
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  yahoo_metadata: Record<string, any>;
 
   @ApiProperty()
   @UpdateDateColumn({ type: 'timestamptz' })

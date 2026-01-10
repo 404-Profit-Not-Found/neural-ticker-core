@@ -18,8 +18,33 @@ import { PortfolioPage } from './pages/PortfolioPage';
 
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { useEffect } from 'react';
-import { api, httpClient } from './lib/api';
+import { useEffect, useLayoutEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    // Disable native scroll restoration to prevent browser jumping
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    
+    // Immediate reset
+    window.scrollTo(0, 0);
+    
+    // Secondary reset after a frame to catch any browser-initiated jumps
+    // (e.g. from autofocus or scroll restoration attempts)
+    const handle = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+    });
+    
+    return () => cancelAnimationFrame(handle);
+  }, [pathname]);
+
+  return null;
+}
+
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,6 +64,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
         <ThemeController />
         <ToastProvider>
@@ -159,18 +185,8 @@ function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const token = searchParams.get('token');
-
-      if (token) {
-        console.log('OAuth Header Fallback Active');
-        // Set header for current session as fallback if cookie fails
-        httpClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      }
-
       await refreshSession();
-      navigate('/');
+      navigate('/', { replace: true });
     };
 
     handleCallback();

@@ -12,7 +12,26 @@ interface PriceChartProps {
 }
 
 export function PriceChart({ data, className }: PriceChartProps) {
-    const [chartType, setChartType] = useState<ChartType>('mountain');
+    const [chartType, setChartType] = useState<ChartType>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('ticker_chart_type') as ChartType) || 'mountain';
+        }
+        return 'mountain';
+    });
+    const [activeRange, setActiveRange] = useState<'1Y' | '2Y' | '5Y'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('ticker_chart_range') as '1Y' | '2Y' | '5Y') || '1Y';
+        }
+        return '1Y';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('ticker_chart_type', chartType);
+    }, [chartType]);
+
+    useEffect(() => {
+        localStorage.setItem('ticker_chart_range', activeRange);
+    }, [activeRange]);
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<"Candlestick" | "Line" | "Area"> | null>(null);
@@ -104,8 +123,24 @@ export function PriceChart({ data, className }: PriceChartProps) {
         if (seriesRef.current && data.length > 0) {
             let formattedData: (CandlestickData | LineData | AreaData)[] = [];
 
+            // Filter by Time Range
+            const now = new Date();
+            let cutoffDate = new Date(0); // Default all time (5Y)
+
+            if (activeRange === '1Y') {
+                cutoffDate = new Date();
+                cutoffDate.setFullYear(now.getFullYear() - 1);
+            } else if (activeRange === '2Y') {
+                cutoffDate = new Date();
+                cutoffDate.setFullYear(now.getFullYear() - 2);
+            }
+            // 5Y is effectively "all" since backend limits to 5Y
+
+            const rangeFilteredData = data.filter(d => new Date(d.ts) >= cutoffDate);
+
+
             // Filter and transform data
-            const validPoints = data
+            const validPoints = rangeFilteredData
                 .filter(d => d && d.ts && d.close !== undefined && d.close !== null)
                 .map(d => ({
                     ...d,
@@ -141,7 +176,7 @@ export function PriceChart({ data, className }: PriceChartProps) {
                 }
             }
         }
-    }, [data, chartType]);
+    }, [data, chartType, activeRange]);
 
     const chartTypes: { id: ChartType; label: string; icon: React.ElementType }[] = [
         { id: 'mountain', label: 'Mountain', icon: MountainChart },
@@ -151,21 +186,40 @@ export function PriceChart({ data, className }: PriceChartProps) {
 
     return (
         <div className={`relative w-full h-full min-h-[180px] ${className}`}>
-            {/* Chart Type Selector - Top Left (to avoid price overlap on right) */}
-            <div className="absolute top-2 left-2 z-10 flex bg-muted/20 backdrop-blur-md rounded-md border border-border/40 p-0.5 shadow-sm">
-                {chartTypes.map((type) => (
-                    <button
-                        key={type.id}
-                        onClick={() => setChartType(type.id)}
-                        className={`p-1.5 rounded transition-all duration-200 ${chartType === type.id
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                            }`}
-                        title={type.label}
-                    >
-                        <type.icon size={14} />
-                    </button>
-                ))}
+            {/* Toolbar Container */}
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+                {/* Chart Type Selector */}
+                <div className="flex bg-muted/20 backdrop-blur-md rounded-md border border-border/40 p-0.5 shadow-sm">
+                    {chartTypes.map((type) => (
+                        <button
+                            key={type.id}
+                            onClick={() => setChartType(type.id)}
+                            className={`p-1.5 rounded transition-all duration-200 ${chartType === type.id
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                }`}
+                            title={type.label}
+                        >
+                            <type.icon size={14} />
+                        </button>
+                    ))}
+                </div>
+
+                {/* Time Range Selector */}
+                <div className="flex bg-muted/20 backdrop-blur-md rounded-md border border-border/40 p-0.5 shadow-sm">
+                    {(['1Y', '2Y', '5Y'] as const).map((range) => (
+                        <button
+                            key={range}
+                            onClick={() => setActiveRange(range)}
+                            className={`px-2 py-1 text-[10px] font-medium rounded transition-all duration-200 ${activeRange === range
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                }`}
+                        >
+                            {range}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div

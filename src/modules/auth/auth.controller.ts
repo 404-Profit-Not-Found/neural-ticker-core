@@ -83,10 +83,8 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
-    // Redirect to frontend with the token
-    return res.redirect(
-      `${frontendUrl}/oauth-callback?token=${result.access_token}`,
-    );
+    // Redirect to frontend (cookie handles auth)
+    return res.redirect(`${frontendUrl}/oauth-callback`);
   }
 
   @ApiOperation({ summary: 'Get current user profile' })
@@ -117,9 +115,23 @@ export class AuthController {
   @ApiBody({ schema: { example: { email: 'dev@test.com' } } })
   @ApiResponse({ status: 200, description: 'App JWT token and user info' })
   @Post('dev/token')
-  async devLogin(@Body() body: { email: string }) {
+  async devLogin(
+    @Body() body: { email: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (!body.email) throw new UnauthorizedException('Email required');
-    return this.authService.localDevLogin(body.email);
+    const result = await this.authService.localDevLogin(body.email);
+
+    // Set HttpOnly cookie for session persistence (matching googleAuthRedirect)
+    res.cookie('authentication', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
+    return result;
   }
   @ApiOperation({
     summary: 'Logout',
