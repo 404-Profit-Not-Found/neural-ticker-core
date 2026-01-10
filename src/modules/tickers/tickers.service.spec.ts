@@ -8,20 +8,30 @@ import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
+import { JobsService } from '../jobs/jobs.service';
 
 describe('TickersService', () => {
   let service: TickersService;
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    setParameter: jest.fn().mockReturnThis(),
+    setParameters: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
     offset: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([]),
+    getOne: jest.fn().mockResolvedValue(null),
     getRawMany: jest.fn().mockResolvedValue([]),
+    getRawOne: jest.fn().mockResolvedValue(null),
   };
 
   const mockTickerRepo = {
@@ -49,6 +59,10 @@ describe('TickersService', () => {
     get: jest.fn().mockReturnValue(of({ data: Buffer.from('') })),
   };
 
+  const mockJobsService = {
+    queueRequest: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,6 +86,10 @@ describe('TickersService', () => {
         {
           provide: HttpService,
           useValue: mockHttpService,
+        },
+        {
+          provide: JobsService,
+          useValue: mockJobsService,
         },
       ],
     }).compile();
@@ -276,7 +294,7 @@ describe('TickersService', () => {
       mockTickerRepo.find.mockResolvedValue(tickers);
 
       const result = await service.searchTickers();
-      expect(result).toEqual(tickers);
+      expect(result).toEqual([{ symbol: 'AAPL', is_locally_tracked: true }]);
     });
 
     it('should return all tickers for empty search', async () => {
@@ -284,7 +302,7 @@ describe('TickersService', () => {
       mockTickerRepo.find.mockResolvedValue(tickers);
 
       const result = await service.searchTickers('   ');
-      expect(result).toEqual(tickers);
+      expect(result).toEqual([{ symbol: 'AAPL', is_locally_tracked: true }]);
     });
 
     it('should search with query pattern', async () => {

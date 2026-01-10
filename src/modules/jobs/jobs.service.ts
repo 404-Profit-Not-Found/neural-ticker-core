@@ -5,9 +5,13 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { ResearchService } from '../research/research.service';
-import { RequestQueue, RequestStatus, RequestType } from './entities/request-queue.entity'; // Added
+import {
+  RequestQueue,
+  RequestStatus,
+  RequestType,
+} from './entities/request-queue.entity'; // Added
 import { InjectRepository } from '@nestjs/typeorm'; // Added
-import { Repository, LessThanOrEqual, IsNull } from 'typeorm'; // Added
+import { Repository, LessThanOrEqual } from 'typeorm'; // Added
 
 @Injectable()
 export class JobsService {
@@ -215,7 +219,7 @@ export class JobsService {
   @Cron(CronExpression.EVERY_MINUTE)
   async processPendingRequests() {
     this.logger.debug('Checking for pending async requests...');
-    
+
     // Fetch pending jobs that are ready to run
     const pending = await this.requestQueueRepo.find({
       where: {
@@ -243,32 +247,35 @@ export class JobsService {
 
         // deeply update status
         await this.requestQueueRepo.update(req.id, {
-           status: RequestStatus.COMPLETED,
-           updated_at: new Date()
+          status: RequestStatus.COMPLETED,
+          updated_at: new Date(),
         });
-        this.logger.log(`Request ${req.id} (${req.type}) completed successfully.`);
-
+        this.logger.log(
+          `Request ${req.id} (${req.type}) completed successfully.`,
+        );
       } catch (err: any) {
         this.logger.warn(`Request ${req.id} failed: ${err.message}`);
-        
+
         const attempts = req.attempts + 1;
-        
+
         let newStatus = RequestStatus.PENDING;
         // Max 10 attempts
         if (attempts >= 10) {
-            newStatus = RequestStatus.FAILED;
-            this.logger.error(`Request ${req.id} failed permanently after ${attempts} attempts.`);
+          newStatus = RequestStatus.FAILED;
+          this.logger.error(
+            `Request ${req.id} failed permanently after ${attempts} attempts.`,
+          );
         }
 
         // Exponential backoff: 30s, 1m, 2m, 4m...
-        const backoffSeconds = 30 * Math.pow(2, attempts - 1); 
+        const backoffSeconds = 30 * Math.pow(2, attempts - 1);
         const nextAttempt = new Date(Date.now() + backoffSeconds * 1000);
 
         await this.requestQueueRepo.update(req.id, {
-            status: newStatus,
-            attempts: attempts,
-            next_attempt: nextAttempt,
-            updated_at: new Date()
+          status: newStatus,
+          attempts: attempts,
+          next_attempt: nextAttempt,
+          updated_at: new Date(),
         });
       }
     }

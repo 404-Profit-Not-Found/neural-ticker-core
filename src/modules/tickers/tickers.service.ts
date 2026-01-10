@@ -1,4 +1,12 @@
-import { Injectable, Logger, NotFoundException, HttpException, Inject, forwardRef, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  HttpException,
+  Inject,
+  forwardRef,
+  HttpStatus,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
@@ -95,39 +103,48 @@ export class TickersService {
           `Finnhub fetch error for ${upperSymbol}: ${error.message}`,
         );
         // Final fallback try
-        profile = await this.fetchFromYahoo(upperSymbol).catch(async e => {
-             const msg = (e.message || '').toLowerCase();
-             const statusText = (e.statusText || '').toLowerCase();
-             const fullErrorString = JSON.stringify(e).toLowerCase();
-             
-             this.logger.warn(`Yahoo Error for ${upperSymbol}: ${e.message}`);
+        profile = await this.fetchFromYahoo(upperSymbol).catch(async (e) => {
+          const msg = (e.message || '').toLowerCase();
+          const statusText = (e.statusText || '').toLowerCase();
+          const fullErrorString = JSON.stringify(e).toLowerCase();
 
-             const isRateLimit = 
-                (e instanceof HttpException && e.getStatus() === 429) || 
-                e.status === 429 || 
-                msg.includes('rate limit') || 
-                msg.includes('too many requests') || 
-                msg.includes('429') ||
-                msg.includes('status 429') ||
-                msg.includes('crumb') ||  // Catch "Failed to get crumb" even without 429
-                msg.includes('cookie') ||
-                statusText.includes('too many requests') ||
-                fullErrorString.includes('too many requests') ||
-                fullErrorString.includes('429');
-             
-             if (isRateLimit) {
-                  this.logger.warn(`Rate limit hit for ${upperSymbol}, queueing for background retry.`);
-                  await this.jobsService.queueRequest(RequestType.ADD_TICKER, { symbol: upperSymbol });
-                  throw new HttpException({ message: 'Ticker addition queued', status: 'QUEUED' }, HttpStatus.ACCEPTED);
-             }
-             
-             if (e instanceof HttpException) {
-                 throw e;
-             }
+          this.logger.warn(`Yahoo Error for ${upperSymbol}: ${e.message}`);
 
-             // Log unknown errors but return null (swallow) so we can proceed to 'tick not found' logic or just fail safely
-             this.logger.error(`Unexpected Yahoo fallback error for ${upperSymbol}: ${e.message}`);
-             return null;
+          const isRateLimit =
+            (e instanceof HttpException && e.getStatus() === 429) ||
+            e.status === 429 ||
+            msg.includes('rate limit') ||
+            msg.includes('too many requests') ||
+            msg.includes('429') ||
+            msg.includes('status 429') ||
+            msg.includes('crumb') || // Catch "Failed to get crumb" even without 429
+            msg.includes('cookie') ||
+            statusText.includes('too many requests') ||
+            fullErrorString.includes('too many requests') ||
+            fullErrorString.includes('429');
+
+          if (isRateLimit) {
+            this.logger.warn(
+              `Rate limit hit for ${upperSymbol}, queueing for background retry.`,
+            );
+            await this.jobsService.queueRequest(RequestType.ADD_TICKER, {
+              symbol: upperSymbol,
+            });
+            throw new HttpException(
+              { message: 'Ticker addition queued', status: 'QUEUED' },
+              HttpStatus.ACCEPTED,
+            );
+          }
+
+          if (e instanceof HttpException) {
+            throw e;
+          }
+
+          // Log unknown errors but return null (swallow) so we can proceed to 'tick not found' logic or just fail safely
+          this.logger.error(
+            `Unexpected Yahoo fallback error for ${upperSymbol}: ${e.message}`,
+          );
+          return null;
         });
         source = 'yahoo';
       }
@@ -240,14 +257,16 @@ export class TickersService {
     });
   }
 
-  async searchTickers(search?: string): Promise<Partial<TickerEntity & { is_locally_tracked: boolean }>[]> {
+  async searchTickers(
+    search?: string,
+  ): Promise<Partial<TickerEntity & { is_locally_tracked: boolean }>[]> {
     if (!search || search.trim() === '') {
       const all = await this.getAllTickers();
-      return all.map(t => ({ ...t, is_locally_tracked: true }));
+      return all.map((t) => ({ ...t, is_locally_tracked: true }));
     }
 
     const searchPattern = `${search.toUpperCase()}%`;
-    
+
     // 1. Local DB Search
     const dbResults = await this.tickerRepo
       .createQueryBuilder('ticker')
@@ -262,23 +281,33 @@ export class TickersService {
         '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
         { pattern: searchPattern },
       )
-      .orderBy('CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END', 'ASC')
+      .orderBy(
+        'CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END',
+        'ASC',
+      )
       .addOrderBy('ticker.symbol', 'ASC')
       .setParameter('exact', search.toUpperCase())
       .limit(20)
       .getMany();
 
-    const mappedDbResults = dbResults.map(t => ({...t, is_locally_tracked: true}));
+    const mappedDbResults = dbResults.map((t) => ({
+      ...t,
+      is_locally_tracked: true,
+    }));
 
     // 2. External Search (Fallback/Supplement)
     if (search.length >= 2) {
       try {
         const extData = await this.finnhubService.searchSymbols(search);
         if (extData && extData.result && Array.isArray(extData.result)) {
-          const existingSymbols = new Set(mappedDbResults.map((t) => t.symbol.toUpperCase()));
-          
+          const existingSymbols = new Set(
+            mappedDbResults.map((t) => t.symbol.toUpperCase()),
+          );
+
           const extResults = extData.result
-            .filter((item: any) => !existingSymbols.has(item.symbol.toUpperCase()))
+            .filter(
+              (item: any) => !existingSymbols.has(item.symbol.toUpperCase()),
+            )
             .slice(0, 10)
             .map((item: any) => ({
               symbol: item.symbol,
@@ -287,7 +316,7 @@ export class TickersService {
               logo_url: null,
               is_locally_tracked: false,
             }));
-            
+
           return [...mappedDbResults, ...extResults];
         }
       } catch (err) {
@@ -427,30 +456,44 @@ export class TickersService {
     try {
       this.logger.log(`Fetching ${symbol} from Yahoo Finance...`);
       // Use catch() on individual calls to avoid total failure if one module is missing (common for international/OTC)
-      const summary = await this.yahooFinanceService.getSummary(symbol).catch((err) => {
-        if (err.message && (
-            err.message.toLowerCase().includes('429') || 
-            err.message.toLowerCase().includes('too many requests') || 
-            err.message.toLowerCase().includes('crumb') ||
-            err.message.toLowerCase().includes('cookie')
-        )) {
-           throw new HttpException('Yahoo Finance Rate Limit Exceeded (Summary).', 429);
-        }
-        this.logger.warn(`Yahoo Summary failed for ${symbol}: ${err.message}`);
-        return null;
-      });
-      const quote = await this.yahooFinanceService.getQuote(symbol).catch((err) => {
-        if (err.message && (
-            err.message.toLowerCase().includes('429') || 
-            err.message.toLowerCase().includes('too many requests') ||
-            err.message.toLowerCase().includes('crumb') ||
-            err.message.toLowerCase().includes('cookie')
-        )) {
-           throw new HttpException('Yahoo Finance Rate Limit Exceeded (Quote).', 429);
-        }
-        this.logger.warn(`Yahoo Quote failed for ${symbol}: ${err.message}`);
-        return null; // Return null to continue if just quote fails
-      });
+      const summary = await this.yahooFinanceService
+        .getSummary(symbol)
+        .catch((err) => {
+          if (
+            err.message &&
+            (err.message.toLowerCase().includes('429') ||
+              err.message.toLowerCase().includes('too many requests') ||
+              err.message.toLowerCase().includes('crumb') ||
+              err.message.toLowerCase().includes('cookie'))
+          ) {
+            throw new HttpException(
+              'Yahoo Finance Rate Limit Exceeded (Summary).',
+              429,
+            );
+          }
+          this.logger.warn(
+            `Yahoo Summary failed for ${symbol}: ${err.message}`,
+          );
+          return null;
+        });
+      const quote = await this.yahooFinanceService
+        .getQuote(symbol)
+        .catch((err) => {
+          if (
+            err.message &&
+            (err.message.toLowerCase().includes('429') ||
+              err.message.toLowerCase().includes('too many requests') ||
+              err.message.toLowerCase().includes('crumb') ||
+              err.message.toLowerCase().includes('cookie'))
+          ) {
+            throw new HttpException(
+              'Yahoo Finance Rate Limit Exceeded (Quote).',
+              429,
+            );
+          }
+          this.logger.warn(`Yahoo Quote failed for ${symbol}: ${err.message}`);
+          return null; // Return null to continue if just quote fails
+        });
 
       if (!summary && !quote) {
         this.logger.warn(`Both Yahoo summary and quote failed for ${symbol}`);
@@ -470,18 +513,23 @@ export class TickersService {
         country: summary?.summaryProfile?.country || 'Unknown',
         ipo: null,
         marketCapitalization:
-          quote?.marketCap || summary?.defaultKeyStatistics?.marketCap || summary?.defaultKeyStatistics?.enterpriseValue,
+          quote?.marketCap ||
+          summary?.defaultKeyStatistics?.marketCap ||
+          summary?.defaultKeyStatistics?.enterpriseValue,
         shareOutstanding: summary?.defaultKeyStatistics?.sharesOutstanding,
         phone: summary?.summaryProfile?.phone,
         weburl: summary?.summaryProfile?.website,
         logo: null,
-        finnhubIndustry: summary?.summaryProfile?.industry || summary?.summaryProfile?.sector,
+        finnhubIndustry:
+          summary?.summaryProfile?.industry || summary?.summaryProfile?.sector,
         sector: summary?.summaryProfile?.sector,
         description: summary?.summaryProfile?.longBusinessSummary,
       };
     } catch (e) {
       if (e instanceof HttpException) throw e; // Propagate rate limits
-      this.logger.error(`Unexpected Yahoo fallback error for ${symbol}: ${e.message}`);
+      this.logger.error(
+        `Unexpected Yahoo fallback error for ${symbol}: ${e.message}`,
+      );
       return null;
     }
   }

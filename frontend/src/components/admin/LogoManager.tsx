@@ -57,6 +57,7 @@ export function LogoManager() {
         if (showMissingLogos) {
             handleSearch();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMissingLogos]);
 
     const handleUpdateLogo = async (symbol: string) => {

@@ -69,6 +69,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
     );
 
     // We map our internal rating variant to the Badge's expected variant types
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const badgeVariant = (variant === 'default' ? 'outline' : variant) as any;
 
     const BadgeContent = (

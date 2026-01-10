@@ -56,6 +56,7 @@ if (connectionUrl) {
 
 const dataSource = new DataSource(dataSourceConfig);
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function migrate() {
   console.log('Initializing DataSource...');
   try {

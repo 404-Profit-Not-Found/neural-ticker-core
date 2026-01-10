@@ -17,6 +17,7 @@ describe('Rating Logic Verification', () => {
 
   it('should fall back to backend upside if Scenarios are missing', () => {
     const currentPrice = 100;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scenarios: any[] = [];
     const backendUpside = 300.4; // From screenshot
 

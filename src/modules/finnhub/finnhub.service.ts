@@ -128,7 +128,7 @@ export class FinnhubService implements OnModuleInit {
   }
 
   async searchSymbols(query: string): Promise<any> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       this.finnhubClient.symbolSearch(query, {}, (error: any, data: any) => {
         if (error) {
           this.handleError(error, 'symbolSearch');

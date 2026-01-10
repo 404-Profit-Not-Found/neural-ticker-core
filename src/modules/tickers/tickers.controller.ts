@@ -143,9 +143,14 @@ export class TickersController {
     summary: 'Ensure ticker exists (Body Payload)',
     description: 'Safe alternative for symbols with special chars (dots).',
   })
-  @ApiBody({ schema: { type: 'object', properties: { symbol: { type: 'string' } } } })
+  @ApiBody({
+    schema: { type: 'object', properties: { symbol: { type: 'string' } } },
+  })
   @ApiResponse({ status: 201, description: 'Ticker ensured/created.' })
-  @ApiResponse({ status: 202, description: 'Ticker addition queued due to rate limiting.' }) // Added
+  @ApiResponse({
+    status: 202,
+    description: 'Ticker addition queued due to rate limiting.',
+  }) // Added
   @Public()
   @Post()
   ensureBody(@Body('symbol') symbol: string) {
@@ -154,7 +159,10 @@ export class TickersController {
   }
 
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
-  @ApiResponse({ status: 202, description: 'Ticker addition queued due to rate limiting.' }) // Added
+  @ApiResponse({
+    status: 202,
+    description: 'Ticker addition queued due to rate limiting.',
+  }) // Added
   @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {

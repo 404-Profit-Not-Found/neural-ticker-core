@@ -1,0 +1,12 @@
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\src\migrations\rename-symbols-to-tickers.ts
+  59:16  error  'migrate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\src\modules\finnhub\finnhub.service.ts
+  131:34  error  'reject' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\src\modules\jobs\jobs.service.ts
+  14:39  error  'IsNull' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 3 problems (3 errors, 0 warnings)
+

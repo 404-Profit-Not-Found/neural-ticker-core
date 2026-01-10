@@ -14,7 +14,6 @@ import { CompanyNews } from './entities/company-news.entity';
 import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
-import { RISK_ALGO } from '../../config/risk-algorithm.config';
 import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
 import { calculateAiRating, VerdictInput } from '../../lib/verdict.util';
 
@@ -890,8 +889,11 @@ export class MarketDataService {
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
     const tickers = await this.getTickersWithRiskData();
-    const strongBuys = tickers.filter(t => t.verdict.variant === 'strongBuy');
-    return { count: strongBuys.length, symbols: strongBuys.map(t => t.symbol) };
+    const strongBuys = tickers.filter((t) => t.verdict.variant === 'strongBuy');
+    return {
+      count: strongBuys.length,
+      symbols: strongBuys.map((t) => t.symbol),
+    };
   }
 
   /**
@@ -900,8 +902,8 @@ export class MarketDataService {
    */
   async getSellCount(): Promise<{ count: number; symbols: string[] }> {
     const tickers = await this.getTickersWithRiskData();
-    const sells = tickers.filter(t => t.verdict.variant === 'sell');
-    return { count: sells.length, symbols: sells.map(t => t.symbol) };
+    const sells = tickers.filter((t) => t.verdict.variant === 'sell');
+    return { count: sells.length, symbols: sells.map((t) => t.symbol) };
   }
 
   /**
@@ -912,24 +914,36 @@ export class MarketDataService {
     const qb = this.tickerRepo.createQueryBuilder('ticker');
 
     // Join Latest Risk
-    qb.leftJoin(RiskAnalysis, 'risk', 
-      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)');
-    
+    qb.leftJoin(
+      RiskAnalysis,
+      'risk',
+      'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
+    );
+
     // Join Fundamentals
     qb.leftJoin(Fundamentals, 'fund', 'fund.symbol_id = ticker.id');
-    
+
     // Join Latest Price
-    qb.leftJoin(PriceOhlcv, 'price',
-      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)');
-    
+    qb.leftJoin(
+      PriceOhlcv,
+      'price',
+      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
+    );
+
     // Join Base and Bear Scenarios
-    qb.leftJoin(RiskScenario, 'base_scenario',
-      "base_scenario.analysis_id = risk.id AND base_scenario.scenario_type = 'base'");
-    qb.leftJoin(RiskScenario, 'bear_scenario',
-      "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'");
-    
+    qb.leftJoin(
+      RiskScenario,
+      'base_scenario',
+      "base_scenario.analysis_id = risk.id AND base_scenario.scenario_type = 'base'",
+    );
+    qb.leftJoin(
+      RiskScenario,
+      'bear_scenario',
+      "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'",
+    );
+
     qb.where('ticker.is_hidden = :hidden', { hidden: false });
-    
+
     // Select fields with dynamic calculations
     qb.select([
       'ticker.symbol',
@@ -944,7 +958,7 @@ export class MarketDataService {
 
     const rawResults = await qb.getRawMany();
 
-    return rawResults.map(row => {
+    return rawResults.map((row) => {
       const currentPrice = parseFloat(row.price_close) || 0;
       const baseTarget = parseFloat(row.base_scenario_price_mid) || null;
       const bearTarget = parseFloat(row.bear_scenario_price_mid) || null;
@@ -1229,9 +1243,13 @@ export class MarketDataService {
             if (rating === 'Strong Buy') {
               sub.orWhere(`${verdictScoreSql} >= 80`);
             } else if (rating === 'Buy') {
-              sub.orWhere(`${verdictScoreSql} >= 65 AND ${verdictScoreSql} < 80`);
+              sub.orWhere(
+                `${verdictScoreSql} >= 65 AND ${verdictScoreSql} < 80`,
+              );
             } else if (rating === 'Hold') {
-              sub.orWhere(`${verdictScoreSql} >= 45 AND ${verdictScoreSql} < 65`);
+              sub.orWhere(
+                `${verdictScoreSql} >= 45 AND ${verdictScoreSql} < 65`,
+              );
             } else if (rating === 'Sell') {
               sub.orWhere(`${verdictScoreSql} < 45`);
             } else if (rating === 'Speculative Buy') {
@@ -1240,7 +1258,9 @@ export class MarketDataService {
               // But 'rating' string is just 'Sell' or 'Hold' usually in that case unless we explicitly label it.
               // For backend filter, let's keep it simple or align strictly if 'Speculative Buy' is a requested filter.
               // Assuming standard tiers for now.
-              sub.orWhere(`risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR COALESCE(${upsideCalc}, 0) >= 100)`);
+              sub.orWhere(
+                `risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR COALESCE(${upsideCalc}, 0) >= 100)`,
+              );
             }
           });
         }),

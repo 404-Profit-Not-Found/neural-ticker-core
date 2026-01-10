@@ -145,7 +145,7 @@ export function AdminConsole() {
         try {
             await AdminService.updateTier(userId, tier);
             // Optimistic update
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             setIdentities(prev => prev.map(u => u.id === userId ? { ...u, tier } : u));
             toast.success(`Updated tier to ${tier}`);
         } catch (err: unknown) {
@@ -205,9 +205,9 @@ export function AdminConsole() {
         }
 
         return [...filtered].sort((a, b) => {
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              
             const aVal = a[sortConfig.key];
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              
             const bVal = b[sortConfig.key];
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;

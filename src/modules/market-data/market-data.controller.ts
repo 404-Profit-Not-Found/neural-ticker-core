@@ -109,6 +109,9 @@ export class MarketDataController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.getCompanyNews(symbol, from, to);
+    return this.service.getCompanyNews(symbol, from, to).catch(() => {
+      // Return empty array if news fetch fails (ticker may not have news coverage)
+      return [];
+    });
   }
 }

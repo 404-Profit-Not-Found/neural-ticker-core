@@ -84,9 +84,7 @@ export class AuthController {
     });
 
     // Redirect to frontend (cookie handles auth)
-    return res.redirect(
-      `${frontendUrl}/oauth-callback`,
-    );
+    return res.redirect(`${frontendUrl}/oauth-callback`);
   }
 
   @ApiOperation({ summary: 'Get current user profile' })

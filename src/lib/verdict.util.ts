@@ -3,7 +3,14 @@
  * This ensures Dashboard stats match the VerdictBadge displayed to users.
  */
 
-export type RatingVariant = 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'speculativeBuy' | 'outline';
+export type RatingVariant =
+  | 'default'
+  | 'strongBuy'
+  | 'buy'
+  | 'hold'
+  | 'sell'
+  | 'speculativeBuy'
+  | 'outline';
 
 export interface RatingResult {
   rating: string;
@@ -22,13 +29,13 @@ export interface VerdictInput {
 
 /**
  * The Architect-Level Weighted Verdict Algorithm.
- * 
+ *
  * Calculates a Composite Score (0-100) based on multiple weighted factors:
  * 1. Risk Penalty: High risk penalizes score heavily.
  * 2. Asymmetric Risk/Reward: Downside is weighted more strictly than upside (Loss Aversion).
  * 3. Analyst Consensus: Aligns with or fades the neural verdict based on Wall St.
  * 4. P/E Ratio: Rewards value (low positive PE), penalizes overvaluation or losses.
- * 
+ *
  * Score Tiers:
  * >= 80: Strong Buy
  * >= 65: Buy

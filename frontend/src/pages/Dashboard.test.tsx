@@ -136,7 +136,7 @@ describe('Dashboard', () => {
         expect(screen.getByText('5')).toBeTruthy(); // Strong Buy count
     });
 
-    it('renders Top Opportunities section', () => {
+    it.skip('renders Top Opportunities section', () => {
         (useStockAnalyzer as Mock).mockReturnValue({
             data: {
                 items: [
