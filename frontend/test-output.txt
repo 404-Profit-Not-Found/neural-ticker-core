@@ -1,0 +1,39 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/brani/Documents/GitHub/neural-ticker-core/frontend[39m
+
+ [31mΓ¥»[39m src/lib/rating-utils.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 15[2mms[22m[39m
+[31m   [31m├ù[31m Rating Utilities[2m > [22mcalculateAiRating - Legacy Mode[2m > [22mshould return Sell for negative upside with significant downside[90m 9[2mms[22m[31m[39m
+[31m     ΓåÆ expected { rating: 'Hold', ΓÇª(2) } to match object { rating: 'Sell', variant: 'sell' }
+(1 matching property omitted from actual)[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/lib/rating-utils.test.ts > Rating Utilities > calculateAiRating - Legacy Mode > should return Sell for negative upside with significant downside
+AssertionError: expected { rating: 'Hold', ΓÇª(2) } to match object { rating: 'Sell', variant: 'sell' }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  Object {
+-   "rating": "Sell",
+-   "variant": "sell",
++   "rating": "Hold",
++   "variant": "hold",
+  }
+
+ Γ¥» src/lib/rating-utils.test.ts:86:41
+     84|       // -20% upside calculates as -28 penalty from downside path (triΓÇª
+     85|       // Base 50 - 16 (20% downside * 0.8) + 5 (low risk) - 10 (no P/EΓÇª
+     86|       expect(calculateAiRating(3, -20)).toMatchObject({ rating: 'Sell'ΓÇª
+       |                                         ^
+     87|     });
+     88| 
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m15 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 07:59:59
+[2m   Duration [22m 1.34s[2m (transform 46ms, setup 108ms, collect 45ms, tests 15ms, environment 597ms, prepare 81ms)[22m
+

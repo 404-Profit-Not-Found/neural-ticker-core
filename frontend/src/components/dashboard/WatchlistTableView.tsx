@@ -283,14 +283,16 @@ export function WatchlistTableView({
                     const downside = row.potentialDownside ?? 0;
                     
                     return (
-                        <VerdictBadge 
-                            risk={risk}
-                            upside={upside}
-                            downside={downside}
-                            consensus={row.rating}
-                            overallScore={row.overallScore}
-                            pe={row.pe}
-                        />
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <VerdictBadge 
+                                risk={risk}
+                                upside={upside}
+                                downside={downside}
+                                consensus={row.rating}
+                                overallScore={row.overallScore}
+                                pe={row.pe}
+                            />
+                        </div>
                     );
                 },
             }),

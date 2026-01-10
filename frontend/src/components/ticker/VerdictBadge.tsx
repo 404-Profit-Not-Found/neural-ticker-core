@@ -131,7 +131,9 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
             </div>
 
             <p className="text-[10px] text-muted-foreground pt-1 border-t border-border opacity-70">
-                Algorithm penalizes downside 2x more than upside (Loss Aversion).
+                Probability-weighted Bull/Base/Bear scenarios. Downside penalized 2x (Loss Aversion).
+                <br />
+                Low P/E (≤10) rewarded. Pre-revenue not penalized.
             </p>
         </div>
     );

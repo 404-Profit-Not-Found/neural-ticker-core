@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   ArrowRight,
   Newspaper,
+  Trash2,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
@@ -23,6 +25,19 @@ export function ResearchListPage() {
   const [searchParams] = useSearchParams();
   const filter = searchParams.get('filter'); // 'recent' or null
   const isRecent = filter === 'recent';
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+
+  // Delete mutation for admin
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/research/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['research-list'] });
+    },
+  });
 
   const { data, isLoading, isError } = useQuery<{
     data: ResearchItem[];
@@ -194,6 +209,24 @@ export function ResearchListPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Admin delete action */}
+                  {isAdmin && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this research note?')) {
+                          deleteMutation.mutate(note.id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
 
                   {/* Arrow action */}
                   <div className="shrink-0 hidden md:block opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">

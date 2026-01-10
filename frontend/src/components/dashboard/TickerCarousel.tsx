@@ -71,15 +71,17 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                                             <div className="font-bold text-xl leading-none">{symbol}</div>
                                             {/* AI Badge (Aligned Right) */}
                                             {aiRating && aiRating !== '-' && (
-                                                <VerdictBadge 
-                                                    risk={riskScore || 0}
-                                                    upside={potentialUpside || 0}
-                                                    downside={item.potentialDownside || 0}
-                                                    consensus={item.rating}
-                                                    overallScore={item.overallScore}
-                                                    pe={item.pe}
-                                                    className="ml-auto"
-                                                />
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <VerdictBadge 
+                                                        risk={riskScore || 0}
+                                                        upside={potentialUpside || 0}
+                                                        downside={item.potentialDownside || 0}
+                                                        consensus={item.rating}
+                                                        overallScore={item.overallScore}
+                                                        pe={item.pe}
+                                                        className="ml-auto"
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-0.5 mt-1">

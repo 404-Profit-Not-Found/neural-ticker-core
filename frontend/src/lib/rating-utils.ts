@@ -67,25 +67,108 @@ export function calculateUpside(currentPrice: number, target: number | null | un
  * - Otherwise -> Hold
  */
 /**
- * Input for the Weighted Verdict Algorithm
+ * Scenario price target with probability for the enhanced verdict algorithm.
+ */
+export interface ScenarioInput {
+    probability: number; // 0-1 (e.g. 0.25 for 25%)
+    price: number;       // Target price for this scenario
+}
+
+/**
+ * Input for the Weighted Verdict Algorithm.
+ * 
+ * When `scenarios` and `currentPrice` are provided, the algorithm uses 
+ * probability-weighted expected returns with Loss Aversion (LAF = 2.0x).
+ * Otherwise, falls back to legacy upside/downside-based calculation.
  */
 export interface VerdictInput {
     risk: number; // 0-10
-    upside: number; // Percentage (e.g. 50.5 for 50.5%)
-    downside?: number; // Percentage (e.g. -20.0 for -20%)
+    upside: number; // Percentage (e.g. 50.5 for 50.5%) - used as fallback
+    downside?: number; // Percentage (e.g. -20.0 for -20%) - used as fallback
     consensus?: string; // "Strong Buy", "Hold", etc.
     overallScore?: number | null; // 0-10 (Neural Score)
     peRatio?: number | null; // P/E Ratio
+    
+    // NEW: Probability-weighted scenario data
+    scenarios?: {
+        bull?: ScenarioInput;
+        base?: ScenarioInput;
+        bear?: ScenarioInput;
+    };
+    currentPrice?: number;
+}
+
+/** Loss Aversion Factor - downside is penalized 2x vs upside (behavioral economics) */
+const LOSS_AVERSION_FACTOR = 2.0;
+
+/** Default probabilities when not provided: Bull 25%, Base 50%, Bear 25% */
+const DEFAULT_PROBABILITIES = { bull: 0.25, base: 0.50, bear: 0.25 };
+
+/**
+ * Calculate the return percentage for a given scenario.
+ */
+function calculateScenarioReturn(targetPrice: number, currentPrice: number): number {
+    if (currentPrice <= 0) return 0;
+    return ((targetPrice - currentPrice) / currentPrice) * 100;
+}
+
+/**
+ * Calculate probability-weighted expected return with loss aversion.
+ * 
+ * Returns: { weightedReturn, lossAdjustedReturn, skewRatio }
+ */
+export function calculateProbabilityWeightedMetrics(
+    scenarios: { bull?: ScenarioInput; base?: ScenarioInput; bear?: ScenarioInput },
+    currentPrice: number
+): { weightedReturn: number; lossAdjustedReturn: number; skewRatio: number } {
+    if (currentPrice <= 0) {
+        return { weightedReturn: 0, lossAdjustedReturn: 0, skewRatio: 1 };
+    }
+
+    // Extract scenario data with defaults
+    const bullProb = scenarios.bull?.probability ?? DEFAULT_PROBABILITIES.bull;
+    const baseProb = scenarios.base?.probability ?? DEFAULT_PROBABILITIES.base;
+    const bearProb = scenarios.bear?.probability ?? DEFAULT_PROBABILITIES.bear;
+
+    const bullPrice = scenarios.bull?.price ?? currentPrice * 1.25;
+    const basePrice = scenarios.base?.price ?? currentPrice;
+    const bearPrice = scenarios.bear?.price ?? currentPrice * 0.75;
+
+    // Calculate returns for each scenario
+    const bullReturn = calculateScenarioReturn(bullPrice, currentPrice);
+    const baseReturn = calculateScenarioReturn(basePrice, currentPrice);
+    const bearReturn = calculateScenarioReturn(bearPrice, currentPrice);
+
+    // 1. Simple probability-weighted expected return
+    const weightedReturn = 
+        bullProb * bullReturn +
+        baseProb * baseReturn +
+        bearProb * bearReturn;
+
+    // 2. Loss-adjusted return (LAF = 2.0 for negative returns)
+    const applyLAF = (ret: number) => ret < 0 ? ret * LOSS_AVERSION_FACTOR : ret;
+    const lossAdjustedReturn = 
+        bullProb * applyLAF(bullReturn) +
+        baseProb * applyLAF(baseReturn) +
+        bearProb * applyLAF(bearReturn);
+
+    // 3. Skew Ratio: Bull contribution / Bear contribution (higher = more favorable asymmetry)
+    const bullContribution = bullProb * Math.max(0, bullReturn);
+    const bearContribution = bearProb * Math.abs(Math.min(0, bearReturn));
+    const skewRatio = bearContribution > 0 ? bullContribution / bearContribution : 10;
+
+    return { weightedReturn, lossAdjustedReturn, skewRatio };
 }
 
 /**
  * The Architect-Level Weighted Verdict Algorithm.
  * 
  * Calculates a Composite Score (0-100) based on multiple weighted factors:
- * 1. Risk Penalty: High risk penalizes score heavily.
- * 2. Asymmetric Risk/Reward: Downside is weighted more strictly than upside (Loss Aversion).
- * 3. Analyst Consensus: Aligns with or fades the neural verdict based on Wall St.
- * 4. P/E Ratio: Rewards value (low positive PE), penalizes overvaluation or losses.
+ * 1. Probability-Weighted Expected Return with Loss Aversion (when scenarios provided)
+ * 2. Risk Penalty: High risk penalizes score heavily.
+ * 3. Skew Bonus/Penalty: Favorable/unfavorable risk-reward asymmetry.
+ * 4. Analyst Consensus: Aligns with or fades the neural verdict based on Wall St.
+ * 5. P/E Ratio: Rewards value (low positive PE), penalizes overvaluation or losses.
  * 
  * Score Tiers:
  * >= 80: Strong Buy
@@ -111,21 +194,40 @@ export function calculateAiRating(
         input = riskOrInput;
     }
 
-    const { risk, upside, consensus, overallScore, peRatio } = input;
-    const downside = input.downside ?? 0;
-
-    let score = 50; // Base Score
-
-    // 1. Upside Impact (Max +30)
-    // Diminishing returns after 50% upside to prevent "YOLO" coins breaking the scale
-    const cappedUpside = Math.min(upside, 100); 
-    score += Math.max(0, cappedUpside * 0.4); 
+    const { risk, consensus, overallScore, peRatio, scenarios, currentPrice } = input;
     
-    // 2. Downside Impact (Max -40) - LOSS AVERSION
-    // We punish downside harder than we reward upside.
-    // If downside is -50%, impact is -50 * 0.8 = -40. 
-    const absDownside = Math.abs(downside);
-    score -= Math.min(40, absDownside * 0.8);
+    let score = 50; // Base Score
+    let effectiveUpside = input.upside;
+    const effectiveDownside = input.downside ?? 0;
+
+    // -------------------------------------------------------------------------
+    // NEW: Probability-Weighted Expected Return (when scenarios available)
+    // -------------------------------------------------------------------------
+    if (scenarios && currentPrice && currentPrice > 0) {
+        const metrics = calculateProbabilityWeightedMetrics(scenarios, currentPrice);
+        
+        // Use loss-adjusted return for scoring
+        // Scale: ±25 points max from expected return
+        score += Math.max(-25, Math.min(25, metrics.lossAdjustedReturn * 0.5));
+        
+        // Skew bonus/penalty
+        if (metrics.skewRatio > 1.5) score += 10;       // Favorable asymmetry
+        else if (metrics.skewRatio < 0.7) score -= 10; // Unfavorable asymmetry
+        
+        // Store effective values for speculative buy check
+        effectiveUpside = metrics.weightedReturn;
+        
+    } else {
+        // FALLBACK: Legacy upside/downside logic
+        
+        // 1. Upside Impact (Max +30)
+        const cappedUpside = Math.min(effectiveUpside, 100); 
+        score += Math.max(0, cappedUpside * 0.4); 
+        
+        // 2. Downside Impact (Max -40) - LOSS AVERSION
+        const absDownside = Math.abs(effectiveDownside);
+        score -= Math.min(40, absDownside * 0.8);
+    }
 
     // 3. Risk Penalty / Bonus
     if (risk >= 8) score -= 20;      // Extreme penalty for high risk
@@ -148,18 +250,15 @@ export function calculateAiRating(
         // Hold is neutral (0)
     }
 
-    // 6. P/E Ratio Impact (Value Investing)
-    if (peRatio === undefined || peRatio === null) {
-        score -= 10; // Penalty for missing P/E (Pre-revenue / Unknown)
-    } else if (peRatio < 0) {
-        score -= 10; // Unprofitable / Loss making
-    } else {
-        // Positive P/E
-        if (peRatio < 15) score += 15;      // Great Value
-        else if (peRatio < 30) score += 5;  // Fair Value
-        else if (peRatio > 60) score -= 15; // Extremely Overvalued
-        else if (peRatio > 40) score -= 5;  // Overvalued
+    // 6. P/E Ratio Impact - Only reward value, don't punish growth/pre-revenue
+    if (typeof peRatio === 'number' && peRatio > 0) {
+        // Positive P/E = profitable company
+        if (peRatio <= 10) score += 20;       // Exceptional Value
+        else if (peRatio <= 15) score += 15;  // Great Value
+        else if (peRatio <= 25) score += 5;   // Fair Value
+        // Higher P/E = no bonus, but no penalty either
     }
+    // Missing P/E (pre-revenue) or negative (loss-making) = neutral, no penalty
 
     // -------------------------------------------------------------------------
     // Verdict Determination
@@ -172,7 +271,7 @@ export function calculateAiRating(
 
     // Speculative Buy Override
     // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
-    if (risk >= 8 && (upside >= 100 || (overallScore && overallScore >= 7.5))) {
+    if (risk >= 8 && (effectiveUpside >= 100 || (overallScore && overallScore >= 7.5))) {
         return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
     }
 
