@@ -31,9 +31,9 @@ export class User {
   @Column({ default: 'user' })
   role: string;
 
-  @ApiProperty({ enum: ['free', 'pro'], default: 'free' })
+  @ApiProperty({ enum: ['free', 'pro', 'whale'], default: 'free' })
   @Column({ type: 'text', default: 'free' })
-  tier: 'free' | 'pro';
+  tier: 'free' | 'pro' | 'whale';
 
   @ApiProperty({ default: 10 })
   @Column({ type: 'int', default: 10 })

@@ -77,22 +77,11 @@ export class UsersService {
     // 1. Remove from allow list
     await this.allowedUserRepo.delete({ email });
 
-    // 2. If user exists, ban/delete/reset role?
-    // For now, let's just ensure they can't login by maybe changing role to 'banned' or just relying on "not in whitelist"
-    // The google strategy checks whitelist. So removing from whitelist is enough for NEW logins.
-    // But existing sessions?
-    // If we want to kill active session, we might need to increment a 'tokenVersion' or similar.
-    // For now, strict requirement is "delete".
-
-    // If user exists, we SHOULD probably remove them or set to a non-active role to be sure.
+    // 2. Soft delete: Set role to 'revoked' so they cannot login but data is preserved
     if (user) {
-      // user.role = 'user'; // Already user?
-      // user.role = 'banned'?
-      // Actually, the request implies 'delete' or 'revoke'.
-      // Existing logic was just removing from allow list?
-      // Let's check what it was doing before.
-      // It seems it was just `this.allowedUserRepo.delete({ email })`.
-      // But if `validateOAuthLogin` checks `isEmailAllowed`, then removing from valid list is sufficient for next login.
+      this.logger.log(`Revoking access for user: ${email}`);
+      user.role = 'revoked';
+      await this.userRepo.save(user);
     }
   }
 
@@ -296,6 +285,9 @@ export class UsersService {
 
     // 2. Process Registered Users (Active or Waitlist)
     for (const u of users) {
+      // Skip revoked users - they should not appear in admin list
+      if (u.role === 'revoked') continue;
+      
       const existing = identityMap.get(u.email) || {};
 
       let status = 'ACTIVE';
