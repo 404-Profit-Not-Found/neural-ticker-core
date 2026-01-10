@@ -611,12 +611,17 @@ describe('MarketDataService', () => {
     it('should fetch snapshots for multiple symbols in chunks', async () => {
       const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META']; // 6 symbols
       // We expect 2 chunks (5 + 1)
-      
-      const mockResult = { ticker: { symbol: 'TEST' }, latestPrice: { close: 100 } };
-      jest.spyOn(service as any, 'performGetSnapshot').mockResolvedValue(mockResult);
+
+      const mockResult = {
+        ticker: { symbol: 'TEST' },
+        latestPrice: { close: 100 },
+      };
+      jest
+        .spyOn(service as any, 'performGetSnapshot')
+        .mockResolvedValue(mockResult);
 
       const results = await service.getSnapshots(symbols);
-      
+
       expect(results.length).toBe(6);
       expect((service as any).performGetSnapshot).toHaveBeenCalledTimes(6);
     });
@@ -632,7 +637,7 @@ describe('MarketDataService', () => {
     it('should skip if coverage is already high', async () => {
       mockTickersService.getTicker.mockResolvedValue({ id: 1, symbol: 'AAPL' });
       // 5 years = 1250 days. If we have 1300, it's 100%+
-      mockOhlcvRepo.count.mockResolvedValue(1300); 
+      mockOhlcvRepo.count.mockResolvedValue(1300);
 
       await service.syncTickerHistory('AAPL', 5);
       expect(mockYahooService.getHistorical).not.toHaveBeenCalled();
@@ -641,12 +646,19 @@ describe('MarketDataService', () => {
     it('should fetch from Yahoo if coverage is low', async () => {
       mockTickersService.getTicker.mockResolvedValue({ id: 1, symbol: 'AAPL' });
       mockOhlcvRepo.count.mockResolvedValue(100); // Low coverage
-      
+
       const mockHist = [
-        { date: new Date(), open: 100, high: 110, low: 90, close: 105, volume: 1000 },
+        {
+          date: new Date(),
+          open: 100,
+          high: 110,
+          low: 90,
+          close: 105,
+          volume: 1000,
+        },
       ];
       mockYahooService.getHistorical.mockResolvedValue(mockHist);
-      
+
       await service.syncTickerHistory('AAPL', 1);
       expect(mockYahooService.getHistorical).toHaveBeenCalled();
       expect(mockOhlcvRepo.upsert).toHaveBeenCalled();

@@ -30,12 +30,13 @@ describe('VerdictUtil', () => {
 
     it('should return Hold for neutral factors', () => {
       const result = calculateAiRating({
-        risk: 6,
-        upside: 10,
-        downside: -10,
+        risk: 5,
+        upside: 15,
+        downside: -5,
         overallScore: 5,
         peRatio: 30,
       });
+      // Base 50 + Upside 6 (15*0.4) - Downside 4 (5*0.8) = 52. Hold.
       expect(result.rating).toBe('Hold');
       expect(result.variant).toBe('hold');
     });
@@ -82,8 +83,10 @@ describe('VerdictUtil', () => {
         upside: 20,
         downside: -10,
         overallScore: 8,
-        peRatio: null,
+        peRatio: 10, // Added to push score above veto threshold (70)
       });
+      // Base 50 + Upside 8 (20*0.4) - Downside 8 (10*0.8) - Risk 20 + Neural 20 + PE 20 = 70.
+      // Not vetoed (score >= 70). Speculative buy override triggers.
       expect(result.rating).toBe('Speculative Buy');
       expect(result.variant).toBe('speculativeBuy');
     });
@@ -103,7 +106,7 @@ describe('VerdictUtil', () => {
         newsImpact: 9,
         peRatio: null,
       });
-      
+
       expect(bullishNews.score).toBeGreaterThan(50);
       expect(bearishNews.score).toBeLessThan(50);
     });

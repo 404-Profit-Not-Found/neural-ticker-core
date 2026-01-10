@@ -52,13 +52,22 @@ describe('TickerRequestsService', () => {
     const symbol = 'AAPL';
 
     it('should throw BadRequestException if ticker is already tracked', async () => {
-      tickersService.findOneBySymbol.mockResolvedValue({ id: 1, symbol: 'AAPL' });
-      await expect(service.createRequest(userId, symbol)).rejects.toThrow(BadRequestException);
+      tickersService.findOneBySymbol.mockResolvedValue({
+        id: 1,
+        symbol: 'AAPL',
+      });
+      await expect(service.createRequest(userId, symbol)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should return existing request if it is already pending', async () => {
       tickersService.findOneBySymbol.mockResolvedValue(null);
-      const existingRequest = { id: 'req-1', symbol: 'AAPL', status: 'PENDING' };
+      const existingRequest = {
+        id: 'req-1',
+        symbol: 'AAPL',
+        status: 'PENDING',
+      };
       requestRepo.findOne.mockResolvedValue(existingRequest);
 
       const result = await service.createRequest(userId, symbol);
@@ -82,7 +91,9 @@ describe('TickerRequestsService', () => {
   describe('approveRequest', () => {
     it('should throw NotFoundException if request does not exist', async () => {
       requestRepo.findOne.mockResolvedValue(null);
-      await expect(service.approveRequest('none')).rejects.toThrow(NotFoundException);
+      await expect(service.approveRequest('none')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return request if already approved', async () => {
@@ -96,7 +107,9 @@ describe('TickerRequestsService', () => {
       const pendingRequest = { id: '1', symbol: 'AAPL', status: 'PENDING' };
       requestRepo.findOne.mockResolvedValue(pendingRequest);
       tickersService.ensureTicker.mockResolvedValue({ id: 1, symbol: 'AAPL' });
-      requestRepo.save.mockImplementation(r => Promise.resolve(r));
+      requestRepo.save.mockImplementation((r: TickerRequestEntity) =>
+        Promise.resolve(r),
+      );
 
       const result = await service.approveRequest('1');
       expect(result.status).toBe('APPROVED');
@@ -106,9 +119,13 @@ describe('TickerRequestsService', () => {
     it('should throw BadRequestException if ensureTicker fails', async () => {
       const pendingRequest = { id: '1', symbol: 'INVALID', status: 'PENDING' };
       requestRepo.findOne.mockResolvedValue(pendingRequest);
-      tickersService.ensureTicker.mockRejectedValue(new Error('Invalid symbol'));
+      tickersService.ensureTicker.mockRejectedValue(
+        new Error('Invalid symbol'),
+      );
 
-      await expect(service.approveRequest('1')).rejects.toThrow(BadRequestException);
+      await expect(service.approveRequest('1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -116,7 +133,9 @@ describe('TickerRequestsService', () => {
     it('should set status to REJECTED', async () => {
       const request = { id: '1', symbol: 'AAPL', status: 'PENDING' };
       requestRepo.findOne.mockResolvedValue(request);
-      requestRepo.save.mockImplementation(r => Promise.resolve(r));
+      requestRepo.save.mockImplementation((r: TickerRequestEntity) =>
+        Promise.resolve(r),
+      );
 
       const result = await service.rejectRequest('1');
       expect(result.status).toBe('REJECTED');

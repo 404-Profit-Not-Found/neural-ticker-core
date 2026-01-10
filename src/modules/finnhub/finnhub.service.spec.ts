@@ -113,7 +113,9 @@ describe('FinnhubService', () => {
   describe('getMarketStatus', () => {
     it('should return market status and cache it', async () => {
       const mockData = { exchange: 'US', isOpen: true };
-      mockFinnhubClient.marketStatus = jest.fn().mockImplementation((params: any, cb: any) => cb(null, mockData));
+      mockFinnhubClient.marketStatus = jest
+        .fn()
+        .mockImplementation((params: any, cb: any) => cb(null, mockData));
 
       const result = await service.getMarketStatus('US');
       expect(result).toEqual(mockData);
@@ -126,7 +128,11 @@ describe('FinnhubService', () => {
     });
 
     it('should handle API error gracefully for market status', async () => {
-      mockFinnhubClient.marketStatus = jest.fn().mockImplementation((params: any, cb: any) => cb(new Error('Forbidden')));
+      mockFinnhubClient.marketStatus = jest
+        .fn()
+        .mockImplementation((params: any, cb: any) =>
+          cb(new Error('Forbidden')),
+        );
 
       const result = await service.getMarketStatus('US');
       expect(result).toBeNull();
