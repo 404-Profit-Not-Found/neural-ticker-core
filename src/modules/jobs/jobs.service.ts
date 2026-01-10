@@ -39,6 +39,48 @@ export class JobsService {
     }
   }
 
+  /**
+   * Performs an exhaustive initial sync for a new ticker:
+   * 1. Snapshot (Price + Fundamentals)
+   * 2. History (180 days for charts)
+   * 3. Initial AI Research (Risk/Reward)
+   */
+  async initializeTicker(symbol: string) {
+    this.logger.log(`Initializing new ticker: ${symbol}`);
+    try {
+      // 1. Snapshot
+      await this.marketDataService.getSnapshot(symbol);
+
+      // 2. History
+      const to = new Date();
+      const from = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+      await this.marketDataService.getHistory(
+        symbol,
+        '1d',
+        from.toISOString(),
+        to.toISOString(),
+      );
+
+      // 3. Queue Research
+      this.logger.log(`Queueing initial research for ${symbol}...`);
+      const note = await this.researchService.createResearchTicket(
+        null, // System
+        [symbol.toUpperCase()],
+        `Perform initial analysis for ${symbol}. Provide company profile, financials, and risk/reward assessment.`,
+        'gemini',
+        'low',
+      );
+      // Process if not too busy, or let a separate worker handle it.
+      // Here we process immediately since it's a "fresh add" event.
+      await this.researchService.processTicket(note.id);
+      
+      this.logger.log(`Initialization complete for ${symbol}`);
+    } catch (err: any) {
+      this.logger.error(`Failed to initialize ticker ${symbol}: ${err.message}`);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async syncDailyCandles() {
     this.logger.log('Starting daily candle sync...');
     try {
@@ -62,11 +104,11 @@ export class JobsService {
           );
 
           this.logger.debug(`Synced snapshot and history for ${ticker.symbol}`);
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error(`Failed to sync ${ticker.symbol}: ${err.message}`);
         }
-        // Small delay to be respectful to API rate limits
-        await new Promise((r) => setTimeout(r, 1000));
+        // Small delay to be respectful to API rate limits (1.5s per ticker)
+        await new Promise((r) => setTimeout(r, 1500));
       }
       this.logger.log('Daily candle sync completed.');
     } catch (e) {
@@ -74,6 +116,7 @@ export class JobsService {
     }
   }
 
+  @Cron(CronExpression.EVERY_WEEK)
   async runRiskRewardScanner() {
     this.logger.log('Starting Periodic Risk/Reward Scanner (Low Tier)...');
     try {

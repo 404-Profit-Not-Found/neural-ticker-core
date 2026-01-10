@@ -24,6 +24,8 @@ interface VerdictBadgeProps {
     downside?: number;
     consensus?: string;
     pe?: number | null;
+    newsSentiment?: string | null;
+    newsImpact?: number | null;
 }
 
 export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
@@ -33,7 +35,9 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
     className,
     downside,
     consensus,
-    pe
+    pe,
+    newsSentiment,
+    newsImpact
 }) => {
     const getConsensusColor = (c?: string) => {
         if (!c) return "text-muted-foreground";
@@ -58,14 +62,16 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
 
     const { rating, variant, score } = useMemo(
         () => calculateAiRating({
-            risk, 
-            upside, 
-            overallScore, 
-            downside, 
+            risk,
+            upside,
+            overallScore,
+            downside,
             consensus,
-            peRatio: pe
+            peRatio: pe, // Legacy name mapping if object was used
+            newsSentiment,
+            newsImpact
         }),
-        [risk, upside, overallScore, downside, consensus, pe]
+        [risk, upside, overallScore, downside, consensus, pe, newsSentiment, newsImpact]
     );
 
     // We map our internal rating variant to the Badge's expected variant types
@@ -126,15 +132,38 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                         !pe || pe < 0 || pe > 40 ? "text-red-500" : 
                         pe < 25 ? "text-emerald-500" : "text-yellow-500"
                     )}>
-                        {pe === undefined || pe === null ? 'Pre-rev' : pe < 0 ? 'Loss' : pe.toFixed(2)}
+                        {pe === undefined || pe === null ? 'n/a' : pe < 0 ? 'Loss' : pe.toFixed(2)}
                     </span>
                 </div>
+
+                {/* Smart News Row (Conditional) */}
+                {(newsImpact || 0) > 0 && (
+                    <>
+                        <div className="flex justify-between items-center">
+                            <span>Smart News:</span>
+                            <span className={cn("font-medium", 
+                                newsSentiment === 'BULLISH' ? 'text-emerald-500' :
+                                newsSentiment === 'BEARISH' ? 'text-red-500' : 'text-blue-500'
+                            )}>
+                                {newsSentiment ?? 'Mixed'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span>Impact:</span>
+                            <span className={cn("font-medium",
+                                (newsImpact || 0) >= 8 ? "text-yellow-500 font-bold" : "text-muted-foreground"
+                            )}>
+                                {newsImpact}/10
+                            </span>
+                        </div>
+                    </>
+                )}
             </div>
 
             <p className="text-[10px] text-muted-foreground pt-1 border-t border-border opacity-70">
                 Probability-weighted Bull/Base/Bear scenarios. Downside penalized 2x (Loss Aversion).
                 <br />
-                Low P/E (≤10) rewarded. Pre-revenue not penalized.
+                Low P/E (≤10) rewarded. Missing P/E not penalized.
             </p>
         </div>
     );

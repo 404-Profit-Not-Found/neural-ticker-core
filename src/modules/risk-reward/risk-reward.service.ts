@@ -467,7 +467,7 @@ export class RiskRewardService {
       quality: 'medium' as QualityTier,
     };
 
-    this.logger.log(`[${symbol}] Numeric Context: ${JSON.stringify(context)}`);
+    // this.logger.log(`[${symbol}] Numeric Context: ${JSON.stringify(context)}`);
     this.logger.log(
       `Extracting Risk Analysis for ${symbol} from Research Note...`,
     );

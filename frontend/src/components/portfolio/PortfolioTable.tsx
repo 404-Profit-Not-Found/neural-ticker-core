@@ -27,7 +27,6 @@ export interface Position {
         industry?: string;
     };
     fundamentals?: {
-        market_cap?: number;
         pe_ttm?: number;
         consensus_rating?: string;
         sector?: string;
@@ -61,12 +60,6 @@ const formatCurrency = (val: number) =>
 const formatPct = (val: number) =>
     `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
-const formatCap = (n: number) => {
-    if (!n) return '-';
-    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-    return (n / 1e6).toFixed(2) + 'M';
-};
 
 export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
@@ -197,13 +190,6 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         }),
 
         // --- NEW ANALYZER COLUMNS ---
-
-        // 6. Market Cap
-        columnHelper.accessor(row => row.fundamentals?.market_cap, {
-            id: 'mkt_cap',
-            header: () => <span className="hidden md:inline">Mkt Cap</span>,
-            cell: (info) => <span className="hidden md:inline text-xs font-mono text-muted-foreground">{formatCap(Number(info.getValue()))}</span>
-        }),
 
         // 7. P/E
         columnHelper.accessor(row => row.fundamentals?.pe_ttm, {

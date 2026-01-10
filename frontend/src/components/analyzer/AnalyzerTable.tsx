@@ -48,14 +48,14 @@ export function AnalyzerTable({
   const [pageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'market_cap', desc: true },
+    { id: 'ai_rating', desc: true },
   ]);
 
   // Fetch Data
   const { data, isLoading } = useStockAnalyzer({
     page,
     limit: pageSize,
-    sortBy: sorting[0]?.id || 'market_cap',
+    sortBy: sorting[0]?.id || 'ai_rating',
     sortDir: sorting[0]?.desc ? 'DESC' : 'ASC',
     search,
     // Pass filters
@@ -169,26 +169,8 @@ export function AnalyzerTable({
       },
     }),
 
-    // 3. Market Cap
-    columnHelper.accessor((row) => row.fundamentals.market_cap, {
-      id: 'market_cap',
-      header: 'Mkt Cap',
-      cell: (info) => {
-        const val = info.getValue();
-        // Hide if 0 or null/undefined
-        if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
 
-        const formatCap = (n: number) => {
-          if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-          if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-          return (n / 1e6).toFixed(2) + 'M';
-        };
-
-        return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
-      },
-    }),
-
-    // 4. P/E
+    // 3. P/E
     columnHelper.accessor((row) => row.fundamentals.pe_ttm, {
       id: 'pe_ttm',
       header: 'P/E',

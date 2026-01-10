@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getErrorMessage } from '../../utils/error.util';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const finnhub = require('finnhub');
@@ -23,7 +24,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(error);
           }
           resolve(data);
         },
@@ -52,7 +53,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(error);
           }
           resolve(data);
         },
@@ -68,7 +69,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, 'general-news');
-            return reject(new Error(error));
+            return reject(error);
           }
           resolve(data);
         },
@@ -84,7 +85,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(error);
           }
           resolve(data);
         },
@@ -119,7 +120,7 @@ export class FinnhubService implements OnModuleInit {
         (error: any, data: any) => {
           if (error) {
             this.handleError(error, symbol);
-            return reject(new Error(error));
+            return reject(error);
           }
           resolve(data);
         },
@@ -140,8 +141,14 @@ export class FinnhubService implements OnModuleInit {
   }
 
   private handleError(error: any, context?: string) {
-    this.logger.error(
-      `Finnhub API Error [${context}]: ${error.message || error}`,
-    );
+    const msg = getErrorMessage(error);
+    const logMsg = `Finnhub API Error [${context}]: ${msg}`;
+    
+    // Downgrade noise for common restricted access errors (where we usually fallback)
+    if (msg.toLowerCase().includes('access') || msg.toLowerCase().includes('restricted') || msg.toLowerCase().includes('plan')) {
+      this.logger.warn(logMsg);
+    } else {
+      this.logger.error(logMsg);
+    }
   }
 }

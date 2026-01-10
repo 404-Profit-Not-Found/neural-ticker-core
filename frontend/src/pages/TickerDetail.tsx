@@ -294,7 +294,9 @@ export function TickerDetail() {
                                         <div>
                                             <div className="flex items-center gap-3">
                                                 <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+
                                                 {(() => {
+                                                    if (!risk_analysis) return null;
                                                     const liveUpside = calculateLiveUpside(
                                                         market_data.price,
                                                         getBasePriceFromScenarios(risk_analysis.scenarios),
@@ -309,9 +311,6 @@ export function TickerDetail() {
                                                         ? ((bearPrice - market_data.price) / market_data.price) * 100
                                                         : -(risk_analysis.financial_risk * 5); // Fallback
 
-                                                    // We call calculateAiRating inside VerdictBadge now, but we need to pass the props.
-                                                    // The previous calculation here was unused.
-                                                    
                                                     return (
                                                         <VerdictBadge
                                                             risk={risk_analysis.financial_risk}
@@ -320,6 +319,8 @@ export function TickerDetail() {
                                                             consensus={fundamentals?.consensus_rating}
                                                             overallScore={risk_analysis.overall_score}
                                                             pe={fundamentals?.pe_ratio}
+                                                            newsSentiment={tickerData.news?.sentiment}
+                                                            newsImpact={tickerData.news?.score}
                                                         />
                                                     );
                                                 })()}
@@ -448,6 +449,7 @@ export function TickerDetail() {
                                         <div className="flex items-center gap-2">
                                             <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
                                             {(() => {
+                                                if (!risk_analysis) return null;
                                                 const liveUpside = calculateLiveUpside(
                                                     market_data.price,
                                                     getBasePriceFromScenarios(risk_analysis.scenarios),
@@ -468,9 +470,13 @@ export function TickerDetail() {
                                                         downside={liveDownside}
                                                         consensus={fundamentals?.consensus_rating}
                                                         overallScore={risk_analysis.overall_score}
+                                                        pe={fundamentals?.pe_ratio} 
+                                                        newsSentiment={tickerData.news?.sentiment}
+                                                        newsImpact={tickerData.news?.score}
                                                     />
                                                 );
                                             })()}
+
                                         </div>
                                         <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
                                             {profile?.name}
@@ -542,6 +548,7 @@ export function TickerDetail() {
                                     market_data={market_data}
                                     ratings={tickerData.ratings}
                                     profile={profile}
+                                    news={tickerData.news}
                                 />
                             </TabsContent>
 

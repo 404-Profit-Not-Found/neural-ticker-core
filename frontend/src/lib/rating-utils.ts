@@ -88,6 +88,8 @@ export interface VerdictInput {
     consensus?: string; // "Strong Buy", "Hold", etc.
     overallScore?: number | null; // 0-10 (Neural Score)
     peRatio?: number | null; // P/E Ratio
+    newsSentiment?: string | null;  // New
+    newsImpact?: number | null;     // New
     
     // NEW: Probability-weighted scenario data
     scenarios?: {
@@ -176,69 +178,69 @@ export function calculateProbabilityWeightedMetrics(
  * >= 45: Hold
  * < 45: Sell
  */
+// 0-10 Impact Score from AI
 export function calculateAiRating(
-    riskOrInput: number | VerdictInput, 
-    upsideArg?: number, 
-    overallScoreArg?: number | null
+    riskOrInput: number | VerdictInput,
+    upsideArg?: number,
+    overallScoreArg?: number | null | undefined, // Added parameter
+    downsideArg: number = 0,
+    consensusArg?: string | null,
+    peArg?: number | null,
+    newsSentimentArg?: string | null,
+    newsImpactArg?: number | null
 ): RatingResult {
-    let input: VerdictInput;
+    // 1. Normalize Input
+    let risk: number;
+    let upside: number;
+    let overallScore: number | null | undefined;
+    let downside: number;
+    let consensus: string | null | undefined;
+    let pe: number | null | undefined;
+    let newsSentiment: string | null | undefined;
+    let newsImpact: number | null | undefined;
 
-    // Support legacy signature (risk, upside, overallScore) for incremental migration
-    if (typeof riskOrInput === 'number') {
-        input = {
-            risk: riskOrInput,
-            upside: upsideArg ?? 0,
-            overallScore: overallScoreArg
-        };
+    if (typeof riskOrInput === 'object') {
+        const i = riskOrInput;
+        risk = i.risk;
+        upside = i.upside;
+        overallScore = i.overallScore;
+        downside = i.downside ?? 0;
+        consensus = i.consensus;
+        pe = i.peRatio;
+        newsSentiment = i.newsSentiment;
+        newsImpact = i.newsImpact;
     } else {
-        input = riskOrInput;
+        risk = riskOrInput;
+        upside = upsideArg!;
+        overallScore = overallScoreArg;
+        downside = downsideArg;
+        consensus = consensusArg;
+        pe = peArg;
+        newsSentiment = newsSentimentArg;
+        newsImpact = newsImpactArg;
     }
 
-    const { risk, consensus, overallScore, peRatio, scenarios, currentPrice } = input;
-    
     let score = 50; // Base Score
-    let effectiveUpside = input.upside;
-    const effectiveDownside = input.downside ?? 0;
+    const effectiveUpside = upside; // For compatibility with speculative buy check
 
-    // -------------------------------------------------------------------------
-    // NEW: Probability-Weighted Expected Return (when scenarios available)
-    // -------------------------------------------------------------------------
-    if (scenarios && currentPrice && currentPrice > 0) {
-        const metrics = calculateProbabilityWeightedMetrics(scenarios, currentPrice);
-        
-        // Use loss-adjusted return for scoring
-        // Scale: ±25 points max from expected return
-        score += Math.max(-25, Math.min(25, metrics.lossAdjustedReturn * 0.5));
-        
-        // Skew bonus/penalty
-        if (metrics.skewRatio > 1.5) score += 10;       // Favorable asymmetry
-        else if (metrics.skewRatio < 0.7) score -= 10; // Unfavorable asymmetry
-        
-        // Store effective values for speculative buy check
-        effectiveUpside = metrics.weightedReturn;
-        
-    } else {
-        // FALLBACK: Legacy upside/downside logic
-        
-        // 1. Upside Impact (Max +30)
-        const cappedUpside = Math.min(effectiveUpside, 100); 
-        score += Math.max(0, cappedUpside * 0.4); 
-        
-        // 2. Downside Impact (Max -40) - LOSS AVERSION
-        const absDownside = Math.abs(effectiveDownside);
-        score -= Math.min(40, absDownside * 0.8);
-    }
+    // 1. Upside Impact (Max +30)
+    const cappedUpside = Math.min(upside, 100); 
+    score += Math.max(0, cappedUpside * 0.4); 
+    
+    // 2. Downside Impact (Max -40) - LOSS AVERSION
+    const absDownside = Math.abs(downside);
+    score -= Math.min(40, absDownside * 0.8);
 
     // 3. Risk Penalty / Bonus
     if (risk >= 8) score -= 20;      // Extreme penalty for high risk
     else if (risk >= 6) score -= 10; // Moderate penalty
     else if (risk <= 3) score += 5;  // Safety bonus
 
-    // 4. Neural Score Bonus (The "AI" part)
+    // 4. Neural Score Bonus (Weight Increased)
     if (overallScore) {
-        if (overallScore >= 8) score += 10;
-        else if (overallScore >= 6) score += 5;
-        else if (overallScore <= 4) score -= 5;
+        if (overallScore >= 8) score += 20; // Was +10
+        else if (overallScore >= 6) score += 10; // Was +5
+        else if (overallScore <= 4) score -= 10; // Was -5
     }
 
     // 5. Analyst Consensus Integration
@@ -250,12 +252,21 @@ export function calculateAiRating(
         // Hold is neutral (0)
     }
 
-    // 6. P/E Ratio Impact - Only reward value, don't punish growth/pre-revenue
-    if (typeof peRatio === 'number' && peRatio > 0) {
+    // 6. Smart News Integration (High Impact Only)
+    if (newsImpact && newsImpact >= 8 && newsSentiment) {
+        if (newsSentiment === 'BULLISH') score += 15; // Major Catalyst
+        else if (newsSentiment === 'BEARISH') score -= 15; // Major Risk
+    } else if (newsImpact && newsImpact >= 5 && newsSentiment) {
+        if (newsSentiment === 'BULLISH') score += 5;
+        else if (newsSentiment === 'BEARISH') score -= 5;
+    }
+
+    // 7. P/E Ratio Impact - Only reward value, don't punish growth/pre-revenue
+    if (typeof pe === 'number' && pe > 0) {
         // Positive P/E = profitable company
-        if (peRatio <= 10) score += 20;       // Exceptional Value
-        else if (peRatio <= 15) score += 15;  // Great Value
-        else if (peRatio <= 25) score += 5;   // Fair Value
+        if (pe <= 10) score += 20;       // Exceptional Value
+        else if (pe <= 15) score += 15;  // Great Value
+        else if (pe <= 25) score += 5;   // Fair Value
         // Higher P/E = no bonus, but no penalty either
     }
     // Missing P/E (pre-revenue) or negative (loss-making) = neutral, no penalty

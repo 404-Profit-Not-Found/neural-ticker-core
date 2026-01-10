@@ -42,7 +42,6 @@ export interface TickerData {
     price: number;
     change: number;
     pe: number | null;
-    marketCap: number | null;
     potentialUpside: number | null;
     riskScore: number | null;
     overallScore: number | null;
@@ -179,24 +178,6 @@ export function WatchlistTableView({
                 },
             }),
 
-             // 3. Market Cap
-            columnHelper.accessor((row) => row.marketCap, {
-                id: 'market_cap',
-                header: 'Mkt Cap',
-                cell: (info) => {
-                    const val = info.getValue();
-                    // Hide if 0 or null/undefined
-                    if (!val || val === 0) return <span className="text-muted-foreground">-</span>;
-                    
-                    const formatCap = (n: number) => {
-                    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-                    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-                    return (n / 1e6).toFixed(2) + 'M';
-                    };
-
-                    return <span className="font-mono text-muted-foreground text-xs">{formatCap(val)}</span>;
-                },
-            }),
 
             // 4. P/E
             columnHelper.accessor((row) => row.pe, {

@@ -1,5 +1,5 @@
 
-import { TrendingUp, TrendingDown, ArrowUpCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpCircle, Zap } from 'lucide-react';
 import { ScenarioCards } from './ScenarioCards';
 import type { TickerData } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -11,11 +11,67 @@ interface TickerOverviewProps {
     market_data: TickerData['market_data'];
     ratings?: TickerData['ratings'];
     profile: TickerData['profile'];
+    news?: TickerData['news'];
 }
 
-export function TickerOverview({ risk_analysis, market_data, ratings, profile }: TickerOverviewProps) {
+export function TickerOverview({ risk_analysis, market_data, ratings, profile, news }: TickerOverviewProps) {
+    // Helper to check freshness and format time
+    const getNewsStatus = (dateStr?: string) => {
+        if (!dateStr) return { isFresh: false, timeAgo: '' };
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        // "Few trading days" ~ 4-5 days to account for weekends
+        if (diffDays > 5) return { isFresh: false, timeAgo: '' };
+        
+        const diffHours = diffMs / (1000 * 60 * 60);
+        if (diffHours < 1) return { isFresh: true, timeAgo: 'Just now' };
+        if (diffHours < 24) return { isFresh: true, timeAgo: `${Math.floor(diffHours)}h ago` };
+        return { isFresh: true, timeAgo: `${Math.floor(diffDays)}d ago` };
+    };
+
+    const { isFresh, timeAgo } = getNewsStatus(news?.updated_at);
+
     return (
         <div className="flex flex-col gap-6">
+            {/* Breaking News Alert */}
+            {news && (news.score || 0) >= 5 && isFresh && (
+                <section className={`rounded-xl border p-4 ${
+                    news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                    news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20' :
+                    'bg-blue-500/10 border-blue-500/20'
+                }`}>
+                    <div className="flex items-start gap-3">
+                         <div className={`mt-0.5 p-1.5 rounded-full ${
+                            news.sentiment === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-600' :
+                            news.sentiment === 'BEARISH' ? 'bg-red-500/20 text-red-600' :
+                            'bg-blue-500/20 text-blue-600'
+                         }`}>
+                            <Zap size={16} className="fill-current" />
+                         </div>
+                         <div className="space-y-1">
+                            <h3 className={`text-sm font-bold flex items-center gap-2 ${
+                                news.sentiment === 'BULLISH' ? 'text-emerald-500' :
+                                news.sentiment === 'BEARISH' ? 'text-red-500' :
+                                'text-blue-500'
+                            }`}>
+                                {news.score && (news.score >= 8) ? 'BREAKING NEWS' : 'MARKET NEWS'}
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded border border-current opacity-80`}>
+                                    Impact: {news.score}/10
+                                </span>
+                                <span className="text-[10px] font-normal opacity-60 ml-auto">
+                                    {timeAgo}
+                                </span>
+                            </h3>
+                            <p className="text-sm text-foreground/90 leading-snug">
+                                {news.summary}
+                            </p>
+                         </div>
+                    </div>
+                </section>
+            )}
             {/* About Section */}
             {profile?.description && (
                 <section className="space-y-3">

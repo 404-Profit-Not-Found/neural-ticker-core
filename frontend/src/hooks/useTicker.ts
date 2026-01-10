@@ -151,7 +151,7 @@ export function useTickerResearch(symbol?: string) {
             // If data is not yet available (initial load), we might want to poll briefly or wait.
             // But if we have data, check statuses.
             if (data?.some((item) => item.status === 'processing' || item.status === 'pending')) {
-                return 3000; // Poll every 3s if analysis is in progress
+                return 5000; // Poll every 5s if analysis is in progress
             }
             return false;
         }
@@ -233,9 +233,9 @@ export function useActiveResearchCount() {
         refetchInterval: (query) => {
             const count = query.state.data as number | undefined;
             if (count && count > 0) {
-                return 3000; // Poll actively if we have active items
+                return 5000; // Poll every 5s if we have active items
             }
-            return 10000; // Poll less frequently if idle, to catch new starts from other tabs
+            return 60000; // Poll only once per minute if idle
         },
         staleTime: 0,
     });

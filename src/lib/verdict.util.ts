@@ -24,7 +24,9 @@ export interface VerdictInput {
   downside?: number; // Percentage (e.g. -20.0 for -20%)
   consensus?: string; // "Strong Buy", "Hold", etc.
   overallScore?: number | null; // 0-10 (Neural Score)
-  peRatio?: number | null; // P/E Ratio
+  peRatio: number | null;
+  newsSentiment?: string | null;  // New
+  newsImpact?: number | null;     // New
 }
 
 /**
@@ -43,7 +45,7 @@ export interface VerdictInput {
  * < 45: Sell
  */
 export function calculateAiRating(input: VerdictInput): RatingResult {
-  const { risk, upside, consensus, overallScore, peRatio } = input;
+  const { risk, upside, consensus, overallScore, peRatio, newsSentiment, newsImpact } = input;
   const downside = input.downside ?? 0;
 
   let score = 50; // Base Score
@@ -61,11 +63,11 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
   else if (risk >= 6) score -= 10;
   else if (risk <= 3) score += 5;
 
-  // 4. Neural Score Bonus
+  // 4. Neural Score Bonus (Weight Increased)
   if (overallScore) {
-    if (overallScore >= 8) score += 10;
-    else if (overallScore >= 6) score += 5;
-    else if (overallScore <= 4) score -= 5;
+    if (overallScore >= 8) score += 20; // Was +10
+    else if (overallScore >= 6) score += 10; // Was +5
+    else if (overallScore <= 4) score -= 10; // Was -5
   }
 
   // 5. Analyst Consensus Integration
@@ -76,17 +78,24 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
     else if (cLower.includes('sell')) score -= 10;
   }
 
-  // 6. P/E Ratio Impact (Value Investing)
-  if (peRatio === undefined || peRatio === null) {
-    score -= 10; // Penalty for missing P/E (Pre-revenue / Unknown)
-  } else if (peRatio < 0) {
-    score -= 10; // Unprofitable / Loss making
-  } else {
-    if (peRatio < 15) score += 15;
-    else if (peRatio < 30) score += 5;
-    else if (peRatio > 60) score -= 15;
-    else if (peRatio > 40) score -= 5;
+  // 6. Smart News Integration (High Impact Only)
+  if (input.newsImpact && input.newsImpact >= 8 && input.newsSentiment) {
+      if (input.newsSentiment === 'BULLISH') score += 15; // Major Catalyst
+      else if (input.newsSentiment === 'BEARISH') score -= 15; // Major Risk
+  } else if (input.newsImpact && input.newsImpact >= 5 && input.newsSentiment) {
+      if (input.newsSentiment === 'BULLISH') score += 5;
+      else if (input.newsSentiment === 'BEARISH') score -= 5;
   }
+
+  // 7. P/E Ratio Impact (Value Investing) - Only reward value, don't punish growth/pre-revenue
+  if (typeof peRatio === 'number' && peRatio > 0) {
+    // Positive P/E = profitable company
+    if (peRatio <= 10) score += 20; // Exceptional Value
+    else if (peRatio <= 15) score += 15; // Great Value
+    else if (peRatio <= 25) score += 5; // Fair Value
+    // Higher P/E = no bonus, but no penalty either
+  }
+  // Missing P/E (pre-revenue) or negative (loss-making) = neutral, no penalty
 
   // Verdict Determination
   // Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
@@ -95,6 +104,7 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
   }
 
   // Speculative Buy Override
+  // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
   if (risk >= 8 && (upside >= 100 || (overallScore && overallScore >= 7.5))) {
     return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
   }

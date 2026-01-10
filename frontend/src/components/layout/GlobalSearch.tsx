@@ -161,9 +161,9 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                 <div className="absolute top-full mt-2 w-full bg-[#09090b] !bg-opacity-100 border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 !opacity-100">
                     <div className="py-1">
                         {results.map((ticker, index) => (
-                            <button
-                                key={ticker.symbol}
-                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${index === highlightedIndex
+                            <div
+                                key={`${ticker.symbol}-${index}`}
+                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer ${index === highlightedIndex
                                     ? 'bg-primary/10 text-primary'
                                     : 'hover:bg-muted/50 text-foreground'
                                     }`}
@@ -212,7 +212,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                         </p>
                                     </div>
                                 </div>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 </div>

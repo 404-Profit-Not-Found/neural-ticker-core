@@ -7,6 +7,7 @@ import {
   forwardRef,
   HttpStatus,
 } from '@nestjs/common';
+import { getErrorMessage } from '../../utils/error.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
@@ -100,15 +101,15 @@ export class TickersService {
         source = 'yahoo';
       } else {
         this.logger.error(
-          `Finnhub fetch error for ${upperSymbol}: ${error.message}`,
+          `Finnhub fetch error for ${upperSymbol}: ${getErrorMessage(error)}`,
         );
         // Final fallback try
         profile = await this.fetchFromYahoo(upperSymbol).catch(async (e) => {
-          const msg = (e.message || '').toLowerCase();
+          const msg = (getErrorMessage(e) || '').toLowerCase();
           const statusText = (e.statusText || '').toLowerCase();
           const fullErrorString = JSON.stringify(e).toLowerCase();
 
-          this.logger.warn(`Yahoo Error for ${upperSymbol}: ${e.message}`);
+          this.logger.warn(`Yahoo Error for ${upperSymbol}: ${getErrorMessage(e)}`);
 
           const isRateLimit =
             (e instanceof HttpException && e.getStatus() === 429) ||
@@ -142,7 +143,7 @@ export class TickersService {
 
           // Log unknown errors but return null (swallow) so we can proceed to 'tick not found' logic or just fail safely
           this.logger.error(
-            `Unexpected Yahoo fallback error for ${upperSymbol}: ${e.message}`,
+            `Unexpected Yahoo fallback error for ${upperSymbol}: ${getErrorMessage(e)}`,
           );
           return null;
         });
@@ -176,12 +177,15 @@ export class TickersService {
 
     const savedTicker = await this.tickerRepo.save(newTicker);
 
+    // Initial background sync: Download logo, Fetch Snapshot, History and Research
+    void this.jobsService.initializeTicker(savedTicker.symbol);
+    
     // Download logo in background
     if (savedTicker.logo_url) {
       this.downloadAndSaveLogo(savedTicker.id, savedTicker.logo_url).catch(
         (err) =>
           this.logger.error(
-            `Failed to download logo for ${savedTicker.symbol}: ${err.message}`,
+            `Failed to download logo for ${savedTicker.symbol}: ${getErrorMessage(err)}`,
           ),
       );
     }
@@ -200,7 +204,7 @@ export class TickersService {
       }
     } catch (e) {
       this.logger.error(
-        `Error checking logo for ${ticker.symbol}: ${e.message}`,
+        `Error checking logo for ${ticker.symbol}: ${getErrorMessage(e)}`,
       );
     }
   }
@@ -228,7 +232,7 @@ export class TickersService {
       this.logger.log(`Saved logo for ticker ID ${symbolId}`);
     } catch (error) {
       this.logger.error(
-        `Failed to download logo from ${url}: ${error.message}`,
+        `Failed to download logo from ${url}: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -320,7 +324,7 @@ export class TickersService {
           return [...mappedDbResults, ...extResults];
         }
       } catch (err) {
-        this.logger.error(`Finnhub search failed: ${err.message}`);
+        this.logger.error(`Finnhub search failed: ${getErrorMessage(err)}`);
       }
     }
 
@@ -373,7 +377,7 @@ export class TickersService {
     if (logoUrl) {
       this.downloadAndSaveLogo(saved.id, logoUrl).catch((err) =>
         this.logger.error(
-          `Failed to download logo for ${saved.symbol}: ${err.message}`,
+          `Failed to download logo for ${saved.symbol}: ${getErrorMessage(err)}`,
         ),
       );
     }
@@ -460,11 +464,11 @@ export class TickersService {
         .getSummary(symbol)
         .catch((err) => {
           if (
-            err.message &&
-            (err.message.toLowerCase().includes('429') ||
-              err.message.toLowerCase().includes('too many requests') ||
-              err.message.toLowerCase().includes('crumb') ||
-              err.message.toLowerCase().includes('cookie'))
+            getErrorMessage(err) &&
+            (getErrorMessage(err).toLowerCase().includes('429') ||
+              getErrorMessage(err).toLowerCase().includes('too many requests') ||
+              getErrorMessage(err).toLowerCase().includes('crumb') ||
+              getErrorMessage(err).toLowerCase().includes('cookie'))
           ) {
             throw new HttpException(
               'Yahoo Finance Rate Limit Exceeded (Summary).',
@@ -472,7 +476,7 @@ export class TickersService {
             );
           }
           this.logger.warn(
-            `Yahoo Summary failed for ${symbol}: ${err.message}`,
+            `Yahoo Summary failed for ${symbol}: ${getErrorMessage(err)}`,
           );
           return null;
         });
@@ -480,18 +484,18 @@ export class TickersService {
         .getQuote(symbol)
         .catch((err) => {
           if (
-            err.message &&
-            (err.message.toLowerCase().includes('429') ||
-              err.message.toLowerCase().includes('too many requests') ||
-              err.message.toLowerCase().includes('crumb') ||
-              err.message.toLowerCase().includes('cookie'))
+            getErrorMessage(err) &&
+            (getErrorMessage(err).toLowerCase().includes('429') ||
+              getErrorMessage(err).toLowerCase().includes('too many requests') ||
+              getErrorMessage(err).toLowerCase().includes('crumb') ||
+              getErrorMessage(err).toLowerCase().includes('cookie'))
           ) {
             throw new HttpException(
               'Yahoo Finance Rate Limit Exceeded (Quote).',
               429,
             );
           }
-          this.logger.warn(`Yahoo Quote failed for ${symbol}: ${err.message}`);
+          this.logger.warn(`Yahoo Quote failed for ${symbol}: ${getErrorMessage(err)}`);
           return null; // Return null to continue if just quote fails
         });
 
@@ -528,7 +532,7 @@ export class TickersService {
     } catch (e) {
       if (e instanceof HttpException) throw e; // Propagate rate limits
       this.logger.error(
-        `Unexpected Yahoo fallback error for ${symbol}: ${e.message}`,
+        `Unexpected Yahoo fallback error for ${symbol}: ${getErrorMessage(e)}`,
       );
       return null;
     }

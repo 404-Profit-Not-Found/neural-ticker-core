@@ -145,4 +145,10 @@ export interface TickerData {
     notes: ResearchItem[]; // Ensuring notes is present
     ratings?: AnalystRating[];
     watchers: number;
+    news?: {
+        sentiment?: string;
+        score?: number;
+        summary?: string;
+        updated_at?: string;
+    };
 }

@@ -223,7 +223,6 @@ export function WatchlistTable() {
                     price: price,
                     change: change,
                     pe: fundamentals.pe_ttm ?? null,
-                    marketCap: fundamentals.market_cap ?? null,
                     potentialUpside: potentialUpside,
                     potentialDownside: potentialDownside,
                     riskScore: safeRiskScore,

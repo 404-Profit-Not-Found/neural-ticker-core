@@ -1,0 +1,17 @@
+92:           `Yahoo quote also failed for ${symbol}: ${yError.message}`,
+163:                 this.logger.warn(`Failed to save Yahoo candle: ${e.message}`);
+194:                 this.logger.warn(`Failed to save candle: ${e.message}`),
+231:                 `Background Yahoo enrichment skipped for ${symbol}: ${ye.message}`,
+242:           `Failed to refresh data for ${symbol} via Finnhub: ${error.message}. Triggering Yahoo fallback...`,
+254:                 `Failed to save Yahoo fallback candle: ${e.message}`,
+334:             `Failed to fetch news for ${symbol} in snapshot: ${err.message}`,
+370:             `Failed to get snapshot for ${symbol}: ${e.message}`,
+372:           return { symbol, error: e.message }; // Return error object to keep index alignment or just filter later
+466:         this.logger.error(`Yahoo history fallback failed: ${ye.message}`);
+509:         this.logger.debug(`Batch save history partially failed: ${e.message}`);
+512:       this.logger.error(`Failed to save historical data: ${e.message}`);
+654:       this.logger.error(`News sync failed for ${symbol}: ${e.message}`);
+686:           `Yahoo general news fallback failed: ${yError.message}`,
+718:             `Failed to fetch news for ${symbol}: ${err?.message ?? err}`,
+1445:         `Failed to fetch Yahoo snapshot for ${symbol}: ${e.message}`,
+1510:     if (error.message) return error.message;

@@ -133,6 +133,12 @@ export class TickerDetailController {
         : null,
       notes: researchNote ? [researchNote] : [], // Legacy support expects array
       ratings: analystRatings,
+      news: {
+        sentiment: ticker.news_sentiment,
+        score: ticker.news_impact_score,
+        summary: ticker.news_summary,
+        updated_at: ticker.last_news_update,
+      }
     };
   }
 }

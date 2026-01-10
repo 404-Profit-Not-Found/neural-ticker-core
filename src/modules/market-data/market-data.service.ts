@@ -1,4 +1,13 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  HttpException,
+  Inject,
+  forwardRef,
+  HttpStatus,
+} from '@nestjs/common';
+import { getErrorMessage } from '../../utils/error.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
@@ -46,6 +55,9 @@ export class MarketDataService {
     private readonly configService: ConfigService, // Added
   ) {}
 
+  private snapshotRequests = new Map<string, Promise<any>>();
+  private historyRequests = new Map<string, Promise<any>>();
+
   async getQuote(symbol: string) {
     try {
       const finnhubQuote = await this.finnhubService.getQuote(symbol);
@@ -72,7 +84,7 @@ export class MarketDataService {
       return null;
     } catch (e) {
       this.logger.warn(
-        `Fallback to Yahoo for quote ${symbol} due to error: ${e.message}`,
+        `Fallback to Yahoo for quote ${symbol} due to error: ${getErrorMessage(e)}`,
       );
       try {
         const yahooQuote = await this.yahooFinanceService.getQuote(symbol);
@@ -89,7 +101,7 @@ export class MarketDataService {
         }
       } catch (yError) {
         this.logger.error(
-          `Yahoo quote also failed for ${symbol}: ${yError.message}`,
+          `Yahoo quote also failed for ${symbol}: ${getErrorMessage(yError)}`,
         );
       }
       return null;
@@ -97,6 +109,22 @@ export class MarketDataService {
   }
 
   async getSnapshot(symbol: string) {
+    const key = symbol.toUpperCase();
+    const existing = this.snapshotRequests.get(key);
+    if (existing) {
+      this.logger.debug(`Coalescing snapshot request for ${key}`);
+      return existing;
+    }
+
+    const promise = this.performGetSnapshot(key).finally(() => {
+      this.snapshotRequests.delete(key);
+    });
+
+    this.snapshotRequests.set(key, promise);
+    return promise;
+  }
+
+  private async performGetSnapshot(symbol: string) {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
 
     // Configurable stale thresholds
@@ -160,7 +188,7 @@ export class MarketDataService {
                 yahooData.quote,
               );
               latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
-                this.logger.warn(`Failed to save Yahoo candle: ${e.message}`);
+                this.logger.warn(`Failed to save Yahoo candle: ${getErrorMessage(e)}`);
                 return latestCandle;
               });
             }
@@ -191,7 +219,7 @@ export class MarketDataService {
             await this.ohlcvRepo
               .save(newCandle)
               .catch((e) =>
-                this.logger.warn(`Failed to save candle: ${e.message}`),
+                this.logger.warn(`Failed to save candle: ${getErrorMessage(e)}`),
               );
             latestCandle = newCandle;
           }
@@ -228,7 +256,7 @@ export class MarketDataService {
               }
             } catch (ye) {
               this.logger.debug(
-                `Background Yahoo enrichment skipped for ${symbol}: ${ye.message}`,
+                `Background Yahoo enrichment skipped for ${symbol}: ${getErrorMessage(ye)}`,
               );
             }
 
@@ -238,8 +266,8 @@ export class MarketDataService {
           }
         }
       } catch (error) {
-        this.logger.error(
-          `Failed to refresh data for ${symbol} via Finnhub: ${error.message}. Triggering Yahoo fallback...`,
+        this.logger.warn(
+          `Failed to refresh data for ${symbol} via Finnhub: ${getErrorMessage(error)}. Triggering Yahoo fallback...`,
         );
         const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
         if (yahooData) {
@@ -251,7 +279,7 @@ export class MarketDataService {
             );
             latestCandle = await this.ohlcvRepo.save(newCandle).catch((e) => {
               this.logger.warn(
-                `Failed to save Yahoo fallback candle: ${e.message}`,
+                `Failed to save Yahoo fallback candle: ${getErrorMessage(e)}`,
               );
               return latestCandle;
             });
@@ -331,7 +359,7 @@ export class MarketDataService {
         }),
         this.getCompanyNews(symbol).catch((err) => {
           this.logger.warn(
-            `Failed to fetch news for ${symbol} in snapshot: ${err.message}`,
+            `Failed to fetch news for ${symbol} in snapshot: ${getErrorMessage(err)}`,
           );
           return [];
         }),
@@ -356,28 +384,55 @@ export class MarketDataService {
   }
 
   async getSnapshots(symbols: string[]) {
-    // Limit concurrency to avoid overwhelming Finnhub if we have many misses
+    // Limit concurrency to avoid overwhelming external APIs if we have many misses
     const validSymbols = symbols.filter((s) => s && s.trim().length > 0);
     const uniqueSymbols = [...new Set(validSymbols)];
 
-    // We can run these in parallel since they are internal calls
-    // However, if we possess a large list, we might want to chunk them.
-    // For now, assuming watchlist size < 50, Promise.all is fine.
-    const results = await Promise.all(
-      uniqueSymbols.map((symbol) =>
-        this.getSnapshot(symbol).catch((e) => {
-          this.logger.error(
-            `Failed to get snapshot for ${symbol}: ${e.message}`,
-          );
-          return { symbol, error: e.message }; // Return error object to keep index alignment or just filter later
-        }),
-      ),
-    );
+    // Fetch in chunks of 5 to respect API rate limits and avoid connection spikes
+    // Each getSnapshot can trigger up to 3 API calls (quote, profile, financials)
+    const chunkSize = 5;
+    const results: any[] = [];
+
+    for (let i = 0; i < uniqueSymbols.length; i += chunkSize) {
+      const chunk = uniqueSymbols.slice(i, i + chunkSize);
+      const chunkResults = await Promise.all(
+        chunk.map((symbol) =>
+          this.getSnapshot(symbol).catch((e) => {
+            this.logger.error(
+              `Failed to get snapshot for ${symbol}: ${getErrorMessage(e)}`,
+            );
+            return { symbol, error: getErrorMessage(e) };
+          }),
+        ),
+      );
+      results.push(...chunkResults);
+    }
 
     return results;
   }
 
   async getHistory(
+    symbol: string,
+    interval: string,
+    fromStr: string,
+    toStr: string,
+  ) {
+    const key = `${symbol.toUpperCase()}-${interval}-${fromStr}-${toStr}`;
+    const existing = this.historyRequests.get(key);
+    if (existing) {
+      this.logger.debug(`Coalescing history request for ${key}`);
+      return existing;
+    }
+
+    const promise = this.performGetHistory(symbol, interval, fromStr, toStr).finally(() => {
+      this.historyRequests.delete(key);
+    });
+
+    this.historyRequests.set(key, promise);
+    return promise;
+  }
+
+  private async performGetHistory(
     symbol: string,
     interval: string,
     fromStr: string,
@@ -438,7 +493,7 @@ export class MarketDataService {
       }
     } catch (e) {
       this.logger.warn(
-        `Finnhub history failed for ${symbol}: ${e.message}. Trying Yahoo fallback...`,
+        `Finnhub history failed for ${symbol}: ${getErrorMessage(e)}. Trying Yahoo fallback...`,
       );
       try {
         // Map common intervals
@@ -463,7 +518,7 @@ export class MarketDataService {
           }));
         }
       } catch (ye) {
-        this.logger.error(`Yahoo history fallback failed: ${ye.message}`);
+        this.logger.error(`Yahoo history fallback failed: ${getErrorMessage(ye)}`);
       }
     }
 
@@ -506,10 +561,10 @@ export class MarketDataService {
       await this.ohlcvRepo.save(entities, { chunk: 100 }).catch((e) => {
         // On conflict do nothing or update?
         // For simplicity with sqlite/postgres mix, we just catch and log
-        this.logger.debug(`Batch save history partially failed: ${e.message}`);
+        this.logger.debug(`Batch save history partially failed: ${getErrorMessage(e)}`);
       });
     } catch (e) {
-      this.logger.error(`Failed to save historical data: ${e.message}`);
+      this.logger.error(`Failed to save historical data: ${getErrorMessage(e)}`);
     }
   }
 
@@ -555,12 +610,12 @@ export class MarketDataService {
       );
     } catch (error) {
       this.logger.warn(
-        `Finnhub news fetch failed for ${symbol}: ${error.message}. Trying Yahoo fallback...`,
+        `Finnhub news fetch failed for ${symbol}: ${getErrorMessage(error)}. Trying Yahoo fallback...`,
       );
       try {
         news = await this.fetchNewsFromYahoo(symbol);
       } catch (yError) {
-        this.logger.error(`Yahoo news fallback also failed: ${yError.message}`);
+        this.logger.error(`Yahoo news fallback also failed: ${getErrorMessage(yError)}`);
         throw error; // Re-throw original error if fallback fails
       }
     }
@@ -651,7 +706,7 @@ export class MarketDataService {
         return news.length;
       }
     } catch (e) {
-      this.logger.error(`News sync failed for ${symbol}: ${e.message}`);
+      this.logger.error(`News sync failed for ${symbol}: ${getErrorMessage(e)}`);
       throw e;
     }
     return 0;
@@ -664,8 +719,8 @@ export class MarketDataService {
       const news = await this.finnhubService.getGeneralNews('general');
       return news || [];
     } catch (e) {
-      this.logger.error(
-        `Failed to fetch general news via Finnhub: ${e.message}. Trying Yahoo fallback...`,
+      this.logger.warn(
+        `Failed to fetch general news via Finnhub: ${getErrorMessage(e)}. Trying Yahoo fallback...`,
       );
       try {
         const yahooResults =
@@ -683,7 +738,7 @@ export class MarketDataService {
         }));
       } catch (yError) {
         this.logger.error(
-          `Yahoo general news fallback failed: ${yError.message}`,
+          `Yahoo general news fallback failed: ${getErrorMessage(yError)}`,
         );
         return [];
       }
@@ -715,7 +770,7 @@ export class MarketDataService {
           return { symbol, count: items.length };
         } catch (err) {
           this.logger.warn(
-            `Failed to fetch news for ${symbol}: ${err?.message ?? err}`,
+            `Failed to fetch news for ${symbol}: ${getErrorMessage(err)}`,
           );
           return { symbol, count: 0, error: true };
         }
@@ -1061,13 +1116,56 @@ export class MarketDataService {
       WHEN bear_scenario.price_mid IS NOT NULL AND price.close > 0 
       THEN ((bear_scenario.price_mid - price.close) / price.close) * 100
       WHEN risk.financial_risk >= 8 THEN -100
-      ELSE -(risk.financial_risk * 2.5)
+      ELSE -(risk.financial_risk * 5)
     END`;
+
+    const verdictScoreSql = `(
+        50
+        -- 1. Upside Impact (Max 0+, Capped at 100, * 0.4)
+        + (GREATEST(0, LEAST(100, COALESCE(${upsideExpr}, 0))) * 0.4)
+        
+        -- 2. Downside Impact (Abs, Cap 40, * 0.8) -> Subtract
+        - (LEAST(40, ABS(COALESCE(${downsideExpr}, 0)) * 0.8))
+        
+        -- 3. Risk Penalty / Bonus
+        + CASE 
+            WHEN risk.financial_risk >= 8 THEN -20 
+            WHEN risk.financial_risk >= 6 THEN -10 
+            WHEN risk.financial_risk <= 3 THEN 5 
+            ELSE 0 
+          END
+        
+        -- 4. Neural Score Bonus (Weight Increased)
+        + CASE 
+            WHEN "risk"."overall_score" >= 8 THEN 20
+            WHEN "risk"."overall_score" >= 6 THEN 10
+            WHEN "risk"."overall_score" <= 4 THEN -10
+            ELSE 0 
+          END
+        
+        -- 5. Analyst Consensus
+        + CASE 
+            WHEN fund.consensus_rating ILIKE '%Strong Buy%' THEN 10 
+            WHEN fund.consensus_rating ILIKE '%Buy%' THEN 5 
+            WHEN fund.consensus_rating ILIKE '%Sell%' THEN -10 
+            ELSE 0 
+          END
+          
+        -- 6. PE Ratio Impact - Only reward value, don't punish growth/pre-revenue
+        + CASE 
+            WHEN fund.pe_ttm IS NULL OR fund.pe_ttm <= 0 THEN 0
+            WHEN fund.pe_ttm <= 10 THEN 20           -- Exceptional Value
+            WHEN fund.pe_ttm <= 15 THEN 15           -- Great Value
+            WHEN fund.pe_ttm <= 25 THEN 5            -- Fair Value
+            ELSE 0 
+          END
+      )`;
 
     qb.addSelect('base_scenario.price_mid', 'base_price');
     qb.addSelect('bear_scenario.price_mid', 'bear_price');
     qb.addSelect(upsideExpr, 'dynamic_upside');
     qb.addSelect(downsideExpr, 'dynamic_downside');
+    qb.addSelect(verdictScoreSql, 'ai_verdict_score');
 
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
@@ -1180,63 +1278,6 @@ export class MarketDataService {
     // Synchronized with frontend rating-utils.ts
     // Score Tiers: >= 80 Strong Buy, >= 65 Buy, >= 45 Hold, < 45 Sell
     if (options.aiRating && options.aiRating.length > 0) {
-      // Define the Verdict Score Expression
-      const upsideCalc = `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100`;
-      const downsideCalc = `
-        CASE 
-          WHEN bear_scenario.price_mid IS NOT NULL AND price.close > 0 
-          THEN ((bear_scenario.price_mid - price.close) / price.close) * 100
-          WHEN risk.financial_risk >= 8 THEN -100
-          ELSE -(risk.financial_risk * 5)
-        END
-      `;
-
-      // SQL equivalent of rating-utils.ts calculateAiRating
-      // Note: usage of COALESCE/NULL handling is critical
-      const verdictScoreSql = `(
-        50
-        -- 1. Upside Impact (Max 0+, Capped at 100, * 0.4)
-        + (GREATEST(0, LEAST(100, COALESCE(${upsideCalc}, 0))) * 0.4)
-        
-        -- 2. Downside Impact (Abs, Cap 40, * 0.8) -> Subtract
-        - (LEAST(40, ABS(COALESCE(${downsideCalc}, 0)) * 0.8))
-        
-        -- 3. Risk Penalty / Bonus
-        + CASE 
-            WHEN risk.financial_risk >= 8 THEN -20 
-            WHEN risk.financial_risk >= 6 THEN -10 
-            WHEN risk.financial_risk <= 3 THEN 5 
-            ELSE 0 
-          END
-        
-        -- 4. Neural Score Bonus
-        + CASE 
-            WHEN risk.overall_score >= 8 THEN 10 
-            WHEN risk.overall_score >= 6 THEN 5 
-            WHEN risk.overall_score <= 4 THEN -5 
-            ELSE 0 
-          END
-        
-        -- 5. Analyst Consensus
-        + CASE 
-            WHEN fund.consensus_rating ILIKE '%Strong Buy%' THEN 10 
-            WHEN fund.consensus_rating ILIKE '%Buy%' THEN 5 
-            WHEN fund.consensus_rating ILIKE '%Sell%' THEN -10 
-            ELSE 0 
-          END
-          
-        -- 6. PE Ratio Impact (Value Investing)
-        + CASE 
-            WHEN fund.pe_ttm IS NULL THEN -10       -- Penalty for missing P/E
-            WHEN fund.pe_ttm < 0 THEN -10           -- Unprofitable
-            WHEN fund.pe_ttm < 15 THEN 15           -- Great Value
-            WHEN fund.pe_ttm < 30 THEN 5            -- Fair Value
-            WHEN fund.pe_ttm > 60 THEN -15          -- Extremely Overvalued
-            WHEN fund.pe_ttm > 40 THEN -5           -- Overvalued
-            ELSE 0 
-          END
-      )`;
-
       qb.andWhere(
         new Brackets((sub) => {
           options.aiRating?.forEach((rating) => {
@@ -1253,13 +1294,9 @@ export class MarketDataService {
             } else if (rating === 'Sell') {
               sub.orWhere(`${verdictScoreSql} < 45`);
             } else if (rating === 'Speculative Buy') {
-              // Speculative Buy override logic: High Risk but High Reward
-              // Frontend: variant = 'speculativeBuy' if risk >= 8 && (score >= 7.5 || upside >= 100)
-              // But 'rating' string is just 'Sell' or 'Hold' usually in that case unless we explicitly label it.
-              // For backend filter, let's keep it simple or align strictly if 'Speculative Buy' is a requested filter.
-              // Assuming standard tiers for now.
+              // Speculative Buy override logic
               sub.orWhere(
-                `risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR COALESCE(${upsideCalc}, 0) >= 100)`,
+                `risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR ${upsideExpr} >= 100)`,
               );
             }
           });
@@ -1273,7 +1310,7 @@ export class MarketDataService {
     if (sortBy === 'change' || sortBy === 'price_change') {
       sortField = '"price_change_pct"';
     } else if (sortBy === 'ai_rating') {
-      sortField = 'risk.financial_risk';
+      sortField = '"ai_verdict_score"';
     } else if (['symbol', 'name', 'sector', 'industry'].includes(sortBy)) {
       sortField = `ticker.${sortBy}`;
     } else if (sortBy === 'upside_percent') {
@@ -1288,6 +1325,8 @@ export class MarketDataService {
       sortField = `price.${sortBy}`;
     } else if (sortBy === 'research') {
       sortField = '"research_count"';
+    } else if (sortBy === 'consensus') {
+      sortField = 'fund.consensus_rating';
     }
 
     qb.orderBy(sortField, sortDir);
@@ -1433,6 +1472,21 @@ export class MarketDataService {
     });
   }
 
+  async updateTickerNews(
+    symbol: string,
+    data: { sentiment: string; score: number; summary: string },
+  ) {
+    const ticker = await this.tickerRepo.findOne({ where: { symbol } });
+    if (!ticker) return;
+
+    ticker.news_sentiment = data.sentiment;
+    ticker.news_impact_score = Math.round(data.score); // Ensure integer column compatibility
+    ticker.news_summary = data.summary;
+    ticker.last_news_update = new Date();
+
+    await this.tickerRepo.save(ticker);
+  }
+
   private async fetchFullSnapshotFromYahoo(symbol: string) {
     try {
       const [quote, summary] = await Promise.all([
@@ -1442,7 +1496,7 @@ export class MarketDataService {
       return { quote, summary };
     } catch (e) {
       this.logger.error(
-        `Failed to fetch Yahoo snapshot for ${symbol}: ${e.message}`,
+        `Failed to fetch Yahoo snapshot for ${symbol}: ${getErrorMessage(e)}`,
       );
       return null;
     }

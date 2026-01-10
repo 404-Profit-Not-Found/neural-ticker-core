@@ -252,7 +252,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       this.logger.log(
         `[Research] Generating note for ${note.tickers.join(', ')}...`,
       );
-      this.logger.log(`[Research] Numeric Context: ${JSON.stringify(context)}`);
+      // this.logger.log(`[Research] Numeric Context: ${JSON.stringify(context)}`);
 
       const result = await this.llmService.generateResearch({
         question: note.question + dataRequirements,
@@ -996,22 +996,40 @@ Title:`;
             Using available news, identify Top Market Movers or Thematic Stories.
             
             STRICT RULES:
-            1. Select only the TOP 3-5 most profound stories. Do not force coverage if news is trivial.
+            1. Select only the TOP 3-5 most profound stories.
             2. Assign an **Impact Index** (1-10) to each story (10 = Market Crash/Explosion, 1 = Noise).
-            3. Label Sentiment as **BULLISH**, **BEARISH**, or **MIXED**.
+            3. Label Sentiment as **BULLISH**, **BEARISH**, or **NEUTRAL**.
             4. SORT stories by Impact Index (Descending).
-            5. Use **Markdown** formatting for the digest use --- to separate sections.
-
-            Style Guide:
-            - Headlines: **[SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]**
-            - ** Headline text**
-            - **IMPORTANT**: When mentioning a ticker symbol, format it as a Markdown link: [SYMBOL](/ticker/SYMBOL). Example: [NVDA](/ticker/NVDA) reported earnings...
-            - Tone: Bloomberg/Terminal. Concise. No fluff.
-            - **DO NOT** include a main title/header (e.g., 'Daily Smart News Digest'). Start directly with the Market Pulse.
-            - Structure:
-              1. Market Pulse (1-2 sentences).
-              2. Sections for each Key Story.
-                 - For each story, explain the **"Why"** and the **"Risk/Catalyst"**.
+            5. **CRITICAL**: END the response with a JSON block containing the structured data.
+            
+            Structure:
+            
+            [Markdown Section]
+            ## Market Pulse
+            (1-2 sentences on macro mood)
+            
+            ---
+            
+            ## Key Stories
+            
+            ### [SYMBOL](/ticker/SYMBOL) (SENTIMENT) [Impact: X/10]
+            **Headline**
+            - **The Why**: ...
+            - **Risk/Catalyst**: ...
+            
+            [JSON Section]
+            \`\`\`json
+            {
+              "items": [
+                {
+                  "symbol": "NVDA",
+                  "sentiment": "BULLISH",
+                  "impact_score": 10,
+                  "summary": "Blackwell chips sold out until 2026."
+                }
+              ]
+            }
+            \`\`\`
         `;
 
       // 3. Call LLM
@@ -1038,6 +1056,31 @@ Title:`;
 
       const saved = await this.noteRepo.save(savedPending);
       this.logger.log(`Personalized Digest Saved (ID: ${saved.id})`);
+
+      // 5. PARSE & UPDATE TICKERS (The Smart News Integration)
+      try {
+        const jsonMatch = result.answerMarkdown.match(/```json\n([\s\S]*?)\n```/) || result.answerMarkdown.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const parsed = JSON.parse(jsonStr);
+            
+            if (parsed.items && Array.isArray(parsed.items)) {
+                this.logger.log(`Found ${parsed.items.length} news items to sync to DB...`);
+                for (const item of parsed.items) {
+                    if (item.symbol && item.impact_score) {
+                        await this.marketDataService.updateTickerNews(item.symbol, {
+                            sentiment: item.sentiment,
+                            score: item.impact_score,
+                            summary: item.summary
+                        });
+                    }
+                }
+            }
+        }
+      } catch (parseErr) {
+        this.logger.warn('Failed to parse structured news data from digest', parseErr);
+      }
+
       return saved;
     } catch (e) {
       this.logger.error('Failed to generate personalized digest', e);
