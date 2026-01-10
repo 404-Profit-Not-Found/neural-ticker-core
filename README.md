@@ -1,460 +1,134 @@
+# 🧠 Neural-Ticker
 
+![Build Status](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/ci.yml/badge.svg)
+![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)
+![NestJS](https://img.shields.io/badge/nestjs-%5E11.0.0-red)
+![React](https://img.shields.io/badge/react-%5E19.0.0-blue)
+![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)
 
+> **Neural-Ticker** is a state-of-the-art, AI-driven equity research and risk-analysis platform. It bridges the gap between raw market data and actionable investment theses by leveraging Large Language Models (LLMs) to perform deep qualitative research and quantitative risk scoring.
 
-# neural-ticker Core
-[![Deploy to Cloud Run](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/deploy.yml/badge.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/deploy.yml)
-[![Build Status](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions/workflows/ci.yml/badge.svg)](https://github.com/404-Profit-Not-Found/neural-ticker-core/actions)
-[![Coverage](https://img.shields.io/badge/coverage-80.9%25-brightgreen)](https://github.com/branislavlang/neural-ticker-core)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![NestJS](https://img.shields.io/badge/nestjs-%5E10.0.0-red)](https://nestjs.com/)
-[![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue)](https://www.typescriptlang.org/)
+---
 
-**neural-ticker Core** is the authoritative backend for the AI-assisted stock research tool. It orchestrates data ingestion from financial APIs (Finnhub), generates qualitative research notes via LLMs (OpenAI, Gemini), and calculates quantitative Risk/Reward scores.
+## 🚀 Key Features
 
-## 📚 System Architecture
+### 🏛️ Professional Research Pipeline
+- **Smart News Briefing**: Native AI-curated daily digests of your top watchlists.
+- **Deep Research Agent**: Autonomous multi-minute investigations using `gemini-3-pro-preview` to analyze 10-Ks, regulatory risks, and competitive landscapes.
+- **Automated SWOT Analysis**: Qualitative factors (Strengths, Weaknesses, Opportunities, Threats) extracted directly from research nodes.
 
-The system is built as a modular NestJS application:
+### ⚖️ Advanced Risk Scoring (Neural Rating)
+- **Probability-Weighted Verdicts**: Advanced algorithm incorporating behavioral economics (Loss Aversion Factor 2.0x).
+- **Skew Analysis**: Rewards favorable risk-reward asymmetry and penalizes catastrophic downside.
+- **Multidimensional Risk**: Scores for Financial, Execution, Dilution, Competitive, and Regulatory risks.
 
-- **TickersModule**: Manages the universe of tracked assets (Tickers, Company Profiles).
-- **MarketDataModule**: Handles Time-Series (OHLCV) and Fundamental data ingestion (PostgreSQL/Neon).
-- **ResearchModule**: Orchestrates LLM-based qualitative analysis.
-- **RiskRewardModule**: Generates quantitative scores (0-100) based on market data and AI insights.
-- **JobsModule**: Schedules background tasks (Daily Sync, Scanners).
-- **AuthModule**: Handles Google OAuth, Firebase Token Exchange, and JWT issuance.
+### 📊 Real-Time Market Intelligence
+- **Hybrid Data Sourcing**: High-performance ingestion from Finnhub and Yahoo Finance.
+- **Market Snapshots**: Instant retrieval of price, fundamentals, and analyst ratings.
+- **Candlestick Visualizations**: Integrated TradingView Lightweight Charts with custom design system tokens.
 
-## 🗄️ Database Architecture
+---
 
-The data layer utilizes **PostgreSQL** (Neon Serverless).
-
-
+## 🏛️ Ecosystem Architecture
 
 ```mermaid
-classDiagram
-    direction TB
-    class tickers {
-        +BIGINT id
-        +TEXT symbol
-        +TEXT name
-        +TEXT exchange
-        +TEXT currency
-        +TEXT country
-        +DATE ipo_date
-        +NUMERIC market_capitalization
-        +NUMERIC share_outstanding
-        +TEXT phone
-        +TEXT web_url
-        +TEXT logo_url
-        +TEXT finnhub_industry
-        +TEXT sector
-        +TEXT industry
-        +JSONB finnhub_raw
-        +TIMESTAMPTZ created_at
-        +TIMESTAMPTZ updated_at
-    }
-
-    class ticker_logos {
-        +BIGINT symbol_id
-        +BYTEA image_data
-        +TEXT mime_type
-    }
-
-    class users {
-        +UUID id
-        +TEXT email
-        +TEXT google_id
-        +TEXT full_name
-        +ENUM role
-        +TEXT avatar_url
-        +TEXT nickname
-        +TEXT view_mode
-        +TEXT theme
-        +JSONB preferences
-        +TIMESTAMPTZ last_login
-        +TIMESTAMPTZ created_at
-        +TIMESTAMPTZ updated_at
-    }
-
-    class allowed_users {
-        +UUID id
-        +TEXT email
-        +TIMESTAMPTZ created_at
-    }
-
-    class auth_logs {
-        +UUID id
-        +UUID user_id
-        +TEXT provider
-        +TEXT ip_address
-        +TIMESTAMPTZ login_at
-    }
-
-    class price_ohlcv {
-        +BIGINT symbol_id
-        +TIMESTAMPTZ ts
-        +TEXT timeframe
-        +NUMERIC open
-        +NUMERIC high
-        +NUMERIC low
-        +NUMERIC close
-        +NUMERIC volume
-        +TEXT source
-    }
-
-    class fundamentals {
-        +BIGINT symbol_id
-        +NUMERIC market_cap
-        +NUMERIC pe_ttm
-        +NUMERIC eps_ttm
-        +NUMERIC beta
-        +TIMESTAMPTZ updated_at
-    }
-
-    class research_notes {
-        +BIGINT id
-        +UUID request_id
-        +UUID user_id
-        +TEXT[] tickers
-        +TEXT question
-        +TEXT title
-        +ENUM provider
-        +ENUM status
-        +TEXT quality
-        +TEXT[] models_used
-        +TEXT answer_markdown
-        +TEXT full_response
-        +JSONB numeric_context
-        +JSONB grounding_metadata
-        +TEXT thinking_process
-        +INTEGER tokens_in
-        +INTEGER tokens_out
-        +TEXT error
-        +TIMESTAMPTZ created_at
-        +TIMESTAMPTZ updated_at
-    }
-
-    class risk_analyses {
-        +BIGINT id
-        +BIGINT ticker_id
-        +TEXT model_version
-        +NUMERIC overall_score
-        +NUMERIC financial_risk
-        +NUMERIC execution_risk
-        +NUMERIC dilution_risk
-        +NUMERIC competitive_risk
-        +NUMERIC regulatory_risk
-        +INTEGER time_horizon_years
-        +NUMERIC price_target_weighted
-        +NUMERIC upside_percent
-        +NUMERIC analyst_target_avg
-        +NUMERIC analyst_target_range_low
-        +NUMERIC analyst_target_range_high
-        +TEXT sentiment
-        +JSONB fundamentals
-        +JSONB red_flags
-        +JSONB metadata
-        +TEXT research_note_id
-        +TIMESTAMPTZ created_at
-    }
-
-    class risk_scenarios {
-        +BIGINT id
-        +BIGINT analysis_id
-        +ENUM scenario_type
-        +NUMERIC probability
-        +NUMERIC price_mid
-        +TEXT description
-        +TEXT[] key_drivers
-    }
-
-    class risk_qualitative_factors {
-        +BIGINT id
-        +BIGINT analysis_id
-        +ENUM factor_type
-        +TEXT description
-    }
-
-    class risk_catalysts {
-        +BIGINT id
-        +BIGINT analysis_id
-        +ENUM timeframe
-        +TEXT description
-    }
-
-    class comments {
-        +BIGINT id
-        +TEXT ticker_symbol
-        +UUID user_id
-        +TEXT content
-        +TIMESTAMPTZ created_at
-        +TIMESTAMPTZ updated_at
-    }
-
-    class stocktwits_posts {
-        +BIGINT id
-        +TEXT symbol
-        +TEXT username
-        +TEXT body
-        +INTEGER likes_count
-        +INTEGER user_followers_count
-        +TIMESTAMPTZ created_at
-    }
-
-    class stocktwits_watchers {
-        +UUID id
-        +TEXT symbol
-        +INTEGER count
-        +TIMESTAMPTZ timestamp
-    }
-
-    class watchlists {
-        +BIGINT id
-        +UUID user_id
-        +TEXT name
-        +TIMESTAMPTZ created_at
-    }
-
-    class watchlist_items {
-        +BIGINT id
-        +BIGINT watchlist_id
-        +BIGINT ticker_id
-        +TIMESTAMPTZ added_at
-    }
-
-    tickers "1" -- "1" ticker_logos : has logo
-    tickers "1" -- "*" price_ohlcv : has history
-    tickers "1" -- "1" fundamentals : has current stats
-    tickers "1" -- "*" risk_analyses : has risk profile
-    tickers "1" -- "*" stocktwits_posts : mentions
-    tickers "1" -- "*" stocktwits_watchers : tracked in
-    tickers "1" -- "*" comments : discussed in
-    risk_analyses "1" -- "*" risk_scenarios : has scenarios
-    risk_analyses "1" -- "*" risk_qualitative_factors : has SWOT factors
-    risk_analyses "1" -- "*" risk_catalysts : has catalysts
-    research_notes "1" -- "*" risk_analyses : generates
-    users "1" -- "*" auth_logs : logs login
-    users "1" -- "*" research_notes : requests
-    users "1" -- "*" watchlists : owns
-    users "1" -- "*" comments : writes
-    watchlists "1" -- "*" watchlist_items : contains
-    watchlist_items "*" -- "1" tickers : references
+graph TD
+    User([Investor/Analyst]) <--> FE[React Frontend]
+    FE <--> BE[NestJS Core API]
+    BE <--> DB[(PostgreSQL)]
+    BE <--> Redis[In-Memory Cache]
+    BE --> FH[Finnhub API]
+    BE --> YF[Yahoo Finance]
+    BE --> AI[AI Engine: Gemini/GPT-4]
+    AI --> Research[Deep Research Reports]
+    Research --> Scoring[Probability-Weighted Risk Score]
 ```
 
-## 🔐 Authentication & API
+## 🛠️ Technology Stack
 
-The API is secured via JWT. Common flow:
+| Layer | Technology |
+| :--- | :--- |
+| **Backend** | [NestJS](https://nestjs.com/) (Modular Architecture) |
+| **Frontend** | [React](https://react.dev/), [Vite](https://vitejs.dev/), [shadcn/ui](https://ui.shadcn.com/) |
+| **Persistence** | [PostgreSQL](https://www.postgresql.org/) (Production), [TypeORM](https://typeorm.io/) |
+| **AI / ML** | [Google Gemini](https://deepmind.google/technologies/gemini/), [OpenAI GPT-4/5](https://openai.com/) |
+| **Styling** | [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) |
+| **Testing** | [Jest](https://jestjs.io/), [Vitest](https://vitest.dev/), [Cypress](https://www.cypress.io/) |
 
-1.  **Login via Google/Firebase**: Obtain a Firebase ID Token.
-2.  **Exchange Token**: `POST /auth/firebase` with `{ token: "..." }` to get an App Access Token.
-3.  **Use Token**: Add `Authorization: Bearer <access_token>` to requests.
+---
 
-Key Endpoints:
-- `GET /api/v1/tickers`: List watched tickers.
-- `GET /api/v1/tickers/{symbol}/snapshot`: Get latest price/fundamentals (Lazy loads from Finnhub if missing).
-- `POST /api/v1/research/ask`: Submit a research query (Async, returns Ticket ID).
-- `GET /api/v1/research`: List my research tickets.
-- `GET /api/v1/research/{id}`: Poll for research results.
-- `POST /api/v1/users/me/preferences`: Securely store API keys (e.g. Gemini).
-
-**Swagger UI**:
-Detailed API documentation enabled in development at `/api` (or `/swagger`).
-
-## 🧠 AI Model Configuration
-
-Multi-provider support (OpenAI, Gemini) with quality tiers. Configuration via `src/config/configuration.ts`.
-
-> [!IMPORTANT]
-> These are my benchmarks as of December 2025. 
-
-| Tier | OpenAI | Gemini | Use Case |
-| :--- | :--- | :--- | :--- |
-| **Low** | `gpt-4.1-mini` | `gemini-2.5-flash-lite` | Quick sentiment, simple extraction |
-| **Medium** | `gpt-5-mini` | `gemini-3-flash-preview` | **Default**: News summaries, alerts |
-| **Deep** | `gpt-5.1`| `gemini-3-pro-preview` | 10-K analysis, thesis generation |
-
-### 📊 Gemini Model Benchmarks (Dec 2025)
-
-| Model | Success Rate | Avg Time | Output Detail (Chars) | Verdict |
-| :--- | :--- | :--- | :--- | :--- |
-| **gemini-3-flash-preview** | 100% | **~5-8s** | 2,400+ | **🏆 Best Value** (Balanced) |
-| **gemini-3-pro-preview** | 100% | ~12-20s | **3,200+** | **Deepest Analysis** |
-| **gemini-2.5-flash-lite** | 100% | **~2-4s** | 1,500 | Fastest / Lower Detail |
-
-**Recommendation**: Use **`gemini-3-flash-preview`** for standard reports and news. Use **`gemini-3-pro-preview`** when depth is critical and latency is less important. Use **`gemini-2.5-flash-lite`** for high-throughput, simple jobs.
-> [!NOTE]
-> Previous failures with `gemini-2.5-pro` were due to testing pre-release versions. The stable channel is now fully operational.
-
-### Deep Research Agent
-
-For autonomous multi-minute investigations, use the **Deep Research Agent** (`deep-research-pro-preview-12-2025`):
-
-```typescript
-// Interactions API (not generateContent)
-await client.interactions.create({
-  agent: 'deep-research-pro-preview-12-2025',
-  input: 'Deep dive into NVDA focusing on regulatory risks.',
-  background: true,
-  stream: true,
-});
-```
-
-### 📰 Smart News Briefing
-The system generates a daily AI-curated news digest ("Smart News Briefing").
-*   **Trigger**: Lazy-loaded upon the first user access of the UTC day.
-*   **Source**: Top 5 tickers most frequently tracked across all user watchlists, falling back to top market movers.
-*   **Persistence**: Generated digests are saved to the `research_notes` table (System User) to allow historical retrieval and prevent re-generation.
-*   **Frontend**: Fetched via `GET /api/v1/news/digest`.
-
-## 🔬 Risk Analysis Data Extraction
-
-The `RiskRewardService` automatically extracts structured risk analysis data from unstructured research notes using a resilient two-phase approach.
-
-### Extraction Pipeline
+## 📂 Repository Structure
 
 ```
-Research Note (Markdown)
-         │
-         ▼
-┌─────────────────────────────────────┐
-│    LLM Extraction (TOON Format)     │
-│    - Primary: toonToJson parser     │
-│    - Fallback 1: JSON.parse         │
-│    - Fallback 2: Manual repair      │
-└─────────────────────────────────────┘
-         │ (up to 3 retries)
-         ▼
-┌─────────────────────────────────────┐
-│     salvageFromRaw (Regex)          │  ◄── Last Resort Fallback
-│     Extracts data even from         │
-│     malformed LLM output            │
-└─────────────────────────────────────┘
-         │
-         ▼
-      RiskAnalysis Entity (Saved to DB)
+neural-ticker/
+├── src/                # Backend (NestJS)
+│   ├── modules/        # Core business logic (Auth, Market, Research, Risk)
+│   ├── common/         # Middlewares, interceptors, guards
+│   └── migrations/     # Database versioning
+├── frontend/           # Frontend (React + Vite)
+│   ├── src/
+│   │   ├── components/ # Atomic UI & Business components
+│   │   ├── services/  # API layer
+│   │   └── lib/       # Shared utilities (Rating logic, API clients)
+├── .github/            # CI/CD Workflows (deployment, crons)
+└── docker-compose.yml  # Local infrastructure orchestration
 ```
 
-### What Gets Extracted
+---
 
-| Category | Fields | Description |
-|----------|--------|-------------|
-| **Risk Scores** | `overall_score`, `financial_risk`, `execution_risk`, `dilution_risk`, `competitive_risk`, `regulatory_risk` | 0-10 scale (0=safe, 10=extreme risk) |
-| **Price Scenarios** | `bull`, `base`, `bear` | Each with `probability`, `price_target_mid/low/high`, `key_drivers[]` |
-| **Qualitative Factors** | `strengths`, `weaknesses`, `opportunities`, `threats` | SWOT-style analysis |
-| **Catalysts** | `near_term`, `long_term` | Upcoming events that could move the stock |
-| **Red Flags** | `red_flags[]` | Warning signs to monitor |
+## 🔬 Risk Analysis Extraction
 
-### salvageFromRaw Fallback
+The `RiskRewardService` utilizes a resilient two-phase pipeline to transform unstructured AI research into structured database entities:
 
-When the LLM produces malformed JSON (common with complex analysis), `salvageFromRaw` uses regex patterns to extract data:
+1. **LLM Extraction**: Preferred output in **TOON** or JSON format.
+2. **Regex Salvage**: A "last-resort" extraction engine that recovers data from malformed LLM responses using high-precision regex patterns.
 
-```typescript
-// Extracts from TOON/JSON format:
-bull: { price_target_mid: 150, key_drivers: ["AI growth"] }
+This ensures that even if an AI model hallucinates formatting, the core numeric data (Prices, Scores, Probabilities) remains intact.
 
-// Also handles text patterns:
-Bull Case: $150
-strengths: ["Strong pipeline", "Good management"]
-```
+---
 
-**Patterns Supported:**
-- **Numeric values:** `key: value` or `"key": value`
-- **Arrays:** `key: ["item1", "item2"]`
-- **Scenario prices:** `Bull Case: $X` or `bull: { price_target_mid: X }`
-- **Probabilities:** `probability: 0.25` or `25%`
+## 🔐 Security & Governance
 
-### Triggering Extraction
+- **Fine-Grained Access Control**: Multi-tier user system (Free, Pro, Whale, Admin).
+- **Audit Logging**: Comprehensive auth logs and credit transaction history.
+- **Admin Console**: Unified identity management and real-time "Shadow Banning" for tickers.
+- **Global Validation**: Strict DTO enforcement via `class-validator` and TypeScript `strict: true`.
 
-Extraction happens automatically when:
-1. **New Research Created:** `POST /api/v1/research/ask` → Research completed → Risk analysis generated
-2. **Manual Sync:** `POST /api/v1/research/sync/{symbol}` → Reprocesses last 5 notes
+---
 
-To manually reprocess all research for a ticker:
-```bash
-curl -X POST http://localhost:3000/api/v1/research/sync/AAPL
-```
-
-### Console Logging
-
-Extraction results are logged for debugging:
-```
-[RiskRewardService] [AAPL] === EXTRACTION RESULTS ===
-[RiskRewardService] [AAPL] Risk Score: overall=6
-[RiskRewardService] [AAPL] Scenarios: bull=$180, base=$150, bear=$120
-[RiskRewardService] [AAPL] Qualitative strengths: ["Strong ecosystem","Services growth"]
-[RiskRewardService] [AAPL] Catalysts near_term: ["iPhone 16 launch","Q4 earnings"]
-[RiskRewardService] [AAPL] Red flags: ["China sales decline"]
-[RiskRewardService] [AAPL] === END EXTRACTION ===
-```
-
-
-### Quick Spec
-- **Auth**: Firebase Client SDK -> Exchange for JWT.
-- **Research**: Async flow (`POST /ask` -> `GET /:id`).
-- **Websockets**: Not currently implemented (use polling).
-
-## 🚀 Getting Started
+## 🏁 Getting Started
 
 ### Prerequisites
-
-- **Node.js** (v18+)
-- **Docker** & **Docker Compose**
-- **Finnhub API Key**
-- **OpenAI / Gemini API Keys** (Optional for AI features)
+- Node.js v20+
+- PostgreSQL (or use the provided Docker setup)
+- Finnhub API Key
 
 ### Installation
 
-```bash
-$ npm install
-```
-
-### Environment Setup
-
-1. Copy the example environment file:
+1. **Clone & Install Dependencies**
    ```bash
-   cp .env.example .env
-   ```
-2. Configure your keys:
-   ```ini
-   DATABASE_URL=postgres://user:pass@host:5432/neondb?sslmode=require
-   FINNHUB_API_KEY=your_key
-   OPENAI_API_KEY=your_key
-   FIREBASE_API_KEY=your_web_api_key
+   git clone https://github.com/404-Profit-Not-Found/neural-ticker-core.git
+   cd neural-ticker-core
+   npm install
+   cd frontend && npm install
    ```
 
-### Running the App
+2. **Environment Configuration**
+   Follow the `.env.example` in both root and `frontend` directories.
 
-Run the server:
-```bash
-# Data ingestion & API
-$ npm run start:dev
-```
+3. **Development Mode**
+   ```bash
+   # Start Backend (Port 3000)
+   npm run start:dev
 
-## 🧪 Testing & Code Quality
+   # Start Frontend (Vite)
+   cd frontend && npm run dev
+   ```
 
-The project maintains **>80% Code Coverage** for critical services.
-
-```bash
-# Linting (Run this before commit)
-$ npm run lint
-
-# Unit Tests
-$ npm run test
-
-# End-to-End Tests
-$ npm run test:e2e
-
-# View Coverage Report
-$ npm run test:cov
-```
-
-## 📦 Deployment
-
-Powered by **Google Cloud Run** and **GitHub Actions**.
-
-- **Push to Main**: Triggers Build, Test, & Lint.
-- **Auto-Migration**: Database migrations run automatically on startup via `migrationsRun: true`.
-- **Release**: Handled via GitHub Release workflow.
+---
 
 ## 📄 License
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
-This project is [MIT licensed](LICENSE).
-
+---
+*Built for the next generation of quantitative and qualitative analysts.*

@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# 🖼️ Neural-Ticker Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The visualization and interactive layer for the **Neural-Ticker** ecosystem. Built with a focus on high-density financial data, real-time feedback, and premium aesthetics.
 
-Currently, two official plugins are available:
+## 🚀 Highlights
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Intelligent Dashboards**: Real-time ticker tracking with integrated sparklines and AI sentiment indicators.
+- **Deep Research Interface**: View-mode toggle (KISS vs. Deep) for researchers to switch between simplified outcomes and raw analytical depth.
+- **Interactive Charting**: Custom wrappers for TradingView Lightweight Charts, synchronized with the platform's color palette.
+- **Admin Command Center**: Real-time user management, tier switching, and identity verification.
 
-## React Compiler
+## 🛠️ Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework**: [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
+- **State Management**: [TanStack Query (v5)](https://tanstack.com/query) with IndexedDB persistence.
+- **UI Components**: [shadcn/ui](https://ui.shadcn.com/) (Radix UI primitives).
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [class-variance-authority](https://cva.style/).
+- **Icons**: [Lucide React](https://lucide.dev/).
+- **Charts**: [Lightweight Charts (TradingView)](https://www.tradingview.com/lightweight-charts/).
 
-## Expanding the ESLint configuration
+## 🏛️ Design System
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Neural-Ticker utilizes a custom **Dark Mode** design system built on top of **shadcn/ui** primitives. 
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Typography**: Inter (System Default).
+- **Color Palette**: Custom HSL tokens defined in `src/index.css` for semantic consistency (success, warning, destructive, and rating-specific gradients).
+- **Glassmorphism**: Subtle backdrop blurs and semi-transparent borders for a modern, professional feel.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 📂 Architecture
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- `src/components/`: Unified component library.
+  - `ui/`: Design system primitives (Buttons, Badges, Cards).
+  - `layout/`: Global Shell, Navigation, and Search.
+  - `dashboard/`: Ticker-specific feature components.
+- `src/hooks/`: Reusable logic (Auth, API calls, Media Queries).
+- `src/services/`: API integration layer using Axios.
+- `src/context/`: Global state (Auth, Theme).
+- `src/lib/`: Complex business logic (Rating algorithms, Date formatting).
+
+## 🧪 Development
+
+### Running the App
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Testing
+We use **Vitest** for unit logic and **Testing Library** for component verification.
+```bash
+npm run test        # Run all tests
+npm run test:unit   # Focused logic testing
 ```
+
+---
+*Part of the Neural-Ticker Core ecosystem.*
