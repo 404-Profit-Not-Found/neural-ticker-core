@@ -25,6 +25,8 @@ RUN npm run build
 # --- Stage 3: Production ---
 FROM node:22-alpine
 
+ENV PORT=8080
+
 WORKDIR /app
 
 # Copy backend package files
