@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SuperLoading } from './components/ui/SuperLoading';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -50,7 +51,7 @@ function ScrollToTop() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-blue-500">Loading NeuralTicker...</div>;
+  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center"><SuperLoading text="INITIALIZING SYSTEM..." /></div>;
 
   if (!user) {
     // Redirect to internal login page instead of auto-redirecting to Google
@@ -69,65 +70,25 @@ function App() {
         <ThemeController />
         <ToastProvider>
           <Routes>
+            {/* Public Routes */}
             <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <ErrorBoundary>
-                    <Dashboard />
-                  </ErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ticker/:symbol/:tab?"
-              element={
-                <ProtectedRoute>
-                  <TickerDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/research/:id"
-              element={
-                <ProtectedRoute>
-                  <ResearchPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/research"
-              element={
-                <ProtectedRoute>
-                  <ResearchListPage />
-                </ProtectedRoute>
-              }
-            />
-            {/* Redirect Legacy Route */}
-            <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
+            <Route path="/access-denied" element={<AccessDenied />} />
+            <Route path="/oauth-callback" element={<OAuthCallback />} />
 
-            {/* Add more routes here */}
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-
-
+            {/* Protected Routes */}
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/research" element={<ProtectedRoute><ResearchListPage /></ProtectedRoute>} />
+            <Route path="/research/:ticker" element={<ProtectedRoute><ResearchPage /></ProtectedRoute>} />
+            
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><PortfolioPage /></ProtectedRoute>} />
-            <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
 
-
-
+            {/* Admin Route */}
             <Route path="/admin" element={
               <AdminRoute>
                 <ErrorBoundary>
@@ -135,8 +96,9 @@ function App() {
                 </ErrorBoundary>
               </AdminRoute>
             } />
-            <Route path="/access-denied" element={<AccessDenied />} />
-            <Route path="/oauth-callback" element={<OAuthCallback />} />
+
+            {/* Redirect Legacy Route */}
+            <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
           </Routes>
         </ToastProvider>
       </AuthProvider>

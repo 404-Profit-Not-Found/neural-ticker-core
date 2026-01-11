@@ -1,6 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-    Loader2,
     TrendingUp,
     TrendingDown,
     Eye,
@@ -9,6 +8,7 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { SuperLoading } from '../components/ui/SuperLoading';
 import {
     Dialog,
     DialogDescription,
@@ -259,8 +259,7 @@ export function TickerDetail() {
 
             {isLoadingDetails ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
-                    <Loader2 className="animate-spin w-8 h-8 text-primary" />
-                    <div className="text-muted-foreground animate-pulse text-sm">Loading Terminal Data...</div>
+                <SuperLoading symbol={symbol} />
                 </main>
             ) : !tickerData ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
