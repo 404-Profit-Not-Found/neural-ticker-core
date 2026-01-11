@@ -73,7 +73,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col bg-card border-border">
+    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
       <DialogHeader className="pb-4 border-b border-border/50">
         <div className="flex items-center justify-between w-full">
           <DialogTitle className="flex items-center gap-2 text-xl">
@@ -225,7 +225,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   {/* Gemini 2.5 Flash Lite */}
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-2.5-flash-lite' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    model === 'gemini-2.5-flash-lite' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
                   )}>
                     <RadioGroupItem value="gemini-2.5-flash-lite" className="sr-only" />
                     <div className="flex justify-between items-start">
@@ -248,7 +248,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   {/* Gemini 3 Flash */}
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-3-flash-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    model === 'gemini-3-flash-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
                   )}>
                     <RadioGroupItem value="gemini-3-flash-preview" className="sr-only" />
                     <div className="flex justify-between items-start">
@@ -271,7 +271,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   {/* GPT-4.1 Mini */}
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gpt-4.1-mini' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    model === 'gpt-4.1-mini' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
                   )}>
                     <RadioGroupItem value="gpt-4.1-mini" className="sr-only" />
                     <div className="flex justify-between items-start">
@@ -294,7 +294,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   {/* Gemini 3 Pro */}
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-3-pro-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    model === 'gemini-3-pro-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
                   )}>
                     <RadioGroupItem value="gemini-3-pro-preview" className="sr-only" />
                     <div className="flex justify-between items-start">
@@ -322,7 +322,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   {/* GPT-5.1 PRO */}
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gpt-5.1' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    model === 'gpt-5.1' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
                   )}>
                     <RadioGroupItem value="gpt-5.1" className="sr-only" />
                     <div className="flex justify-between items-start">
@@ -376,7 +376,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
         )}
 
         {step === 'result' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 prose prose-invert prose-sm max-w-none px-2">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 prose dark:prose-invert prose-sm max-w-none px-2">
             <ReactMarkdown
               components={{
                 h1: ({ ...props }) => <h1 className="text-primary font-bold text-lg mb-2" {...props} />,

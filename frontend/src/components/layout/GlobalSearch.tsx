@@ -158,7 +158,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                 <input
                     ref={inputRef}
                     type="text"
-                    className="w-full bg-[#09090b] border border-input text-sm rounded-full pl-10 pr-16 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background transition-all placeholder:text-muted-foreground/70"
+                    className="w-full bg-background border border-input text-sm rounded-full pl-10 pr-16 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/70"
                     placeholder="Search tickers..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -185,7 +185,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-[#09090b] !bg-opacity-100 border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 !opacity-100">
+                <div className="absolute top-full mt-2 w-full bg-popover !bg-opacity-100 border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 !opacity-100">
                     <div className="py-1">
                         {results.map((ticker, index) => (
                             <div

@@ -19,9 +19,8 @@ const Dialog = React.forwardRef<
             />
             <div
                 ref={ref}
-                style={{ backgroundColor: '#1c1c1c' }}
                 className={cn(
-                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-zinc-900 p-6 text-left shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95",
+                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-background p-6 text-left text-foreground shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95",
                     className
                 )}
             >
