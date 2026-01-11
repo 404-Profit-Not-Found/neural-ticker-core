@@ -60,6 +60,7 @@ jobs:
           # flags: '--allow-unauthenticated' # Moved to bottom combined with other flags
           env_vars: |
              NODE_ENV=production
+             RUN_MIGRATIONS=false
              DATABASE_URL=${{ secrets.DATABASE_URL }}
              FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}

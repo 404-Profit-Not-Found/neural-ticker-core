@@ -75,7 +75,7 @@ import configuration from './config/configuration';
           database: dbConfig.database || 'postgres',
           autoLoadEntities: true,
           synchronize: dbConfig.synchronize,
-          migrationsRun: true,
+          migrationsRun: process.env.RUN_MIGRATIONS === 'true',
           migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
           connectTimeoutMS: 10000,
           ssl:
