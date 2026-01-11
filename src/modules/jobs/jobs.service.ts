@@ -5,6 +5,7 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { ResearchService } from '../research/research.service';
+import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import {
   RequestQueue,
   RequestStatus,
@@ -25,6 +26,8 @@ export class JobsService {
     private readonly tickersService: TickersService,
     private readonly marketDataService: MarketDataService,
     private readonly researchService: ResearchService,
+    @Inject(forwardRef(() => StockTwitsService))
+    private readonly stockTwitsService: StockTwitsService,
     @InjectRepository(RequestQueue)
     private readonly requestQueueRepo: Repository<RequestQueue>,
   ) {}
@@ -429,6 +432,10 @@ export class JobsService {
           this.logger.log(`Processing queued ticker addition: ${symbol}`);
           // Force ensure ticker (will fail again if 429, but that's handled locally here)
           await this.tickersService.ensureTicker(symbol);
+        } else if (req.type === RequestType.SYNC_STOCKTWITS_POSTS) {
+          const { symbol } = req.payload;
+          this.logger.debug(`Processing queued StockTwits sync for: ${symbol}`);
+          await this.stockTwitsService.fetchAndStorePosts(symbol);
         }
 
         // deeply update status

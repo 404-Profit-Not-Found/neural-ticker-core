@@ -8,6 +8,7 @@ import {
 
 export enum RequestType {
   ADD_TICKER = 'ADD_TICKER',
+  SYNC_STOCKTWITS_POSTS = 'SYNC_STOCKTWITS_POSTS',
 }
 
 export enum RequestStatus {
