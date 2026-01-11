@@ -75,5 +75,35 @@ jobs:
              APP_ENV=${{ secrets.APP_ENV }}
              APP_PORT=${{ secrets.APP_PORT }}
 
+      # Create/Update and Run Migration Job
+      - name: 'Run Database Migrations'
+        run: |
+          # 1. Update (or create) the job definition using the new image
+          gcloud run jobs update migrate-job \
+            --image ${{ env.IMAGE_TAG }} \
+            --region ${{ env.REGION }} \
+            --command "npm" \
+            --args "run,migration:run:prod" \
+            --set-env-vars NODE_ENV=production \
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --set-env-vars DB_SSL=true \
+            --max-retries 0 \
+            --task-timeout 5m \
+            --quiet || \
+          gcloud run jobs create migrate-job \
+            --image ${{ env.IMAGE_TAG }} \
+            --region ${{ env.REGION }} \
+            --command "npm" \
+            --args "run,migration:run:prod" \
+            --set-env-vars NODE_ENV=production \
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --set-env-vars DB_SSL=true \
+            --max-retries 0 \
+            --task-timeout 5m \
+            --quiet
+
+          # 2. Execute the job and wait for completion
+          gcloud run jobs execute migrate-job --region ${{ env.REGION }} --wait
+
       - name: 'Show Output'
         run: echo ${{ steps.deploy.outputs.url }}

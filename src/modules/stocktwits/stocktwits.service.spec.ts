@@ -5,6 +5,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 import { TickersService } from '../tickers/tickers.service';
+import { JobsService } from '../jobs/jobs.service';
+import { RequestType } from '../jobs/entities/request-queue.entity';
 import { of, throwError } from 'rxjs';
 
 describe('StockTwitsService', () => {
@@ -12,6 +14,7 @@ describe('StockTwitsService', () => {
   let httpService: HttpService;
   let postsRepo: any;
   let watchersRepo: any;
+  let jobsService: JobsService;
 
   const mockHttpService = {
     get: jest.fn(),
@@ -34,6 +37,10 @@ describe('StockTwitsService', () => {
     getAllTickers: jest.fn(),
   };
 
+  const mockJobsService = {
+    queueRequest: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,6 +55,7 @@ describe('StockTwitsService', () => {
           useValue: mockWatchersRepo,
         },
         { provide: TickersService, useValue: mockTickersService },
+        { provide: JobsService, useValue: mockJobsService },
       ],
     }).compile();
 
@@ -55,6 +63,7 @@ describe('StockTwitsService', () => {
     httpService = module.get<HttpService>(HttpService);
     postsRepo = module.get(getRepositoryToken(StockTwitsPost));
     watchersRepo = module.get(getRepositoryToken(StockTwitsWatcher));
+    jobsService = module.get<JobsService>(JobsService);
     jest.clearAllMocks();
   });
 
@@ -163,16 +172,23 @@ describe('StockTwitsService', () => {
   });
 
   describe('handleHourlyPostsSync', () => {
-    it('should sync posts for all tickers', async () => {
+    it('should queue sync jobs for all tickers', async () => {
       mockTickersService.getAllTickers.mockResolvedValue([
         { symbol: 'AAPL' },
         { symbol: 'GOOGL' },
       ]);
-      mockHttpService.get.mockReturnValue(of({ data: { messages: [] } }));
 
       await service.handleHourlyPostsSync();
 
-      expect(mockHttpService.get).toHaveBeenCalledTimes(2);
+      expect(mockJobsService.queueRequest).toHaveBeenCalledTimes(2);
+      expect(mockJobsService.queueRequest).toHaveBeenCalledWith(
+        RequestType.SYNC_STOCKTWITS_POSTS,
+        { symbol: 'AAPL' },
+      );
+      expect(mockJobsService.queueRequest).toHaveBeenCalledWith(
+        RequestType.SYNC_STOCKTWITS_POSTS,
+        { symbol: 'GOOGL' },
+      );
     });
 
     it('should skip tickers without symbol', async () => {
@@ -180,11 +196,10 @@ describe('StockTwitsService', () => {
         { symbol: 'AAPL' },
         { name: 'no symbol' },
       ]);
-      mockHttpService.get.mockReturnValue(of({ data: { messages: [] } }));
 
       await service.handleHourlyPostsSync();
 
-      expect(mockHttpService.get).toHaveBeenCalledTimes(1);
+      expect(mockJobsService.queueRequest).toHaveBeenCalledTimes(1);
     });
   });
 

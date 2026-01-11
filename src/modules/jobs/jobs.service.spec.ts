@@ -5,7 +5,8 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { ResearchService } from '../research/research.service';
-import { RequestQueue } from './entities/request-queue.entity';
+import { StockTwitsService } from '../stocktwits/stocktwits.service';
+import { RequestQueue, RequestType } from './entities/request-queue.entity';
 
 describe('JobsService', () => {
   let service: JobsService;
@@ -17,12 +18,14 @@ describe('JobsService', () => {
 
   const mockTickersService = {
     getAllTickers: jest.fn(),
+    ensureTicker: jest.fn(),
   };
 
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
     getHistory: jest.fn().mockResolvedValue([]),
     syncTickerHistory: jest.fn().mockResolvedValue(undefined),
+    dedupeAnalystRatings: jest.fn().mockResolvedValue({ removed: 0 }),
   };
 
   const mockResearchService = {
@@ -30,6 +33,11 @@ describe('JobsService', () => {
     createResearchTicket: jest.fn(),
     processTicket: jest.fn(),
     getOrGenerateDailyDigest: jest.fn(),
+    reprocessFinancials: jest.fn(),
+  };
+
+  const mockStockTwitsService = {
+    fetchAndStorePosts: jest.fn(),
   };
 
   const mockRequestQueueRepo = {
@@ -47,6 +55,7 @@ describe('JobsService', () => {
         { provide: TickersService, useValue: mockTickersService },
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: ResearchService, useValue: mockResearchService },
+        { provide: StockTwitsService, useValue: mockStockTwitsService },
         {
           provide: getRepositoryToken(RequestQueue),
           useValue: mockRequestQueueRepo,
@@ -135,6 +144,33 @@ describe('JobsService', () => {
       expect(mockResearchService.processTicket).toHaveBeenCalledWith('note-1');
 
       sleepSpy.mockRestore();
+    });
+  });
+
+  describe('processPendingRequests', () => {
+    it('should process SYNC_STOCKTWITS_POSTS request', async () => {
+      const mockRequest = {
+        id: 'req-1',
+        type: RequestType.SYNC_STOCKTWITS_POSTS,
+        payload: { symbol: 'AAPL' },
+        status: 'PENDING',
+        attempts: 0,
+      };
+
+      mockRequestQueueRepo.find.mockResolvedValue([mockRequest]);
+      mockRequestQueueRepo.save.mockResolvedValue(mockRequest);
+      mockRequestQueueRepo.update.mockResolvedValue({});
+
+      await service.processPendingRequests();
+
+      expect(mockRequestQueueRepo.find).toHaveBeenCalled();
+      expect(mockStockTwitsService.fetchAndStorePosts).toHaveBeenCalledWith(
+        'AAPL',
+      );
+      expect(mockRequestQueueRepo.update).toHaveBeenCalledWith('req-1', {
+        status: 'COMPLETED',
+        updated_at: expect.any(Date),
+      });
     });
   });
 });

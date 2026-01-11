@@ -119,13 +119,22 @@ export class AuthController {
     @Body() body: { email: string },
     @Res({ passthrough: true }) res: Response,
   ) {
+    // SECURITY: Disable in production
+    const isProd =
+      this.configService.get<string>('nodeEnv') === 'production' ||
+      process.env.NODE_ENV === 'production';
+
+    if (isProd) {
+      throw new UnauthorizedException('Dev login is disabled in production');
+    }
+
     if (!body.email) throw new UnauthorizedException('Email required');
     const result = await this.authService.localDevLogin(body.email);
 
     // Set HttpOnly cookie for session persistence (matching googleAuthRedirect)
     res.cookie('authentication', result.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
       path: '/',
       maxAge: 24 * 60 * 60 * 1000, // 1 day
