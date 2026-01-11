@@ -85,7 +85,7 @@ describe('WatchlistTable - Typing Performance Test', () => {
     console.log(`Initial API calls: ${initialCallCount}`);
 
     // Find search input
-    const searchInput = container.querySelector('input[placeholder*="Add stock"]') as HTMLInputElement;
+    const searchInput = container.querySelector('input[placeholder*="Add ticker"]') as HTMLInputElement;
     expect(searchInput).toBeTruthy();
 
     const user = userEvent.setup();
@@ -122,7 +122,7 @@ describe('WatchlistTable - Typing Performance Test', () => {
 
     const initialCallCount = apiCallCount;
 
-    const searchInput = container.querySelector('input[placeholder*="Add stock"]') as HTMLInputElement;
+    const searchInput = container.querySelector('input[placeholder*="Add ticker"]') as HTMLInputElement;
     const user = userEvent.setup();
 
     // Type single character

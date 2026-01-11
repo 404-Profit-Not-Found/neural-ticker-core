@@ -1,0 +1,1536 @@
+npm warn Unknown cli config "--watchAll". This will stop working in the next major version of npm.
+
+> frontend@0.3.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/brani/Documents/GitHub/neural-ticker-core/frontend[39m
+
+ [32mΓ£ô[39m src/lib/rating-utils.test.ts [2m([22m[2m22 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [31mΓ¥»[39m src/pages/AnalyzerPage.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 99[2mms[22m[39m
+[31m   [31m├ù[31m AnalyzerPage[2m > [22mrenders page components[90m 68[2mms[22m[31m[39m
+[31m     ΓåÆ Unable to find an element by: [data-testid="filter-bar"]
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"header"[31m
+      [36m>[31m
+        [0mHeader[0m
+      [36m</div>[31m
+      [36m<main[31m
+        [33mclass[31m=[32m"container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col gap-2"[31m
+        [36m>[31m
+          [36m<h1[31m
+            [33mclass[31m=[32m"text-3xl font-bold tracking-tight"[31m
+          [36m>[31m
+            [0mTickers[0m
+          [36m</h1>[31m
+          [36m<p[31m
+            [33mclass[31m=[32m"text-muted-foreground"[31m
+          [36m>[31m
+            [0mAdvanced screening for all [0m
+            [0m2026[0m
+            [0m market data. Filter by AI risk, upside potential, and fundamentals.[0m
+          [36m</p>[31m
+        [36m</div>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"space-y-4"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mdata-testid[31m=[32m"analyzer-table"[31m
+          [36m>[31m
+            [36m<span[31m
+              [33mdata-testid[31m=[32m"view-mode"[31m
+            [36m>[31m
+              [0mtable[0m
+            [36m</span>[31m
+            [36m<button>[31m
+              [0mSet Grid[0m
+            [36m</button>[31m
+          [36m</div>[31m
+        [36m</div>[31m
+      [36m</main>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m[39m
+[31m   [31m├ù[31m AnalyzerPage[2m > [22minitializes filters from URL parameters[90m 10[2mms[22m[31m[39m
+[31m     ΓåÆ Unable to find an element by: [data-testid="active-filter-risk"]
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"header"[31m
+      [36m>[31m
+        [0mHeader[0m
+      [36m</div>[31m
+      [36m<main[31m
+        [33mclass[31m=[32m"container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col gap-2"[31m
+        [36m>[31m
+          [36m<h1[31m
+            [33mclass[31m=[32m"text-3xl font-bold tracking-tight"[31m
+          [36m>[31m
+            [0mTickers[0m
+          [36m</h1>[31m
+          [36m<p[31m
+            [33mclass[31m=[32m"text-muted-foreground"[31m
+          [36m>[31m
+            [0mAdvanced screening for all [0m
+            [0m2026[0m
+            [0m market data. Filter by AI risk, upside potential, and fundamentals.[0m
+          [36m</p>[31m
+        [36m</div>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"space-y-4"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mdata-testid[31m=[32m"analyzer-table"[31m
+          [36m>[31m
+            [36m<span[31m
+              [33mdata-testid[31m=[32m"view-mode"[31m
+            [36m>[31m
+              [0mtable[0m
+            [36m</span>[31m
+            [36m<button>[31m
+              [0mSet Grid[0m
+            [36m</button>[31m
+          [36m</div>[31m
+        [36m</div>[31m
+      [36m</main>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m[39m
+[31m   [31m├ù[31m AnalyzerPage[2m > [22mhandles legacy "filter=strong_buy" parameter correctly[90m 11[2mms[22m[31m[39m
+[31m     ΓåÆ Unable to find an element by: [data-testid="active-filter-ai"]
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"header"[31m
+      [36m>[31m
+        [0mHeader[0m
+      [36m</div>[31m
+      [36m<main[31m
+        [33mclass[31m=[32m"container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col gap-2"[31m
+        [36m>[31m
+          [36m<h1[31m
+            [33mclass[31m=[32m"text-3xl font-bold tracking-tight"[31m
+          [36m>[31m
+            [0mTickers[0m
+          [36m</h1>[31m
+          [36m<p[31m
+            [33mclass[31m=[32m"text-muted-foreground"[31m
+          [36m>[31m
+            [0mAdvanced screening for all [0m
+            [0m2026[0m
+            [0m market data. Filter by AI risk, upside potential, and fundamentals.[0m
+          [36m</p>[31m
+        [36m</div>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"space-y-4"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mdata-testid[31m=[32m"analyzer-table"[31m
+          [36m>[31m
+            [36m<span[31m
+              [33mdata-testid[31m=[32m"view-mode"[31m
+            [36m>[31m
+              [0mtable[0m
+            [36m</span>[31m
+            [36m<button>[31m
+              [0mSet Grid[0m
+            [36m</button>[31m
+          [36m</div>[31m
+        [36m</div>[31m
+      [36m</main>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m[39m
+ [32mΓ£ô[39m src/hooks/useWatchlist.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 622[2mms[22m[39m
+ [32mΓ£ô[39m src/pages/Dashboard.test.tsx [2m([22m[2m7 tests[22m[2m | [22m[33m4 skipped[39m[2m)[22m[90m 274[2mms[22m[39m
+ [32mΓ£ô[39m src/hooks/useTicker.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 791[2mms[22m[39m
+ [2m[90mΓåô[39m[22m src/components/dashboard/WatchlistTable.sorting.test.tsx [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [2m[90mΓåô[39m[22m src/components/dashboard/WatchlistGridView.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m
+ [31mΓ¥»[39m src/components/analyzer/AnalyzerTable.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[90m 113[2mms[22m[39m
+[31m   [31m├ù[31m AnalyzerTable[2m > [22mrenders table view correctly[90m 76[2mms[22m[31m[39m
+[31m     ΓåÆ No QueryClient set, use QueryClientProvider to set one[39m
+[31m   [31m├ù[31m AnalyzerTable[2m > [22mrenders grid view correctly[90m 17[2mms[22m[31m[39m
+[31m     ΓåÆ No QueryClient set, use QueryClientProvider to set one[39m
+[31m   [31m├ù[31m AnalyzerTable[2m > [22mcalls onViewModeChange when toggled[90m 7[2mms[22m[31m[39m
+[31m     ΓåÆ No QueryClient set, use QueryClientProvider to set one[39m
+[31m   [31m├ù[31m AnalyzerTable[2m > [22mpasses filters to hook[90m 9[2mms[22m[31m[39m
+[31m     ΓåÆ No QueryClient set, use QueryClientProvider to set one[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mAPI GET call #1: /tickers/sectors
+API GET call #2: /watchlists
+
+ [32mΓ£ô[39m src/components/layout/GlobalSearch.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 732[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GlobalSearch[2m > [22mcalls api with debounced query [33m331[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GlobalSearch[2m > [22mdisplays results and navigates on click [33m342[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not make excessive API calls when typing in search box
+[22m[39mInitial API calls: 2
+Total API calls after typing: 2
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not search with single character
+[22m[39mAPI GET call #1: /tickers/sectors
+API GET call #2: /watchlists
+
+ [31mΓ¥»[39m src/components/dashboard/WatchlistTable.typing.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 304[2mms[22m[39m
+[31m   [31m├ù[31m WatchlistTable - Typing Performance Test[2m > [22mshould not make excessive API calls when typing in search box[90m 222[2mms[22m[31m[39m
+[31m     ΓåÆ expected null to be truthy[39m
+[31m   [31m├ù[31m WatchlistTable - Typing Performance Test[2m > [22mshould not search with single character[90m 80[2mms[22m[31m[39m
+[31m     ΓåÆ Cannot read properties of null (reading 'disabled')[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.typing.test.tsx[2m > [22m[2mWatchlistTable - Typing Performance Test[2m > [22m[2mshould not search with single character
+[22m[39mTotal API calls after typing: 2
+
+[90mstdout[2m | src/components/dashboard/WatchlistTable.simple.test.tsx[2m > [22m[2mWatchlistTable - Simple Render Test[2m > [22m[2mshould render empty watchlist without excessive API calls
+[22m[39mAPI GET call #1: /tickers/sectors
+API GET call #2: /watchlists
+
+ [32mΓ£ô[39m src/lib/rating-logic.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32mΓ£ô[39m src/components/ui/SuperLoading.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[90m 207[2mms[22m[39m
+ [32mΓ£ô[39m src/hooks/useStockAnalyzer.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 167[2mms[22m[39m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.simple.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 734[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Simple Render Test[2m > [22mshould render empty watchlist without excessive API calls [33m731[2mms[22m[39m
+[90mstdout[2m | src/components/dashboard/WatchlistTable.simple.test.tsx[2m > [22m[2mWatchlistTable - Simple Render Test[2m > [22m[2mshould render empty watchlist without excessive API calls
+[22m[39mFinal API call count: 2
+Total API calls: 2
+
+ [32mΓ£ô[39m src/pages/Login.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 160[2mms[22m[39m
+ [32mΓ£ô[39m src/components/ticker/ResearchFeed.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 155[2mms[22m[39m
+ [2m[90mΓåô[39m[22m src/components/layout/Header.nav.test.tsx [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 381[2mms[22m[39m
+ [32mΓ£ô[39m src/components/dashboard/WatchlistTable.interaction.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 476[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Interaction Freeze[2m > [22mshould not freeze when clicking document body [33m475[2mms[22m[39m
+ [31mΓ¥»[39m src/components/dashboard/WatchlistTable.infinite-loop.test.tsx [2m([22m[2m5 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 3134[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop with empty watchlist [33m410[2mms[22m[39m
+[31m   [31m├ù[31m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop when searching with no results[33m 1081[2mms[22m[31m[39m
+[31m     ΓåÆ Unable to find an element with the placeholder text of: /Add stock/i
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"w-full space-y-4"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"flex flex-col gap-4 p-1"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col sm:flex-row sm:items-center justify-between gap-4"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"[31m
+          [36m>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"flex items-center gap-2"[31m
+            [36m>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"relative"[31m
+              [36m>[31m
+                [36m<button[31m
+                  [33mclass[31m=[32m"inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"[31m
+                [36m>[31m
+                  [36m<span[31m
+                    [33mclass[31m=[32m"truncate font-bold text-xl"[31m
+                  [36m>[31m
+                    [0mMy List[0m
+                  [36m</span>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"m6 9 6 6 6-6"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+              [36m</div>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"flex items-center"[31m
+              [36m>[31m
+                [36m<button[31m
+                  [33maria-label[31m=[32m"Rename watchlist"[31m
+                  [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"[31m
+                  [33mtitle[31m=[32m"Rename List"[31m
+                [36m>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-pencil w-3.5 h-3.5"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"m15 5 4 4"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+                [36m<button[31m
+                  [33maria-label[31m=[32m"Delete watchlist"[31m
+                  [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"[31m
+                  [33mtitle[31m=[32m"Delete List"[31m
+                [36m>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M10 11v6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M14 11v6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M3 6h18"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+              [36m</div>[31m
+            [36m</div>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"relative"[31m
+            [36m>[31m
+              [36m<svg[31m
+                [33maria-hidden[31m=[32m"true"[31m
+                [33mclass[31m=[32m"lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5"[31m
+                [33mfill[31m=[32m"none"[31m
+                [33mheight[31m=[32m"24"[31m
+                [33mstroke[31m=[32m"currentColor"[31m
+                [33mstroke-linecap[31m=[32m"round"[31m
+  ...
+
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"w-full space-y-4"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col gap-4 p-1"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex flex-col sm:flex-row sm:items-center justify-between gap-4"[31m
+          [36m>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"[31m
+            [36m>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"flex items-center gap-2"[31m
+              [36m>[31m
+                [36m<div[31m
+                  [33mclass[31m=[32m"relative"[31m
+                [36m>[31m
+                  [36m<button[31m
+                    [33mclass[31m=[32m"inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"[31m
+                  [36m>[31m
+                    [36m<span[31m
+                      [33mclass[31m=[32m"truncate font-bold text-xl"[31m
+                    [36m>[31m
+                      [0mMy List[0m
+                    [36m</span>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"m6 9 6 6 6-6"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                [36m</div>[31m
+                [36m<div[31m
+                  [33mclass[31m=[32m"flex items-center"[31m
+                [36m>[31m
+                  [36m<button[31m
+                    [33maria-label[31m=[32m"Rename watchlist"[31m
+                    [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"[31m
+                    [33mtitle[31m=[32m"Rename List"[31m
+                  [36m>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-pencil w-3.5 h-3.5"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"m15 5 4 4"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                  [36m<button[31m
+                    [33maria-label[31m=[32m"Delete watchlist"[31m
+                    [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"[31m
+                    [33mtitle[31m=[32m"Delete List"[31m
+                  [36m>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M10 11v6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M14 11v6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M3 6h18"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                [36m</div>[31m
+              [36m</div>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"relative"[31m
+              [36m>[31m
+                [36m<svg[31m
+                  [33maria-hidden[31m=[32m"true"[31m
+                  [33mclass[31m=[32m"lucide lucide-search absolute left-2.5 top-...[39m
+[31m   [31m├ù[31m WatchlistTable - Infinite Loop Prevention[2m > [22mshould not cause infinite loop when adding ticker to empty watchlist[33m 1094[2mms[22m[31m[39m
+[31m     ΓåÆ Unable to find an element with the placeholder text of: /Add stock/i
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div[31m
+      [33mclass[31m=[32m"w-full space-y-4"[31m
+    [36m>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"flex flex-col gap-4 p-1"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col sm:flex-row sm:items-center justify-between gap-4"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"[31m
+          [36m>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"flex items-center gap-2"[31m
+            [36m>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"relative"[31m
+              [36m>[31m
+                [36m<button[31m
+                  [33mclass[31m=[32m"inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"[31m
+                [36m>[31m
+                  [36m<span[31m
+                    [33mclass[31m=[32m"truncate font-bold text-xl"[31m
+                  [36m>[31m
+                    [0mMy List[0m
+                  [36m</span>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"m6 9 6 6 6-6"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+              [36m</div>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"flex items-center"[31m
+              [36m>[31m
+                [36m<button[31m
+                  [33maria-label[31m=[32m"Rename watchlist"[31m
+                  [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"[31m
+                  [33mtitle[31m=[32m"Rename List"[31m
+                [36m>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-pencil w-3.5 h-3.5"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"m15 5 4 4"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+                [36m<button[31m
+                  [33maria-label[31m=[32m"Delete watchlist"[31m
+                  [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"[31m
+                  [33mtitle[31m=[32m"Delete List"[31m
+                [36m>[31m
+                  [36m<svg[31m
+                    [33maria-hidden[31m=[32m"true"[31m
+                    [33mclass[31m=[32m"lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"[31m
+                    [33mfill[31m=[32m"none"[31m
+                    [33mheight[31m=[32m"24"[31m
+                    [33mstroke[31m=[32m"currentColor"[31m
+                    [33mstroke-linecap[31m=[32m"round"[31m
+                    [33mstroke-linejoin[31m=[32m"round"[31m
+                    [33mstroke-width[31m=[32m"2"[31m
+                    [33mviewBox[31m=[32m"0 0 24 24"[31m
+                    [33mwidth[31m=[32m"24"[31m
+                    [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                  [36m>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M10 11v6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M14 11v6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M3 6h18"[31m
+                    [36m/>[31m
+                    [36m<path[31m
+                      [33md[31m=[32m"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"[31m
+                    [36m/>[31m
+                  [36m</svg>[31m
+                [36m</button>[31m
+              [36m</div>[31m
+            [36m</div>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"relative"[31m
+            [36m>[31m
+              [36m<svg[31m
+                [33maria-hidden[31m=[32m"true"[31m
+                [33mclass[31m=[32m"lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5"[31m
+                [33mfill[31m=[32m"none"[31m
+                [33mheight[31m=[32m"24"[31m
+                [33mstroke[31m=[32m"currentColor"[31m
+                [33mstroke-linecap[31m=[32m"round"[31m
+  ...
+
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<div[31m
+        [33mclass[31m=[32m"w-full space-y-4"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mclass[31m=[32m"flex flex-col gap-4 p-1"[31m
+        [36m>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"flex flex-col sm:flex-row sm:items-center justify-between gap-4"[31m
+          [36m>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"[31m
+            [36m>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"flex items-center gap-2"[31m
+              [36m>[31m
+                [36m<div[31m
+                  [33mclass[31m=[32m"relative"[31m
+                [36m>[31m
+                  [36m<button[31m
+                    [33mclass[31m=[32m"inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"[31m
+                  [36m>[31m
+                    [36m<span[31m
+                      [33mclass[31m=[32m"truncate font-bold text-xl"[31m
+                    [36m>[31m
+                      [0mMy List[0m
+                    [36m</span>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"m6 9 6 6 6-6"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                [36m</div>[31m
+                [36m<div[31m
+                  [33mclass[31m=[32m"flex items-center"[31m
+                [36m>[31m
+                  [36m<button[31m
+                    [33maria-label[31m=[32m"Rename watchlist"[31m
+                    [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"[31m
+                    [33mtitle[31m=[32m"Rename List"[31m
+                  [36m>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-pencil w-3.5 h-3.5"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"m15 5 4 4"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                  [36m<button[31m
+                    [33maria-label[31m=[32m"Delete watchlist"[31m
+                    [33mclass[31m=[32m"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"[31m
+                    [33mtitle[31m=[32m"Delete List"[31m
+                  [36m>[31m
+                    [36m<svg[31m
+                      [33maria-hidden[31m=[32m"true"[31m
+                      [33mclass[31m=[32m"lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"[31m
+                      [33mfill[31m=[32m"none"[31m
+                      [33mheight[31m=[32m"24"[31m
+                      [33mstroke[31m=[32m"currentColor"[31m
+                      [33mstroke-linecap[31m=[32m"round"[31m
+                      [33mstroke-linejoin[31m=[32m"round"[31m
+                      [33mstroke-width[31m=[32m"2"[31m
+                      [33mviewBox[31m=[32m"0 0 24 24"[31m
+                      [33mwidth[31m=[32m"24"[31m
+                      [33mxmlns[31m=[32m"http://www.w3.org/2000/svg"[31m
+                    [36m>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M10 11v6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M14 11v6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M3 6h18"[31m
+                      [36m/>[31m
+                      [36m<path[31m
+                        [33md[31m=[32m"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"[31m
+                      [36m/>[31m
+                    [36m</svg>[31m
+                  [36m</button>[31m
+                [36m</div>[31m
+              [36m</div>[31m
+              [36m<div[31m
+                [33mclass[31m=[32m"relative"[31m
+              [36m>[31m
+                [36m<svg[31m
+                  [33maria-hidden[31m=[32m"true"[31m
+                  [33mclass[31m=[32m"lucide lucide-search absolute left-2.5 top-...[39m
+stderr | src/App.test.tsx > App Component > renders without crashing
+Error: Not implemented: window.scrollTo
+    at module.exports (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\jsdom\lib\jsdom\browser\Window.js:960:7
+    at C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\App.tsx:35:12
+    at Object.react_stack_bottom_frame (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:25989:20)
+    at runWithFiberInDEV (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at commitHookEffectListMount (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:13249:29)
+    at commitHookLayoutEffects (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:13213:11)
+    at commitLayoutEffectOnFiber (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:13951:13)
+    at recursivelyTraverseLayoutEffects (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:15159:11)
+    at commitLayoutEffectOnFiber (C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\node_modules\react-dom\cjs\react-dom-client.development.js:14165:11) undefined
+
+ [32mΓ£ô[39m src/App.test.tsx [2m([22m[2m1 test[22m[2m)[22m[90m 101[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 11 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/pages/AnalyzerPage.test.tsx > AnalyzerPage > renders page components
+TestingLibraryElementError: Unable to find an element by: [data-testid="filter-bar"]
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"
+    >
+      <div
+        data-testid="header"
+      >
+        Header
+      </div>
+      <main
+        class="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"
+      >
+        <div
+          class="flex flex-col gap-2"
+        >
+          <h1
+            class="text-3xl font-bold tracking-tight"
+          >
+            Tickers
+          </h1>
+          <p
+            class="text-muted-foreground"
+          >
+            Advanced screening for all 
+            2026
+             market data. Filter by AI risk, upside potential, and fundamentals.
+          </p>
+        </div>
+        <div
+          class="space-y-4"
+        >
+          <div
+            data-testid="analyzer-table"
+          >
+            <span
+              data-testid="view-mode"
+            >
+              table
+            </span>
+            <button>
+              Set Grid
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» src/pages/AnalyzerPage.test.tsx:53:19
+     51|     renderWithRouter();
+     52|     expect(screen.getByTestId('header')).toBeInTheDocument();
+     53|     expect(screen.getByTestId('filter-bar')).toBeInTheDocument();
+       |                   ^
+     54|     expect(screen.getByTestId('analyzer-table')).toBeInTheDocument();
+     55|     expect(screen.getByText(/Advanced screening/i)).toBeInTheDocument(ΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/11]ΓÄ»
+
+ FAIL  src/pages/AnalyzerPage.test.tsx > AnalyzerPage > initializes filters from URL parameters
+TestingLibraryElementError: Unable to find an element by: [data-testid="active-filter-risk"]
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"
+    >
+      <div
+        data-testid="header"
+      >
+        Header
+      </div>
+      <main
+        class="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"
+      >
+        <div
+          class="flex flex-col gap-2"
+        >
+          <h1
+            class="text-3xl font-bold tracking-tight"
+          >
+            Tickers
+          </h1>
+          <p
+            class="text-muted-foreground"
+          >
+            Advanced screening for all 
+            2026
+             market data. Filter by AI risk, upside potential, and fundamentals.
+          </p>
+        </div>
+        <div
+          class="space-y-4"
+        >
+          <div
+            data-testid="analyzer-table"
+          >
+            <span
+              data-testid="view-mode"
+            >
+              table
+            </span>
+            <button>
+              Set Grid
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» src/pages/AnalyzerPage.test.tsx:61:19
+     59|     renderWithRouter(['/analyzer?risk=High&aiRating=Buy&upside=>20%']);
+     60|     
+     61|     expect(screen.getByTestId('active-filter-risk')).toHaveTextContentΓÇª
+       |                   ^
+     62|     expect(screen.getByTestId('active-filter-ai')).toHaveTextContent('ΓÇª
+     63|     expect(screen.getByTestId('active-filter-upside')).toHaveTextConteΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/11]ΓÄ»
+
+ FAIL  src/pages/AnalyzerPage.test.tsx > AnalyzerPage > handles legacy "filter=strong_buy" parameter correctly
+TestingLibraryElementError: Unable to find an element by: [data-testid="active-filter-ai"]
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30"
+    >
+      <div
+        data-testid="header"
+      >
+        Header
+      </div>
+      <main
+        class="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500"
+      >
+        <div
+          class="flex flex-col gap-2"
+        >
+          <h1
+            class="text-3xl font-bold tracking-tight"
+          >
+            Tickers
+          </h1>
+          <p
+            class="text-muted-foreground"
+          >
+            Advanced screening for all 
+            2026
+             market data. Filter by AI risk, upside potential, and fundamentals.
+          </p>
+        </div>
+        <div
+          class="space-y-4"
+        >
+          <div
+            data-testid="analyzer-table"
+          >
+            <span
+              data-testid="view-mode"
+            >
+              table
+            </span>
+            <button>
+              Set Grid
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» src/pages/AnalyzerPage.test.tsx:76:19
+     74|   it('handles legacy "filter=strong_buy" parameter correctly', () => {
+     75|     renderWithRouter(['/analyzer?filter=strong_buy']);
+     76|     expect(screen.getByTestId('active-filter-ai')).toHaveTextContent('ΓÇª
+       |                   ^
+     77|   });
+     78| });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/11]ΓÄ»
+
+ FAIL  src/components/analyzer/AnalyzerTable.test.tsx > AnalyzerTable > renders table view correctly
+ FAIL  src/components/analyzer/AnalyzerTable.test.tsx > AnalyzerTable > renders grid view correctly
+ FAIL  src/components/analyzer/AnalyzerTable.test.tsx > AnalyzerTable > calls onViewModeChange when toggled
+ FAIL  src/components/analyzer/AnalyzerTable.test.tsx > AnalyzerTable > passes filters to hook
+Error: No QueryClient set, use QueryClientProvider to set one
+ Γ¥» useQueryClient node_modules/@tanstack/react-query/src/QueryClientProvider.tsx:18:11
+ Γ¥» useBaseQuery node_modules/@tanstack/react-query/src/useBaseQuery.ts:54:18
+ Γ¥» Module.useQuery node_modules/@tanstack/react-query/src/useQuery.ts:51:10
+ Γ¥» Module.useSectors src/hooks/useSectors.ts:5:10
+      3| 
+      4| export function useSectors() {
+      5|   return useQuery<string[]>({
+       |          ^
+      6|     queryKey: ['tickers', 'sectors'],
+      7|     queryFn: async () => {
+ Γ¥» FilterBar src/components/analyzer/FilterBar.tsx:31:65
+ Γ¥» Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ Γ¥» renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ Γ¥» updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ Γ¥» beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ Γ¥» runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/11]ΓÄ»
+
+ FAIL  src/components/dashboard/WatchlistTable.infinite-loop.test.tsx > WatchlistTable - Infinite Loop Prevention > should not cause infinite loop when searching with no results
+TestingLibraryElementError: Unable to find an element with the placeholder text of: /Add stock/i
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="w-full space-y-4"
+    >
+      <div
+        class="flex flex-col gap-4 p-1"
+      >
+        <div
+          class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div
+            class="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"
+          >
+            <div
+              class="flex items-center gap-2"
+            >
+              <div
+                class="relative"
+              >
+                <button
+                  class="inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"
+                >
+                  <span
+                    class="truncate font-bold text-xl"
+                  >
+                    My List
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="m6 9 6 6 6-6"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="flex items-center"
+              >
+                <button
+                  aria-label="Rename watchlist"
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"
+                  title="Rename List"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-pencil w-3.5 h-3.5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                    />
+                    <path
+                      d="m15 5 4 4"
+                    />
+                  </svg>
+                </button>
+                <button
+                  aria-label="Delete watchlist"
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"
+                  title="Delete List"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M10 11v6"
+                    />
+                    <path
+                      d="M14 11v6"
+                    />
+                    <path
+                      d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                    />
+                    <path
+                      d="M3 6h18"
+                    />
+                    <path
+                      d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div
+              class="relative"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+  ...
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="w-full space-y-4"
+      >
+        <div
+          class="flex flex-col gap-4 p-1"
+        >
+          <div
+            class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div
+              class="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <div
+                  class="relative"
+                >
+                  <button
+                    class="inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"
+                  >
+                    <span
+                      class="truncate font-bold text-xl"
+                    >
+                      My List
+                    </span>
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m6 9 6 6 6-6"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div
+                  class="flex items-center"
+                >
+                  <button
+                    aria-label="Rename watchlist"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"
+                    title="Rename List"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-pencil w-3.5 h-3.5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                      />
+                      <path
+                        d="m15 5 4 4"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="Delete watchlist"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"
+                    title="Delete List"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M10 11v6"
+                      />
+                      <path
+                        d="M14 11v6"
+                      />
+                      <path
+                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                      />
+                      <path
+                        d="M3 6h18"
+                      />
+                      <path
+                        d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div
+                class="relative"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-search absolute left-2.5 top-...
+ Γ¥» Proxy.waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ Γ¥» src/components/dashboard/WatchlistTable.infinite-loop.test.tsx:117:11
+    115|     renderWithProviders(queryClient);
+    116| 
+    117|     await waitFor(() => {
+       |           ^
+    118|       expect(screen.getByPlaceholderText(/Add stock/i)).toBeInTheDocumΓÇª
+    119|     });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[5/11]ΓÄ»
+
+ FAIL  src/components/dashboard/WatchlistTable.infinite-loop.test.tsx > WatchlistTable - Infinite Loop Prevention > should not cause infinite loop when adding ticker to empty watchlist
+TestingLibraryElementError: Unable to find an element with the placeholder text of: /Add stock/i
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="w-full space-y-4"
+    >
+      <div
+        class="flex flex-col gap-4 p-1"
+      >
+        <div
+          class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div
+            class="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"
+          >
+            <div
+              class="flex items-center gap-2"
+            >
+              <div
+                class="relative"
+              >
+                <button
+                  class="inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"
+                >
+                  <span
+                    class="truncate font-bold text-xl"
+                  >
+                    My List
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="m6 9 6 6 6-6"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="flex items-center"
+              >
+                <button
+                  aria-label="Rename watchlist"
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"
+                  title="Rename List"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-pencil w-3.5 h-3.5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                    />
+                    <path
+                      d="m15 5 4 4"
+                    />
+                  </svg>
+                </button>
+                <button
+                  aria-label="Delete watchlist"
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"
+                  title="Delete List"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M10 11v6"
+                    />
+                    <path
+                      d="M14 11v6"
+                    />
+                    <path
+                      d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                    />
+                    <path
+                      d="M3 6h18"
+                    />
+                    <path
+                      d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div
+              class="relative"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+  ...
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="w-full space-y-4"
+      >
+        <div
+          class="flex flex-col gap-4 p-1"
+        >
+          <div
+            class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div
+              class="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <div
+                  class="relative"
+                >
+                  <button
+                    class="inline-flex items-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground py-2 justify-start px-2 hover:bg-muted/50 gap-2 h-10"
+                  >
+                    <span
+                      class="truncate font-bold text-xl"
+                    >
+                      My List
+                    </span>
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-chevron-down w-4 h-4 opacity-50 transition-transform duration-200"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m6 9 6 6 6-6"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div
+                  class="flex items-center"
+                >
+                  <button
+                    aria-label="Rename watchlist"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-foreground"
+                    title="Rename List"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-pencil w-3.5 h-3.5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                      />
+                      <path
+                        d="m15 5 4 4"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="Delete watchlist"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 text-muted-foreground hover:text-destructive"
+                    title="Delete List"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-trash2 lucide-trash-2 w-3.5 h-3.5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M10 11v6"
+                      />
+                      <path
+                        d="M14 11v6"
+                      />
+                      <path
+                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                      />
+                      <path
+                        d="M3 6h18"
+                      />
+                      <path
+                        d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div
+                class="relative"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-search absolute left-2.5 top-...
+ Γ¥» Proxy.waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ Γ¥» src/components/dashboard/WatchlistTable.infinite-loop.test.tsx:229:11
+    227|     renderWithProviders(queryClient);
+    228| 
+    229|     await waitFor(() => {
+       |           ^
+    230|       expect(screen.getByPlaceholderText(/Add stock/i)).toBeInTheDocumΓÇª
+    231|     });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[6/11]ΓÄ»
+
+ FAIL  src/components/dashboard/WatchlistTable.typing.test.tsx > WatchlistTable - Typing Performance Test > should not make excessive API calls when typing in search box
+AssertionError: expected null to be truthy
+
+- Expected: 
+true
+
++ Received: 
+null
+
+ Γ¥» src/components/dashboard/WatchlistTable.typing.test.tsx:89:25
+     87|     // Find search input
+     88|     const searchInput = container.querySelector('input[placeholder*="AΓÇª
+     89|     expect(searchInput).toBeTruthy();
+       |                         ^
+     90| 
+     91|     const user = userEvent.setup();
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[7/11]ΓÄ»
+
+ FAIL  src/components/dashboard/WatchlistTable.typing.test.tsx > WatchlistTable - Typing Performance Test > should not search with single character
+TypeError: Cannot read properties of null (reading 'disabled')
+ Γ¥» Object.type node_modules/@testing-library/user-event/dist/esm/utility/type.js:8:17
+ Γ¥» node_modules/@testing-library/user-event/dist/esm/setup/setup.js:83:35
+ Γ¥» Object.asyncWrapper node_modules/@testing-library/react/dist/pure.js:88:28
+ Γ¥» wrapAsync node_modules/@testing-library/user-event/dist/esm/setup/wrapAsync.js:6:24
+ Γ¥» Object.method [as type] node_modules/@testing-library/user-event/dist/esm/setup/setup.js:83:16
+ Γ¥» src/components/dashboard/WatchlistTable.typing.test.tsx:129:16
+    127| 
+    128|     // Type single character
+    129|     await user.type(searchInput, 'A');
+       |                ^
+    130|     await new Promise((resolve) => setTimeout(resolve, 300));
+    131| 
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[8/11]ΓÄ»
+
+[2m Test Files [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (21)[39m
+[2m      Tests [22m [1m[31m11 failed[39m[22m[2m | [22m[1m[32m74 passed[39m[22m[2m | [22m[33m14 skipped[39m[90m (99)[39m
+[2m   Start at [22m 00:21:00
+[2m   Duration [22m 7.80s[2m (transform 2.51s, setup 4.71s, collect 17.64s, tests 8.46s, environment 25.86s, prepare 3.91s)[22m
+
