@@ -7,9 +7,6 @@ import { firstValueFrom } from 'rxjs';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 import { TickersService } from '../tickers/tickers.service';
-import { JobsService } from '../jobs/jobs.service';
-import { Inject, forwardRef } from '@nestjs/common';
-import { RequestType } from '../jobs/entities/request-queue.entity';
 
 @Injectable()
 export class StockTwitsService {
@@ -23,8 +20,6 @@ export class StockTwitsService {
     @InjectRepository(StockTwitsWatcher)
     private readonly watchersRepository: Repository<StockTwitsWatcher>,
     private readonly tickersService: TickersService,
-    @Inject(forwardRef(() => JobsService))
-    private readonly jobsService: JobsService,
   ) {}
 
   /**
@@ -107,18 +102,14 @@ export class StockTwitsService {
    */
 
   async handleHourlyPostsSync() {
-    this.logger.log('Starting Hourly StockTwits Post Sync (Queuing)...');
+    this.logger.log('Starting Hourly StockTwits Post Sync...');
     const tickers = await this.tickersService.getAllTickers();
-    let queued = 0;
     for (const ticker of tickers) {
       if (ticker.symbol) {
-        await this.jobsService.queueRequest(RequestType.SYNC_STOCKTWITS_POSTS, {
-          symbol: ticker.symbol,
-        });
-        queued++;
+        await this.fetchAndStorePosts(ticker.symbol);
       }
     }
-    this.logger.log(`Queued ${queued} StockTwits Post Sync jobs.`);
+    this.logger.log('Hourly Post Sync Complete.');
   }
 
   /**

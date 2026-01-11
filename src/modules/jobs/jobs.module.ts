@@ -8,7 +8,6 @@ import { TickersModule } from '../tickers/tickers.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { ResearchModule } from '../research/research.module';
-import { StockTwitsModule } from '../stocktwits/stocktwits.module';
 
 @Module({
   imports: [
@@ -17,8 +16,7 @@ import { StockTwitsModule } from '../stocktwits/stocktwits.module';
     RiskRewardModule,
     ResearchModule,
     TypeOrmModule.forFeature([RequestQueue]),
-    forwardRef(() => TickersModule),
-    forwardRef(() => StockTwitsModule),
+    forwardRef(() => TickersModule), // Circular dependency likely with TickersService using JobsService
   ],
   controllers: [JobsController],
   providers: [JobsService],
