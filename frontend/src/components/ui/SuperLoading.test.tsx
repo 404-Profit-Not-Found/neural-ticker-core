@@ -5,8 +5,10 @@ import { SuperLoading } from './SuperLoading';
 describe('SuperLoading Component', () => {
     it('renders without crashing', () => {
         render(<SuperLoading />);
-        // Check for the "SYSTEM" default text if no symbol is provided
-        expect(screen.getByText('SYSTEM')).toBeInTheDocument();
+        // Check for the "Neural Ticker" default text if no symbol is provided
+        expect(screen.getByText('Neural Ticker')).toBeInTheDocument();
+        // Check for the default loading text
+        expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
 
     it('displays the provided symbol', () => {
@@ -24,8 +26,12 @@ describe('SuperLoading Component', () => {
     it('renders the chart visualization elements', () => {
         const { container } = render(<SuperLoading />);
         // Use a selector to check for the chart container styling
-        // The mask-linear-fade class is a key identifier for our chart background
-        const chartBackground = container.querySelector('.mask-linear-fade');
-        expect(chartBackground).toBeInTheDocument();
+        // The chart-wrapper class is the container for our realistic CSS candlestick chart
+        const chartWrapper = container.querySelector('.chart-wrapper');
+        expect(chartWrapper).toBeInTheDocument();
+        
+        // Optionally check for at least one candle
+        const candle = container.querySelector('.candle');
+        expect(candle).toBeInTheDocument();
     });
 });

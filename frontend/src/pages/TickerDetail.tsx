@@ -3,7 +3,6 @@ import {
     TrendingUp,
     TrendingDown,
     Eye,
-    Share2,
     ArrowLeft,
     RefreshCw
 } from 'lucide-react';
@@ -128,6 +127,10 @@ export function TickerDetail() {
     const isFavorite = watchlists?.some(wl =>
         wl.items?.some(item => item.ticker.symbol === symbol)
     ) ?? false;
+    
+    // Optimistic Favorite State
+    const [optimisticFavorite, setOptimisticFavorite] = useState<boolean | null>(null);
+    const isFavEffectively = optimisticFavorite !== null ? optimisticFavorite : isFavorite;
 
     // -- Mutations --
     const triggerResearchMutation = useTriggerResearch();
@@ -254,7 +257,7 @@ export function TickerDetail() {
 
 
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
+        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20 overflow-x-hidden">
             <Header />
 
             {isLoadingDetails ? (
@@ -277,7 +280,8 @@ export function TickerDetail() {
                         {/* --- 1. HERO HEADER --- */}
                         <div className="relative z-30 space-y-4 pb-4 md:pb-6">
                             {/* Mobile Actions (Absolute Top Right) */}
-                            <div className="md:hidden absolute top-0 right-0 flex items-center gap-2 z-40">
+                            {/* Mobile Actions (Absolute Top Right) */}
+                            <div className="md:hidden absolute top-1 right-0 flex items-center gap-2 z-40">
                                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
                                     <Eye size={12} />
                                     <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
@@ -288,16 +292,16 @@ export function TickerDetail() {
                                     className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2"
                                     title="Add to Favourites"
                                     onClick={() => {
-                                        if (symbol) favoriteMutation.mutate(symbol);
+                                        if (symbol) {
+                                            setOptimisticFavorite(!isFavEffectively);
+                                            favoriteMutation.mutate(symbol);
+                                        }
                                     }}
                                 >
                                     <Star
                                         size={16}
-                                        className={isFavorite ? "fill-yellow-400 text-yellow-400" : ""}
+                                        className={isFavEffectively ? "fill-yellow-400 text-yellow-400" : ""}
                                     />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted -mr-2" title="Share">
-                                    <Share2 size={16} className="text-muted-foreground" />
                                 </Button>
                             </div>
 
@@ -403,18 +407,17 @@ export function TickerDetail() {
                                             size="sm"
                                             className="h-9 w-9 rounded-full"
                                             onClick={() => {
-                                                if (symbol) favoriteMutation.mutate(symbol);
+                                                if (symbol) {
+                                                    setOptimisticFavorite(!isFavEffectively);
+                                                    favoriteMutation.mutate(symbol);
+                                                }
                                             }}
-                                            title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                                            title={isFavEffectively ? "Remove from Favorites" : "Add to Favorites"}
                                         >
                                             <Star
                                                 size={18}
-                                                className={isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
+                                                className={isFavEffectively ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
                                             />
-                                        </Button>
-
-                                        <Button variant="ghost" size="sm" className="h-9 w-9 rounded-full" title="Share">
-                                            <Share2 size={18} className="text-muted-foreground" />
                                         </Button>
                                     </div>
                                 </div>

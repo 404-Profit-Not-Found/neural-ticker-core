@@ -43,7 +43,7 @@ export function Login() {
                 <div className="flex flex-col items-center space-y-4 text-center">
                     <div className="space-y-2">
                         {/* Title with Gradient - Matched to Loading Screen */}
-                        <h1 className="text-5xl font-light tracking-tight text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                        <h1 className="text-[3.5rem] leading-none font-light tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
                             Neural Ticker
                         </h1>
                     </div>
@@ -67,6 +67,11 @@ export function Login() {
                         <span className="text-white/90 group-hover:text-white transition-colors">Sign in with Google</span>
                     </Button>
                 </div>
+            </div>
+            
+            {/* Version Number (Bottom Left) */}
+            <div className="absolute bottom-8 left-8 text-left z-20">
+                <span className="text-xs font-mono text-white/20">v{__APP_VERSION__}</span>
             </div>
         </div>
     );

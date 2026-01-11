@@ -51,7 +51,7 @@ function ScrollToTop() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center"><SuperLoading text="INITIALIZING SYSTEM..." /></div>;
+  if (loading) return <SuperLoading text="Initializing..." fullScreen />;
 
   if (!user) {
     // Redirect to internal login page instead of auto-redirecting to Google
@@ -137,6 +137,14 @@ function ThemeController() {
 
   }, [user?.theme]);
 
+  // Handle global loader removal if it exists
+  useEffect(() => {
+     // If we are mounting, maybe we should remove index.html loader if it's still there?
+     // React usually wipes "root", but the loader is often outside or inside root.
+     // In our case, index.html has static content in #root. React wipes it.
+     // So no manual removal needed.
+  }, []);
+
   return null;
 }
 
@@ -154,7 +162,7 @@ function OAuthCallback() {
     handleCallback();
   }, [refreshSession, navigate]);
 
-  return <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-[#a1a1aa]">Authenticating...</div>;
+  return <SuperLoading text="Authenticating..." fullScreen />;
 }
 
 export default App;
