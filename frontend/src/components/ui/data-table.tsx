@@ -9,6 +9,7 @@ import {
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Skeleton } from './skeleton';
 import { useState } from 'react';
+import { cn } from '../../lib/utils';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -17,6 +18,7 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: TData) => void;
   emptyMessage?: string;
   defaultSorting?: SortingState;
+  className?: string;
 }
 
 export function DataTable<TData, TValue>({
@@ -26,6 +28,7 @@ export function DataTable<TData, TValue>({
   onRowClick,
   emptyMessage = 'No results found.',
   defaultSorting = [],
+  className,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
 
@@ -42,7 +45,7 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="rounded-md border border-border bg-card overflow-hidden shadow-sm">
+    <div className={cn("rounded-md border border-border bg-card overflow-hidden shadow-sm", className)}>
       <div className="overflow-x-auto">
         <table className="w-full caption-bottom text-sm">
           <thead className="[&_tr]:border-b">

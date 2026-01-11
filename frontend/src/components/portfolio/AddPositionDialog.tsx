@@ -164,7 +164,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               onFocus={() => {
                 if (results.length > 0) setShowResults(true);
               }}
-              className="pl-9 uppercase placeholder:normal-case font-mono font-bold bg-background"
+              className="pl-9 uppercase placeholder:normal-case font-mono font-bold bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-primary/50"
             />
             {isLoadingSearch && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -175,7 +175,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
 
           {/* Autocomplete Dropdown */}
           {showResults && results.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1c1c1c] border border-border rounded-lg shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="py-1 max-h-[220px] overflow-y-auto custom-scrollbar">
                 {results.map((ticker, index) => (
                   <button
@@ -185,7 +185,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                       'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
                       index === highlightedIndex
                         ? 'bg-primary/10 text-primary'
-                        : 'hover:bg-muted/50 text-foreground',
+                        : 'hover:bg-zinc-800/50 text-zinc-100',
                     )}
                     onClick={() => selectTicker(ticker)}
                     onMouseEnter={() => setHighlightedIndex(index)}
@@ -193,18 +193,18 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                     <TickerLogo
                       symbol={ticker.symbol}
                       url={ticker.logo_url}
-                      className="w-8 h-8 rounded-full border border-border flex-shrink-0"
+                      className="w-8 h-8 rounded-full border border-zinc-700 flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm">
                           {ticker.symbol}
                         </span>
-                        <span className="text-[10px] text-muted-foreground border border-border px-1.5 rounded bg-background/50">
+                        <span className="text-[10px] text-zinc-400 border border-zinc-700 px-1.5 rounded bg-zinc-800">
                           {ticker.exchange}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground truncate opacity-80 font-sans">
+                      <p className="text-[11px] text-zinc-500 truncate opacity-80 font-sans">
                         {ticker.name}
                       </p>
                     </div>
@@ -225,7 +225,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               placeholder="0.00"
               value={shares}
               onChange={(e) => setShares(e.target.value)}
-              className="bg-background"
+              className="bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-500"
             />
           </div>
           <div className="space-y-1.5">
@@ -237,7 +237,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               placeholder="0.00"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="bg-background"
+              className="bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-500"
             />
           </div>
         </div>
@@ -250,7 +250,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="pl-10 [color-scheme:dark] bg-background"
+              className="pl-10 [color-scheme:dark] bg-zinc-900 border-zinc-800 text-white"
             />
             <Calendar className="absolute left-3 top-2.5 text-muted-foreground pointer-events-none" size={16} />
           </div>

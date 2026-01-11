@@ -106,7 +106,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
         <Dialog
             open={open}
             onOpenChange={onOpenChange}
-            className="sm:max-w-[425px] bg-card text-foreground border-border"
+            className="sm:max-w-[425px] bg-[#1c1c1c] text-white border-zinc-800"
         >
             <DialogHeader>
                 <DialogTitle>Manage Position: {position?.symbol}</DialogTitle>
@@ -118,7 +118,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                     <Input
                         type="number" step="any" required
                         value={modShares} onChange={(e) => setModShares(e.target.value)}
-                        className="col-span-3 bg-background"
+                        className="col-span-3 bg-zinc-900 border-zinc-800 text-white"
                     />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -126,7 +126,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                     <Input
                         type="number" step="any" required
                         value={modPrice} onChange={(e) => setModPrice(e.target.value)}
-                        className="col-span-3 bg-background"
+                        className="col-span-3 bg-zinc-900 border-zinc-800 text-white"
                     />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -134,7 +134,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                     <Input
                         type="date"
                         value={modDate} onChange={(e) => setModDate(e.target.value)}
-                        className="col-span-3 bg-background"
+                        className="col-span-3 bg-zinc-900 border-zinc-800 text-white"
                     />
                 </div>
 

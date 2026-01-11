@@ -14,6 +14,7 @@ import { Search, LayoutGrid, List, Plus, X, Bot, PieChart } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { calculateAiRating } from '../lib/rating-utils';
+import { useMarketSnapshots } from '../hooks/useWatchlist';
 
 interface PortfolioPosition {
   id: string;
@@ -96,9 +97,30 @@ export function PortfolioPage() {
     return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk };
   }, [positions]);
 
+  // -- Market Data for Sparklines & 52-Week Range --
+  const symbols = useMemo(() => positions.map((p: PortfolioPosition) => p.symbol), [positions]);
+  const { data: snapshots = [] } = useMarketSnapshots(symbols);
+
+  // Merge Snapshots with Positions
+  const enrichedPositions = useMemo(() => {
+    if (!snapshots || snapshots.length === 0) return positions;
+    const snapMap = new Map(snapshots.map((s: any) => [s.ticker.symbol, s]));
+    
+    return positions.map((p: PortfolioPosition) => {
+      const snap = snapMap.get(p.symbol);
+      if (!snap) return p;
+      return {
+        ...p,
+        sparkline: snap.sparkline,
+        fiftyTwoWeekHigh: snap.fundamentals?.fifty_two_week_high,
+        fiftyTwoWeekLow: snap.fundamentals?.fifty_two_week_low,
+      };
+    });
+  }, [positions, snapshots]);
+
   // Client-Side Filtering
   const filteredPositions = useMemo(() => {
-    return positions.filter((item: PortfolioPosition) => {
+    return enrichedPositions.filter((item: any) => { // Type as any to suffice for now
       // 1. Search (Symbol or Name)
       const matchSearch = !search ||
         item.symbol.includes(search.toUpperCase()) ||
@@ -164,7 +186,7 @@ export function PortfolioPage() {
 
       return true;
     });
-  }, [positions, search, filters]);
+  }, [enrichedPositions, search, filters]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this position?')) return;
@@ -178,7 +200,8 @@ export function PortfolioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+    <div className="dark min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+            <div className="fixed inset-0 bg-black -z-10" /> {/* Fallback/Reinforce Black BG */}
       <Header />
       <Toaster position="top-right" theme="dark" />
 
@@ -189,9 +212,7 @@ export function PortfolioPage() {
           totalValue={stats.totalValue}
           totalGainLoss={stats.totalGain}
           totalGainLossPercent={stats.totalGainPct}
-          positionCount={stats.count}
-          avgRisk={stats.avgRisk}
-          onAddPosition={() => setIsAddOpen(true)}
+          positions={positions}
           onAnalyze={() => setIsAiOpen(true)}
         />
 
@@ -215,6 +236,14 @@ export function PortfolioPage() {
             </div>
 
             <div className="flex items-center justify-end gap-2">
+              <Button 
+                onClick={() => setIsAddOpen(true)} 
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm"
+              >
+                <Plus size={16} />
+                Add Position
+              </Button>
+
               {/* View Toggle */}
               <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
                 <button
