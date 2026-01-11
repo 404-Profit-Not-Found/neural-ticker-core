@@ -105,7 +105,7 @@ export function ResearchListPage() {
               <Card
                 key={note.id}
                 className="group hover:border-primary/50 transition-all cursor-pointer bg-card/50 hover:bg-card"
-                onClick={() => navigate(`/research/${note.id}`)}
+                onClick={() => navigate(`/ticker/${note.tickers[0] || 'unknown'}/research/${note.id}`)}
               >
                 <CardContent className="p-4 flex flex-row items-start md:items-center gap-3 md:gap-4">
                   {/* Icon Replacement: Ticker Logo or News */}

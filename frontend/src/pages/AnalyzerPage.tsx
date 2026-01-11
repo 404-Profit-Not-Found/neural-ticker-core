@@ -2,7 +2,6 @@ import { Header } from '../components/layout/Header';
 import { AnalyzerTable } from '../components/analyzer/AnalyzerTable';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import {
-  FilterBar,
   type AnalyzerFilters,
 } from '../components/analyzer/FilterBar';
 import { useState, useEffect, useRef } from 'react';
@@ -99,15 +98,11 @@ export function AnalyzerPage() {
         </div>
 
         <div className="space-y-4">
-          <FilterBar
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onReset={handleReset}
-          />
-
           <ErrorBoundary>
             <AnalyzerTable
               filters={filters}
+              onFilterChange={handleFilterChange}
+              onReset={handleReset}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
             />

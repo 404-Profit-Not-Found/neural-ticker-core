@@ -7,12 +7,197 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#09090b" />
   <title>NeuralTicker</title>
-  <script type="module" crossorigin src="/assets/index-c7DD_bK5.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CxMZJxOH.css">
+  <style>
+    body { background-color: #09090b; margin: 0; color: #ffffff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    
+    .loading-container {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background-color: #09090b;
+      /* Hero Grid */
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), 
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        /* Blobs */
+        radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.15), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.12), transparent 30%);
+      background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+      background-position: center top;
+      background-repeat: repeat, repeat, no-repeat, no-repeat;
+    }
+
+    .loading-content {
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .ticker-display {
+      font-size: 3.5rem;
+      font-weight: 300; /* Thinner font */
+      letter-spacing: -1px;
+      margin: 0 0 30px 0;
+      color: #ffffff; /* Pure white */
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+      animation: pulseOpacity 3s infinite ease-in-out;
+    }
+
+    /* Realistic Candlestick Styles */
+    .chart-wrapper {
+      height: 320px; /* Doubled height per user request */
+      width: 320px;
+      margin: 20px 0;
+      position: relative;
+      border-radius: 4px;
+    }
+
+    .cs {
+      position: absolute;
+      width: 12px;
+      opacity: 0;
+      animation: candleReveal 0.5s forwards;
+    }
+
+    /* Candle Body */
+    .cs-body {
+      width: 100%;
+      border-radius: 1px;
+    }
+
+    /* Candle Wick */
+    .cs-wick {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background: inherit;
+      opacity: 0.5;
+      z-index: -1;
+    }
+
+    /* Colors */
+    .g { color: #22c55e; } /* Green */
+    .r { color: #ef4444; } /* Red */
+    
+    .g .cs-body, .g .cs-wick { background-color: #22c55e; }
+    .r .cs-body, .r .cs-wick { background-color: #ef4444; }
+
+    /* Animation Timing */
+    .d-1 { animation-delay: 0.1s; }
+    .d-2 { animation-delay: 0.2s; }
+    .d-3 { animation-delay: 0.3s; }
+    .d-4 { animation-delay: 0.4s; }
+    .d-5 { animation-delay: 0.5s; }
+    .d-6 { animation-delay: 0.6s; }
+    .d-7 { animation-delay: 0.7s; }
+    .d-8 { animation-delay: 0.8s; }
+    .d-9 { animation-delay: 0.9s; }
+    .d-10 { animation-delay: 1.0s; }
+    .d-11 { animation-delay: 1.1s; }
+    .d-12 { animation-delay: 1.2s; }
+
+    @keyframes candleLoop {
+      0% { opacity: 0; transform: scaleY(0.5); }
+      10% { opacity: 1; transform: scaleY(1); }
+      70% { opacity: 1; transform: scaleY(1); }
+      80% { opacity: 0; transform: scaleY(0.5); }
+      100% { opacity: 0; transform: scaleY(0.5); }
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/index-Dwmv2hnr.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-sU713Jab.css">
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="loading-container">
+      <div class="loading-content">
+        
+        <!-- Animated Title (White & Thin) -->
+        <h1 class="ticker-display">Neural Ticker</h1>
+        
+        <!-- Realistic Candlestick Construction (Hardcoded Trend) -->
+        <div class="chart-wrapper">
+            <!-- 1. Green: Bullish start -->
+            <div class="cs g" style="left: 5%; bottom: 30%; height: 35%; animation: candleLoop 4s infinite 0.1s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 20%; height: 60%; position: absolute;"></div>
+            </div>
+            <!-- 2. Red: Pullback -->
+            <div class="cs r" style="left: 13%; bottom: 40%; height: 25%; animation: candleLoop 4s infinite 0.2s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 15%; height: 50%; position: absolute;"></div>
+            </div>
+            <!-- 3. Green: Recovery -->
+            <div class="cs g" style="left: 21%; bottom: 45%; height: 30%; animation: candleLoop 4s infinite 0.3s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 25%; height: 50%; position: absolute;"></div>
+            </div>
+            <!-- 4. Red: Consolidation -->
+            <div class="cs r" style="left: 29%; bottom: 50%; height: 15%; animation: candleLoop 4s infinite 0.4s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 30%; height: 40%; position: absolute;"></div>
+            </div>
+            <!-- 5. Green: Breakout -->
+            <div class="cs g" style="left: 37%; bottom: 48%; height: 40%; animation: candleLoop 4s infinite 0.5s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 10%; height: 80%; position: absolute;"></div>
+            </div>
+            <!-- 6. Green: Continuation -->
+            <div class="cs g" style="left: 45%; bottom: 70%; height: 25%; animation: candleLoop 4s infinite 0.6s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 30%; height: 50%; position: absolute;"></div>
+            </div>
+             <!-- 7. Red: Sharp Drop -->
+             <div class="cs r" style="left: 53%; bottom: 55%; height: 35%; animation: candleLoop 4s infinite 0.7s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="top: 10%; height: 70%; position: absolute;"></div>
+            </div>
+             <!-- 8. Red: Test Support -->
+             <div class="cs r" style="left: 61%; bottom: 40%; height: 20%; animation: candleLoop 4s infinite 0.8s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="top: 20%; height: 40%; position: absolute;"></div>
+            </div>
+             <!-- 9. Green: Doji/Reversal -->
+             <div class="cs g" style="left: 69%; bottom: 42%; height: 15%; animation: candleLoop 4s infinite 0.9s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 45%; height: 10%; position: absolute;"></div>
+            </div>
+             <!-- 10. Green: Strong Buy -->
+             <div class="cs g" style="left: 77%; bottom: 48%; height: 45%; animation: candleLoop 4s infinite 1.0s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 10%; height: 80%; position: absolute;"></div>
+            </div>
+            <!-- 11. Green: Higher High -->
+            <div class="cs g" style="left: 85%; bottom: 75%; height: 20%; animation: candleLoop 4s infinite 1.1s;">
+                <div class="cs-wick" style="bottom: 0; height: 100%;"></div>
+                <div class="cs-body" style="bottom: 20%; height: 60%; position: absolute;"></div>
+            </div>
+        </div>
+
+        <!-- Status Text -->
+        <div class="status-container">
+          <p class="status-text" style="font-family: monospace; font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Loading...</p>
+          <div class="progress-bar" style="height: 2px; width: 200px; background: rgba(255,255,255,0.1); border-radius: 9999px; overflow: hidden;">
+            <div class="progress-fill" style="height: 100%; width: 30%; background: linear-gradient(to right, #8A2BE2, #00C076); animation: progressMove 2s infinite linear;"></div>
+          </div>
+        </div>
+        
+        <!-- Version Number (Bottom Left) -->
+        <div class="version-text" style="position: absolute; bottom: 32px; left: 32px; color: rgba(255,255,255,0.2); font-size: 0.75rem; font-family: monospace;">
+          v0.3.0
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

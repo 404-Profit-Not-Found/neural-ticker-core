@@ -14,6 +14,7 @@ import { Search, LayoutGrid, List, Plus, X, Bot, PieChart } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { calculateAiRating } from '../lib/rating-utils';
+import { useMarketSnapshots } from '../hooks/useWatchlist';
 
 interface PortfolioPosition {
   id: string;
@@ -96,9 +97,32 @@ export function PortfolioPage() {
     return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk };
   }, [positions]);
 
+  // -- Market Data for Sparklines & 52-Week Range --
+  const symbols = useMemo(() => positions.map((p: PortfolioPosition) => p.symbol), [positions]);
+  const { data: snapshots = [] } = useMarketSnapshots(symbols);
+
+  // Merge Snapshots with Positions
+  const enrichedPositions = useMemo(() => {
+    if (!snapshots || snapshots.length === 0) return positions;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const snapMap = new Map(snapshots.map((s: any) => [s.ticker.symbol, s]));
+    
+    return positions.map((p: PortfolioPosition) => {
+      const snap = snapMap.get(p.symbol);
+      if (!snap) return p;
+      return {
+        ...p,
+        sparkline: snap.sparkline,
+        fiftyTwoWeekHigh: snap.fundamentals?.fifty_two_week_high,
+        fiftyTwoWeekLow: snap.fundamentals?.fifty_two_week_low,
+      };
+    });
+  }, [positions, snapshots]);
+
   // Client-Side Filtering
   const filteredPositions = useMemo(() => {
-    return positions.filter((item: PortfolioPosition) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return enrichedPositions.filter((item: any) => {
       // 1. Search (Symbol or Name)
       const matchSearch = !search ||
         item.symbol.includes(search.toUpperCase()) ||
@@ -164,7 +188,7 @@ export function PortfolioPage() {
 
       return true;
     });
-  }, [positions, search, filters]);
+  }, [enrichedPositions, search, filters]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this position?')) return;
@@ -178,7 +202,8 @@ export function PortfolioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+    <div className="dark min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+            <div className="fixed inset-0 bg-black -z-10" /> {/* Fallback/Reinforce Black BG */}
       <Header />
       <Toaster position="top-right" theme="dark" />
 
@@ -189,33 +214,40 @@ export function PortfolioPage() {
           totalValue={stats.totalValue}
           totalGainLoss={stats.totalGain}
           totalGainLossPercent={stats.totalGainPct}
-          positionCount={stats.count}
-          avgRisk={stats.avgRisk}
-          onAddPosition={() => setIsAddOpen(true)}
+          positions={positions}
           onAnalyze={() => setIsAiOpen(true)}
         />
 
-        {/* FILTERS & TOOLBAR */}
-        <div className="space-y-4">
-          <FilterBar
-            filters={filters}
-            onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
-            onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
-          />
+        {/* TOOLBAR: SEARCH & FILTERS */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
+            <div className="flex flex-wrap flex-1 items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  placeholder="Search symbols or names..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
 
-          <div className="flex flex-row items-center justify-between gap-3">
-            <div className="relative flex-1 sm:max-w-md">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                placeholder="Search symbols or names..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              <FilterBar
+                filters={filters}
+                onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
+                onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2">
-              {/* View Toggle */}
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setIsAddOpen(true)} 
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm"
+              >
+                <Plus size={16} />
+                Add Position
+              </Button>
+
               <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
                 <button
                   onClick={() => setViewMode('table')}

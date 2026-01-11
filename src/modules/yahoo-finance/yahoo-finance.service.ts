@@ -58,6 +58,7 @@ export class YahooFinanceService implements OnModuleInit {
           'financialData',
           'calendarEvents',
           'earnings',
+          'summaryDetail', // Added for 52-week range and other details
         ],
       });
     } catch (error) {

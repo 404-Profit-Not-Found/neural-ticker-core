@@ -105,7 +105,7 @@ This ensures that even if an AI model hallucinates formatting, the core numeric 
 
 ### Installation
 
-1. **Clone & Install Dependencies**
+1. **Clone & Install Dependencies** 
    ```bash
    git clone https://github.com/404-Profit-Not-Found/neural-ticker-core.git
    cd neural-ticker-core

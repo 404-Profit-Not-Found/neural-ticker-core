@@ -9,8 +9,6 @@ import {
     Search,
     Trash2,
     Check,
-    Filter,
-    X,
     ChevronDown,
     Pencil,
     LayoutGrid,
@@ -35,6 +33,7 @@ import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
 import { calculateAiRating, calculateLiveUpside } from '../../lib/rating-utils';
+import { FilterBar, type AnalyzerFilters } from '../analyzer/FilterBar';
 
 // --- Types ---
 interface TickerSearchResult {
@@ -77,7 +76,6 @@ interface MarketSnapshot {
 const EMPTY_SYMBOLS: string[] = [];
 const EMPTY_ITEMS: WatchlistItem[] = [];
 const EMPTY_TABLE_DATA: TickerData[] = [];
-const EMPTY_SECTORS: string[] = [];
 
 export function WatchlistTable() {
     const { showToast } = useToast();
@@ -96,10 +94,18 @@ export function WatchlistTable() {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
 
+    // FilterBar State
+    const [filters, setFilters] = useState<AnalyzerFilters>({
+        risk: [],
+        aiRating: [],
+        upside: null,
+        sector: [],
+        overallScore: null,
+    });
+
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isSectorFilterOpen, setIsSectorFilterOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
 
@@ -244,17 +250,66 @@ export function WatchlistTable() {
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);
 
-    const uniqueSectors = useMemo(() => {
-        if (!tableData || tableData.length === 0) return EMPTY_SECTORS;
-        const sectors = new Set(tableData.filter(d => d && d.sector).map(d => d.sector));
-        return Array.from(sectors).sort();
-    }, [tableData]);
+    const filteredTableData = useMemo(() => {
+        return tableData.filter(item => {
+            // 1. Sector
+            if (filters.sector.length > 0 && !filters.sector.includes(item.sector)) {
+                return false;
+            }
+
+            // 2. Risk
+            if (filters.risk.length > 0 && item.riskScore !== null) {
+                const matchesRisk = filters.risk.some(range => {
+                    if (range === 'Low (0-3.5)') return item.riskScore! <= 3.5;
+                    if (range === 'Medium (3.5-6.5)') return item.riskScore! > 3.5 && item.riskScore! <= 6.5;
+                    if (range === 'High (6.5+)') return item.riskScore! > 6.5;
+                    return false;
+                });
+                if (!matchesRisk) return false;
+            }
+
+            // 3. AI Rating
+            if (filters.aiRating.length > 0 && !filters.aiRating.includes(item.aiRating)) {
+                return false;
+            }
+
+            // 4. Upside
+            if (filters.upside && item.potentialUpside !== null) {
+                if (filters.upside === '> 10%' && item.potentialUpside <= 10) return false;
+                if (filters.upside === '> 20%' && item.potentialUpside <= 20) return false;
+                if (filters.upside === '> 50%' && item.potentialUpside <= 50) return false;
+            }
+
+            // 5. Overall Score (Risk/Reward)
+            if (filters.overallScore && item.overallScore !== null) {
+                 if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
+                 if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
+                 if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
+            }
+
+            return true;
+        });
+    }, [tableData, filters]);
+
 
     const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && symbols.length > 0);
-    const activeSectorFilter = useMemo(() => {
-        const sectorFilter = columnFilters.find(f => f.id === 'sector');
-        return (sectorFilter?.value as string) || null;
-    }, [columnFilters]);
+
+    const handleFilterChange = (key: keyof AnalyzerFilters, value: AnalyzerFilters[keyof AnalyzerFilters]) => {
+        setFilters(prev => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
+
+    const handleResetFilters = () => {
+        setFilters({
+            risk: [],
+            aiRating: [],
+            upside: null,
+            sector: [],
+            overallScore: null,
+        });
+    };
 
     // -- Handlers --
     const handleCreateList = useCallback(() => {
@@ -332,7 +387,6 @@ export function WatchlistTable() {
 
     const closeAllDropdowns = useCallback(() => {
         setIsDropdownOpen(false);
-        setIsSectorFilterOpen(false);
         setShowSuggestions(false);
     }, []);
 
@@ -362,20 +416,10 @@ export function WatchlistTable() {
         }
     }, [searchTickerQuery.data, showSuggestions, searchTerm, selectedIndex, selectSuggestion]);
 
-    const setSectorFilter = (value: string | undefined) => {
-        setColumnFilters(prev => {
-            const others = prev.filter(f => f.id !== 'sector');
-            if (value) {
-                return [...others, { id: 'sector', value }];
-            }
-            return others;
-        });
-    };
-
     return (
         <div className="w-full space-y-4">
             <div className="flex flex-col gap-4 p-1">
-                {/* Row 1: Header (Left) and Sector Filter (Right) - on mobile this might wrap/stack, but let's try to keep the header line clean */}
+                {/* Row 1: Header (Left) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
                     {/* LEFT GROUP: Watchlist Selector + View Switcher */}
@@ -451,151 +495,89 @@ export function WatchlistTable() {
                     </div>
                 </div>
 
-                {/* Row 2: Controls (Add, Filter, Sector) */}
-                <div className="flex flex-col sm:flex-row gap-3">
-
-                    {/* Add Ticker */}
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            placeholder="Add stock..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={addTickerMutation.isPending}
-                            className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
-                        />
-                        {showSuggestions && (
-                            <>
-                                <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
-                                <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-[#09090b] !bg-opacity-100 border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 !opacity-100">
-                                    <div className="py-1 max-h-[300px] overflow-y-auto">
-                                        {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
-                                            <button
-                                                key={s.symbol}
-                                                onClick={() => selectSuggestion(s.symbol)}
-                                                className={cn(
-                                                    "w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0",
-                                                    selectedIndex === idx && "bg-muted/50"
-                                                )}
-                                            >
-                                                <div className="bg-background p-1.5 rounded-md border border-border/50 shadow-sm">
-                                                    <TickerLogo url={s.logo_url} symbol={s.symbol} className="w-6 h-6" />
+                {/* Row 2: Add Ticker (Standalone) */}
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Add stock..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={addTickerMutation.isPending}
+                        className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
+                    />
+                    {showSuggestions && (
+                        <>
+                            <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
+                            <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-[#09090b] !bg-opacity-100 border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 !opacity-100">
+                                <div className="py-1 max-h-[300px] overflow-y-auto">
+                                    {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
+                                        <button
+                                            key={s.symbol}
+                                            onClick={() => selectSuggestion(s.symbol)}
+                                            className={cn(
+                                                "w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0",
+                                                selectedIndex === idx && "bg-muted/50"
+                                            )}
+                                        >
+                                            <div className="bg-background p-1.5 rounded-md border border-border/50 shadow-sm">
+                                                <TickerLogo url={s.logo_url} symbol={s.symbol} className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-bold text-sm text-foreground">{s.symbol}</span>
+                                                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{s.exchange}</Badge>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="font-bold text-sm text-foreground">{s.symbol}</span>
-                                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{s.exchange}</Badge>
-                                                    </div>
-                                                    <span className="text-xs text-muted-foreground truncate block mt-0.5">{s.name}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
+                                                <span className="text-xs text-muted-foreground truncate block mt-0.5">{s.name}</span>
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
-                            </>
-                        )}
-                    </div>
+                            </div>
+                        </>
+                    )}
+                </div>
 
-                    {/* Global Filter & View Toggle Row */}
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="relative flex-1">
+                {/* Row 3: INTEGRATED TOOLBAR (Search Table + Filters + View Mode) */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
+                    <div className="flex flex-wrap flex-1 items-center gap-3">
+                        <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
                             <input
                                 type="text"
                                 placeholder="Filter watchlist..."
                                 value={globalFilter ?? ''}
                                 onChange={(e) => setGlobalFilter(e.target.value)}
-                                className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
+                                className="h-10 w-full bg-background/50 border border-input rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
                             />
                         </div>
 
-                        {/* View Switcher - Moved here for mobile alignment */}
-                        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0 h-9">
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                title="Table View"
-                            >
-                                <List size={16} />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                title="Grid View"
-                            >
-                                <LayoutGrid size={16} />
-                            </button>
-                        </div>
+                        <FilterBar
+                            filters={filters}
+                            onFilterChange={handleFilterChange}
+                            onReset={handleResetFilters}
+                        />
                     </div>
 
-                    {/* Sector Filter - Right Aligned on Desktop */}
-                    <div className="relative w-full sm:w-auto">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsSectorFilterOpen(!isSectorFilterOpen)}
-                            className={cn(
-                                "w-full sm:w-auto h-9 gap-2 justify-between sm:justify-center border-border/60",
-                                activeSectorFilter && "text-primary border-primary/50 bg-primary/5"
-                            )}
+                    {/* View Switcher */}
+                    <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card shrink-0 h-10">
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                            title="Table View"
                         >
-                            <div className="flex items-center gap-2">
-                                <Filter className="w-3.5 h-3.5" />
-                                <span className="text-sm">{activeSectorFilter || "Sector"}</span>
-                            </div>
-                            {activeSectorFilter ? (
-                                <div
-                                    className="p-0.5 hover:bg-background/20 rounded-full cursor-pointer ml-1"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSectorFilter(undefined);
-                                    }}
-                                >
-                                    <X className="w-3 h-3" />
-                                </div>
-                            ) : (
-                                <ChevronDown className="w-3.5 h-3.5 opacity-50 block sm:hidden" />
-                            )}
-                        </Button>
-
-                        {isSectorFilterOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
-                                <div className="absolute top-full right-0 mt-1 w-full sm:w-56 bg-popover border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95">
-                                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
-                                        Filter by Sector
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setSectorFilter(undefined);
-                                            setIsSectorFilterOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
-                                    >
-                                        <span className="text-muted-foreground">All Sectors</span>
-                                        {!activeSectorFilter && <Check className="w-3.5 h-3.5 text-primary" />}
-                                    </button>
-                                    {uniqueSectors.map(sector => (
-                                        <button
-                                            key={sector}
-                                            onClick={() => {
-                                                setSectorFilter(sector);
-                                                setIsSectorFilterOpen(false);
-                                            }}
-                                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
-                                        >
-                                            <span className="truncate text-foreground">{sector}</span>
-                                            {activeSectorFilter === sector && <Check className="w-3.5 h-3.5 text-primary" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
+                            <List size={16} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
                     </div>
-
                 </div>
             </div>
 
@@ -603,7 +585,7 @@ export function WatchlistTable() {
             {
                 viewMode === 'table' ? (
                     <WatchlistTableView
-                        data={tableData}
+                        data={filteredTableData}
                         isLoading={isGlobalLoading}
                         onRemove={handleRemoveTicker}
                         sorting={sorting}
@@ -616,10 +598,7 @@ export function WatchlistTable() {
                     />
                 ) : (
                     <WatchlistGridView
-                        data={tableData.filter(item => {
-                            // Apply Sector Filter
-                            if (activeSectorFilter && item.sector !== activeSectorFilter) return false;
-
+                        data={filteredTableData.filter(item => {
                             // Apply Global Search Filter
                             if (globalFilter) {
                                 const search = globalFilter.toLowerCase();
@@ -629,7 +608,6 @@ export function WatchlistTable() {
                                     item.sector.toLowerCase().includes(search)
                                 );
                             }
-
                             return true;
                         })}
                         isLoading={isGlobalLoading}

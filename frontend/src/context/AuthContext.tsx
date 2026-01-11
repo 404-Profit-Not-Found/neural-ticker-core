@@ -19,7 +19,6 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     loginWithGoogle: () => void;
-    loginWithDevToken: (email: string) => Promise<void>;
     logout: () => void;
     refreshSession: () => Promise<void>;
 }
@@ -58,18 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.href = '/api/auth/google'; // Full redirect
     };
 
-    const loginWithDevToken = async (email: string) => {
-        try {
-            // Use httpClient for auth endpoints
-            const { data } = await httpClient.post('/api/auth/dev/token', { email });
-            console.log('Dev token received:', data);
-            await checkSession();
-        } catch (error) {
-            console.log('Login failed', error);
-            throw error;
-        }
-    };
-
     const logout = async () => {
         try {
             // Call backend logout to clear cookie
@@ -93,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithDevToken, logout, refreshSession }}>
+        <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, refreshSession }}>
             {children}
         </AuthContext.Provider>
     );

@@ -1,4 +1,4 @@
-import { Trash2, Edit2, ArrowUp, ArrowDown, ShieldCheck, AlertTriangle, Flame, Brain, Newspaper, MessageCircle } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
@@ -6,6 +6,8 @@ import { TickerLogo } from '../dashboard/TickerLogo';
 import { useNavigate } from 'react-router-dom';
 import { calculateLiveUpside } from '../../lib/rating-utils';
 import { VerdictBadge } from "../ticker/VerdictBadge";
+import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
+import { Sparkline } from '../ui/Sparkline';
 
 export interface Position {
     id: string;
@@ -18,6 +20,11 @@ export interface Position {
     cost_basis: number;
     gain_loss: number;
     gain_loss_percent: number;
+    
+    // Sparkline & Range
+    sparkline?: number[];
+    fiftyTwoWeekHigh?: number;
+    fiftyTwoWeekLow?: number;
 
     // Enriched Backend Data
     ticker?: {
@@ -49,7 +56,7 @@ export interface Position {
 interface PortfolioTableProps {
     positions: Position[];
     onDelete: (id: string) => void;
-    onEdit?: (position: Position) => void; // Added Edit Handler
+    onEdit?: (position: Position) => void;
     loading: boolean;
 }
 
@@ -127,7 +134,24 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // 2. Price / Change
+        // 2. Value (Moved Here)
+        columnHelper.accessor('current_value', {
+            header: () => <span className="hidden md:inline">Value</span>,
+            cell: (info) => <span className="hidden md:inline font-bold text-foreground">{formatCurrency(info.getValue())}</span>
+        }),
+
+        // 3. Position (Shares) (Moved Here)
+        columnHelper.accessor('shares', {
+            header: 'Position',
+            cell: (info) => (
+                <div className="flex flex-col min-w-[80px]">
+                    <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
+                    <span className="text-xs text-muted-foreground">Avg: {formatCurrency(Number(info.row.original.buy_price))}</span>
+                </div>
+            )
+        }),
+
+        // 4. Price / Change
         columnHelper.accessor('current_price', {
             header: 'Price / Change',
             cell: (info) => {
@@ -149,24 +173,47 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // 3. Shares & Cost (Combined for space)
-        columnHelper.accessor('shares', {
-            header: 'Position',
-            cell: (info) => (
-                <div className="flex flex-col min-w-[80px]">
-                    <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
-                    <span className="text-xs text-muted-foreground">Avg: {formatCurrency(Number(info.row.original.buy_price))}</span>
-                </div>
-            )
+        // 5. Trend (14d)
+        columnHelper.accessor('sparkline', {
+            header: () => <span className="hidden md:inline">Trend (14d)</span>,
+            cell: (info) => {
+                const data = info.getValue();
+                if (!data || data.length === 0) return <span className="hidden md:inline text-muted-foreground text-xs">-</span>;
+                return (
+                    <div className="hidden md:flex w-[100px] h-8 items-center justify-center">
+                        <Sparkline
+                            data={data}
+                            width={100}
+                            height={32}
+                            className="opacity-80 group-hover:opacity-100 transition-opacity"
+                        />
+                    </div>
+                );
+            }
         }),
 
-        // 4. Value
-        columnHelper.accessor('current_value', {
-            header: () => <span className="hidden md:inline">Value</span>,
-            cell: (info) => <span className="hidden md:inline font-medium text-foreground">{formatCurrency(info.getValue())}</span>
+        // 6. 52-Week Range
+         columnHelper.accessor(row => row.fiftyTwoWeekHigh, { // Accessor key
+            id: '52wk',
+            header: () => <span className="hidden lg:inline">52-Week Range</span>,
+            cell: (info) => {
+                const row = info.row.original;
+                if (!row.fiftyTwoWeekHigh || !row.fiftyTwoWeekLow) return <span className="hidden lg:inline text-muted-foreground text-xs">-</span>;
+                return (
+                    <div className="hidden lg:block w-[140px]">
+                        <FiftyTwoWeekRange
+                            low={row.fiftyTwoWeekLow}
+                            high={row.fiftyTwoWeekHigh}
+                            current={row.current_price}
+                            showLabels={true} // Small labels
+                            className="scale-90 origin-left"
+                        />
+                    </div>
+                );
+            }
         }),
 
-        // 5. Total Return
+        // 7. Total Return
         columnHelper.accessor('gain_loss', {
             header: () => <span className="hidden md:inline">Total Return</span>,
             cell: (info) => {
@@ -189,57 +236,9 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // --- NEW ANALYZER COLUMNS ---
+        // REMOVED P/E, Risk, Risk/Reward columns
 
-        // 7. P/E
-        columnHelper.accessor(row => row.fundamentals?.pe_ttm, {
-            id: 'pe',
-            header: () => <span className="hidden md:inline">P/E</span>,
-            cell: (info) => {
-                const val = info.getValue();
-                return val ? <span className="hidden md:inline text-xs font-mono text-muted-foreground">{Number(val).toFixed(2)}</span> : <span className="hidden md:inline">-</span>;
-            }
-        }),
-
-        // 8. Risk
-        columnHelper.accessor(row => row.aiAnalysis?.financial_risk, {
-            id: 'risk',
-            header: () => <span className="hidden md:inline">Risk</span>,
-            cell: (info) => {
-                const val = info.getValue();
-                if (val === undefined || val === null) return <span className="hidden md:inline">-</span>;
-
-                let colorClass = 'text-muted-foreground';
-                let Icon = ShieldCheck;
-                if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
-                else if (val <= 6.5) { colorClass = 'text-yellow-500'; Icon = AlertTriangle; }
-                else { colorClass = 'text-red-500'; Icon = Flame; }
-
-                return (
-                    <span className={cn('hidden md:flex items-center gap-1.5 font-bold', colorClass)}>
-                        <Icon size={14} />
-                        {Number(val).toFixed(1)}
-                    </span>
-                );
-            }
-        }),
-
-        // 9. Overall Score (Risk/Reward)
-        columnHelper.accessor(row => row.aiAnalysis?.overall_score, {
-            id: 'risk_reward',
-            header: () => <span className="hidden md:inline">Risk/Reward</span>,
-            cell: (info) => {
-                const val = info.getValue();
-                if (!val) return <span className="hidden md:inline">-</span>;
-                let color = 'text-red-500';
-                if (val >= 7.5) color = 'text-emerald-500';
-                else if (val >= 5.0) color = 'text-yellow-500';
-
-                return <span className={cn("hidden md:inline font-bold", color)}>{Number(val).toFixed(1)}</span>
-            }
-        }),
-
-        // 10. Upside
+        // 8. Upside
         columnHelper.accessor((row) => row.aiAnalysis?.base_price, {
             id: 'upside',
             header: () => <span className="hidden md:inline">Upside</span>,
@@ -257,7 +256,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             },
         }),
 
-        // 11. AI Rating
+        // 9. AI Rating
         columnHelper.accessor((row) => row.aiAnalysis?.financial_risk, {
             id: 'ai_rating',
             header: () => <span className="hidden md:inline">AI Rating</span>,
@@ -296,7 +295,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // 12. Actions
+        // 10. Actions
         columnHelper.display({
             id: 'actions',
             header: 'Actions',

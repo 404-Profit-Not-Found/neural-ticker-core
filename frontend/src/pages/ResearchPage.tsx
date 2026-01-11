@@ -58,7 +58,8 @@ interface ResearchNote {
 
 
 export function ResearchPage() {
-    const { id } = useParams<{ id: string }>();
+    // Route: /ticker/:symbol/research/:id
+    const { id } = useParams<{ id: string; symbol: string }>();
     const navigate = useNavigate();
 
     const { data: note, isLoading, error } = useQuery<ResearchNote>({

@@ -10,13 +10,14 @@ async function run() {
         fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0' } }
     });
     
-    const symbol = 'NVDA';
+    const symbol = 'NOVO-B.CO';
     console.log(`Fetching summary for ${symbol}...`);
     const result = await yahoo.quoteSummary(symbol, {
       modules: [
           'summaryProfile',
           'defaultKeyStatistics',
           'financialData',
+          'summaryDetail', 
           'calendarEvents',
           'earnings',
       ],
@@ -30,6 +31,9 @@ async function run() {
 
     console.log("\n--- financialData ---");
     console.log(JSON.stringify(result.financialData, null, 2));
+
+    console.log("\n--- summaryDetail ---");
+    console.log(JSON.stringify(result.summaryDetail, null, 2));
 
   } catch (e) {
     console.error(e);

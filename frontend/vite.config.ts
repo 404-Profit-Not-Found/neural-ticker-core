@@ -1,9 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import packageJson from './package.json'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  define: {
+    '__APP_VERSION__': JSON.stringify(packageJson.version)
+  },
+  plugins: [
+    react(),
+    {
+      name: 'html-transform',
+      transformIndexHtml(html) {
+        return html.replace('%APP_VERSION%', packageJson.version)
+      }
+    }
+  ],
   server: {
     proxy: {
       '/api': {
