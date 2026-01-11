@@ -217,14 +217,7 @@ export function AnalyzerTable({
     }),
 
     // 3. P/E
-    columnHelper.accessor((row) => row.fundamentals.pe_ttm, {
-      id: 'pe_ttm',
-      header: 'P/E',
-      cell: (info) => {
-        const val = info.getValue();
-        return val ? <span className="font-mono text-muted-foreground text-xs">{Number(val).toFixed(2)}</span> : '-';
-      },
-    }),
+
 
     // 5. Financial Risk
     columnHelper.accessor((row) => row.aiAnalysis?.financial_risk, {

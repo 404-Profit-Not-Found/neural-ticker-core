@@ -9,8 +9,6 @@ import {
     Search,
     Trash2,
     Check,
-    Filter,
-    X,
     ChevronDown,
     Pencil,
     LayoutGrid,
@@ -35,6 +33,7 @@ import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
 import { calculateAiRating, calculateLiveUpside } from '../../lib/rating-utils';
+import { FilterBar, type AnalyzerFilters } from '../analyzer/FilterBar';
 
 // --- Types ---
 interface TickerSearchResult {
@@ -77,7 +76,6 @@ interface MarketSnapshot {
 const EMPTY_SYMBOLS: string[] = [];
 const EMPTY_ITEMS: WatchlistItem[] = [];
 const EMPTY_TABLE_DATA: TickerData[] = [];
-const EMPTY_SECTORS: string[] = [];
 
 export function WatchlistTable() {
     const { showToast } = useToast();
@@ -96,10 +94,18 @@ export function WatchlistTable() {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
 
+    // FilterBar State
+    const [filters, setFilters] = useState<AnalyzerFilters>({
+        risk: [],
+        aiRating: [],
+        upside: null,
+        sector: [],
+        overallScore: null,
+    });
+
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isSectorFilterOpen, setIsSectorFilterOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
 
@@ -244,17 +250,66 @@ export function WatchlistTable() {
             });
     }, [snapshotData, activeWatchlist, watchlistItems]);
 
-    const uniqueSectors = useMemo(() => {
-        if (!tableData || tableData.length === 0) return EMPTY_SECTORS;
-        const sectors = new Set(tableData.filter(d => d && d.sector).map(d => d.sector));
-        return Array.from(sectors).sort();
-    }, [tableData]);
+    const filteredTableData = useMemo(() => {
+        return tableData.filter(item => {
+            // 1. Sector
+            if (filters.sector.length > 0 && !filters.sector.includes(item.sector)) {
+                return false;
+            }
+
+            // 2. Risk
+            if (filters.risk.length > 0 && item.riskScore !== null) {
+                const matchesRisk = filters.risk.some(range => {
+                    if (range === 'Low (0-3.5)') return item.riskScore! <= 3.5;
+                    if (range === 'Medium (3.5-6.5)') return item.riskScore! > 3.5 && item.riskScore! <= 6.5;
+                    if (range === 'High (6.5+)') return item.riskScore! > 6.5;
+                    return false;
+                });
+                if (!matchesRisk) return false;
+            }
+
+            // 3. AI Rating
+            if (filters.aiRating.length > 0 && !filters.aiRating.includes(item.aiRating)) {
+                return false;
+            }
+
+            // 4. Upside
+            if (filters.upside && item.potentialUpside !== null) {
+                if (filters.upside === '> 10%' && item.potentialUpside <= 10) return false;
+                if (filters.upside === '> 20%' && item.potentialUpside <= 20) return false;
+                if (filters.upside === '> 50%' && item.potentialUpside <= 50) return false;
+            }
+
+            // 5. Overall Score (Risk/Reward)
+            if (filters.overallScore && item.overallScore !== null) {
+                 if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
+                 if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
+                 if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
+            }
+
+            return true;
+        });
+    }, [tableData, filters]);
+
 
     const isGlobalLoading = isLoadingWatchlists || (isLoadingSnapshots && symbols.length > 0);
-    const activeSectorFilter = useMemo(() => {
-        const sectorFilter = columnFilters.find(f => f.id === 'sector');
-        return (sectorFilter?.value as string) || null;
-    }, [columnFilters]);
+
+    const handleFilterChange = (key: keyof AnalyzerFilters, value: AnalyzerFilters[keyof AnalyzerFilters]) => {
+        setFilters(prev => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
+
+    const handleResetFilters = () => {
+        setFilters({
+            risk: [],
+            aiRating: [],
+            upside: null,
+            sector: [],
+            overallScore: null,
+        });
+    };
 
     // -- Handlers --
     const handleCreateList = useCallback(() => {
@@ -332,7 +387,6 @@ export function WatchlistTable() {
 
     const closeAllDropdowns = useCallback(() => {
         setIsDropdownOpen(false);
-        setIsSectorFilterOpen(false);
         setShowSuggestions(false);
     }, []);
 
@@ -362,20 +416,10 @@ export function WatchlistTable() {
         }
     }, [searchTickerQuery.data, showSuggestions, searchTerm, selectedIndex, selectSuggestion]);
 
-    const setSectorFilter = (value: string | undefined) => {
-        setColumnFilters(prev => {
-            const others = prev.filter(f => f.id !== 'sector');
-            if (value) {
-                return [...others, { id: 'sector', value }];
-            }
-            return others;
-        });
-    };
-
     return (
         <div className="w-full space-y-4">
             <div className="flex flex-col gap-4 p-1">
-                {/* Row 1: Header (Left) and Sector Filter (Right) - on mobile this might wrap/stack, but let's try to keep the header line clean */}
+                {/* Row 1: Header (Left) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
                     {/* LEFT GROUP: Watchlist Selector + View Switcher */}
@@ -451,7 +495,7 @@ export function WatchlistTable() {
                     </div>
                 </div>
 
-                {/* Row 2: Controls (Add, Filter, Sector) */}
+                {/* Row 2: Controls (Add, Filter, View) */}
                 <div className="flex flex-col sm:flex-row gap-3">
 
                     {/* Add Ticker */}
@@ -530,80 +574,21 @@ export function WatchlistTable() {
                             </button>
                         </div>
                     </div>
-
-                    {/* Sector Filter - Right Aligned on Desktop */}
-                    <div className="relative w-full sm:w-auto">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsSectorFilterOpen(!isSectorFilterOpen)}
-                            className={cn(
-                                "w-full sm:w-auto h-9 gap-2 justify-between sm:justify-center border-border/60",
-                                activeSectorFilter && "text-primary border-primary/50 bg-primary/5"
-                            )}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Filter className="w-3.5 h-3.5" />
-                                <span className="text-sm">{activeSectorFilter || "Sector"}</span>
-                            </div>
-                            {activeSectorFilter ? (
-                                <div
-                                    className="p-0.5 hover:bg-background/20 rounded-full cursor-pointer ml-1"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSectorFilter(undefined);
-                                    }}
-                                >
-                                    <X className="w-3 h-3" />
-                                </div>
-                            ) : (
-                                <ChevronDown className="w-3.5 h-3.5 opacity-50 block sm:hidden" />
-                            )}
-                        </Button>
-
-                        {isSectorFilterOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
-                                <div className="absolute top-full right-0 mt-1 w-full sm:w-56 bg-popover border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95">
-                                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
-                                        Filter by Sector
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setSectorFilter(undefined);
-                                            setIsSectorFilterOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
-                                    >
-                                        <span className="text-muted-foreground">All Sectors</span>
-                                        {!activeSectorFilter && <Check className="w-3.5 h-3.5 text-primary" />}
-                                    </button>
-                                    {uniqueSectors.map(sector => (
-                                        <button
-                                            key={sector}
-                                            onClick={() => {
-                                                setSectorFilter(sector);
-                                                setIsSectorFilterOpen(false);
-                                            }}
-                                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between transition-colors"
-                                        >
-                                            <span className="truncate text-foreground">{sector}</span>
-                                            {activeSectorFilter === sector && <Check className="w-3.5 h-3.5 text-primary" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
                 </div>
+                
+                {/* Row 3: Filter Bar */}
+                 <FilterBar
+                    filters={filters}
+                    onFilterChange={handleFilterChange}
+                    onReset={handleResetFilters}
+                />
             </div>
 
             {/* Content Area */}
             {
                 viewMode === 'table' ? (
                     <WatchlistTableView
-                        data={tableData}
+                        data={filteredTableData}
                         isLoading={isGlobalLoading}
                         onRemove={handleRemoveTicker}
                         sorting={sorting}
@@ -616,10 +601,7 @@ export function WatchlistTable() {
                     />
                 ) : (
                     <WatchlistGridView
-                        data={tableData.filter(item => {
-                            // Apply Sector Filter
-                            if (activeSectorFilter && item.sector !== activeSectorFilter) return false;
-
+                        data={filteredTableData.filter(item => {
                             // Apply Global Search Filter
                             if (globalFilter) {
                                 const search = globalFilter.toLowerCase();
@@ -629,7 +611,6 @@ export function WatchlistTable() {
                                     item.sector.toLowerCase().includes(search)
                                 );
                             }
-
                             return true;
                         })}
                         isLoading={isGlobalLoading}
