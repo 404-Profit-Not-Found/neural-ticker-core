@@ -100,17 +100,7 @@ export function TickerDetail() {
     // -- Hooks --
     const { data: tickerData, isLoading: isLoadingDetails } = useTickerDetails(symbol);
 
-    // Extra-aggressive scroll reset: when data finishes loading for a new symbol
-    // This ensures that even if async content expands the page, we force top-of-page.
-    useEffect(() => {
-        if (!isLoadingDetails && tickerData) {
-            // Triple reset to fight browser "memory"
-            window.scrollTo(0, 0);
-            requestAnimationFrame(() => window.scrollTo(0, 0));
-            const timer = setTimeout(() => window.scrollTo(0, 0), 150);
-            return () => clearTimeout(timer);
-        }
-    }, [isLoadingDetails, symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
     // Trigger background sync for 5-year history
     useEffect(() => {
@@ -257,7 +247,7 @@ export function TickerDetail() {
 
 
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20 overflow-x-hidden">
+        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
             <Header />
 
             {isLoadingDetails ? (
@@ -275,150 +265,128 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 return (
-                    <main key={symbol} className="container mx-auto px-4 py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
+
+                    <main key={symbol} className="container mx-auto px-4 pt-2 pb-6 md:py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
 
                         {/* --- 1. HERO HEADER --- */}
-                        <div className="relative z-30 space-y-4 pb-4 md:pb-6">
-                            {/* Mobile Actions (Absolute Top Right) */}
-                            {/* Mobile Actions (Absolute Top Right) */}
-                            <div className="md:hidden absolute top-1 right-0 flex items-center gap-2 z-40">
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title="Watchers">
-                                    <Eye size={12} />
-                                    <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-yellow-400 -mr-2"
-                                    title="Add to Favourites"
-                                    onClick={() => {
-                                        if (symbol) {
-                                            setOptimisticFavorite(!isFavEffectively);
-                                            favoriteMutation.mutate(symbol);
-                                        }
-                                    }}
-                                >
-                                    <Star
-                                        size={16}
-                                        className={isFavEffectively ? "fill-yellow-400 text-yellow-400" : ""}
-                                    />
-                                </Button>
-                            </div>
 
+
+                        <div className="relative z-30 space-y-4 pb-4 md:pb-6">
                             {/* --- DESKTOP LAYOUT --- */}
                             <div className="hidden md:block space-y-6">
                                 {/* Row 1: Identity & Actions */}
-                                <div className="flex items-center justify-between py-2 mb-2">
-                                    {/* Left: Identity */}
-                                    <div className="flex items-center gap-4">
-                                        <Link 
-                                            to="/dashboard" 
-                                            aria-label="Back to dashboard"
-                                            className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center"
-                                        >
-                                            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                                        </Link>
-                                        <div
-                                            className="relative w-14 h-14 shrink-0"
-                                            onDoubleClick={handleLogoDoubleClick}
-                                            title="Double-click to update logo (Admin)"
-                                        >
-                                            <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-full h-full object-contain" />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-
-                                                {(() => {
-                                                    if (!risk_analysis) return null;
-                                                    const liveUpside = calculateLiveUpside(
-                                                        market_data.price,
-                                                        getBasePriceFromScenarios(risk_analysis.scenarios),
-                                                        risk_analysis.upside_percent
-                                                    );
-                                                    
-                                                    // Extract Bear Price
-                                                    const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
-                                                    const bearPrice = bearScenario ? Number(bearScenario.price_mid) : undefined;
-                                                    
-                                                    const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
-                                                        ? ((bearPrice - market_data.price) / market_data.price) * 100
-                                                        : -(risk_analysis.financial_risk * 5); // Fallback
-
-                                                    return (
-                                                        <VerdictBadge
-                                                            risk={risk_analysis.financial_risk}
-                                                            upside={liveUpside}
-                                                            downside={liveDownside}
-                                                            consensus={fundamentals?.consensus_rating}
-                                                            overallScore={risk_analysis.overall_score}
-                                                            pe={fundamentals?.pe_ratio}
-                                                            newsSentiment={tickerData.news?.sentiment}
-                                                            newsImpact={tickerData.news?.score}
-                                                        />
-                                                    );
-                                                })()}
-
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
-                                                {profile?.industry && (
-                                                    <>
-                                                        <span className="text-muted-foreground/40">•</span>
-                                                        <span className="text-sm text-muted-foreground">{profile.industry}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
+                                {/* Row 1: Identity & Actions */}
+                                <div className="flex items-start gap-4 py-2 mb-2">
+                                    {/* Left: Identity - Logo & Back */}
+                                    <Link 
+                                        to="/dashboard" 
+                                        aria-label="Back to dashboard"
+                                        className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1"
+                                    >
+                                        <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                                    </Link>
+                                    <div
+                                        className="relative w-14 h-14 shrink-0"
+                                        onDoubleClick={handleLogoDoubleClick}
+                                        title="Double-click to update logo (Admin)"
+                                    >
+                                        <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-full h-full object-contain" />
                                     </div>
 
-                                    {/* Right: Actions */}
-                                    <div className="flex items-center gap-1">
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 mr-2" title="Watchers">
-                                            <Eye size={14} className="text-muted-foreground" />
-                                            <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                                    {/* Identity Text & Actions Flow */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3">
+                                            <h1 className="text-3xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+
+                                            {(() => {
+                                                if (!risk_analysis) return null;
+                                                const liveUpside = calculateLiveUpside(
+                                                    market_data.price,
+                                                    getBasePriceFromScenarios(risk_analysis.scenarios),
+                                                    risk_analysis.upside_percent
+                                                );
+                                                
+                                                const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
+                                                const bearPrice = bearScenario && bearScenario.price_mid ? Number(bearScenario.price_mid) : undefined;
+                                                
+                                                const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
+                                                    ? ((bearPrice - market_data.price) / market_data.price) * 100
+                                                    : -(risk_analysis.financial_risk * 5);
+
+                                                return (
+                                                    <VerdictBadge
+                                                        risk={risk_analysis.financial_risk}
+                                                        upside={liveUpside}
+                                                        downside={liveDownside}
+                                                        consensus={fundamentals?.consensus_rating}
+                                                        overallScore={risk_analysis.overall_score}
+                                                        pe={fundamentals?.pe_ratio}
+                                                        newsSentiment={tickerData.news?.sentiment}
+                                                        newsImpact={tickerData.news?.score}
+                                                    />
+                                                );
+                                            })()}
+
+                                            {/* Right Actions: Nested in Title Row for Perfect Alignment */}
+                                            <div className="ml-auto flex items-center gap-1">
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 mr-2" title="Watchers">
+                                                    <Eye size={14} className="text-muted-foreground" />
+                                                    <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
+                                                </div>
+
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
+                                                    onClick={async () => {
+                                                        if (!symbol) return;
+                                                        try {
+                                                            setIsSyncing(true);
+                                                            await api.post(`/research/sync/${symbol}`);
+                                                            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
+                                                            queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
+                                                        } catch (err) {
+                                                            console.error("Sync failed", err);
+                                                        } finally {
+                                                            setIsSyncing(false);
+                                                        }
+                                                    }}
+                                                    disabled={isSyncing}
+                                                    title="Sync Data"
+                                                >
+                                                    <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
+                                                </Button>
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-6 gap-1.5 rounded-full border-yellow-500/50 text-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400 text-xs font-semibold uppercase tracking-wider px-2"
+                                                    onClick={() => {
+                                                        if (symbol) {
+                                                            setOptimisticFavorite(!isFavEffectively);
+                                                            favoriteMutation.mutate(symbol);
+                                                        }
+                                                    }}
+                                                    title={isFavEffectively ? "Remove from Favorites" : "Add to Favorites"}
+                                                >
+                                                    <Star
+                                                        size={14}
+                                                        className={isFavEffectively ? "fill-yellow-500" : ""}
+                                                    />
+                                                    <span>Favourite</span>
+                                                </Button>
+                                            </div>
                                         </div>
-
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-9 w-9 data-[state=active]:bg-muted rounded-full"
-                                            onClick={async () => {
-                                                if (!symbol) return;
-                                                try {
-                                                    setIsSyncing(true);
-                                                    await api.post(`/research/sync/${symbol}`);
-                                                    queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
-                                                    queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
-                                                } catch (err) {
-                                                    console.error("Sync failed", err);
-                                                } finally {
-                                                    setIsSyncing(false);
-                                                }
-                                            }}
-                                            disabled={isSyncing}
-                                            title="Sync Data"
-                                        >
-                                            <RefreshCw size={18} className={isSyncing ? "animate-spin text-primary" : "text-muted-foreground"} />
-                                        </Button>
-
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-9 w-9 rounded-full"
-                                            onClick={() => {
-                                                if (symbol) {
-                                                    setOptimisticFavorite(!isFavEffectively);
-                                                    favoriteMutation.mutate(symbol);
-                                                }
-                                            }}
-                                            title={isFavEffectively ? "Remove from Favorites" : "Add to Favorites"}
-                                        >
-                                            <Star
-                                                size={18}
-                                                className={isFavEffectively ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}
-                                            />
-                                        </Button>
+                                        
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
+                                            {profile?.industry && (
+                                                <>
+                                                    <span className="text-muted-foreground/40">•</span>
+                                                    <span className="text-sm text-muted-foreground">{profile.industry}</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 {/* Row 2: Data & Context */}
@@ -487,7 +455,7 @@ export function TickerDetail() {
                             {/* --- MOBILE LAYOUT --- */}
                             <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
-                                <div className="flex items-start gap-3 pr-24 relative">
+                                <div className="flex items-start gap-3 relative">
                                     <Link 
                                         to="/dashboard" 
                                         aria-label="Back to dashboard"
@@ -499,8 +467,9 @@ export function TickerDetail() {
                                     <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-3 flex-wrap">
                                             <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
+                                            
                                             {(() => {
                                                 if (!risk_analysis) return null;
                                                 const liveUpside = calculateLiveUpside(
@@ -530,10 +499,38 @@ export function TickerDetail() {
                                                 );
                                             })()}
 
+                                            {/* Right Aligned Actions */}
+                                            <div className="ml-auto flex items-center gap-3">
+                                                {/* Watchers */}
+                                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground" title="Watchers">
+                                                    <Eye size={12} />
+                                                    <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
+                                                </div>
+
+                                                {/* Star / Favorite */}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 rounded-full -ml-1 hover:bg-transparent text-muted-foreground"
+                                                    onClick={() => {
+                                                        if (symbol) {
+                                                            setOptimisticFavorite(!isFavEffectively);
+                                                            favoriteMutation.mutate(symbol);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Star
+                                                        size={16}
+                                                        className={isFavEffectively ? "fill-yellow-500 text-yellow-500" : ""}
+                                                    />
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground font-medium truncate mt-0.5">
+
+                                        <div className="text-xs text-muted-foreground font-medium truncate mt-0.5 mb-2">
                                             {profile?.name}
                                         </div>
+
                                         <div className="flex items-baseline gap-2 mt-1">
                                             <span className="text-lg font-mono font-bold tracking-tight">
                                                 ${market_data?.price?.toFixed(2)}

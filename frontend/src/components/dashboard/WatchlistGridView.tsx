@@ -60,6 +60,8 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                     newsCount={item.newsCount}
                     socialCount={item.socialCount}
                     sparkline={item.sparkline}
+                    fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
+                    fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
                 >
                     {/* Action Overlays */}
                     <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">

@@ -47,17 +47,17 @@ export function SuperLoading({ text, symbol, className, fullScreen = false }: Su
             </div>
 
             {/* --- CONTENT --- */}
-            <div className="relative z-10 flex flex-col items-center w-full max-w-sm p-5 space-y-6">
+            <div className="relative z-10 flex flex-col items-center w-full max-w-sm p-5">
                 
                 {/* 1. Title (White, Thin, Glow) */}
-                <div className="text-center space-y-2">
+                <div className="text-center mb-[30px]">
                     <h1 className="text-[3.5rem] leading-none font-light tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] animate-pulse-slow">
                         {displayTitle}
                     </h1>
                 </div>
 
                 {/* 2. Candlestick Chart (CSS Reconstruction) */}
-                <div className="chart-wrapper relative h-[320px] w-[320px] my-5 rounded">
+                <div className="chart-wrapper relative h-[320px] w-[320px] my-[20px] rounded">
                     {CANDLE_DATA.map((c, i) => (
                         <div 
                             key={i}
