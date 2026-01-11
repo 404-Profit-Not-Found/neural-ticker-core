@@ -79,8 +79,11 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/ticker/:symbol" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/research" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/financials" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/news" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/research" element={<ProtectedRoute><ResearchListPage /></ProtectedRoute>} />
-            <Route path="/research/:ticker" element={<ProtectedRoute><ResearchPage /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/research/:id" element={<ProtectedRoute><ResearchPage /></ProtectedRoute>} />
             
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><PortfolioPage /></ProtectedRoute>} />

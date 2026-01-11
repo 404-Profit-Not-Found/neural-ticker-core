@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
     TrendingUp,
     TrendingDown,
@@ -51,8 +51,9 @@ import { Star } from 'lucide-react';
 
 const RESEARCH_PENDING_GRACE_MS = 45000;
 export function TickerDetail() {
-    const { symbol, tab } = useParams();
+    const { symbol } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     
 
@@ -94,8 +95,15 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news'];
-    const currentTab = (tab && validTabs.includes(tab)) ? tab : 'overview';
+    const validTabs = ['overview', 'financials', 'research', 'news'] as const;
+    // Extract tab from pathname: /ticker/NVDA/research -> research
+    // Handle potential trailing slashes and case sensitivity
+    const pathSegments = location.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
+    // Expected format: ['ticker', 'symbol', 'tab?']
+    const potentialTab = pathSegments.length >= 3 ? pathSegments[pathSegments.length - 1] : null;
+    const currentTab = potentialTab && validTabs.includes(potentialTab as typeof validTabs[number]) 
+        ? potentialTab 
+        : 'overview';
 
     // -- Hooks --
     const { data: tickerData, isLoading: isLoadingDetails } = useTickerDetails(symbol);

@@ -104,6 +104,7 @@ export function PortfolioPage() {
   // Merge Snapshots with Positions
   const enrichedPositions = useMemo(() => {
     if (!snapshots || snapshots.length === 0) return positions;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const snapMap = new Map(snapshots.map((s: any) => [s.ticker.symbol, s]));
     
     return positions.map((p: PortfolioPosition) => {
@@ -120,7 +121,8 @@ export function PortfolioPage() {
 
   // Client-Side Filtering
   const filteredPositions = useMemo(() => {
-    return enrichedPositions.filter((item: any) => { // Type as any to suffice for now
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return enrichedPositions.filter((item: any) => {
       // 1. Search (Symbol or Name)
       const matchSearch = !search ||
         item.symbol.includes(search.toUpperCase()) ||

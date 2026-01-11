@@ -145,7 +145,7 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
                                 <div key={item.id} className="bg-background hover:bg-muted/50 transition-colors">
                                     <div
                                         className={`p-3 md:p-4 flex items-center justify-between group ${isPending ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
-                                        onClick={() => !isPending && navigate(`/research/${item.id}`)}
+                                        onClick={() => !isPending && navigate(`/ticker/${item.tickers[0] || defaultTicker || 'unknown'}/research/${item.id}`)}
                                     >
                                         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                                             <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${item.status === 'completed' ? 'bg-green-500' : item.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />

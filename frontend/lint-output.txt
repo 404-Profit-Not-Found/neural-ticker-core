@@ -1,0 +1,21 @@
+
+> frontend@0.3.0 lint
+> eslint .
+
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\coverage\block-navigation.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\coverage\prettify.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\coverage\sorter.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\Users\brani\Documents\GitHub\neural-ticker-core\frontend\src\components\portfolio\PortfolioStats.tsx
+  188:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  205:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 5 problems (2 errors, 3 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+

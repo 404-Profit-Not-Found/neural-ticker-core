@@ -88,7 +88,7 @@ export function TransactionHistoryDialog({
                                         onClick={() => {
                                             if (isResearch) {
                                                 setOpen(false); // Close dialog on navigation
-                                                navigate(`/research/${researchId}`);
+                                                navigate(`/ticker/unknown/research/${researchId}`);
                                             }
                                         }}
                                     >

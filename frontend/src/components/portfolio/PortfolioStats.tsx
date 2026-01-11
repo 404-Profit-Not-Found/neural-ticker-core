@@ -1,19 +1,32 @@
 import { useMemo, useState } from 'react';
 import { 
   ResponsiveContainer, PieChart, Pie, Cell, 
-  BarChart, Bar, XAxis, YAxis, Tooltip,
-  ComposedChart, Area, Scatter, CartesianGrid
+  XAxis, YAxis, Tooltip,
+  ComposedChart, Area, CartesianGrid
 } from 'recharts';
 import { TrendingUp, TrendingDown, Bot } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { format, subDays, differenceInDays, addDays, isBefore, startOfDay, parseISO, isValid } from 'date-fns';
 
+interface Position {
+  symbol: string;
+  shares: number;
+  buy_price: number;
+  current_price: number;
+  current_value?: number;
+  buy_date?: string;
+  sector?: string;
+  ticker?: { sector?: string; name?: string };
+  fundamentals?: { sector?: string };
+  [key: string]: unknown;
+}
+
 interface PortfolioStatsProps {
   totalValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
-  positions: any[]; 
+  positions: Position[];
   onAnalyze: () => void;
 }
 
@@ -68,25 +81,7 @@ export function PortfolioStats({
     return { sectorData: data, sectorWithPercent: withPercent };
   }, [positions]);
 
-  // 2. Risk Distribution
-  const riskData = useMemo(() => {
-    const buckets = [
-      { name: 'Low', count: 0, color: '#10b981' }, 
-      { name: 'Medium', count: 0, color: '#f59e0b' },
-      { name: 'High', count: 0, color: '#ef4444' },
-    ];
-    positions.forEach(p => {
-      const r = p.aiAnalysis?.financial_risk;
-      if (typeof r === 'number') {
-        if (r <= 3.5) buckets[0].count += 1;
-        else if (r <= 6.5) buckets[1].count += 1;
-        else buckets[2].count += 1;
-      }
-    });
-    return buckets;
-  }, [positions]);
-
-  // 3. History Simulation (Date-Aware) - WITH FALLBACKS AND NUMERIC CASTING
+  // 2. History Simulation (Date-Aware) - WITH FALLBACKS AND NUMERIC CASTING
   const historyData = useMemo(() => {
     let days = 30;
     switch (range) {
@@ -144,15 +139,26 @@ export function PortfolioStats({
            
            const estimatedPrice = safeBuyPrice + (safeCurrentPrice - safeBuyPrice) * progress;
            
-           // Very subtle noise for smoothness
-           const noise = (Math.random() - 0.5) * (estimatedPrice * 0.003);
+           // Use deterministic variation based on index instead of Math.random() for purity
+           const variation = ((i % 7) - 3) * 0.001;
            
-           dailyValue += shares * Math.max(0, estimatedPrice + noise);
+           dailyValue += shares * Math.max(0, estimatedPrice * (1 + variation));
        });
+
+       // Check for buys on this specific day
+       const buysToday = positions.filter(pos => {
+          if (!pos.buy_date) return false;
+          try {
+             // Compare purely on YYYY-MM-DD to avoid time zone drift issues for dots
+             const buyDate = parseISO(pos.buy_date);
+             return isValid(buyDate) && format(buyDate, 'MMM dd') === format(currentDate, 'MMM dd');
+          } catch { return false; }
+       }).map(p => p.symbol);
 
        data.push({ 
            date: format(currentDate, 'MMM dd'),
            value: dailyValue,
+           addedSymbols: buysToday.length > 0 ? buysToday : undefined
        });
     }
 
@@ -167,71 +173,49 @@ export function PortfolioStats({
     return data;
   }, [range, positions, totalValue]);
 
-  // 4. Calculate Buy Markers (Positions added within range)
-  const buyMarkers = useMemo(() => {
-    if (!historyData || historyData.length === 0) return [];
-    
-    // Create a set of valid dates in the chart for quick lookup
-    const validDates = new Set(historyData.map(d => d.date));
-    
-    return positions.flatMap(pos => {
-      if (!pos.buy_date) return [];
-      try {
-        const buyDate = parseISO(pos.buy_date);
-        if (!isValid(buyDate)) return [];
-        
-        const dateKey = format(buyDate, 'MMM dd');
-        if (!validDates.has(dateKey)) return []; // Bought outside range
-        
-        // Find approximate value at that date (or linear interpolation if needed, but strict match is safer for dots)
-        const point = historyData.find(d => d.date === dateKey);
-        
-        return [{
-            date: dateKey,
-            value: point?.value || 0,
-            symbol: pos.symbol
-        }];
-      } catch { 
-        return []; 
-      }
-    });
-  }, [positions, historyData]);
-
 
   const isProfit = totalGainLoss >= 0;
   const chartColor = isProfit ? '#10b981' : '#f43f5e'; // Emerald-500 or Rose-500
 
   // Standard Tooltip (Theme-Aware)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
          <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs">
           <p className="font-semibold text-popover-foreground mb-1.5">{label}</p>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {payload.map((entry: any, index: number) => {
-            if (entry.name === 'Added') {
+            // Check if this data point has added symbols attached
+            if (entry.payload && entry.payload.addedSymbols && index === 0) {
               return (
-                 <div key={index} className="mt-1 pt-1 border-t border-border/50">
-                    <p className="flex items-center gap-1.5 text-blue-400 font-semibold">
-                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                       Added: {entry.payload.symbol}
-                    </p>
+                 <div key={`added-${index}`} className="mt-1 pt-1 border-t border-border/50">
+                    {entry.payload.addedSymbols.map((sym: string) => (
+                      <p key={sym} className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                         <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                         Added: {sym}
+                      </p>
+                    ))}
                  </div>
               );
             }
-            return (
+            return null;
+          })}
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {payload.map((entry: any, index: number) => (
              <p key={index} className="flex items-center gap-2">
                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke }} />
                <span className="text-muted-foreground">{entry.name}:</span>
                <span className="font-medium text-popover-foreground">{typeof entry.value === 'number' ? formatCurrency(entry.value) : entry.value}</span>
             </p>
-            );
-          })}
+          ))}
         </div>
       );
     }
     return null;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderPieLabel = ({ cx, cy }: any) => {
     return (
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
@@ -245,14 +229,12 @@ export function PortfolioStats({
     <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">My Portfolio</h1>
-              <p className="text-sm text-muted-foreground">Real-time cross-asset performance analytics</p>
-            </div>
+      <div className="flex flex-row items-center justify-between gap-4">
+          <div className="min-w-0">
+               <h1 className="text-3xl font-bold tracking-tight text-foreground truncate">My Portfolio</h1>
+               <p className="text-sm text-muted-foreground truncate hidden sm:block">Real-time cross-asset performance analytics</p>
           </div>
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex-shrink-0">
              <Button onClick={onAnalyze} size="sm" className="gap-2 h-9 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white border-0 shadow-md">
                 <Bot size={14} className="text-white" />
                 AI Analyze
@@ -264,11 +246,11 @@ export function PortfolioStats({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* 1. Portfolio Performance Chart (Main Card) */}
-        <div className="lg:col-span-2 rounded-lg border border-border bg-card flex flex-col h-[450px]">
+        <div className="lg:col-span-2 rounded-lg border border-border bg-card flex flex-col h-72 lg:h-80">
            <div className="p-6 pb-2 flex justify-between items-start">
               <div>
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Net Worth</p>
-                  <h2 className="text-4xl font-bold tracking-tight text-foreground">
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground">
                     {formatCurrency(totalValue)}
                   </h2>
                   <div className={cn(
@@ -302,9 +284,9 @@ export function PortfolioStats({
            </div>
            
            {/* Chart Area */}
-           <div className="flex-1 w-full min-h-0 relative px-4 pb-4">
+           <div className="flex-1 w-full min-h-0 relative px-3 sm:px-4 pb-2">
                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={historyData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                  <ComposedChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorValuePortfolio" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={chartColor} stopOpacity={0.1}/>
@@ -318,14 +300,14 @@ export function PortfolioStats({
                         tickLine={false} 
                         tick={{fontSize: 10, fill: '#9ca3af'}} 
                         interval="preserveStartEnd"
-                        minTickGap={60}
-                        dy={8}
+                        minTickGap={50}
+                        dy={4}
                     />
                     <YAxis 
                         orientation="right"
-                        width={60} 
+                        width={40} 
                         tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(value)}
-                        tick={{fontSize: 10, fill: '#9ca3af'}}
+                        tick={{fontSize: 9, fill: '#9ca3af'}}
                         axisLine={false}
                         tickLine={false}
                     />
@@ -342,30 +324,25 @@ export function PortfolioStats({
                         fillOpacity={1} 
                         fill="url(#colorValuePortfolio)" 
                         animationDuration={1000}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        dot={(props: any) => {
+                          const { cx, cy, payload } = props;
+                          if (payload && payload.addedSymbols && payload.addedSymbols.length > 0) {
+                            return <circle key={payload.date} cx={cx} cy={cy} r={4} fill="white" stroke={chartColor} strokeWidth={2} />;
+                          }
+                          return <></>;
+                        }}
                     />
-                    <Scatter 
-                      data={buyMarkers}
-                      name="Added"
-                      fill="white"
-                      shape="circle"
-                    >
-                      {buyMarkers.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill="white" stroke={chartColor} strokeWidth={2} />
-                      ))}
-                    </Scatter>
                   </ComposedChart>
                </ResponsiveContainer>
            </div>
         </div>
 
-        {/* 2. Secondary Stats - Vertical Stack */}
-        <div className="flex flex-col gap-6">
-            
-            {/* Sector Allocation */}
-            <div className="flex-1 rounded-lg border border-border bg-card p-5 flex flex-col min-h-[213px]">
+            {/* 2. Sector Allocation */}
+            <div className="rounded-lg border border-border bg-card p-5 flex flex-col h-72 lg:h-80">
                 <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Allocation</h3>
-                <div className="flex-1 flex items-center gap-3 min-h-0">
-                    <div className="w-[120px] h-[120px] flex-shrink-0 relative">
+                <div className="flex-1 flex items-center justify-center gap-4 min-h-0">
+                    <div className="w-[140px] h-[140px] flex-shrink-0 relative">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
@@ -374,8 +351,8 @@ export function PortfolioStats({
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={38}
-                                outerRadius={55}
+                                innerRadius={45}
+                                outerRadius={65}
                                 paddingAngle={2}
                                 stroke="none"
                                 cornerRadius={3}
@@ -395,71 +372,25 @@ export function PortfolioStats({
                         </ResponsiveContainer>
                     </div>
                     {/* Legend */}
-                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[130px] pr-1">
-                      {sectorWithPercent.slice(0, 5).map((item, index) => (
-                        <div key={item.name} className="flex items-center gap-2 text-[10px]">
+                    <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[180px] pr-1">
+                      {sectorWithPercent.slice(0, 6).map((item, index) => (
+                        <div key={item.name} className="flex items-center gap-2 text-xs">
                           <span 
-                            className="w-2 h-2 rounded-full flex-shrink-0" 
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
                           <span className="text-muted-foreground truncate flex-1">{item.name}</span>
                           <span className="text-foreground font-medium">{item.percent}%</span>
                         </div>
                       ))}
-                      {sectorWithPercent.length > 5 && (
-                        <div className="text-[9px] text-muted-foreground pl-4">
-                          +{sectorWithPercent.length - 5} more
+                      {sectorWithPercent.length > 6 && (
+                        <div className="text-[10px] text-muted-foreground pl-5">
+                          +{sectorWithPercent.length - 6} more
                         </div>
                       )}
                     </div>
                 </div>
             </div>
-
-            {/* Risk Exposure - Vertical Bars */}
-            <div className="flex-1 rounded-lg border border-border bg-card p-5 flex flex-col min-h-[213px]">
-                <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Risk Analysis</h3>
-                <div className="flex-1 min-h-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={riskData} margin={{ top: 10, right: 0, left: 0, bottom: 5 }} barCategoryGap="30%">
-                            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
-                            <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{fontSize: 10, fill: '#9ca3af', fontWeight: 500}} 
-                                dy={8}
-                            />
-                            <YAxis hide domain={[0, 'auto']} />
-                            <Tooltip 
-                              cursor={{fill: 'hsl(var(--muted))', opacity: 0.2, radius: 4}} 
-                              formatter={(value: number, name: string) => [`${value} positions`, name]}
-                              labelFormatter={(label) => `${label} Risk`}
-                              contentStyle={{
-                                backgroundColor: 'hsl(var(--popover))',
-                                borderColor: 'hsl(var(--border))',
-                                borderRadius: '8px',
-                                padding: '8px 12px',
-                                fontSize: '11px',
-                                color: 'hsl(var(--popover-foreground))'
-                              }}
-                              itemStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: '4px' }}
-                            />
-                            <Bar 
-                                dataKey="count" 
-                                radius={[4, 4, 0, 0]} 
-                                maxBarSize={40}
-                            >
-                              {riskData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-        </div>
 
       </div>
     </div>
