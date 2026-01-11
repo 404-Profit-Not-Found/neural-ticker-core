@@ -40,7 +40,7 @@ export function FilterBar({
   const sectors = dynamicSectors || [];
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-1 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+    <div className="flex flex-wrap items-center gap-2 p-1 animate-in fade-in slide-in-from-top-2 duration-300">
       {/* Label */}
       <div className="flex items-center gap-2 mr-2 text-muted-foreground/80">
         <SlidersHorizontal className="w-4 h-4" />

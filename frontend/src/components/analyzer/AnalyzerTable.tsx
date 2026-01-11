@@ -30,16 +30,23 @@ import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
 import { Sparkline } from "../ui/Sparkline";
 
-import { type AnalyzerFilters } from './FilterBar';
+import { FilterBar, type AnalyzerFilters } from './FilterBar';
 
 export interface AnalyzerTableProps {
   filters?: AnalyzerFilters;
+  onFilterChange?: (
+    key: keyof AnalyzerFilters,
+    value: AnalyzerFilters[keyof AnalyzerFilters],
+  ) => void;
+  onReset?: () => void;
   viewMode: 'table' | 'grid';
   onViewModeChange: (mode: 'table' | 'grid') => void;
 }
 
 export function AnalyzerTable({
   filters,
+  onFilterChange,
+  onReset,
   viewMode,
   onViewModeChange,
 }: AnalyzerTableProps) {
@@ -390,22 +397,30 @@ export function AnalyzerTable({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 sm:flex-none sm:w-64">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            placeholder="Search tickers..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="pl-8 h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
+        <div className="flex flex-wrap flex-1 items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              placeholder="Search tickers..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+
+          <FilterBar
+            filters={filters || { risk: [], aiRating: [], sector: [], upside: null, overallScore: null }}
+            onFilterChange={onFilterChange || (() => {})}
+            onReset={onReset || (() => {})}
           />
         </div>
 
         {/* View Toggle */}
-        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card">
+        <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
           <button
             onClick={() => onViewModeChange('table')}
             className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}

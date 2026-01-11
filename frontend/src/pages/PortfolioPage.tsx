@@ -218,26 +218,28 @@ export function PortfolioPage() {
           onAnalyze={() => setIsAiOpen(true)}
         />
 
-        {/* FILTERS & TOOLBAR */}
-        <div className="space-y-4">
-          <FilterBar
-            filters={filters}
-            onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
-            onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
-          />
+        {/* TOOLBAR: SEARCH & FILTERS */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
+            <div className="flex flex-wrap flex-1 items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  placeholder="Search symbols or names..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
 
-          <div className="flex flex-row items-center justify-between gap-3">
-            <div className="relative flex-1 sm:max-w-md">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                placeholder="Search symbols or names..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              <FilterBar
+                filters={filters}
+                onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
+                onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center gap-2">
               <Button 
                 onClick={() => setIsAddOpen(true)} 
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm"
@@ -246,7 +248,6 @@ export function PortfolioPage() {
                 Add Position
               </Button>
 
-              {/* View Toggle */}
               <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
                 <button
                   onClick={() => setViewMode('table')}
