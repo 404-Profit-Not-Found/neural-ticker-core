@@ -422,7 +422,7 @@ export function WatchlistTable() {
                 {/* Row 1: Header (Left) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
-                    {/* LEFT GROUP: Watchlist Selector + View Switcher */}
+                    {/* LEFT GROUP: Watchlist Selector + Edit Actions + Add Stock */}
                     <div className="flex items-center gap-3 justify-between sm:justify-start w-full sm:w-auto">
 
                         {/* Watchlist Selector + Edit Actions */}
@@ -492,55 +492,55 @@ export function WatchlistTable() {
                             )}
                         </div>
 
+                        {/* Add Ticker (Compact next to name) */}
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Add ticker..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                disabled={addTickerMutation.isPending}
+                                className="h-9 w-32 bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
+                            />
+                            {showSuggestions && (
+                                <>
+                                    <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
+                                    <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-[300px] bg-[#09090b] !bg-opacity-100 border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 !opacity-100">
+                                        <div className="py-1 max-h-[300px] overflow-y-auto">
+                                            {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
+                                                <button
+                                                    key={s.symbol}
+                                                    onClick={() => selectSuggestion(s.symbol)}
+                                                    className={cn(
+                                                        "w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0",
+                                                        selectedIndex === idx && "bg-muted/50"
+                                                    )}
+                                                >
+                                                    <div className="bg-background p-1.5 rounded-md border border-border/50 shadow-sm">
+                                                        <TickerLogo url={s.logo_url} symbol={s.symbol} className="w-6 h-6" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-bold text-sm text-foreground">{s.symbol}</span>
+                                                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{s.exchange}</Badge>
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground truncate block mt-0.5">{s.name}</span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
                     </div>
                 </div>
 
-                {/* Row 2: Add Ticker (Standalone) */}
-                <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5" />
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        placeholder="Add stock..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={addTickerMutation.isPending}
-                        className="h-9 w-full bg-transparent border border-border rounded-md pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground hover:bg-accent/10 transition-all bg-card/50"
-                    />
-                    {showSuggestions && (
-                        <>
-                            <div className="fixed inset-0 z-40 bg-transparent" onClick={closeAllDropdowns} />
-                            <div ref={suggestionsRef} className="absolute top-full left-0 mt-2 w-full sm:w-[300px] bg-[#09090b] !bg-opacity-100 border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 !opacity-100">
-                                <div className="py-1 max-h-[300px] overflow-y-auto">
-                                    {searchTickerQuery.data?.map((s: TickerSearchResult, idx: number) => (
-                                        <button
-                                            key={s.symbol}
-                                            onClick={() => selectSuggestion(s.symbol)}
-                                            className={cn(
-                                                "w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0",
-                                                selectedIndex === idx && "bg-muted/50"
-                                            )}
-                                        >
-                                            <div className="bg-background p-1.5 rounded-md border border-border/50 shadow-sm">
-                                                <TickerLogo url={s.logo_url} symbol={s.symbol} className="w-6 h-6" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-bold text-sm text-foreground">{s.symbol}</span>
-                                                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{s.exchange}</Badge>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground truncate block mt-0.5">{s.name}</span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {/* Row 3: INTEGRATED TOOLBAR (Search Table + Filters + View Mode) */}
+                {/* INTEGRATED TOOLBAR (Search Table + Filters + View Mode) */}
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
                     <div className="flex flex-wrap flex-1 items-center gap-3">
                         <div className="relative w-full sm:w-64">
