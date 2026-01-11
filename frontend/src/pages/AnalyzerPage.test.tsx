@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalyzerPage } from './AnalyzerPage';
 import { MemoryRouter } from 'react-router-dom';
+import type { AnalyzerFilters } from '../components/analyzer/FilterBar';
+
 
 // Mocks
 vi.mock('../components/layout/Header', () => ({
@@ -10,7 +12,7 @@ vi.mock('../components/layout/Header', () => ({
 
 vi.mock('../components/analyzer/FilterBar', () => ({
   FilterBar: ({ filters, onFilterChange, onReset }: { 
-    filters: { risk: string[], aiRating: string[], upside: string | null, sector: string[] }, 
+    filters: { risk: string[], aiRating: string[], upside: string | null, sector: string[], overallScore: string | null }, 
     onFilterChange: (key: 'risk' | 'aiRating' | 'upside' | 'sector', val: string[] | string | null) => void, 
     onReset: () => void 
   }) => (
@@ -25,8 +27,28 @@ vi.mock('../components/analyzer/FilterBar', () => ({
 }));
 
 vi.mock('../components/analyzer/AnalyzerTable', () => ({
-  AnalyzerTable: ({ viewMode, onViewModeChange }: { viewMode: string, onViewModeChange: (mode: 'table' | 'grid') => void }) => (
+  AnalyzerTable: ({ 
+    viewMode, 
+    onViewModeChange, 
+    filters,
+    onFilterChange,
+    onReset 
+  }: { 
+    viewMode: string, 
+    onViewModeChange: (mode: 'table' | 'grid') => void,
+    filters: AnalyzerFilters,
+    onFilterChange: (key: keyof AnalyzerFilters, value: AnalyzerFilters[keyof AnalyzerFilters]) => void,
+    onReset: () => void
+  }) => (
     <div data-testid="analyzer-table">
+      <div data-testid="filter-bar">
+        <span data-testid="active-filter-risk">{filters.risk.join(',')}</span>
+        <span data-testid="active-filter-ai">{filters.aiRating.join(',')}</span>
+        <span data-testid="active-filter-upside">{filters.upside}</span>
+      <span data-testid="active-filter-score">{filters.overallScore}</span>
+        <button onClick={() => onFilterChange('risk', ['High'])}>Set Risk</button>
+        <button onClick={onReset}>Reset</button>
+      </div>
       <span data-testid="view-mode">{viewMode}</span>
       <button onClick={() => onViewModeChange('grid')}>Set Grid</button>
     </div>

@@ -115,10 +115,10 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
     renderWithProviders(queryClient);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText(/Add stock/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Add ticker/i)).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/Add stock/i);
+    const searchInput = screen.getByPlaceholderText(/Add ticker/i);
     const user = userEvent.setup();
 
     // Type in search box
@@ -227,10 +227,10 @@ describe('WatchlistTable - Infinite Loop Prevention', () => {
     renderWithProviders(queryClient);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText(/Add stock/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Add ticker/i)).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/Add stock/i);
+    const searchInput = screen.getByPlaceholderText(/Add ticker/i);
     const user = userEvent.setup();
 
     // Type and select a ticker

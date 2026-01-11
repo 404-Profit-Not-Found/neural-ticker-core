@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AnalyzerTable } from './AnalyzerTable';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 
 // Mocks
 vi.mock('../../hooks/useStockAnalyzer', () => ({
@@ -17,6 +19,11 @@ vi.mock('./AnalyzerGridView', () => ({
   AnalyzerGridView: () => <div data-testid="grid-view">Grid View Content</div>,
 }));
 
+vi.mock('../analyzer/FilterBar', () => ({
+  FilterBar: () => <div data-testid="filter-bar">Filter Bar</div>,
+}));
+
+
 import { useStockAnalyzer } from '../../hooks/useStockAnalyzer';
 
 const mockUseStockAnalyzer = useStockAnalyzer as ReturnType<typeof vi.fn>;
@@ -24,12 +31,26 @@ const mockUseStockAnalyzer = useStockAnalyzer as ReturnType<typeof vi.fn>;
 const defaultProps = {
   viewMode: 'table' as const,
   onViewModeChange: vi.fn(),
-  filters: { risk: [], aiRating: [], upside: null, sector: [] },
+  filters: { risk: [], aiRating: [], upside: null, sector: [], overallScore: null },
+  onFilterChange: vi.fn(),
+  onReset: vi.fn(),
 };
 
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+});
+
 const renderWithRouter = (component: React.ReactNode) => {
-  return render(<BrowserRouter>{component}</BrowserRouter>);
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>{component}</BrowserRouter>
+    </QueryClientProvider>
+  );
 };
+
 
 describe('AnalyzerTable', () => {
   // Mock Data
@@ -77,7 +98,7 @@ describe('AnalyzerTable', () => {
 
   it('passes filters to hook', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
-    const filters = { risk: ['High'], aiRating: ['Buy'], upside: '>20%', sector: [] };
+    const filters = { risk: ['High'], aiRating: ['Buy'], upside: '>20%', sector: [], overallScore: null };
     
     renderWithRouter(<AnalyzerTable {...defaultProps} filters={filters} />);
     
