@@ -526,7 +526,7 @@ export function AdminConsole() {
                             <NativeSelect
                                 value={activeTab}
                                 onChange={(e) => {
-                                    setActiveTab(e.target.value as any);
+                                    setActiveTab(e.target.value as 'users' | 'shadowban' | 'logo' | 'requests');
                                     setCurrentPage(1);
                                 }}
                             >

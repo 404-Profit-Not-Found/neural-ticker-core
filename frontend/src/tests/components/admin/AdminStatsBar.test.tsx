@@ -7,6 +7,7 @@ describe('AdminStatsBar', () => {
         total: 100,
         active: 80,
         waitlist: 20,
+        banned: 0,
         pro: 10,
         whale: 5,
     };
@@ -38,13 +39,11 @@ describe('AdminStatsBar', () => {
         );
 
         // Click Waitlist
-        const waitlistButton = screen.getByText('Waitlist').closest('button');
-        fireEvent.click(waitlistButton!);
+        fireEvent.click(screen.getByText('Waitlist'));
         expect(onFilterChange).toHaveBeenCalledWith('WAITLIST');
 
         // Click Active
-        const activeButton = screen.getByText('Active').closest('button');
-        fireEvent.click(activeButton!);
+        fireEvent.click(screen.getByText('Active'));
         expect(onFilterChange).toHaveBeenCalledWith('ACTIVE');
     });
 
