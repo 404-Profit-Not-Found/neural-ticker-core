@@ -201,48 +201,47 @@ export function Header() {
 
   return (
     <header className="rgb-border-b h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="container max-w-[80rem] mx-auto h-full flex items-center gap-2 md:gap-4 px-4">
-        {/* Mobile Menu Toggle */}
-        <button
-          className="md:hidden text-muted-foreground hover:text-foreground flex-shrink-0"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+      <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
+        {/* Left Section: Mobile Toggle & Logo */}
+        <div className="flex-1 flex items-center justify-start gap-4">
+          <button
+            className="md:hidden text-muted-foreground hover:text-foreground flex-shrink-0"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
 
-        {/* Logo: Desktop only */}
-        <Link
-          to="/dashboard"
-          className="hidden md:flex text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
-        >
-          NeuralTicker.com
-        </Link>
-
-        {/* Search Bar - Always visible */}
-        <div className="flex-1 max-w-sm md:ml-4 lg:ml-8">
-          <GlobalSearch />
+          <Link
+            to="/dashboard"
+            className="flex text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
+          >
+            NeuralTicker.com
+          </Link>
         </div>
 
-        {/* Center: Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-4 lg:gap-6 px-2">
-          <Link to="/watchlist" className={linkClass('/watchlist')}>
-            Watchlist
-          </Link>
-          <Link to="/analyzer" className={linkClass('/analyzer')}>
-            Tickers
-          </Link>
-          <Link to="/portfolio" className={linkClass('/portfolio')}>
-            Portfolio
-          </Link>
-        </nav>
+        {/* Center Section: Search & Desktop Nav */}
+        <div className="hidden md:flex items-center gap-4 lg:gap-8 justify-center">
+          <div className="w-64 lg:w-80">
+            <GlobalSearch />
+          </div>
+          <nav className="flex items-center gap-4 lg:gap-6">
+            <Link to="/watchlist" className={linkClass('/watchlist')}>
+              Watchlist
+            </Link>
+            <Link to="/analyzer" className={linkClass('/analyzer')}>
+              Tickers
+            </Link>
+            <Link to="/portfolio" className={linkClass('/portfolio')}>
+              Portfolio
+            </Link>
+          </nav>
+        </div>
 
-        {/* Right: actions (Research, Notifications, Profile) */}
-        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
-          {/* Active Research Indicator */}
+        {/* Right Section: Actions */}
+        <div className="flex-1 flex items-center justify-end gap-1.5 md:gap-4 flex-shrink-0">
           <ActiveResearchIndicator count={researchCount} />
 
-          {/* Notifications Trigger */}
           <div className="relative">
             <button
               className={`flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors relative ${notificationsMenuOpen ? 'text-foreground' : ''}`}
@@ -256,7 +255,7 @@ export function Header() {
               )}
             </button>
 
-            {/* Notifications Dropdown */}
+            {/* Notifications Dropdown contents remain unchanged... */}
             <div
               className={`absolute right-0 top-full mt-3 w-80 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 overflow-hidden ${notificationsMenuOpen
                 ? 'opacity-100 visible translate-y-0'
@@ -339,7 +338,6 @@ export function Header() {
               )}
             </button>
 
-            {/* Profile Dropdown */}
             <div
               className={`absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 z-50 ${profileMenuOpen
                 ? 'opacity-100 visible translate-y-0'

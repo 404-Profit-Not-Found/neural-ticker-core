@@ -30,16 +30,16 @@ function ScrollToTop() {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
-    
+
     // Immediate reset
     window.scrollTo(0, 0);
-    
+
     // Secondary reset after a frame to catch any browser-initiated jumps
     // (e.g. from autofocus or scroll restoration attempts)
     const handle = requestAnimationFrame(() => {
       window.scrollTo(0, 0);
     });
-    
+
     return () => cancelAnimationFrame(handle);
   }, [pathname]);
 
@@ -79,12 +79,13 @@ function App() {
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/ticker/:symbol" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/overview" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/research" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/financials" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/news" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/research" element={<ProtectedRoute><ResearchListPage /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/research/:id" element={<ProtectedRoute><ResearchPage /></ProtectedRoute>} />
-            
+
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/portfolio" element={<ProtectedRoute><PortfolioPage /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
@@ -142,10 +143,10 @@ function ThemeController() {
 
   // Handle global loader removal if it exists
   useEffect(() => {
-     // If we are mounting, maybe we should remove index.html loader if it's still there?
-     // React usually wipes "root", but the loader is often outside or inside root.
-     // In our case, index.html has static content in #root. React wipes it.
-     // So no manual removal needed.
+    // If we are mounting, maybe we should remove index.html loader if it's still there?
+    // React usually wipes "root", but the loader is often outside or inside root.
+    // In our case, index.html has static content in #root. React wipes it.
+    // So no manual removal needed.
   }, []);
 
   return null;

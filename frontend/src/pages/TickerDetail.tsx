@@ -55,11 +55,11 @@ export function TickerDetail() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
-    
 
-    
 
-    
+
+
+
     const [localResearchRunning, setLocalResearchRunning] = useState(false);
 
     const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,8 +101,8 @@ export function TickerDetail() {
     const pathSegments = location.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
     // Expected format: ['ticker', 'symbol', 'tab?']
     const potentialTab = pathSegments.length >= 3 ? pathSegments[pathSegments.length - 1] : null;
-    const currentTab = potentialTab && validTabs.includes(potentialTab as typeof validTabs[number]) 
-        ? potentialTab 
+    const currentTab = potentialTab && validTabs.includes(potentialTab as typeof validTabs[number])
+        ? potentialTab
         : 'overview';
 
     // -- Hooks --
@@ -125,7 +125,7 @@ export function TickerDetail() {
     const isFavorite = watchlists?.some(wl =>
         wl.items?.some(item => item.ticker.symbol === symbol)
     ) ?? false;
-    
+
     // Optimistic Favorite State
     const [optimisticFavorite, setOptimisticFavorite] = useState<boolean | null>(null);
     const isFavEffectively = optimisticFavorite !== null ? optimisticFavorite : isFavorite;
@@ -260,7 +260,7 @@ export function TickerDetail() {
 
             {isLoadingDetails ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
-                <SuperLoading symbol={symbol} />
+                    <SuperLoading symbol={symbol} />
                 </main>
             ) : !tickerData ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
@@ -286,8 +286,8 @@ export function TickerDetail() {
                                 {/* Row 1: Identity & Actions */}
                                 <div className="flex items-start gap-4 py-2 mb-2">
                                     {/* Left: Identity - Logo & Back */}
-                                    <Link 
-                                        to="/dashboard" 
+                                    <Link
+                                        to="/dashboard"
                                         aria-label="Back to dashboard"
                                         className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1"
                                     >
@@ -313,10 +313,10 @@ export function TickerDetail() {
                                                     getBasePriceFromScenarios(risk_analysis.scenarios),
                                                     risk_analysis.upside_percent
                                                 );
-                                                
+
                                                 const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
                                                 const bearPrice = bearScenario && bearScenario.price_mid ? Number(bearScenario.price_mid) : undefined;
-                                                
+
                                                 const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
                                                     ? ((bearPrice - market_data.price) / market_data.price) * 100
                                                     : -(risk_analysis.financial_risk * 5);
@@ -385,7 +385,7 @@ export function TickerDetail() {
                                                 </Button>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-sm text-foreground font-medium truncate">{profile?.name}</span>
                                             {profile?.industry && (
@@ -464,8 +464,8 @@ export function TickerDetail() {
                             <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
                                 <div className="flex items-start gap-3 relative">
-                                    <Link 
-                                        to="/dashboard" 
+                                    <Link
+                                        to="/dashboard"
                                         aria-label="Back to dashboard"
                                         className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center"
                                     >
@@ -477,7 +477,7 @@ export function TickerDetail() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 flex-wrap">
                                             <h1 className="text-xl font-bold tracking-tight leading-none">{profile?.symbol}</h1>
-                                            
+
                                             {(() => {
                                                 if (!risk_analysis) return null;
                                                 const liveUpside = calculateLiveUpside(
@@ -485,10 +485,10 @@ export function TickerDetail() {
                                                     getBasePriceFromScenarios(risk_analysis.scenarios),
                                                     risk_analysis.upside_percent
                                                 );
-                                                
+
                                                 const bearScenario = risk_analysis.scenarios.find(s => s.scenario_type.toLowerCase() === 'bear');
                                                 const bearPrice = bearScenario && bearScenario.price_mid ? Number(bearScenario.price_mid) : undefined;
-                                                
+
                                                 const liveDownside = typeof bearPrice === 'number' && market_data.price > 0
                                                     ? ((bearPrice - market_data.price) / market_data.price) * 100
                                                     : -(risk_analysis.financial_risk * 5);
@@ -500,7 +500,7 @@ export function TickerDetail() {
                                                         downside={liveDownside}
                                                         consensus={fundamentals?.consensus_rating}
                                                         overallScore={risk_analysis.overall_score}
-                                                        pe={fundamentals?.pe_ratio} 
+                                                        pe={fundamentals?.pe_ratio}
                                                         newsSentiment={tickerData.news?.sentiment}
                                                         newsImpact={tickerData.news?.score}
                                                     />
@@ -572,7 +572,7 @@ export function TickerDetail() {
                                 {/* Mobile: 52-Week Range */}
                                 {fundamentals?.fifty_two_week_high && market_data?.price && (
                                     <div className="md:hidden px-4 mt-4">
-                                         <FiftyTwoWeekRange
+                                        <FiftyTwoWeekRange
                                             low={fundamentals.fifty_two_week_low || 0}
                                             high={fundamentals.fifty_two_week_high || 0}
                                             current={market_data.price}
@@ -602,7 +602,13 @@ export function TickerDetail() {
                         {/* --- 2. TABS LAYOUT --- */}
                         <Tabs
                             value={currentTab}
-                            onValueChange={(value) => navigate(`/ticker/${symbol}/${value}`)}
+                            onValueChange={(value) => {
+                                if (value === 'overview') {
+                                    navigate(`/ticker/${symbol}`);
+                                } else {
+                                    navigate(`/ticker/${symbol}/${value}`);
+                                }
+                            }}
                             className="w-full relative z-0"
                         >
                             <TabsList className="mb-6">
