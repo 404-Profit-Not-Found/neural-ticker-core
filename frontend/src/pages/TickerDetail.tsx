@@ -44,10 +44,27 @@ import {
     useToggleFavorite
 } from '../hooks/useTicker';
 import { useWatchlists } from '../hooks/useWatchlist';
+import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
 import { Star } from 'lucide-react';
+
+// Market Status Badge for per-ticker display
+function TickerMarketStatusBadge({ symbol }: { symbol?: string }) {
+    const { data: status, isLoading } = useTickerMarketStatus(symbol || '');
+
+    if (isLoading || !status) return null;
+
+    const label = getSessionLabel(status.session);
+    const colorClass = getSessionColor(status.session);
+
+    return (
+        <span className={`text-[10px] uppercase tracking-wider font-bold ${colorClass}`}>
+            {label}
+        </span>
+    );
+}
 
 const RESEARCH_PENDING_GRACE_MS = 45000;
 export function TickerDetail() {
@@ -410,6 +427,8 @@ export function TickerDetail() {
                                                 {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
                                             </div>
                                         </div>
+                                        {/* Market Status */}
+                                        <TickerMarketStatusBadge symbol={symbol} />
 
                                         {risk_analysis && (
                                             <div className="pt-2 border-t border-border/50 flex items-center">
@@ -547,6 +566,8 @@ export function TickerDetail() {
                                                 {isPriceUp ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
                                                 {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
                                             </span>
+                                            {/* Market Status */}
+                                            <TickerMarketStatusBadge symbol={symbol} />
                                         </div>
                                     </div>
                                 </div>

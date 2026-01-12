@@ -106,7 +106,7 @@ export function PortfolioPage() {
     if (!snapshots || snapshots.length === 0) return positions;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const snapMap = new Map(snapshots.map((s: any) => [s.ticker.symbol, s]));
-    
+
     return positions.map((p: PortfolioPosition) => {
       const snap = snapMap.get(p.symbol);
       if (!snap) return p;
@@ -203,7 +203,7 @@ export function PortfolioPage() {
 
   return (
     <div className="dark min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
-            <div className="fixed inset-0 bg-black -z-10" /> {/* Fallback/Reinforce Black BG */}
+      <div className="fixed inset-0 bg-black -z-10" /> {/* Fallback/Reinforce Black BG */}
       <Header />
       <Toaster position="top-right" theme="dark" />
 
@@ -220,8 +220,9 @@ export function PortfolioPage() {
 
         {/* TOOLBAR: SEARCH & FILTERS */}
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-card/30 p-2 rounded-lg border border-border/50">
-            <div className="flex flex-wrap flex-1 items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 bg-card/30 p-2 sm:p-3 rounded-lg border border-border/50">
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:flex-1 gap-3">
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
@@ -232,17 +233,20 @@ export function PortfolioPage() {
                 />
               </div>
 
-              <FilterBar
-                filters={filters}
-                onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
-                onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
-              />
+              <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+                <FilterBar
+                  filters={filters}
+                  onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
+                  onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button 
-                onClick={() => setIsAddOpen(true)} 
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm"
+            {/* Actions */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
+              <Button
+                onClick={() => setIsAddOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm flex-1 sm:flex-initial"
               >
                 <Plus size={16} />
                 Add Position

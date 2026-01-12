@@ -34,8 +34,6 @@ describe('StockTwitsService', () => {
     getAllTickers: jest.fn(),
   };
 
-
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,7 +48,6 @@ describe('StockTwitsService', () => {
           useValue: mockWatchersRepo,
         },
         { provide: TickersService, useValue: mockTickersService },
-
       ],
     }).compile();
 

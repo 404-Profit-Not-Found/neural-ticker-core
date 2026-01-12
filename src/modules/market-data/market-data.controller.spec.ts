@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MarketDataController } from './market-data.controller';
 import { MarketDataService } from './market-data.service';
+import { MarketStatusService } from './market-status.service';
 
 describe('MarketDataController', () => {
   let controller: MarketDataController;
@@ -12,6 +13,11 @@ describe('MarketDataController', () => {
     getCompanyNews: jest.fn(),
   };
 
+  const mockMarketStatusService = {
+    getMarketStatus: jest.fn(),
+    getAllMarketsStatus: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MarketDataController],
@@ -19,6 +25,10 @@ describe('MarketDataController', () => {
         {
           provide: MarketDataService,
           useValue: mockMarketDataService,
+        },
+        {
+          provide: MarketStatusService,
+          useValue: mockMarketStatusService,
         },
       ],
     }).compile();

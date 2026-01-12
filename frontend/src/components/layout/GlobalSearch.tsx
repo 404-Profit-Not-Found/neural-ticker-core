@@ -17,7 +17,13 @@ interface TickerResult {
     sparkline?: number[];
 }
 
-export function GlobalSearch({ className = '' }: { className?: string }) {
+interface GlobalSearchProps {
+    className?: string;
+    autoFocus?: boolean;
+    onSelect?: () => void;
+}
+
+export function GlobalSearch({ className = '', autoFocus = false, onSelect }: GlobalSearchProps) {
     const navigate = useNavigate();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<TickerResult[]>([]);
@@ -26,6 +32,13 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Auto focus on mount if requested
+    useEffect(() => {
+        if (autoFocus && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [autoFocus]);
 
     // Keyboard shortcut (CMD/CTRL + K)
     useEffect(() => {
@@ -100,12 +113,12 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             if (highlightedIndex >= 0 && results[highlightedIndex]) {
                 selectTicker(results[highlightedIndex]);
             } else if (results.length > 0 && results[0].is_locally_tracked) {
-                 // If top result is local, auto-select it? Or wait for explicit highlight?
-                 // Standard behavior: select top result.
-                 selectTicker(results[0]);
+                // If top result is local, auto-select it? Or wait for explicit highlight?
+                // Standard behavior: select top result.
+                selectTicker(results[0]);
             } else {
-                 // If no local result selected/found, trigger external search
-                 performExternalSearch();
+                // If no local result selected/found, trigger external search
+                performExternalSearch();
             }
         } else if (e.key === 'Escape') {
             setIsOpen(false);
@@ -117,6 +130,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
         navigate(`/ticker/${encodeURIComponent(ticker.symbol)}`);
         setQuery('');
         setIsOpen(false);
+        onSelect?.();
     };
 
     const requestTickerMutation = useRequestTicker();
@@ -131,7 +145,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
             console.error('Failed to request ticker', error);
         }
     };
-    
+
     // Legacy direct add is disabled for new flow, but we keep this function if we need it for admins later?
     // User requested "Request" flow.
 
@@ -167,12 +181,12 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                         if (results.length > 0) setIsOpen(true);
                     }}
                 />
-                
+
                 {/* Visual feedback or button to force external search */}
                 {results.length === 0 && query.length >= 2 && !isLoading && (
-                   <div className="absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none text-[10px] text-muted-foreground opacity-50">
-                      Press Enter to search market
-                   </div>
+                    <div className="absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none text-[10px] text-muted-foreground opacity-50">
+                        Press Enter to search market
+                    </div>
                 )}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                     {isLoading && (
@@ -210,10 +224,10 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                         <div className="flex items-center gap-2 shrink-0 h-6">
                                             {ticker.is_locally_tracked && ticker.sparkline && ticker.sparkline.length > 0 ? (
                                                 <div className="flex items-center gap-3">
-                                                    <Sparkline 
-                                                        data={ticker.sparkline} 
-                                                        width={60} 
-                                                        height={24} 
+                                                    <Sparkline
+                                                        data={ticker.sparkline}
+                                                        width={60}
+                                                        height={24}
                                                         className="opacity-80 group-hover:opacity-100 transition-opacity"
                                                     />
                                                 </div>
@@ -239,7 +253,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
                                             )}
                                         </div>
                                     </div>
-                                    
+
                                     <div className="mt-0.5 min-w-0 text-left">
                                         <p className="text-xs text-foreground/90 font-medium truncate">
                                             {ticker.name}

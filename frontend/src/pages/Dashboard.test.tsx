@@ -64,6 +64,10 @@ vi.mock('../components/layout/Header', () => ({
     Header: () => <div data-testid="header">Header</div>
 }));
 
+vi.mock('../components/dashboard/MarketStatusBar', () => ({
+    MarketStatusBar: () => <div data-testid="market-status-bar">US: Open | EU: Open</div>
+}));
+
 // Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
     observe: vi.fn(),
@@ -105,8 +109,8 @@ describe('Dashboard', () => {
             isPending: false
         });
         (useActiveResearchCount as Mock).mockReturnValue({
-             data: 0,
-             isLoading: false
+            data: 0,
+            isLoading: false
         });
 
         (useStockAnalyzer as Mock).mockReturnValue({
@@ -129,7 +133,11 @@ describe('Dashboard', () => {
 
     it('renders dashboard layout with stats', () => {
         renderDashboard();
-        expect(screen.getByText('AI assisted stock analyzer')).toBeTruthy();
+        // Header should be rendered
+        expect(screen.getByTestId('header')).toBeTruthy();
+        // Market status bar should be visible
+        expect(screen.getByTestId('market-status-bar')).toBeTruthy();
+        // Stats should be visible
         expect(screen.getByText('Tickers Tracked')).toBeTruthy();
         expect(screen.getByText('100')).toBeTruthy(); // Tickers count
         expect(screen.getByText('Strong Buy')).toBeTruthy();

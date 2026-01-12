@@ -1,9 +1,11 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketDataController } from './market-data.controller';
+import { MarketStatusController } from './market-status.controller';
 import { MarketDataBulkController } from './market-data-bulk.controller';
 import { StatsController } from './stats.controller';
 import { MarketDataService } from './market-data.service';
+import { MarketStatusService } from './market-status.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
@@ -41,11 +43,12 @@ import { ResearchModule } from '../research/research.module';
   ],
   controllers: [
     MarketDataController,
+    MarketStatusController,
     MarketDataBulkController,
     NewsController,
     StatsController,
   ],
-  providers: [MarketDataService],
-  exports: [MarketDataService],
+  providers: [MarketDataService, MarketStatusService],
+  exports: [MarketDataService, MarketStatusService],
 })
 export class MarketDataModule {}
