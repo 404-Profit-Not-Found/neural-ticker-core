@@ -20,7 +20,7 @@ export interface Position {
     cost_basis: number;
     gain_loss: number;
     gain_loss_percent: number;
-    
+
     // Sparkline & Range
     sparkline?: number[];
     fiftyTwoWeekHigh?: number;
@@ -134,10 +134,28 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // 2. Value (Moved Here)
-        columnHelper.accessor('current_value', {
-            header: () => <span className="hidden md:inline">Value</span>,
-            cell: (info) => <span className="hidden md:inline font-bold text-foreground">{formatCurrency(info.getValue())}</span>
+        // 2. Value / Return (Merged)
+        columnHelper.accessor('gain_loss_percent', {
+            id: 'gain_loss_percent', // Sort by percentage
+            header: () => <span className="hidden md:inline">Value / Return</span>,
+            cell: (info) => {
+                const val = info.row.original.current_value;
+                const gainLoss = info.row.original.gain_loss;
+                const pct = info.getValue();
+                const isProfit = gainLoss >= 0;
+
+                return (
+                    <div className="hidden md:flex flex-col items-start min-w-[100px]">
+                        <span className="font-bold text-foreground text-sm">
+                            {formatCurrency(val)}
+                        </span>
+                        <div className={cn("flex items-center gap-1 text-xs font-bold", isProfit ? "text-emerald-500" : "text-red-500")}>
+                            <span>{gainLoss > 0 ? '+' : ''}{formatCurrency(gainLoss)}</span>
+                            <span className="opacity-80">({formatPct(pct)})</span>
+                        </div>
+                    </div>
+                );
+            }
         }),
 
         // 3. Position (Shares) (Moved Here)
@@ -193,7 +211,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         }),
 
         // 6. 52-Week Range
-         columnHelper.accessor(row => row.fiftyTwoWeekHigh, { // Accessor key
+        columnHelper.accessor(row => row.fiftyTwoWeekHigh, { // Accessor key
             id: '52wk',
             header: () => <span className="hidden lg:inline">52-Week Range</span>,
             cell: (info) => {
@@ -213,28 +231,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             }
         }),
 
-        // 7. Total Return
-        columnHelper.accessor('gain_loss', {
-            header: () => <span className="hidden md:inline">Total Return</span>,
-            cell: (info) => {
-                const val = info.getValue();
-                const pct = info.row.original.gain_loss_percent;
-                const isProfit = val >= 0;
-
-                return (
-                    <div className={cn("hidden md:flex flex-col items-start font-medium", isProfit ? "text-emerald-500" : "text-red-500")}>
-                        <div className="flex items-center gap-1">
-                            <span className="font-mono font-bold text-sm">
-                                {val > 0 ? '+' : ''}{formatCurrency(val)}
-                            </span>
-                        </div>
-                        <span className="text-xs opacity-80">
-                            {formatPct(pct)}
-                        </span>
-                    </div>
-                );
-            }
-        }),
+        // REMOVED Separate Total Return Column (Merged with Value)
 
         // REMOVED P/E, Risk, Risk/Reward columns
 
@@ -264,14 +261,14 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const riskRaw = info.row.original.aiAnalysis?.financial_risk;
                 const risk = typeof riskRaw === 'number' ? riskRaw : 0;
                 const price = info.row.original.current_price;
-                
+
                 // Calculate Upside/Downside for the badge
                 const upside = calculateLiveUpside(
-                    price, 
-                    info.row.original.aiAnalysis?.base_price, 
+                    price,
+                    info.row.original.aiAnalysis?.base_price,
                     info.row.original.aiAnalysis?.upside_percent
                 );
-                
+
                 let downside = 0;
                 const bearPrice = info.row.original.aiAnalysis?.bear_price;
                 if (typeof bearPrice === 'number' && price > 0) {
@@ -282,7 +279,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
                 return (
                     <div className="hidden md:block">
-                        <VerdictBadge 
+                        <VerdictBadge
                             risk={risk}
                             upside={upside}
                             downside={downside}

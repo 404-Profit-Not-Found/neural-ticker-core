@@ -1,11 +1,14 @@
 import { TickerCard } from '../ticker/TickerCard';
 import type { TickerData } from './WatchlistTableView';
 
+import { useAllMarketsStatus, getRegionForStatus } from '../../hooks/useMarketStatus';
+
 interface TickerCarouselProps {
     data: TickerData[];
     isLoading: boolean;
 }
 export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
+    const { data: marketStatusRaw } = useAllMarketsStatus();
 
     if (isLoading) {
         return (
@@ -29,29 +32,35 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
         <div className="relative group/carousel">
             {/* Unified Grid Layout */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
-                {data.map((item) => (
-                    <TickerCard
-                        key={item.symbol}
-                        symbol={item.symbol}
-                        name={item.company}
-                        logoUrl={item.logo}
-                        sector={item.sector}
-                        price={item.price}
-                        change={item.change ?? 0}
-                        risk={item.riskScore ?? 0}
-                        overallScore={item.overallScore ?? undefined}
-                        upside={item.potentialUpside ?? 0}
-                        downside={item.potentialDownside ?? 0}
-                        pe={item.pe ?? undefined}
-                        consensus={item.rating ?? undefined}
-                        researchCount={item.researchCount ?? 0}
-                        newsCount={item.newsCount ?? 0}
-                        socialCount={item.socialCount ?? 0}
-                        sparkline={item.sparkline}
-                        fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
-                        fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
-                    />
-                ))}
+                {data.map((item) => {
+                    const region = getRegionForStatus(item.symbol);
+                    const status = marketStatusRaw ? (region === 'EU' ? marketStatusRaw.eu : marketStatusRaw.us) : undefined;
+
+                    return (
+                        <TickerCard
+                            key={item.symbol}
+                            symbol={item.symbol}
+                            name={item.company}
+                            logoUrl={item.logo}
+                            sector={item.sector}
+                            price={item.price}
+                            change={item.change ?? 0}
+                            risk={item.riskScore ?? 0}
+                            overallScore={item.overallScore ?? undefined}
+                            upside={item.potentialUpside ?? 0}
+                            downside={item.potentialDownside ?? 0}
+                            pe={item.pe ?? undefined}
+                            consensus={item.rating ?? undefined}
+                            researchCount={item.researchCount ?? 0}
+                            newsCount={item.newsCount ?? 0}
+                            socialCount={item.socialCount ?? 0}
+                            sparkline={item.sparkline}
+                            fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
+                            fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
+                            marketStatus={status}
+                        />
+                    );
+                })}
             </div>
         </div>
     );

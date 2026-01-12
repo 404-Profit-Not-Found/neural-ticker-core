@@ -15,6 +15,14 @@ export interface MarketStatusResult {
 export class MarketStatusService {
   private readonly logger = new Logger(MarketStatusService.name);
 
+  // Caching & Coalescing
+  private statusCache = new Map<
+    string,
+    { data: MarketStatusResult; expires: number }
+  >();
+  private pendingRequests = new Map<string, Promise<MarketStatusResult>>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   // Known EU exchange suffixes and codes
   private readonly EU_EXCHANGES = [
     'LSE',
@@ -53,7 +61,7 @@ export class MarketStatusService {
   /**
    * Determines the region (US/EU) based on symbol or exchange.
    */
-  private getRegion(symbol: string, exchange?: string): 'US' | 'EU' | 'OTHER' {
+  public getRegion(symbol: string, exchange?: string): 'US' | 'EU' | 'OTHER' {
     const upperSymbol = symbol.toUpperCase();
     const upperExchange = (exchange || '').toUpperCase();
 
@@ -76,12 +84,12 @@ export class MarketStatusService {
   }
 
   /**
-   * Gets market status for a specific symbol.
-   * Routes to Yahoo Finance for EU stocks, Finnhub for US.
+   * Gets market status for a specific symbol/exchange.
+   * Optimizes performance via Caching & Request Coalescing.
    */
   async getMarketStatus(
-    symbol?: string,
-    exchange?: string,
+    symbol: string = '',
+    exchange: string = 'US',
   ): Promise<MarketStatusResult> {
     const region = symbol
       ? this.getRegion(symbol, exchange)
@@ -89,25 +97,68 @@ export class MarketStatusService {
         ? 'US'
         : 'EU';
 
-    if (region === 'EU' || region === 'OTHER') {
-      // Use Yahoo Finance for EU stocks
-      if (symbol) {
-        return this.getStatusFromYahoo(symbol, region);
-      }
-      // Fallback to time-based calculation for EU without symbol
-      return this.getEUFallback();
+    // Grouping Key: Status is generally region-wide, not per-ticker.
+    // US status is the same for AAPL and MSFT.
+    // EU status is the same for all Frankfurt stocks.
+    // We cache by Region + Exchange to be safe, or just Region for major markets.
+    const cacheKey = `${region}-${exchange}`;
+
+    // 1. Check Cache
+    const cached = this.statusCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) {
+      return cached.data;
     }
 
-    // US: Try Finnhub first, fallback to time-based
-    return this.getStatusFromFinnhub(symbol, exchange || 'US');
+    // 2. Check Pending Requests (Coalescing)
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey)!;
+    }
+
+    // 3. Fetch Fresh Data
+    const promise = (async () => {
+      try {
+        let result: MarketStatusResult;
+
+        if (region === 'EU' || region === 'OTHER') {
+          // Use Yahoo Finance for EU stocks
+          if (symbol) {
+            result = await this.getStatusFromYahoo(symbol, region);
+          } else {
+            result = this.getEUFallback();
+          }
+        } else {
+          // US: Try Finnhub first, fallback to time-based
+          result = await this.getStatusFromFinnhub(symbol, exchange || 'US');
+        }
+
+        // 4. Update Cache
+        this.statusCache.set(cacheKey, {
+          data: result,
+          expires: Date.now() + this.CACHE_TTL,
+        });
+
+        return result;
+      } finally {
+        // Cleanup pending request
+        this.pendingRequests.delete(cacheKey);
+      }
+    })();
+
+    this.pendingRequests.set(cacheKey, promise);
+    return promise;
   }
 
   /**
    * Gets market status for all major markets (for the MarketStatusBar).
    */
-  getAllMarketsStatus(): { us: MarketStatusResult; eu: MarketStatusResult } {
-    const us = this.getUSFallback();
-    const eu = this.getEUFallback();
+  async getAllMarketsStatus(): Promise<{
+    us: MarketStatusResult;
+    eu: MarketStatusResult;
+  }> {
+    const [us, eu] = await Promise.all([
+      this.getMarketStatus(undefined, 'US'),
+      this.getMarketStatus(undefined, 'EU'),
+    ]);
     return { us, eu };
   }
 
@@ -230,7 +281,7 @@ export class MarketStatusService {
 
     const isWeekday = day >= 1 && day <= 5;
     const marketOpen = 8 * 60; // 8:00 AM CET
-    const marketClose = 16 * 60 + 30; // 4:30 PM CET
+    const marketClose = 17 * 60 + 30; // 5:30 PM CET
 
     const isOpen =
       isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;

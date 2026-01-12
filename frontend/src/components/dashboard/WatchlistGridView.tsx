@@ -6,6 +6,8 @@ import { useToggleFavorite } from '../../hooks/useTicker';
 import { useWatchlists } from '../../hooks/useWatchlist';
 import { TickerCard } from '../ticker/TickerCard';
 
+import { useAllMarketsStatus, getRegionForStatus } from '../../hooks/useMarketStatus';
+
 interface WatchlistGridViewProps {
     data: TickerData[];
     isLoading: boolean;
@@ -15,6 +17,7 @@ interface WatchlistGridViewProps {
 export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridViewProps) {
     const { data: watchlists } = useWatchlists();
     const toggleFavorite = useToggleFavorite();
+    const { data: marketStatusRaw } = useAllMarketsStatus();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const favoritesList = watchlists?.find((w: any) => w.name === 'Favourites');
@@ -41,62 +44,68 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {data.map((item) => (
-                <TickerCard
-                    key={item.symbol}
-                    symbol={item.symbol}
-                    name={item.company}
-                    logoUrl={item.logo}
-                    sector={item.sector}
-                    price={item.price}
-                    change={item.change ?? 0}
-                    risk={item.riskScore ?? 0}
-                    overallScore={item.overallScore ?? undefined}
-                    upside={item.potentialUpside ?? 0}
-                    downside={item.potentialDownside ?? 0}
-                    pe={item.pe ?? undefined}
-                    consensus={item.rating ?? undefined}
-                    researchCount={item.researchCount}
-                    newsCount={item.newsCount}
-                    socialCount={item.socialCount}
-                    sparkline={item.sparkline}
-                    fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
-                    fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
-                >
-                    {/* Action Overlays */}
-                    <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        {onRemove ? (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemove(item.itemId || '', item.symbol);
-                                }}
-                            >
-                                <Trash2 className="h-3 w-3" />
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                    "h-6 w-6 bg-card/80 backdrop-blur-sm transition-colors",
-                                    favoritesSet.has(item.symbol) ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
-                                )}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleFavorite.mutate(item.symbol);
-                                }}
-                                disabled={toggleFavorite.isPending}
-                            >
-                                <Star className={cn("h-4 w-4", favoritesSet.has(item.symbol) && "fill-current")} />
-                            </Button>
-                        )}
-                    </div>
-                </TickerCard>
-            ))}
+            {data.map((item) => {
+                const region = getRegionForStatus(item.symbol);
+                const status = marketStatusRaw ? (region === 'EU' ? marketStatusRaw.eu : marketStatusRaw.us) : undefined;
+
+                return (
+                    <TickerCard
+                        key={item.symbol}
+                        symbol={item.symbol}
+                        name={item.company}
+                        logoUrl={item.logo}
+                        sector={item.sector}
+                        price={item.price}
+                        change={item.change ?? 0}
+                        risk={item.riskScore ?? 0}
+                        overallScore={item.overallScore ?? undefined}
+                        upside={item.potentialUpside ?? 0}
+                        downside={item.potentialDownside ?? 0}
+                        pe={item.pe ?? undefined}
+                        consensus={item.rating ?? undefined}
+                        researchCount={item.researchCount}
+                        newsCount={item.newsCount}
+                        socialCount={item.socialCount}
+                        sparkline={item.sparkline}
+                        fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
+                        fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
+                        marketStatus={status}
+                    >
+                        {/* Action Overlays */}
+                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                            {onRemove ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRemove(item.itemId || '', item.symbol);
+                                    }}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "h-6 w-6 bg-card/80 backdrop-blur-sm transition-colors",
+                                        favoritesSet.has(item.symbol) ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFavorite.mutate(item.symbol);
+                                    }}
+                                    disabled={toggleFavorite.isPending}
+                                >
+                                    <Star className={cn("h-4 w-4", favoritesSet.has(item.symbol) && "fill-current")} />
+                                </Button>
+                            )}
+                        </div>
+                    </TickerCard>
+                );
+            })}
         </div>
     );
 }
