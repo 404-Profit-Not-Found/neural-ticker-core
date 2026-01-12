@@ -117,11 +117,11 @@ function ThemeController() {
   useEffect(() => {
     // Map legacy 'g100' or default to 'dark'
     let theme = user?.theme || 'dark';
-    if (theme.startsWith('g')) theme = 'dark'; // Fallback for old themes
-    if (!['light', 'dark', 'rgb'].includes(theme)) theme = 'dark';
+    if (theme.startsWith('g') && theme !== 'gray') theme = 'dark'; // Fallback for old themes
+    if (!['light', 'dark', 'rgb', 'gray'].includes(theme)) theme = 'dark';
 
     document.documentElement.setAttribute('data-theme', theme);
-    document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
+    document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb', 'theme-gray');
     document.documentElement.classList.add(`theme-${theme}`);
 
     // For RGB mode, we might want to ensure dark mode base styles are applied
@@ -136,7 +136,13 @@ function ThemeController() {
     // Dynamic Meta Theme Color Update for Mobile Browsers
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'light' ? '#ffffff' : '#09090b');
+      if (theme === 'light') {
+        metaThemeColor.setAttribute('content', '#ffffff');
+      } else if (theme === 'gray') {
+        metaThemeColor.setAttribute('content', '#f3f4f6');
+      } else {
+        metaThemeColor.setAttribute('content', '#09090b');
+      }
     }
 
   }, [user?.theme]);

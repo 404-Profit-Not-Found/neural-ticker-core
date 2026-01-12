@@ -16,6 +16,7 @@ import {
     Mail,
     Plus,
     Camera,
+    Cloud,
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -36,14 +37,14 @@ export function ProfilePage() {
     // Live Preview Effect
     useEffect(() => {
         let previewTheme = theme;
-        if (previewTheme.startsWith('g')) previewTheme = 'dark';
-        if (!['light', 'dark', 'rgb'].includes(previewTheme)) previewTheme = 'dark';
+        if (previewTheme.startsWith('g') && previewTheme !== 'gray') previewTheme = 'dark';
+        if (!['light', 'dark', 'rgb', 'gray'].includes(previewTheme)) previewTheme = 'dark';
 
         document.documentElement.setAttribute('data-theme', previewTheme);
-        document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
+        document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb', 'theme-gray');
         document.documentElement.classList.add(`theme-${previewTheme}`);
 
-        if (previewTheme === 'light') {
+        if (previewTheme === 'light' || previewTheme === 'gray') {
             document.documentElement.classList.remove('dark');
         } else {
             document.documentElement.classList.add('dark');
@@ -150,13 +151,24 @@ export function ProfilePage() {
                         <div className="relative group">
                             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-purple-500 p-0.5">
                                 <div className="w-full h-full rounded-full overflow-hidden bg-background">
-                                    {avatarUrl || user?.avatar_url ? (
-                                        <img src={avatarUrl || user?.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-lg font-medium">
-                                            {(user?.nickname || user?.email || '??').slice(0, 2).toUpperCase()}
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const url = avatarUrl || user?.avatar_url;
+                                        const isSafeUrl = (u: string) => {
+                                            try {
+                                                const parsed = new URL(u);
+                                                return ['http:', 'https:'].includes(parsed.protocol);
+                                            } catch {
+                                                return false;
+                                            }
+                                        };
+                                        return url && isSafeUrl(url) ? (
+                                            <img src={url} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-lg font-medium">
+                                                {(user?.nickname || user?.email || '??').slice(0, 2).toUpperCase()}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                             <button
@@ -294,6 +306,7 @@ export function ProfilePage() {
                         <div className="flex gap-2 p-1 bg-muted/30 rounded-lg border border-border/40">
                             {[
                                 { id: 'light', label: 'Light', icon: Sun },
+                                { id: 'gray', label: 'Gray', icon: Cloud },
                                 { id: 'dark', label: 'Dark', icon: Moon },
                                 { id: 'rgb', label: 'RGB', icon: Palette }
                             ].map((t) => (

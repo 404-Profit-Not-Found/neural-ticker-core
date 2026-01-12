@@ -59,6 +59,19 @@ describe('ProxyController', () => {
       expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');
     });
 
+    it('should block malicious domains ending with finnhub.io', async () => {
+      const res = {
+        set: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
+      };
+
+      await controller.proxyImage('https://evilfinnhub.io/image.png', res as any);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');
+    });
+
     it('should proxy image from finnhub.io', async () => {
       const mockStream = { pipe: jest.fn() };
       const mockResponse = {
