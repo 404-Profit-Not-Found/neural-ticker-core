@@ -8,10 +8,10 @@ const alertVariants = cva(
     {
         variants: {
             variant: {
-                success: "border-emerald-500/30 bg-emerald-500/15 text-emerald-200 [data-theme='light']:bg-emerald-100 [data-theme='light']:border-emerald-200 [data-theme='light']:text-emerald-800",
-                error: "border-red-500/30 bg-red-500/15 text-red-200 [data-theme='light']:bg-red-100 [data-theme='light']:border-red-200 [data-theme='light']:text-red-800",
-                warning: "border-yellow-500/30 bg-yellow-500/15 text-yellow-200 [data-theme='light']:bg-yellow-100 [data-theme='light']:border-yellow-200 [data-theme='light']:text-yellow-800",
-                info: "border-blue-500/30 bg-blue-500/15 text-blue-200 [data-theme='light']:bg-blue-100 [data-theme='light']:border-blue-200 [data-theme='light']:text-blue-800",
+                success: "border-emerald-500/30 bg-emerald-500/15 text-emerald-200 [data-theme='light']:bg-emerald-100 [data-theme='light']:border-emerald-200 [data-theme='light']:text-emerald-800 [data-theme='gray']:bg-emerald-100 [data-theme='gray']:border-emerald-200 [data-theme='gray']:text-emerald-800",
+                error: "border-red-500/30 bg-red-500/15 text-red-200 [data-theme='light']:bg-red-100 [data-theme='light']:border-red-200 [data-theme='light']:text-red-800 [data-theme='gray']:bg-red-100 [data-theme='gray']:border-red-200 [data-theme='gray']:text-red-800",
+                warning: "border-yellow-500/30 bg-yellow-500/15 text-yellow-200 [data-theme='light']:bg-yellow-100 [data-theme='light']:border-yellow-200 [data-theme='light']:text-yellow-800 [data-theme='gray']:bg-yellow-100 [data-theme='gray']:border-yellow-200 [data-theme='gray']:text-yellow-800",
+                info: "border-blue-500/30 bg-blue-500/15 text-blue-200 [data-theme='light']:bg-blue-100 [data-theme='light']:border-blue-200 [data-theme='light']:text-blue-800 [data-theme='gray']:bg-blue-100 [data-theme='gray']:border-blue-200 [data-theme='gray']:text-blue-800",
             },
         },
         defaultVariants: {
@@ -39,10 +39,10 @@ function InlineAlert({ className, variant = "info", icon = true, children, ...pr
     return (
         <div className={cn(alertVariants({ variant }), className)} {...props}>
             {icon && <IconComponent className={cn("w-4 h-4",
-                variant === 'success' && "text-emerald-600 [data-theme='light']:text-emerald-600",
-                variant === 'error' && "text-red-600 [data-theme='light']:text-red-600",
-                variant === 'warning' && "text-yellow-600 [data-theme='light']:text-yellow-600",
-                variant === 'info' && "text-blue-600 [data-theme='light']:text-blue-600"
+                variant === 'success' && "text-emerald-600 [data-theme='light']:text-emerald-600 [data-theme='gray']:text-emerald-600",
+                variant === 'error' && "text-red-600 [data-theme='light']:text-red-600 [data-theme='gray']:text-red-600",
+                variant === 'warning' && "text-yellow-600 [data-theme='light']:text-yellow-600 [data-theme='gray']:text-yellow-600",
+                variant === 'info' && "text-blue-600 [data-theme='light']:text-blue-600 [data-theme='gray']:text-blue-600"
             )} />}
             <div>{children}</div>
         </div>

@@ -27,7 +27,6 @@ vi.mock('../context/AuthContext', () => ({
 vi.mock('../hooks/useTicker', () => ({
     useTickerResearch: vi.fn(),
     useTriggerResearch: vi.fn(),
-    useWatchlists: vi.fn(),
     useToggleFavorite: vi.fn(),
     useActiveResearchCount: vi.fn() // Also mocked to avoid warnings
 }));
@@ -80,7 +79,7 @@ vi.mock('recharts', () => ({
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
-import { useTickerResearch, useTriggerResearch, useWatchlists, useToggleFavorite, useActiveResearchCount } from '../hooks/useTicker';
+import { useTickerResearch, useTriggerResearch, useToggleFavorite, useActiveResearchCount } from '../hooks/useTicker';
 import { useStockAnalyzer } from '../hooks/useStockAnalyzer';
 import { useQuery } from '@tanstack/react-query';
 
@@ -100,10 +99,7 @@ describe('Dashboard', () => {
             mutate: mockTriggerResearch,
             isPending: false
         });
-        (useWatchlists as Mock).mockReturnValue({
-            data: [],
-            isLoading: false
-        });
+
         (useToggleFavorite as Mock).mockReturnValue({
             mutate: vi.fn(),
             isPending: false
@@ -140,8 +136,8 @@ describe('Dashboard', () => {
         // Stats should be visible
         expect(screen.getByText('Tickers Tracked')).toBeTruthy();
         expect(screen.getByText('100')).toBeTruthy(); // Tickers count
-        expect(screen.getByText('Strong Buy')).toBeTruthy();
-        expect(screen.getByText('5')).toBeTruthy(); // Strong Buy count
+        expect(screen.getAllByText('Strong Buy').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('5').length).toBeGreaterThan(0); // Strong Buy count
     });
 
     it.skip('renders Top Opportunities section', () => {

@@ -285,15 +285,13 @@ export class UsersService {
 
     // 2. Process Registered Users (Active or Waitlist)
     for (const u of users) {
-      // Skip revoked users - they should not appear in admin list
-      if (u.role === 'revoked') continue;
-
       const existing = identityMap.get(u.email) || {};
 
       let status = 'ACTIVE';
       if (u.role === 'admin') status = 'ADMIN';
       else if (u.role === 'waitlist') status = 'WAITLIST';
-      else if (existing.is_whitelisted) status = 'ACTIVE'; // If whitelisted and registered, they are active
+      else if (u.role === 'revoked') status = 'BANNED';
+      else if (existing.is_whitelisted) status = 'ACTIVE';
 
       identityMap.set(u.email, {
         ...existing, // Keep invited info if exists

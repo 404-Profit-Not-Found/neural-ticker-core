@@ -1,44 +1,50 @@
-import { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
-import { UserService } from '../services/userService'; // Added
-import { Settings, User, Save, CreditCard, History } from 'lucide-react'; // Added icons
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Badge } from '../components/ui/badge';
-import { useQuery } from '@tanstack/react-query'; // Added
+import { UserService } from '../services/userService';
 import {
-    // Table,
-    // TableBody,
-    // TableCell,
-    // TableHead,
-    // TableHeader,
-    // TableRow,
-} from '../components/ui/table';
+    ChevronRight,
+    CreditCard,
+    Fingerprint,
+    Settings,
+    Moon,
+    Sun,
+    Palette,
+    Crown,
+    Sparkles,
+    Mail,
+    Plus,
+    Camera,
+    Cloud,
+} from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
+import { cn, debounce } from '../lib/utils';
 import { TransactionHistoryDialog } from '../components/profile/TransactionHistoryDialog';
 
+// Version is injected by Vite (same as SuperLoading)
+declare const __APP_VERSION__: string;
 
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
     const [nickname, setNickname] = useState('');
+    const [avatarUrl, setAvatarUrl] = useState('');
     const [theme, setTheme] = useState('g100');
-    const [saving, setSaving] = useState(false);
+    const [isEditingAvatar, setIsEditingAvatar] = useState(false);
 
     // Live Preview Effect
     useEffect(() => {
         let previewTheme = theme;
-        if (previewTheme.startsWith('g')) previewTheme = 'dark';
-        if (!['light', 'dark', 'rgb'].includes(previewTheme)) previewTheme = 'dark';
+        if (previewTheme.startsWith('g') && previewTheme !== 'gray') previewTheme = 'dark';
+        if (!['light', 'dark', 'rgb', 'gray'].includes(previewTheme)) previewTheme = 'dark';
 
         document.documentElement.setAttribute('data-theme', previewTheme);
-        document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb');
+        document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-rgb', 'theme-gray');
         document.documentElement.classList.add(`theme-${previewTheme}`);
 
-        if (previewTheme === 'light') {
+        if (previewTheme === 'light' || previewTheme === 'gray') {
             document.documentElement.classList.remove('dark');
         } else {
             document.documentElement.classList.add('dark');
@@ -48,6 +54,7 @@ export function ProfilePage() {
     useEffect(() => {
         if (user) {
             setNickname(user.nickname || '');
+            setAvatarUrl(user.avatar_url || '');
             setTheme(user.theme || 'g100');
         }
     }, [user]);
@@ -59,191 +66,276 @@ export function ProfilePage() {
         enabled: !!user?.id,
     });
 
-
-    const handleSave = async () => {
-        setSaving(true);
+    // Auto-save function
+    const saveChanges = useCallback(async (newNickname: string, newAvatarUrl: string, newTheme: string) => {
         try {
             await api.patch('/users/me', {
-                nickname,
-                theme
+                nickname: newNickname,
+                avatar_url: newAvatarUrl,
+                theme: newTheme
             });
-            await refreshSession(); // Refresh to get updated user data
+            await refreshSession();
         } catch (error) {
             console.error('Failed to update profile', error);
-        } finally {
-            setSaving(false);
+        }
+    }, [refreshSession]);
+
+    // Debounced auto-save for nickname/avatar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const debouncedSave = useCallback(
+        debounce((newNickname: string, newAvatarUrl: string, newTheme: string) => {
+            saveChanges(newNickname, newAvatarUrl, newTheme);
+        }, 800),
+        [saveChanges]
+    );
+
+    // Handle nickname change with auto-save
+    const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newNickname = e.target.value;
+        setNickname(newNickname);
+        debouncedSave(newNickname, avatarUrl, theme);
+    };
+
+    // Handle avatar URL change with auto-save
+    const handleAvatarUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newUrl = e.target.value;
+        setAvatarUrl(newUrl);
+        debouncedSave(nickname, newUrl, theme);
+    };
+
+    // Handle theme change with immediate save
+    const handleThemeChange = (newTheme: string) => {
+        setTheme(newTheme);
+        saveChanges(nickname, avatarUrl, newTheme);
+    };
+
+    // Get tier badge (exact match to Admin Console UserAdminCard)
+    const getTierBadge = (tier: string | undefined) => {
+        switch (tier) {
+            case 'whale':
+                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
+            case 'pro':
+                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
+            default:
+                return null;
         }
     };
 
+    // Get status badge (exact match to Admin Console UserAdminCard)
+    const getStatusBadge = (role: string | undefined) => {
+        if (role === 'admin') {
+            return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 h-5 text-[10px]">ADMIN</Badge>;
+        }
+        return <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5 h-5 text-[10px]">ACTIVE</Badge>;
+    };
+
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+        <div className="min-h-screen bg-background text-foreground font-sans">
             <Header />
 
-            <main className="max-w-5xl mx-auto p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
+            <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6 pt-8 pb-24">
 
-                {/* Header Section */}
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 text-center sm:text-left">
-                    <div className="relative group">
-                        <div className="relative w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-background overflow-hidden shrink-0">
-                            {user?.avatar_url ? (
-                                <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <User size={48} className="text-muted-foreground" />
-                            )}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="flex items-center justify-center sm:justify-start gap-3">
-                            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                                {nickname || user?.name || 'Trader'}
-                            </h1>
-                            {(profile?.tier === 'pro' || profile?.tier === 'admin' || profile?.role === 'admin') && (
-                                <Badge className="bg-gradient-to-r from-violet-600 to-fuchsia-600 border-0">PRO</Badge>
-                            )}
-                            {profile?.tier === 'whale' && (
-                                <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 border-0 text-black">WHALE</Badge>
-                            )}
-                        </div>
-                        <p className="text-muted-foreground font-mono text-sm mt-1">{user?.email}</p>
-                    </div>
+                {/* PAGE TITLE */}
+                <div className="space-y-1">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Profile Settings</h1>
+                    <p className="text-muted-foreground text-sm">Manage your account and preferences.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Membership & Credits */}
-                    <Card className="md:col-span-2 border-primary/20 bg-muted/10 overflow-hidden relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-transparent pointer-events-none" />
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <CreditCard className="text-primary" size={20} />
-                                Membership & Credits
-                            </CardTitle>
-                            <CardDescription>
-                                Your subscription status and available research credits
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6 relative z-10">
-                            <div className="flex flex-col sm:flex-row gap-6 items-center justify-between p-6 bg-background/50 rounded-xl border border-border/50 shadow-sm">
-                                <div className="text-center sm:text-left space-y-1">
-                                    <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Current Balance</div>
-                                    <div className="text-3xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
-                                        {profile?.credits_balance ?? 0}
+                {/* USER PROFILE CARD - with avatar, email, tags - colorful accent */}
+                <div className="relative bg-card border border-border/40 rounded-xl p-4 overflow-hidden">
+                    {/* Subtle gradient accent */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-purple-500/5 pointer-events-none" />
+
+                    <div className="relative flex items-center gap-4">
+                        {/* Avatar with ring */}
+                        <div className="relative group">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-purple-500 p-0.5">
+                                <div className="w-full h-full rounded-full overflow-hidden bg-background">
+                                    {(() => {
+                                        const url = avatarUrl || user?.avatar_url;
+                                        const isSafeUrl = (u: string) => {
+                                            try {
+                                                const parsed = new URL(u);
+                                                return ['http:', 'https:'].includes(parsed.protocol);
+                                            } catch {
+                                                return false;
+                                            }
+                                        };
+                                        return url && isSafeUrl(url) ? (
+                                            <img src={url} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-lg font-medium">
+                                                {(user?.nickname || user?.email || '??').slice(0, 2).toUpperCase()}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsEditingAvatar(!isEditingAvatar)}
+                                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center border-2 border-background hover:scale-110 transition-transform"
+                            >
+                                <Camera size={12} className="text-primary-foreground" />
+                            </button>
+                        </div>
+
+                        {/* User Info */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold truncate">{nickname || user?.nickname || 'User'}</span>
+                                {getTierBadge(profile?.tier)}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Mail size={12} />
+                                <span className="truncate">{user?.email}</span>
+                            </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="shrink-0">
+                            {getStatusBadge(user?.role)}
+                        </div>
+                    </div>
+
+                    {/* Avatar URL Input - appears when editing */}
+                    {isEditingAvatar && (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                            <Input
+                                value={avatarUrl}
+                                onChange={handleAvatarUrlChange}
+                                placeholder="Paste avatar URL here..."
+                                className="bg-muted/30 border-border/40 h-11"
+                                autoFocus
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* ACCOUNT SECTION */}
+                <div className="space-y-3">
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Account</h2>
+
+                    <div className="bg-card border border-border/40 rounded-xl overflow-hidden">
+                        {/* Nickname Row */}
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                    <Fingerprint size={18} className="text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium">Trader Designation</div>
+                                    <div className="text-xs text-muted-foreground">Your public display name</div>
+                                </div>
+                            </div>
+                            <Input
+                                value={nickname}
+                                onChange={handleNicknameChange}
+                                placeholder="Enter nickname"
+                                className="bg-muted/30 border-border/40 h-11"
+                            />
+                        </div>
+
+                        <div className="h-px bg-border/40" />
+
+                        {/* Credits Row */}
+                        <div className="p-4 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                <CreditCard size={18} className="text-muted-foreground" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium">Credits Balance</div>
+                                <div className="text-xs text-muted-foreground">Available for AI research</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-lg font-bold tabular-nums">{profile?.credits_balance ?? 0}</div>
+                                <div className="text-xs text-muted-foreground">credits</div>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-border/40" />
+
+                        {/* Add Credits Button */}
+                        <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors text-left">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                <Plus size={18} className="text-primary" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium text-primary">Add Credits</div>
+                                <div className="text-xs text-muted-foreground">Purchase more credits</div>
+                            </div>
+                            <ChevronRight size={16} className="text-muted-foreground/50" />
+                        </button>
+
+                        <div className="h-px bg-border/40" />
+
+                        {/* Transaction History Row */}
+                        <TransactionHistoryDialog
+                            transactions={profile?.credit_transactions}
+                            trigger={
+                                <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors text-left">
+                                    <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                        <CreditCard size={18} className="text-muted-foreground" />
                                     </div>
-                                    <div className="text-xs text-muted-foreground">credits remaining this month</div>
-                                </div>
+                                    <div className="flex-1">
+                                        <div className="text-sm font-medium">Transaction History</div>
+                                        <div className="text-xs text-muted-foreground">View and manage your credits</div>
+                                    </div>
+                                    <ChevronRight size={16} className="text-muted-foreground/50" />
+                                </button>
+                            }
+                        />
+                    </div>
+                </div>
 
-                                <div className="h-12 w-[1px] bg-border hidden sm:block" />
+                {/* PREFERENCE SECTION */}
+                <div className="space-y-3">
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Preference</h2>
 
-                                <div className="flex flex-col gap-3 w-full sm:w-auto">
-                                    <TransactionHistoryDialog
-                                        transactions={profile?.credit_transactions}
-                                        trigger={
-                                            <Button variant="outline" className="w-full justify-start gap-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5">
-                                                <History size={16} className="text-primary" />
-                                                View History
-                                                <span className="ml-auto text-xs text-muted-foreground font-mono">
-                                                    {profile?.credit_transactions?.length ?? 0} tx
-                                                </span>
-                                            </Button>
-                                        }
-                                    />
-                                    {profile?.tier === 'free' && (
-                                        <Button className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90 transition-opacity border-0">
-                                            Upgrade to Pro
-                                        </Button>
+                    <div className="bg-card border border-border/40 rounded-xl p-4 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                <Settings size={18} className="text-muted-foreground" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium">Dark Mode & Themes</div>
+                                <div className="text-xs text-muted-foreground">UI personalization</div>
+                            </div>
+                        </div>
+
+                        {/* Theme Switcher */}
+                        <div className="flex gap-2 p-1 bg-muted/30 rounded-lg border border-border/40">
+                            {[
+                                { id: 'light', label: 'Light', icon: Sun },
+                                { id: 'gray', label: 'Gray', icon: Cloud },
+                                { id: 'dark', label: 'Dark', icon: Moon },
+                                { id: 'rgb', label: 'RGB', icon: Palette }
+                            ].map((t) => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => handleThemeChange(t.id)}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all",
+                                        (theme === t.id || (t.id === 'dark' && theme.startsWith('g')))
+                                            ? "bg-background text-foreground shadow-sm border border-border/50"
+                                            : "text-muted-foreground hover:text-foreground"
                                     )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Identity */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <User className="text-primary" size={20} />
-                                Identity
-                            </CardTitle>
-                            <CardDescription>
-                                How you appear in the community
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="nickname">Display Name</Label>
-                                <Input
-                                    id="nickname"
-                                    value={nickname}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNickname(e.target.value)}
-                                    placeholder="Enter your nickname"
-                                    className="bg-muted/50 border-input focus:ring-primary h-11"
-                                />
-                                <p className="text-xs text-muted-foreground">This name will be visible on your shared research notes.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Preferences */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Settings className="text-primary" size={20} />
-                                Appearance
-                            </CardTitle>
-                            <CardDescription>
-                                Customize your terminal experience
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-3 gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setTheme('light')}
-                                    className={`h-24 flex flex-col gap-3 hover:bg-muted/50 border-input ${theme === 'light' ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm" />
-                                    <span className="text-xs font-medium">Light</span>
-                                </Button>
-
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setTheme('dark')}
-                                    className={`h-24 flex flex-col gap-3 hover:bg-muted/50 border-input ${(theme === 'dark' || theme.startsWith('g')) ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 shadow-sm" />
-                                    <span className="text-xs font-medium">Dark</span>
-                                </Button>
-
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setTheme('rgb')}
-                                    className={`h-24 flex flex-col gap-3 relative overflow-hidden group border-input ${theme === 'rgb' ? 'border-[transparent] ring-2 ring-fuchsia-500/50' : ''}`}
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <div className="w-8 h-8 rounded-full bg-black border-0 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-500 relative z-10 shadow-sm" />
-                                    <span className="text-xs font-medium relative z-10">RGB</span>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    <t.icon size={14} />
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex justify-end pt-4 pb-20 sm:pb-4">
-                    <Button
-                        onClick={handleSave}
-                        disabled={saving}
-                        size="lg"
-                        className="w-full sm:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-                    >
-                        {saving ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                            <Save size={18} />
-                        )}
-                        {saving ? 'Saving...' : 'Save Configuration'}
-                    </Button>
+                {/* VERSION FOOTER */}
+                <div className="pt-8 text-center">
+                    <span className="text-xs text-muted-foreground">v{__APP_VERSION__}</span>
                 </div>
-            </main >
-        </div >
+
+            </main>
+        </div>
     );
 }
 

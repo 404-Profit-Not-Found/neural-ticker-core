@@ -64,6 +64,15 @@ export class AdminController {
     return this.usersService.revokeEmail(email, req.user);
   }
 
+  @Patch('users/:id/role')
+  @ApiOperation({ summary: 'Update user role (admin/user/waitlist)' })
+  async updateUserRole(
+    @Param('id') id: string,
+    @Body() body: { role: string },
+  ) {
+    return this.usersService.updateRole(id, body.role);
+  }
+
   @Delete('waitlist/:email')
   @ApiOperation({ summary: 'Reject/Delete a waitlist user' })
   async rejectWaitlistUser(@Param('email') email: string) {

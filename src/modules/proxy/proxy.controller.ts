@@ -40,7 +40,8 @@ export class ProxyController {
 
     try {
       const parsedUrl = new URL(url);
-      if (!parsedUrl.hostname.endsWith('finnhub.io')) {
+      const hostname = parsedUrl.hostname;
+      if (hostname !== 'finnhub.io' && !hostname.endsWith('.finnhub.io')) {
         throw new BadRequestException('Only finnhub.io images are allowed');
       }
 

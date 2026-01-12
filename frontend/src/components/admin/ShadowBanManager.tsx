@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AdminService } from '../../services/adminService';
 import { Search, EyeOff, Eye, Loader2, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import {
-    Table,
     TableBody,
     TableCell,
     TableHead,
@@ -67,7 +65,7 @@ export function ShadowBanManager() {
         try {
             await AdminService.setTickerHidden(symbol, !currentlyHidden);
             // Update local state
-            setTickers(prev => 
+            setTickers(prev =>
                 prev.map(t => t.symbol === symbol ? { ...t, is_hidden: !currentlyHidden } : t)
             );
             // Refresh hidden list
@@ -83,80 +81,83 @@ export function ShadowBanManager() {
     return (
         <div className="space-y-6">
             {/* Search Section */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2">
-                        <EyeOff className="w-5 h-5 text-orange-500" />
-                        Shadow Ban Tickers
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        Hide bankrupt or problematic companies from appearing in suggestions
-                    </p>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex gap-2 mb-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                type="text"
-                                placeholder="Search ticker symbol or name..."
-                                value={searchTerm}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                                onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleSearch()}
-                                className="pl-9"
-                            />
-                        </div>
-                        <Button onClick={handleSearch} disabled={loading}>
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-                        </Button>
+            <div className="space-y-4">
+                <div className="flex items-center gap-3 pb-2 border-b border-border/50">
+                    <EyeOff className="w-5 h-5 text-orange-500" />
+                    <div>
+                        <h2 className="text-xl font-semibold">Shadow Ban Tickers</h2>
+                        <p className="text-sm text-muted-foreground">
+                            Hide bankrupt or problematic companies from appearing in suggestions
+                        </p>
                     </div>
+                </div>
+                <div className="flex gap-2 mb-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                            type="text"
+                            placeholder="Search ticker symbol or name..."
+                            value={searchTerm}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleSearch()}
+                            className="pl-9"
+                        />
+                    </div>
+                    <Button onClick={handleSearch} disabled={loading}>
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                    </Button>
+                </div>
 
-                    {/* Search Results */}
-                    {tickers.length > 0 && (
-                        <Table>
+                {/* Search Results */}
+                {tickers.length > 0 && (
+                    <div className="overflow-x-auto">
+                        <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Symbol</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Exchange</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
+                                <TableRow className="bg-transparent hover:bg-transparent border-none">
+                                    <TableHead className="font-medium text-muted-foreground pl-6">Symbol</TableHead>
+                                    <TableHead className="font-medium text-muted-foreground">Name</TableHead>
+                                    <TableHead className="font-medium text-muted-foreground">Exchange</TableHead>
+                                    <TableHead className="font-medium text-muted-foreground">Status</TableHead>
+                                    <TableHead className="text-right font-medium text-muted-foreground pr-6">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
-                            <TableBody>
+                            <TableBody className="space-y-2">
                                 {tickers.map((ticker) => (
-                                    <TableRow key={ticker.symbol}>
-                                        <TableCell className="font-mono font-semibold">
+                                    <TableRow
+                                        key={ticker.symbol}
+                                        className="bg-card hover:bg-muted/40 transition-colors shadow-sm border-y border-border/40 first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg group"
+                                    >
+                                        <TableCell className="py-4 pl-6 font-mono font-bold text-lg rounded-l-lg border-l border-y border-border/40 text-foreground">
                                             {ticker.symbol}
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground">
+                                        <TableCell className="border-y border-border/40 text-foreground font-medium">
                                             {ticker.name}
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline" className="text-xs">
+                                        <TableCell className="border-y border-border/40">
+                                            <Badge variant="outline" className="text-xs font-mono">
                                                 {ticker.exchange}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="border-y border-border/40">
                                             {ticker.is_hidden ? (
-                                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                                                <Badge className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20 shadow-none">
                                                     <EyeOff className="w-3 h-3 mr-1" />
                                                     Hidden
                                                 </Badge>
                                             ) : (
-                                                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                                                <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 shadow-none">
                                                     <Eye className="w-3 h-3 mr-1" />
                                                     Visible
                                                 </Badge>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right rounded-r-lg border-r border-y border-border/40 pr-6">
                                             <Button
                                                 size="sm"
                                                 variant={ticker.is_hidden ? 'outline' : 'destructive'}
                                                 onClick={() => handleToggleHidden(ticker.symbol, ticker.is_hidden)}
                                                 disabled={togglingSymbol === ticker.symbol}
-                                                className="gap-1"
+                                                className={ticker.is_hidden ? "gap-1 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600" : "gap-1"}
                                             >
                                                 {togglingSymbol === ticker.symbol ? (
                                                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -176,26 +177,23 @@ export function ShadowBanManager() {
                                     </TableRow>
                                 ))}
                             </TableBody>
-                        </Table>
-                    )}
+                        </table>
+                    </div>
+                )}
 
-                    {searchTerm && tickers.length === 0 && !loading && (
-                        <p className="text-center text-muted-foreground py-4">
-                            No tickers found matching "{searchTerm}"
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
+                {searchTerm && tickers.length === 0 && !loading && (
+                    <p className="text-center text-muted-foreground py-4">
+                        No tickers found matching "{searchTerm}"
+                    </p>
+                )}
+            </div>
 
-            {/* Currently Hidden Tickers */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-orange-500" />
-                        Currently Hidden ({hiddenTickers.length})
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
+            <div className="space-y-4">
+                <div className="flex items-center gap-3 pb-2 border-b border-border/50">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    <h2 className="text-xl font-semibold">Currently Hidden ({hiddenTickers.length})</h2>
+                </div>
+                <div className="py-4">
                     {loadingHidden ? (
                         <div className="flex items-center justify-center py-8">
                             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -234,8 +232,8 @@ export function ShadowBanManager() {
                             ))}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </div>
     );
 }

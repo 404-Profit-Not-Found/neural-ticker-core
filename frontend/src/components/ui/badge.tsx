@@ -8,12 +8,12 @@ const badgeVariants = cva(
         variants: {
             variant: {
                 default:
-                    "border-transparent bg-primary text-primary-foreground hover:bg-primary/80 [data-theme=light]&:text-black",
+                    "border-transparent bg-primary text-primary-foreground hover:bg-primary/80 [data-theme=light]&:text-black [data-theme=gray]&:text-black",
                 secondary:
-                    "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 [data-theme=light]&:text-black",
+                    "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 [data-theme=light]&:text-black [data-theme=gray]&:text-black",
                 destructive:
-                    "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80 [data-theme=light]&:text-black",
-                outline: "text-foreground [data-theme=light]&:text-black",
+                    "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80 [data-theme=light]&:text-black [data-theme=gray]&:text-black",
+                outline: "text-foreground [data-theme=light]&:text-black [data-theme=gray]&:text-black",
                 // Custom variants for Rating
                 strongBuy: "border-transparent bg-green-500/20 text-green-400 hover:bg-green-500/30 badge-light-strong",
                 buy: "border-transparent bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 badge-light-buy",
