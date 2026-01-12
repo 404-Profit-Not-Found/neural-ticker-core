@@ -82,4 +82,34 @@ export class TickerRequestsService {
     request.status = 'REJECTED';
     return this.requestRepo.save(request);
   }
+  async onModuleInit() {
+    // DEBUG: Auto-seed VWS.CO request if missing
+    // Commented out to ensure backend stability during diagnosis of 500 errors
+    /*
+    try {
+      const symbol = 'VWS.CO';
+      const existingRequest = await this.requestRepo.findOne({ where: { symbol } });
+      const existingTicker = await this.tickersService.findOneBySymbol(symbol);
+      
+      if (!existingRequest && !existingTicker) {
+        // Find a valid user to assign this request to
+        const result = await this.requestRepo.manager.query('SELECT id FROM users LIMIT 1');
+        const userId = result[0]?.id;
+
+        if (userId) {
+            console.log(`[DEBUG] Seeding missing request for ${symbol} for user ${userId}`);
+            await this.requestRepo.save(this.requestRepo.create({
+                user_id: userId,
+                symbol,
+                status: 'PENDING',
+            }));
+        } else {
+            console.warn('[DEBUG] Cannot seed request: No users found in DB');
+        }
+      }
+    } catch (e) {
+      console.error('[DEBUG] Failed to seed request', e);
+    }
+    */
+  }
 }

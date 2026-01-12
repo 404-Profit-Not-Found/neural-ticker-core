@@ -168,4 +168,36 @@ export const AdminService = {
       throw error;
     }
   },
+
+  // Ticker Requests Management
+  getTickerRequests: async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await api.get<any[]>('/v1/ticker-requests');
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
+  approveTickerRequest: async (requestId: string) => {
+    try {
+      const { data } = await api.patch(`/v1/ticker-requests/${requestId}/approve`);
+      return data;
+    } catch (error) {
+        handleAdminError(error);
+        throw error;
+    }
+  },
+
+  rejectTickerRequest: async (requestId: string) => {
+    try {
+      const { data } = await api.patch(`/v1/ticker-requests/${requestId}/reject`);
+      return data;
+    } catch (error) {
+        handleAdminError(error);
+        throw error;
+    }
+  }
 };
