@@ -110,6 +110,18 @@ export const AdminService = {
     }
   },
 
+  updateRole: async (userId: string, role: string) => {
+    try {
+      const { data } = await api.patch<User>(`/admin/users/${userId}/role`, {
+        role,
+      });
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
   giftCredits: async (userId: string, amount: number, reason: string) => {
     try {
       const { data } = await api.post<User>(`/admin/users/${userId}/credits`, {
@@ -173,7 +185,7 @@ export const AdminService = {
   getTickerRequests: async () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await api.get<any[]>('/v1/ticker-requests');
+      const { data } = await api.get<any[]>('/ticker-requests');
       return data;
     } catch (error) {
       handleAdminError(error);
@@ -183,7 +195,7 @@ export const AdminService = {
 
   approveTickerRequest: async (requestId: string) => {
     try {
-      const { data } = await api.patch(`/v1/ticker-requests/${requestId}/approve`);
+      const { data } = await api.patch(`/ticker-requests/${requestId}/approve`);
       return data;
     } catch (error) {
         handleAdminError(error);
@@ -193,7 +205,7 @@ export const AdminService = {
 
   rejectTickerRequest: async (requestId: string) => {
     try {
-      const { data } = await api.patch(`/v1/ticker-requests/${requestId}/reject`);
+      const { data } = await api.patch(`/ticker-requests/${requestId}/reject`);
       return data;
     } catch (error) {
         handleAdminError(error);

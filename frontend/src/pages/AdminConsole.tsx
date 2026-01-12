@@ -1,41 +1,35 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { LogoManager } from '../components/admin/LogoManager';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
 import {
     Plus,
-    CheckCircle,
     Search,
     ChevronLeft,
     ArrowUpDown,
     Shield,
-    Coins,
-    EyeOff,
-    Users,
-    Image as ImageIcon,
     Crown,
     Sparkles,
-    UserCircle,
-    Clock,
-    ChevronDown,
-    MoreHorizontal,
     Gift,
     Ban,
-    Vote,
-    Check,
-    X,
+    CheckCircle,
+    LayoutGrid,
+    List,
 } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { NativeSelect } from '../components/ui/select-native';
+import { TickerRequestCard } from '../components/admin/TickerRequestCard';
+import { UserAdminCard, type AdminUser } from '../components/admin/UserAdminCard';
 import { ShadowBanManager } from '../components/admin/ShadowBanManager';
+import { LogoManager } from '../components/admin/LogoManager';
 import { Header } from '../components/layout/Header';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { TickerRequestRow } from '../components/admin/TickerRequestRow';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import {
-    Table,
     TableBody,
     TableCell,
     TableHead,
@@ -47,25 +41,27 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '../components/ui/popover';
+import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
+import { UserDetailDialog } from '../components/admin/UserDetailDialog';
 
 type SortConfig = {
     key: string;
     direction: 'asc' | 'desc';
 };
 
-// Helper function for relative time
-function getRelativeTime(dateString: string): string {
+// Helper function for full timestamp
+function formatTimestamp(dateString: string | undefined): string {
+    if (!dateString) return 'Never';
     const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)}w ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (isNaN(date.getTime())) return 'Never';
+    return date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).replace(',', '');
 }
 
 // Get user initials for avatar
@@ -86,20 +82,19 @@ export function AdminConsole() {
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'users' | 'shadowban' | 'logo' | 'requests'>('users');
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
     // Users Tab State
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [identities, setIdentities] = useState<any[]>([]);
+    const [identities, setIdentities] = useState<AdminUser[]>([]);
     const [newEmail, setNewEmail] = useState('');
     const [loading, setLoading] = useState(true);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [_error, setError] = useState<string | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
-    const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [selectedUserForCredits, setSelectedUserForCredits] = useState<any | null>(null);
-    const [creditAmount, setCreditAmount] = useState(1);
-    const [creditReason, setCreditReason] = useState('Admin Gift');
+
+    // Dialog & Detail State
+    const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
     // Requests Tab State
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,10 +102,24 @@ export function AdminConsole() {
 
     // Table State
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'WAITLIST' | 'INVITED'>('ALL');
+    const [statusFilter, setStatusFilter] = useState<AdminFilterKey>('ALL');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const isSuperAdmin = currentUser?.email === 'branislavlang@gmail.com';
+
+    // Force grid view on mobile
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setViewMode('grid');
+            }
+        };
+        handleResize(); // Initial check
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Redirect non-admin users immediately
     useEffect(() => {
@@ -134,7 +143,6 @@ export function AdminConsole() {
                 setIdentities(data);
             } else if (activeTab === 'requests') {
                 const data = await AdminService.getTickerRequests();
-                console.log('Ticker Requests Data:', data); // Debug log
                 setRequests(Array.isArray(data) ? data : []);
             }
         } catch (err: unknown) {
@@ -175,15 +183,18 @@ export function AdminConsole() {
     };
 
     const handleApprove = async (email: string) => {
-        // We'll need userId for approve, but let's see if we have it in the item
         try {
-            // Find user ID from identities
             const user = identities.find(u => u.email === email);
-            if (!user) throw new Error('User not found');
+            if (!user || !user.id) throw new Error('User not found or missing ID');
 
             await AdminService.approveUser(user.id);
             toast.success(`Approved ${email}`);
-            loadData();
+
+            // Refresh data explicitly or optimistically update
+            setIdentities(prev => prev.map(u => u.email === email ? { ...u, status: 'ACTIVE' } : u));
+            if (selectedUser?.email === email) {
+                setSelectedUser(prev => prev ? { ...prev, status: 'ACTIVE' } : null);
+            }
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const msg = (err as any).response?.data?.message || (err as any).message || 'Failed to approve user';
@@ -191,13 +202,22 @@ export function AdminConsole() {
         }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleRevoke = async (item: any) => {
-        if (!confirm(`Revoke access for ${item.email}?`)) return;
+    const handleRevoke = async (user: AdminUser) => {
+        if (!user.email) return;
+        if (user.role === 'admin' && !isSuperAdmin) {
+            toast.error("Only Superadmin can revoke Admin access.");
+            return;
+        }
+
+        if (!confirm(`Revoke access for ${user.email}?`)) return;
         try {
-            await AdminService.revokeAccess(item.email);
-            toast.success(`Revoked access for ${item.email}`);
-            loadData();
+            await AdminService.revokeAccess(user.email);
+            toast.success(`Revoked access for ${user.email}`);
+            // Refresh data
+            setIdentities(prev => prev.map(u => u.id === user.id ? { ...u, status: 'BANNED' } : u));
+            if (selectedUser?.id === user.id) {
+                setSelectedUser(prev => prev ? { ...prev, status: 'BANNED' } : null);
+            }
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const msg = (err as any).response?.data?.message || 'Failed to revoke access';
@@ -205,12 +225,41 @@ export function AdminConsole() {
         }
     };
 
+    const handleUnban = async (user: AdminUser) => {
+        if (!user.email) return;
+        if (!confirm(`Unban ${user.email}?`)) return;
+        try {
+            // Re-add to userlist to restore access
+            await AdminService.addToUserlist(user.email);
+            // If they have an ID, also ensure they are approved/active in users table if needed
+            if (user.id) {
+                try {
+                    await AdminService.approveUser(user.id);
+                } catch (e) {
+                    console.log("User might already be approved", e);
+                }
+            }
+
+            toast.success(`Unbanned ${user.email}`);
+            // Refresh data
+            setIdentities(prev => prev.map(u => u.id === user.id ? { ...u, status: 'ACTIVE' } : u));
+            if (selectedUser?.id === user.id) {
+                setSelectedUser(prev => prev ? { ...prev, status: 'ACTIVE' } : null);
+            }
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to unban user';
+            toast.error(msg);
+        }
+    };
+
     const handleUpdateTier = async (userId: string, tier: 'free' | 'pro' | 'whale') => {
         try {
             await AdminService.updateTier(userId, tier);
-            // Optimistic update
-
             setIdentities(prev => prev.map(u => u.id === userId ? { ...u, tier } : u));
+            if (selectedUser?.id === userId) {
+                setSelectedUser(prev => prev ? { ...prev, tier } : null);
+            }
             toast.success(`Updated tier to ${tier}`);
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,28 +268,53 @@ export function AdminConsole() {
         }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openCreditModal = (user: any) => {
-        setSelectedUserForCredits(user);
-        setCreditAmount(1);
-        setCreditReason('Admin Gift');
-        setIsCreditModalOpen(true);
+    const handleUpdateRole = async (userId: string, role: string) => {
+        try {
+            await AdminService.updateRole(userId, role);
+            setIdentities(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+            if (selectedUser?.id === userId) {
+                setSelectedUser(prev => prev ? { ...prev, role } : null);
+            }
+            toast.success(`Updated role to ${role}`);
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to update role';
+            toast.error(msg);
+        }
     };
 
-    const handleGiftCredits = async () => {
-        if (!selectedUserForCredits) return;
+    const openUserDetail = (user: AdminUser) => {
+        setSelectedUser(user);
+        setIsUserDetailOpen(true);
+    };
+
+    // Gift Credits Handler for Dialog
+    const handleGiftCredits = async (user: AdminUser) => {
+        // Ask for amount via prompt for simplicity or reuse a dedicated modal?
+        // User requested "Modal shows actions".
+        // If "Gift Credits" clicked in Detail Dialog, we can show a prompt or sub-dialog.
+        // For now, let's use a browser prompt to keep it simple as the original design had a separate complex modal.
+        // OR better: reuse the existing logic but we need amount.
+        // Let's implement a simple prompt flow for now, or just default to 1 credit?
+        // The original code had a dedicated modal.
+        // We can use a `toast` with input? No.
+        // Let's assume we gift 5 credits by default or prompt.
+        const amountStr = prompt("Enter credit amount to gift:", "1");
+        if (!amountStr) return;
+        const amount = parseInt(amountStr);
+        if (!amount || amount <= 0) return;
+
         try {
-            await AdminService.giftCredits(selectedUserForCredits.id, creditAmount, creditReason);
-            toast.success(`Sent ${creditAmount} credits to ${selectedUserForCredits.email}`);
-            setIsCreditModalOpen(false);
-            setSelectedUserForCredits(null);
-            // Optionally reload to see credit counts (if displayed)
+            if (!user.id) throw new Error('User ID is missing');
+            await AdminService.giftCredits(user.id, amount, "Admin Gift");
+            toast.success(`Sent ${amount} credits to ${user.email}`);
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const msg = (err as any).response?.data?.message || 'Failed to gift credits';
             toast.error(msg);
         }
     };
+
     // Requests Actions
     const handleApproveRequest = async (id: string, symbol: string) => {
         try {
@@ -280,23 +354,30 @@ export function AdminConsole() {
 
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            filtered = filtered.filter((item: any) =>
+            filtered = filtered.filter((item) =>
                 item.email?.toLowerCase().includes(lower) ||
                 item.nickname?.toLowerCase().includes(lower)
             );
         }
 
         if (statusFilter !== 'ALL') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            filtered = filtered.filter((item: any) => item.status === statusFilter);
+            if (statusFilter === 'PRO') {
+                filtered = filtered.filter(u => u.tier === 'pro' && u.status !== 'BANNED');
+            } else if (statusFilter === 'WHALE') {
+                filtered = filtered.filter(u => u.tier === 'whale' && u.status !== 'BANNED');
+            } else {
+                filtered = filtered.filter((item) => item.status === statusFilter);
+            }
+        } else {
+            // Default view: exclude banned users
+            filtered = filtered.filter(u => u.status !== 'BANNED');
         }
 
         return [...filtered].sort((a, b) => {
-
-            const aVal = a[sortConfig.key];
-
-            const bVal = b[sortConfig.key];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const aVal = (a as any)[sortConfig.key];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const bVal = (b as any)[sortConfig.key];
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -309,9 +390,10 @@ export function AdminConsole() {
         const total = identities.length;
         const active = identities.filter(u => u.status === 'ACTIVE').length;
         const waitlist = identities.filter(u => u.status === 'WAITLIST').length;
+        const banned = identities.filter(u => u.status === 'BANNED').length;
         const pro = identities.filter(u => u.tier === 'pro').length;
         const whale = identities.filter(u => u.tier === 'whale').length;
-        return { total, active, waitlist, pro, whale };
+        return { total, active, waitlist, banned, pro, whale };
     }, [identities]);
 
     // Pagination
@@ -332,757 +414,506 @@ export function AdminConsole() {
 
     // Get status badge variant - using standard variants
     const getStatusBadge = (status: string, role?: string) => {
-        if (role === 'admin') {
-            return <Badge variant="secondary" className="gap-1"><Shield size={10} /> ADMIN</Badge>;
+        const badges = [];
+        const isAdmin = role === 'admin' || status === 'ADMIN';
+
+        if (isAdmin) {
+            badges.push(<Badge key="admin" variant="secondary" className="gap-1 bg-red-500/10 text-red-500 border-red-500/20"><Shield size={10} /> ADMIN</Badge>);
         }
-        switch (status) {
-            case 'ACTIVE':
-                return <Badge variant="default">ACTIVE</Badge>;
-            case 'WAITLIST':
-                return <Badge variant="secondary">WAITLIST</Badge>;
-            case 'INVITED':
-                return <Badge variant="outline">INVITED</Badge>;
+
+        if (status !== 'ADMIN') {
+            switch (status) {
+                case 'ACTIVE':
+                    badges.push(<Badge key="active" variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5">ACTIVE</Badge>);
+                    break;
+                case 'WAITLIST':
+                    badges.push(<Badge key="waitlist" variant="secondary" className="text-amber-500 border-amber-500/20">WAITLIST</Badge>);
+                    break;
+                case 'INVITED':
+                    badges.push(<Badge key="invited" variant="outline" className="text-blue-500 border-blue-500/20 bg-blue-500/5">INVITED</Badge>);
+                    break;
+                case 'BANNED':
+                    badges.push(<Badge key="banned" variant="destructive">BANNED</Badge>);
+                    break;
+                default:
+                    if (status) badges.push(<Badge key="other" variant="outline">{status}</Badge>);
+            }
+        }
+
+        return <div className="flex flex-wrap gap-1">{badges}</div>;
+    };
+
+    // Get tier badge - matches mobile card styling (UserAdminCard)
+    const getTierBadge = (tier: string | undefined) => {
+        switch (tier) {
+            case 'whale':
+                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
+            case 'pro':
+                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
             default:
-                return <Badge variant="outline">{status}</Badge>;
+                return null; // Don't show badge for free users to reduce noise
         }
     };
 
-    // Get tier badge - matches existing app styling (Header, TickerDiscussion)
-    const getTierBadge = (tier: string | undefined) => {
-        const tierValue = tier || 'free';
-        const isPremium = tierValue === 'pro' || tierValue === 'whale';
+    // Loading skeleton - view-aware to avoid hydration errors
+    const LoadingSkeleton = ({ mode = viewMode }: { mode?: 'list' | 'grid' }) => {
+        const items = [...Array(mode === 'list' ? 5 : 6)];
+
+        if (mode === 'list') {
+            // Wrap TableRow elements in proper table structure to avoid hydration errors
+            return (
+                <div className="overflow-x-auto">
+                    <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
+                        <TableBody>
+                            {items.map((_, i) => (
+                                <TableRow key={`skeleton-row-${i}`} className="bg-card border-none rounded-lg">
+                                    <TableCell className="pl-6 rounded-l-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
+                                            <div className="space-y-2">
+                                                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+                                                <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><div className="h-5 w-16 bg-muted animate-pulse rounded-full" /></TableCell>
+                                    <TableCell><div className="h-4 w-12 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell className="rounded-r-lg"><div className="h-4 w-8 bg-muted animate-pulse rounded ml-auto" /></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </table>
+                </div>
+            );
+        }
+
         return (
-            <Badge
-                variant="outline"
-                className={`text-[10px] h-5 px-1.5 uppercase ${isPremium
-                    ? 'border-purple-500 text-purple-500'
-                    : 'border-emerald-500 text-emerald-500'
-                    }`}
-            >
-                {tierValue.toUpperCase()}
-            </Badge>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {items.map((_, i) => (
+                    <div key={`skeleton-card-${i}`} className="h-32 bg-card border border-border/40 rounded-xl animate-pulse" />
+                ))}
+            </div>
         );
     };
 
-    // Loading skeleton
-    const LoadingSkeleton = () => (
-        <>
-            {[...Array(5)].map((_, i) => (
-                <TableRow key={i} className="admin-table-row">
-                    <TableCell>
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
-                            <div className="space-y-2">
-                                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-                                <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-                            </div>
-                        </div>
-                    </TableCell>
-                    <TableCell><div className="h-5 w-16 bg-muted animate-pulse rounded-full" /></TableCell>
-                    <TableCell><div className="h-5 w-16 bg-muted animate-pulse rounded-full" /></TableCell>
-                    <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded" /></TableCell>
-                    <TableCell><div className="h-8 w-8 bg-muted animate-pulse rounded" /></TableCell>
-                </TableRow>
-            ))}
-        </>
-    );
-
     return (
-        <div className="flex flex-col min-h-screen bg-background">
+        <div className="min-h-screen bg-background relative flex flex-col">
             <Header />
-            <main className="flex-1 container mx-auto p-4 md:p-8 pt-24">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-violet-500">
-                            Admin Console
+
+            {/* Main Content Area */}
+            <main className="flex-1 pt-6 overflow-y-auto h-screen scrollbar-thin">
+                <div className="container mx-auto p-4 md:p-8 max-w-7xl">
+                    <div className="flex flex-col gap-2 mb-6">
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            {activeTab === 'users' && 'User Management'}
+                            {activeTab === 'requests' && 'Ticker Requests'}
+                            {activeTab === 'shadowban' && 'Shadow Ban Quality'}
+                            {activeTab === 'logo' && 'Logo Manager'}
                         </h1>
-                        <p className="text-muted-foreground mt-1">Manage users, access, and system content</p>
+                        <p className="text-muted-foreground">
+                            {activeTab === 'users' && 'Verify and manage users, tiers, and access control.'}
+                            {activeTab === 'requests' && 'Review and approve new asset requests from the community.'}
+                            {activeTab === 'shadowban' && 'Monitor and manage shadow-banned accounts.'}
+                            {activeTab === 'logo' && 'Update and verify asset branding and logos.'}
+                        </p>
                     </div>
-                </div>
 
-                {/* Tab Navigation */}
-                <div className="flex gap-2 mb-6 border-b border-border overflow-x-auto">
-                    <button
-                        onClick={() => setActiveTab('users')}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${activeTab === 'users'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                    >
-                        <Users size={16} />
-                        Users
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('requests')}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${activeTab === 'requests'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                    >
-                        <Vote size={16} />
-                        Ticker Requests
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('shadowban')}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${activeTab === 'shadowban'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                    >
-                        <EyeOff size={16} />
-                        Shadow Ban
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('logo')}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${activeTab === 'logo'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                    >
-                        <ImageIcon size={16} />
-                        Logo Manager
-                    </button>
-                </div>
+                    {/* Integrated Tab Navigation */}
+                    <div className="flex items-center justify-between gap-4 mb-8">
+                        {/* Mobile Select */}
+                        <div className="md:hidden w-full">
+                            <NativeSelect
+                                value={activeTab}
+                                onChange={(e) => {
+                                    setActiveTab(e.target.value as any);
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <option value="users">User Management</option>
+                                <option value="requests">Ticker Requests</option>
+                                <option value="shadowban">Shadow Ban</option>
+                                <option value="logo">Logo Manager</option>
+                            </NativeSelect>
+                        </div>
 
-                {/* Shadow Ban Tab */}
-                {activeTab === 'shadowban' && <ShadowBanManager />}
-                {/* Logo Manager Tab */}
-                {activeTab === 'logo' && <LogoManager />}
+                        {/* Desktop Navigation - Simple underline tabs like TickerDetail */}
+                        <div className="hidden md:flex items-center border-b border-border w-full">
+                            {(['users', 'requests', 'shadowban', 'logo'] as const).map((tabId) => {
+                                const labels: Record<string, string> = {
+                                    users: 'Users',
+                                    requests: 'Ticker Requests',
+                                    shadowban: 'Shadow Ban',
+                                    logo: 'Logo Manager'
+                                };
+                                const isActive = activeTab === tabId;
 
-                {/* Requests Tab */}
-                {
-                    activeTab === 'requests' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-xl flex items-center gap-2">
-                                    <Vote className="text-primary" size={20} />
-                                    Ticker Requests
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="bg-muted/30">
-                                                <TableHead>Symbol</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Requested By</TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {loading ? (
-                                                <LoadingSkeleton />
-                                            ) : !Array.isArray(requests) || requests.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                                                        No pending requests
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                requests.map((req) => (
-                                                    <TableRow key={req.id}>
-                                                        <TableCell className="font-bold font-mono text-lg">{req.symbol}</TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={req.status === 'PENDING' ? 'secondary' : req.status === 'APPROVED' ? 'default' : 'destructive'} className="font-mono">
-                                                                {req.status}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-sm font-medium">{req.user?.email}</span>
-                                                                <span className="text-xs text-muted-foreground font-mono">ID: {req.user?.id?.slice(0, 8)}...</span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-muted-foreground">
-                                                            {new Date(req.created_at).toLocaleDateString()}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            {req.status === 'PENDING' && (
-                                                                <div className="flex justify-end gap-2">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-9 w-9 p-0 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 border-emerald-500/20"
-                                                                        onClick={() => handleApproveRequest(req.id, req.symbol)}
-                                                                        title="Approve"
-                                                                    >
-                                                                        <Check size={18} />
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/20"
-                                                                        onClick={() => handleRejectRequest(req.id, req.symbol)}
-                                                                        title="Reject"
-                                                                    >
-                                                                        <X size={18} />
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </TableCell>
+                                return (
+                                    <button
+                                        key={tabId}
+                                        className={cn(
+                                            "py-2 px-4 text-sm font-medium border-b-2 transition-all",
+                                            isActive
+                                                ? "border-primary text-foreground font-bold"
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
+                                        )}
+                                        onClick={() => {
+                                            setActiveTab(tabId);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        {labels[tabId]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Shadow Ban Tab */}
+                        {activeTab === 'shadowban' && <ShadowBanManager />}
+                        {/* Logo Manager Tab */}
+                        {activeTab === 'logo' && <LogoManager />}
+
+                        {/* Requests Tab */}
+                        {
+                            activeTab === 'requests' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    {/* ... Requests Content ... */}
+                                    {/* Re-implementing Requests Header for view toggle */}
+                                    <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                                        <div className="flex items-center gap-3">
+                                            {/* Redundant Title Removed */}
+                                        </div>
+                                        {/* Hidden on mobile since grid is forced */}
+                                        <div className="hidden md:flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/40">
+                                            <Button
+                                                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => setViewMode('list')}
+                                            >
+                                                <List size={14} />
+                                            </Button>
+                                            <Button
+                                                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => setViewMode('grid')}
+                                            >
+                                                <LayoutGrid size={14} />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Requests Grid/List Logic same as before... */}
+                                    {viewMode === 'list' ? (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
+                                                <TableHeader>
+                                                    <TableRow className="bg-transparent hover:bg-transparent border-none">
+                                                        <TableHead className="font-medium text-muted-foreground pl-6">Symbol</TableHead>
+                                                        <TableHead className="font-medium text-muted-foreground">Status</TableHead>
+                                                        <TableHead className="font-medium text-muted-foreground">Requested By</TableHead>
+                                                        <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                                                        <TableHead className="text-right font-medium text-muted-foreground pr-6">Actions</TableHead>
                                                     </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-
-                                {/* Mobile Card View */}
-                                <div className="md:hidden space-y-4">
-                                    {loading ? (
-                                        <div className="p-8 text-center"><LoadingSkeleton /></div>
-                                    ) : !Array.isArray(requests) || requests.length === 0 ? (
-                                        <div className="h-32 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg">
-                                            No pending requests
+                                                </TableHeader>
+                                                <TableBody className="space-y-2">
+                                                    {loading ? (
+                                                        <TableRow><TableCell colSpan={5} className="h-24 text-center"><LoadingSkeleton /></TableCell></TableRow>
+                                                    ) : requests.length === 0 ? (
+                                                        <TableRow className="bg-card hover:bg-card border-none rounded-lg">
+                                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No pending requests</TableCell>
+                                                        </TableRow>
+                                                    ) : (
+                                                        requests.map((req) => (
+                                                            <TickerRequestRow
+                                                                key={req.id}
+                                                                request={req}
+                                                                onApprove={handleApproveRequest}
+                                                                onReject={handleRejectRequest}
+                                                            />
+                                                        ))
+                                                    )}
+                                                </TableBody>
+                                            </table>
                                         </div>
                                     ) : (
-                                        requests.map((req) => (
-                                            <div key={req.id} className="bg-muted/10 border border-border/50 rounded-xl p-4 space-y-4">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <h3 className="text-2xl font-bold font-mono tracking-tight">{req.symbol}</h3>
-                                                        <div className="text-sm text-muted-foreground mt-1">
-                                                            by {req.user?.email}
-                                                        </div>
-                                                    </div>
-                                                    <Badge variant={req.status === 'PENDING' ? 'secondary' : req.status === 'APPROVED' ? 'default' : 'destructive'}>
-                                                        {req.status}
-                                                    </Badge>
+                                        <div className="w-full">
+                                            {loading ? (
+                                                <LoadingSkeleton mode="grid" />
+                                            ) : requests.length === 0 ? (
+                                                <div className="h-32 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg col-span-full">No requests</div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {requests.map((req) => (
+                                                        <TickerRequestCard
+                                                            key={req.id}
+                                                            request={req}
+                                                            onApprove={handleApproveRequest}
+                                                            onReject={handleRejectRequest}
+                                                        />
+                                                    ))}
                                                 </div>
-
-                                                <div className="text-xs text-muted-foreground font-mono flex gap-2">
-                                                    <span>{new Date(req.created_at).toLocaleDateString()}</span>
-                                                    <span>•</span>
-                                                    <span>ID: {req.user?.id?.slice(0, 8)}...</span>
-                                                </div>
-
-                                                {req.status === 'PENDING' && (
-                                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
-                                                            onClick={() => handleApproveRequest(req.id, req.symbol)}
-                                                        >
-                                                            <Check size={16} className="mr-2" /> Approve
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full text-red-500 border-red-500/30 hover:bg-red-500/10"
-                                                            onClick={() => handleRejectRequest(req.id, req.symbol)}
-                                                        >
-                                                            <X size={16} className="mr-2" /> Reject
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )
-                }
+                            )
+                        }
 
-                {/* Users Tab (Inline) */}
-                {
-                    activeTab === 'users' && (
-                        <div className="space-y-6">
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <Card className="admin-stats-card">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Users</p>
-                                                <p className="text-2xl font-bold mt-1">{stats.total}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Users size={20} className="text-primary" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="admin-stats-card">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Active</p>
-                                                <p className="text-2xl font-bold mt-1 text-emerald-400">{stats.active}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                                                <CheckCircle size={20} className="text-emerald-400" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="admin-stats-card">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Waitlist</p>
-                                                <p className="text-2xl font-bold mt-1 text-amber-400">{stats.waitlist}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                                <Clock size={20} className="text-amber-400" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="admin-stats-card">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Pro</p>
-                                                <p className="text-2xl font-bold mt-1 text-purple-400">{stats.pro}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                                                <Sparkles size={20} className="text-purple-400" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="admin-stats-card">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Whale</p>
-                                                <p className="text-2xl font-bold mt-1 text-amber-300">{stats.whale}</p>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                                <Crown size={20} className="text-amber-300" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                        {/* Users Tab (Refactored) */}
+                        {
+                            activeTab === 'users' && (
+                                <div className="space-y-6">
+                                    {/* New Admin Stats Bar */}
+                                    <AdminStatsBar
+                                        stats={stats}
+                                        selectedFilter={statusFilter}
+                                        onFilterChange={setStatusFilter}
+                                    />
 
-                            {/* Main Table Card */}
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between pb-4">
-                                    <CardTitle className="text-xl flex items-center gap-2">
-                                        <Shield className="text-primary" size={20} />
-                                        User Management
-                                    </CardTitle>
-                                    <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                                        <DialogTrigger asChild>
-                                            <Button className="gap-2">
-                                                <Plus size={16} />
-                                                Add User
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Add to Waitlist / Invite</DialogTitle>
-                                                <DialogDescription>
-                                                    Enter the email address to add. They will see the 'You are on the list' screen until approved.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="grid gap-4 py-4">
-                                                <Input
-                                                    value={newEmail}
-                                                    onChange={(e) => setNewEmail(e.target.value)}
-                                                    placeholder="user@example.com"
-                                                />
+                                    {/* User Management Section */}
+                                    <div className="space-y-4">
+                                        <div className="flex flex-row items-center justify-between pb-2 border-b border-border/50">
+                                            <div className="flex items-center gap-3">
+                                                {/* Redundant Title Removed */}
                                             </div>
-                                            <DialogFooter>
-                                                <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                                                <Button onClick={handleAddEmail}>Add User</Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                </CardHeader>
-                                <CardContent>
-                                    {/* Filters */}
-                                    <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between">
-                                        <div className="relative w-full md:w-72">
+                                            <div className="flex items-center gap-3">
+                                                {/* View Toggle (Desktop Only) */}
+                                                <div className="hidden md:flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/40">
+                                                    <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')}><List size={14} /></Button>
+                                                    <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')}><LayoutGrid size={14} /></Button>
+                                                </div>
+
+                                                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button className="gap-2 h-9">
+                                                            <Plus size={16} />
+                                                            Add User
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader>
+                                                            <DialogTitle>Add to Waitlist / Invite</DialogTitle>
+                                                            <DialogDescription>
+                                                                Enter the email address to add.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="grid gap-4 py-4">
+                                                            <Input
+                                                                value={newEmail}
+                                                                onChange={(e) => setNewEmail(e.target.value)}
+                                                                placeholder="user@example.com"
+                                                            />
+                                                        </div>
+                                                        <DialogFooter>
+                                                            <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
+                                                            <Button onClick={handleAddEmail}>Add User</Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
+                                        </div>
+
+                                        {/* Search Only (Filters are in StatsBar) */}
+                                        <div className="relative w-full">
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                             <Input
                                                 placeholder="Search by email or nickname..."
-                                                className="pl-10"
+                                                className="pl-10 bg-muted/20 border-border/40 focus:bg-background transition-colors"
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
                                             />
                                         </div>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {(['ALL', 'ACTIVE', 'WAITLIST', 'INVITED'] as const).map((status) => (
-                                                <Button
-                                                    key={status}
-                                                    variant={statusFilter === status ? 'default' : 'outline'}
-                                                    size="sm"
-                                                    onClick={() => setStatusFilter(status)}
-                                                    className="transition-all duration-200"
-                                                >
-                                                    {status}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
 
-                                    {/* Table */}
-                                    <div className="rounded-lg border border-border overflow-hidden">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                                                    <TableHead className="w-[280px] cursor-pointer" onClick={() => handleSort('email')}>
-                                                        <div className="flex items-center font-semibold">User {renderSortIcon('email')}</div>
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
-                                                        <div className="flex items-center font-semibold">Status {renderSortIcon('status')}</div>
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('tier')}>
-                                                        <div className="flex items-center font-semibold">Tier {renderSortIcon('tier')}</div>
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                                                        <div className="flex items-center font-semibold">Joined {renderSortIcon('created_at')}</div>
-                                                    </TableHead>
-                                                    <TableHead className="text-right font-semibold">Actions</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {loading ? (
-                                                    <LoadingSkeleton />
-                                                ) : paginatedData.length === 0 ? (
-                                                    <TableRow>
-                                                        <TableCell colSpan={5} className="h-32 text-center">
-                                                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                                                <Users size={40} className="opacity-20" />
-                                                                <p>No users found</p>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ) : (
-                                                    paginatedData.map((item) => (
-                                                        <TableRow key={item.id} className="admin-table-row">
-                                                            <TableCell>
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="admin-user-avatar">
-                                                                        {getInitials(item.email, item.nickname)}
-                                                                    </div>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-medium">{item.email}</span>
-                                                                        {item.nickname && (
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                @{item.nickname}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {getStatusBadge(item.status, item.role)}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Popover>
-                                                                    <PopoverTrigger asChild>
-                                                                        <button className="tier-selector flex items-center gap-2 rounded-md px-2 py-1 hover:bg-muted/50 transition-colors">
-                                                                            {getTierBadge(item.tier)}
-                                                                            <ChevronDown size={12} className="text-muted-foreground" />
-                                                                        </button>
-                                                                    </PopoverTrigger>
-                                                                    <PopoverContent className="w-40 p-2" align="start">
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <button
-                                                                                onClick={() => item.id && handleUpdateTier(item.id, 'free')}
-                                                                                disabled={!item.id}
-                                                                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'free' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                            >
-                                                                                <UserCircle size={14} className="text-zinc-400" />
-                                                                                Free
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => item.id && handleUpdateTier(item.id, 'pro')}
-                                                                                disabled={!item.id}
-                                                                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'pro' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                            >
-                                                                                <Sparkles size={14} className="text-purple-400" />
-                                                                                Pro
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => item.id && handleUpdateTier(item.id, 'whale')}
-                                                                                disabled={!item.id}
-                                                                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'whale' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                            >
-                                                                                <Crown size={14} className="text-amber-400" />
-                                                                                Whale
-                                                                            </button>
-                                                                        </div>
-                                                                    </PopoverContent>
-                                                                </Popover>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-sm">{getRelativeTime(item.created_at)}</span>
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {new Date(item.created_at).toLocaleDateString()}
-                                                                    </span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                <div className="flex justify-end gap-1">
-                                                                    {item.status === 'WAITLIST' && (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="h-8 gap-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-                                                                            onClick={() => handleApprove(item.email)}
-                                                                        >
-                                                                            <CheckCircle size={14} />
-                                                                            Approve
-                                                                        </Button>
-                                                                    )}
+                                        {/* Consolidated List/Grid View */}
+                                        <div className="w-full">
+                                            {loading ? (
+                                                <LoadingSkeleton mode={viewMode} />
+                                            ) : (
+                                                <>
+                                                    {viewMode === 'list' ? (
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
+                                                                <TableHeader>
+                                                                    <TableRow className="bg-transparent hover:bg-transparent border-none">
+                                                                        <TableHead className="w-[350px] cursor-pointer text-muted-foreground font-medium pl-6" onClick={() => handleSort('email')}>
+                                                                            <div className="flex items-center gap-1">User {renderSortIcon('email')}</div>
+                                                                        </TableHead>
+                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('status')}>
+                                                                            <div className="flex items-center gap-1">Status {renderSortIcon('status')}</div>
+                                                                        </TableHead>
+                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('credits_balance')}>
+                                                                            <div className="flex items-center gap-1">Credits {renderSortIcon('credits_balance')}</div>
+                                                                        </TableHead>
+                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('created_at')}>
+                                                                            <div className="flex items-center gap-1">Joined {renderSortIcon('created_at')}</div>
+                                                                        </TableHead>
+                                                                        <TableHead className="text-right text-muted-foreground font-medium pr-6">Actions</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody className="space-y-2">
+                                                                    {paginatedData.map((user, index) => (
+                                                                        <TableRow key={user.id || user.email || `user-${index}`} className="bg-card hover:bg-card/80 transition-colors border-none rounded-lg group text-xs sm:text-sm">
+                                                                            <TableCell className="pl-6 font-medium rounded-l-lg py-3">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground ring-1 ring-border/50 overflow-hidden shrink-0">
+                                                                                        {user.avatar_url ? (
+                                                                                            <img src={user.avatar_url} alt="User" className="w-full h-full object-cover" />
+                                                                                        ) : (
+                                                                                            getInitials(user.email, user.nickname)
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="flex flex-col">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="font-bold text-foreground truncate max-w-[150px]">{user.nickname || user.email?.split('@')[0]}</span>
+                                                                                            {getTierBadge(user.tier)}
+                                                                                        </div>
+                                                                                        <span className="text-xs text-muted-foreground font-normal truncate max-w-[200px]">{user.email}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </TableCell>
+                                                                            <TableCell className="py-3">
+                                                                                {getStatusBadge(user.status, user.role)}
+                                                                            </TableCell>
+                                                                            <TableCell className="py-3">
+                                                                                <div className="font-mono text-xs bg-muted/30 w-fit px-2 py-1 rounded">
+                                                                                    <span>{user.credits_balance?.toLocaleString() ?? 0}</span>
+                                                                                </div>
+                                                                            </TableCell>
+                                                                            <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                                                                                {formatTimestamp(user.created_at || user.invited_at)}
+                                                                            </TableCell>
+                                                                            <TableCell className="text-right pr-6 rounded-r-lg py-3">
+                                                                                <div className="flex items-center justify-end gap-1">
+                                                                                    {/* DESKTOP ACTIONS - Always Visible with Text */}
+                                                                                    <Popover>
+                                                                                        <PopoverTrigger asChild>
+                                                                                            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs hover:bg-primary/10 hover:text-primary transition-colors">
+                                                                                                <Sparkles size={12} />
+                                                                                                Tier
+                                                                                            </Button>
+                                                                                        </PopoverTrigger>
+                                                                                        <PopoverContent className="w-48 p-0" align="end">
+                                                                                            <div className="p-2">
+                                                                                                <p className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">Set Tier</p>
+                                                                                                {(['free', 'pro', 'whale'] as const).map((t) => (
+                                                                                                    <Button
+                                                                                                        key={t}
+                                                                                                        variant={user.tier === t ? 'secondary' : 'ghost'}
+                                                                                                        size="sm"
+                                                                                                        className="w-full justify-start h-8 text-xs mb-1"
+                                                                                                        onClick={() => user.id && handleUpdateTier(user.id, t)}
+                                                                                                        disabled={!user.id}
+                                                                                                    >
+                                                                                                        {t === 'whale' && <Crown size={10} className="mr-2 text-amber-400" />}
+                                                                                                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                                                                                                    </Button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </PopoverContent>
+                                                                                    </Popover>
 
-                                                                    <Popover>
-                                                                        <PopoverTrigger asChild>
-                                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                                <MoreHorizontal size={16} />
-                                                                            </Button>
-                                                                        </PopoverTrigger>
-                                                                        <PopoverContent className="w-48 p-2" align="end">
-                                                                            <div className="flex flex-col gap-1">
-                                                                                <button
-                                                                                    onClick={() => openCreditModal(item)}
-                                                                                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted w-full text-left"
-                                                                                >
-                                                                                    <Gift size={14} className="text-amber-400" />
-                                                                                    Gift Credits
-                                                                                </button>
-                                                                                {item.status === 'ACTIVE' && (
-                                                                                    <button
-                                                                                        onClick={() => handleRevoke(item)}
-                                                                                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-destructive/10 w-full text-left text-destructive"
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="h-7 gap-1.5 text-xs hover:bg-amber-400/10 hover:text-amber-400 transition-colors"
+                                                                                        onClick={() => handleGiftCredits(user)}
                                                                                     >
-                                                                                        <Ban size={14} />
-                                                                                        Revoke Access
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        </PopoverContent>
-                                                                    </Popover>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
+                                                                                        <Gift size={12} />
+                                                                                        Gift
+                                                                                    </Button>
 
-                                    {/* Mobile Card View for Users */}
-                                    <div className="md:hidden space-y-4">
-                                        {loading ? (
-                                            <div className="p-8 text-center"><LoadingSkeleton /></div>
-                                        ) : paginatedData.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground bg-muted/10 rounded-lg">
-                                                <Users size={32} className="opacity-20 mb-2" />
-                                                <p>No users found</p>
-                                            </div>
-                                        ) : (
-                                            paginatedData.map((item) => (
-                                                <div key={item.id} className="bg-muted/10 border border-border/50 rounded-xl p-4 space-y-4">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="admin-user-avatar ring-2 ring-background">
-                                                                {getInitials(item.email, item.nickname)}
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-medium">{item.email}</div>
-                                                                {item.nickname && (
-                                                                    <div className="text-xs text-muted-foreground">@{item.nickname}</div>
-                                                                )}
-                                                            </div>
+                                                                                    {user.status !== 'BANNED' ? (
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            className="h-7 gap-1.5 text-xs hover:bg-destructive/10 hover:text-destructive"
+                                                                                            onClick={() => handleRevoke(user)}
+                                                                                        >
+                                                                                            <Ban size={12} />
+                                                                                            Ban
+                                                                                        </Button>
+                                                                                    ) : (
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            className="h-7 gap-1.5 text-xs hover:bg-emerald-500/10 hover:text-emerald-500 text-emerald-500"
+                                                                                            onClick={() => handleUnban(user)}
+                                                                                        >
+                                                                                            <CheckCircle size={12} />
+                                                                                            Unban
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </table>
                                                         </div>
-                                                        {getStatusBadge(item.status, item.role)}
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                                        <div>
-                                                            <span className="text-muted-foreground block text-xs uppercase tracking-wide">Tier</span>
-                                                            <Popover>
-                                                                <PopoverTrigger asChild>
-                                                                    <button className="flex items-center gap-2 mt-1 font-medium hover:text-primary transition-colors">
-                                                                        {getTierBadge(item.tier)}
-                                                                        <ChevronDown size={12} className="text-muted-foreground" />
-                                                                    </button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-40 p-2" align="start">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <button
-                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'free')}
-                                                                            disabled={!item.id}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'free' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                        >
-                                                                            <UserCircle size={14} className="text-zinc-400" />
-                                                                            Free
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'pro')}
-                                                                            disabled={!item.id}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'pro' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                        >
-                                                                            <Sparkles size={14} className="text-purple-400" />
-                                                                            Pro
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => item.id && handleUpdateTier(item.id, 'whale')}
-                                                                            disabled={!item.id}
-                                                                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted ${item.tier === 'whale' ? 'bg-muted' : ''} ${!item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                        >
-                                                                            <Crown size={14} className="text-amber-400" />
-                                                                            Whale
-                                                                        </button>
-                                                                    </div>
-                                                                </PopoverContent>
-                                                            </Popover>
+                                                    ) : (
+                                                        /* Grid View */
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                            {paginatedData.map((user, index) => (
+                                                                <UserAdminCard
+                                                                    key={user.id || user.email || `user-grid-${index}`}
+                                                                    user={user}
+                                                                    onClick={openUserDetail}
+                                                                />
+                                                            ))}
                                                         </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground block text-xs uppercase tracking-wide">Joined</span>
-                                                            <span className="mt-1 block">{new Date(item.created_at).toLocaleDateString()}</span>
-                                                        </div>
-                                                    </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
 
-                                                    <div className="flex gap-2 pt-2 border-t border-border/30">
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <Button variant="outline" className="flex-1">
-                                                                    Actions <ChevronDown size={14} className="ml-2" />
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-56 p-2" align="start">
-                                                                <div className="flex flex-col gap-1">
-                                                                    <button
-                                                                        onClick={() => openCreditModal(item)}
-                                                                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted w-full text-left"
-                                                                    >
-                                                                        <Gift size={14} className="text-amber-400" />
-                                                                        Gift Credits
-                                                                    </button>
-                                                                    {item.status === 'ACTIVE' && (
-                                                                        <button
-                                                                            onClick={() => handleRevoke(item)}
-                                                                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors hover:bg-destructive/10 w-full text-left text-destructive"
-                                                                        >
-                                                                            <Ban size={14} />
-                                                                            Revoke Access
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </PopoverContent>
-                                                        </Popover>
-
-                                                        {item.status === 'WAITLIST' && (
-                                                            <Button
-                                                                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-                                                                onClick={() => handleApprove(item.email)}
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                        )}
-                                                    </div>
+                                        {/* Pagination */}
+                                        {totalPages > 1 && (
+                                            <div className="flex items-center justify-between mt-4">
+                                                <p className="text-sm text-muted-foreground">
+                                                    Page {currentPage} of {totalPages}
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={currentPage === 1}
+                                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                    >
+                                                        Previous
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={currentPage === totalPages}
+                                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                    >
+                                                        Next
+                                                    </Button>
                                                 </div>
-                                            ))
+                                            </div>
                                         )}
                                     </div>
-
-
-                                    {/* Pagination */}
-                                    {totalPages > 1 && (
-                                        <div className="flex items-center justify-between mt-4">
-                                            <p className="text-sm text-muted-foreground">
-                                                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} users
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={currentPage === 1}
-                                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                                >
-                                                    Previous
-                                                </Button>
-                                                <div className="flex items-center gap-1">
-                                                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                                                        let pageNum: number;
-                                                        if (totalPages <= 5) {
-                                                            pageNum = i + 1;
-                                                        } else if (currentPage <= 3) {
-                                                            pageNum = i + 1;
-                                                        } else if (currentPage >= totalPages - 2) {
-                                                            pageNum = totalPages - 4 + i;
-                                                        } else {
-                                                            pageNum = currentPage - 2 + i;
-                                                        }
-                                                        return (
-                                                            <Button
-                                                                key={pageNum}
-                                                                variant={currentPage === pageNum ? 'default' : 'outline'}
-                                                                size="sm"
-                                                                className="w-8 h-8 p-0"
-                                                                onClick={() => setCurrentPage(pageNum)}
-                                                            >
-                                                                {pageNum}
-                                                            </Button>
-                                                        );
-                                                    })}
-                                                </div>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={currentPage === totalPages}
-                                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                                >
-                                                    Next
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-
-            </main >
-
-            <Dialog open={isCreditModalOpen} onOpenChange={setIsCreditModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Gift className="text-amber-400" size={20} />
-                            Gift Credits
-                        </DialogTitle>
-                        <DialogDescription>
-                            Send credits to {selectedUserForCredits?.email}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <label className="text-sm font-medium">Amount</label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={creditAmount}
-                                onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <label className="text-sm font-medium">Reason</label>
-                            <Input
-                                value={creditReason}
-                                onChange={(e) => setCreditReason(e.target.value)}
-                            />
-                        </div>
+                                </div>
+                            )}
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCreditModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleGiftCredits} className="gap-2">
-                            <Coins size={16} />
-                            Send Gift
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div >
+                </div>
+            </main>
+
+            <UserDetailDialog
+                user={selectedUser}
+                open={isUserDetailOpen}
+                onOpenChange={setIsUserDetailOpen}
+                onUpdateTier={handleUpdateTier}
+                onUpdateRole={handleUpdateRole}
+                onRevoke={handleRevoke}
+                onUnban={handleUnban}
+                onApprove={handleApprove}
+                onGiftCredits={handleGiftCredits}
+            />
+        </div>
     );
 }

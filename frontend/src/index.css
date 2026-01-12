@@ -285,21 +285,21 @@
   pointer-events: none;
 }
 
-/* RGB Bottom Border (Header) */
+/* RGB Bottom Border (Header) - Keep sticky by removing relative position */
 [data-theme='rgb'] .rgb-border-b {
-  position: relative;
   border-bottom-color: transparent !important;
 }
 
 [data-theme='rgb'] .rgb-border-b::after {
   content: "";
   position: absolute;
+  top: auto;
   bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
   z-index: 50;
-  background: linear-gradient(90deg, 
+  background: linear-gradient(90deg,
       #ff0000,
       #ff8800,
       #ffff00,
@@ -436,21 +436,54 @@
 /* --- SUPER LOADING ANIMATIONS (Global) --- */
 
 @keyframes candleLoop {
-  0% { opacity: 0; transform: scaleY(0.5); }
-  10% { opacity: 1; transform: scaleY(1); }
-  70% { opacity: 1; transform: scaleY(1); }
-  80% { opacity: 0; transform: scaleY(0.5); }
-  100% { opacity: 0; transform: scaleY(0.5); }
+  0% {
+    opacity: 0;
+    transform: scaleY(0.5);
+  }
+
+  10% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  80% {
+    opacity: 0;
+    transform: scaleY(0.5);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleY(0.5);
+  }
 }
 
 @keyframes progressMove {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(400%);
+  }
 }
 
 @keyframes pulseOpacity {
-  0%, 100% { opacity: 1; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
-  50% { opacity: 0.6; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
+
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+
+  50% {
+    opacity: 0.6;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+  }
 }
 
 .animate-progress-bar {

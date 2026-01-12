@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, User as UserIcon, Shield, Menu, X, Brain, Search } from 'lucide-react';
+import { Bell, User as UserIcon, Shield, Menu, X, Brain, Search, Crown, Sparkles } from 'lucide-react';
 import { api } from '../../lib/api';
 import { queryClient } from '../../lib/queryClient';
 import { Badge } from '../ui/badge';
@@ -203,7 +203,7 @@ export function Header() {
   return (
     <>
       <header className="rgb-border-b h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container max-w-[80rem] mx-auto h-full flex items-center justify-between px-4">
+        <div className="container max-w-[90rem] mx-auto h-full flex items-center justify-between px-4">
           {/* Left Section: Mobile Toggle & Logo */}
           <div className="flex-1 flex items-center justify-start gap-4">
             <button
@@ -358,15 +358,16 @@ export function Header() {
                 <div className="p-4 border-b border-border">
                   <div className="font-semibold text-foreground flex items-center gap-2">
                     {user?.nickname || 'Trader'}
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] h-5 px-1.5 ${user?.tier === 'pro' || user?.tier === 'admin'
-                        ? 'border-purple-500 text-purple-500 uppercase'
-                        : 'border-emerald-500 text-emerald-500 uppercase'
-                        }`}
-                    >
-                      {(user?.tier || 'free').toUpperCase()}
-                    </Badge>
+                    {user?.tier === 'whale' && (
+                      <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5">
+                        <Crown size={10} /> WHALE
+                      </Badge>
+                    )}
+                    {user?.tier === 'pro' && (
+                      <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5">
+                        <Sparkles size={10} /> PRO
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
