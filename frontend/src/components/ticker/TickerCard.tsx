@@ -32,7 +32,7 @@ export interface TickerCardProps {
 }
 
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
-import { useMarketStatus } from '../../hooks/useMarketStatus';
+import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../../hooks/useMarketStatus';
 
 export function TickerCard({
     symbol,
@@ -60,8 +60,13 @@ export function TickerCard({
     children
 }: TickerCardProps) {
     const navigate = useNavigate();
-    const { data: marketStatus } = useMarketStatus();
-    
+    // Use per-ticker market status based on symbol's exchange
+    const { data: marketStatus } = useTickerMarketStatus(symbol);
+
+    // Market session display
+    const sessionLabel = marketStatus?.session ? getSessionLabel(marketStatus.session) : 'Closed';
+    const sessionColor = marketStatus?.session ? getSessionColor(marketStatus.session) : 'text-muted-foreground';
+
     // --- Risk Logic ---
     let riskColorClass = "text-muted-foreground";
     let RiskIcon = ShieldCheck;
@@ -80,7 +85,7 @@ export function TickerCard({
         <div
             onClick={() => navigate(`/ticker/${symbol}`)}
             className={cn(
-                "group flex flex-col p-4 rounded-lg border border-border bg-transparent hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full",
+                "group flex flex-col p-4 rounded-lg border border-border sm:border-border/50 bg-transparent hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full min-w-[320px] sm:min-w-0",
                 className
             )}
         >
@@ -92,7 +97,7 @@ export function TickerCard({
                         <div className="flex items-center justify-between gap-2">
                             <div className="font-bold text-xl leading-none">{symbol}</div>
                             {/* AI Badge (Aligned Right) */}
-                            <VerdictBadge 
+                            <VerdictBadge
                                 risk={risk}
                                 upside={upside}
                                 downside={downside}
@@ -130,8 +135,8 @@ export function TickerCard({
                                 {Math.abs(change).toFixed(2)}%
                             </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest opacity-50 font-bold mt-1">
-                            {marketStatus?.isOpen ? 'TODAY' : 'MARKET CLOSED'}
+                        <span className={cn("text-[10px] uppercase tracking-widest opacity-70 font-bold mt-1", sessionColor)}>
+                            {sessionLabel}
                         </span>
                     </div>
 
@@ -142,10 +147,10 @@ export function TickerCard({
                         <div className="flex items-center h-full pl-3 border-l border-border/50 bg-muted/5 rounded-r-sm">
                             <div className="w-[100px] h-10 flex items-center justify-center relative">
                                 {sparkline && sparkline.length > 0 ? (
-                                    <Sparkline 
-                                        data={sparkline} 
-                                        width={100} 
-                                        height={40} 
+                                    <Sparkline
+                                        data={sparkline}
+                                        width={100}
+                                        height={40}
                                         className="opacity-80 group-hover:opacity-100 transition-opacity"
                                     />
                                 ) : (
@@ -159,11 +164,11 @@ export function TickerCard({
                 {/* 52-Week Range Bar */}
                 {fiftyTwoWeekLow && fiftyTwoWeekHigh && (
                     <div className="pt-2 pb-1">
-                        <FiftyTwoWeekRange 
-                            low={fiftyTwoWeekLow} 
-                            high={fiftyTwoWeekHigh} 
-                            current={price} 
-                            showLabels={true} 
+                        <FiftyTwoWeekRange
+                            low={fiftyTwoWeekLow}
+                            high={fiftyTwoWeekHigh}
+                            current={price}
+                            showLabels={true}
                             className="w-full"
                         />
                     </div>

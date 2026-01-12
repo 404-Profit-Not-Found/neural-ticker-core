@@ -92,6 +92,40 @@ export class YahooFinanceService implements OnModuleInit {
   }
 
   /**
+   * Gets market status for a symbol from its quote data.
+   * Useful for EU stocks where Finnhub doesn't provide market status.
+   */
+  async getMarketStatus(
+    symbol: string,
+  ): Promise<{
+    isOpen: boolean;
+    session: string;
+    timezone: string;
+    exchange: string;
+  }> {
+    try {
+      const quote = await this.getQuote(symbol);
+      const marketState = (quote?.marketState || 'CLOSED').toLowerCase();
+      const isOpen = marketState === 'regular';
+      return {
+        isOpen,
+        session: marketState,
+        timezone: quote?.exchangeTimezoneName || 'Unknown',
+        exchange: quote?.fullExchangeName || quote?.exchange || 'Unknown',
+      };
+    } catch (error) {
+      this.handleError(error, `Market status fetch failed for ${symbol}`);
+      // Return a safe fallback
+      return {
+        isOpen: false,
+        session: 'closed',
+        timezone: 'Unknown',
+        exchange: 'Unknown',
+      };
+    }
+  }
+
+  /**
    * Searches for symbols or news related to a query.
    */
   async search(query: string): Promise<any> {

@@ -24,7 +24,7 @@ import {
 import { TickerCarousel } from '../components/dashboard/TickerCarousel';
 import { NewsFeed } from '../components/dashboard/NewsFeed';
 import type { TickerData } from '../components/dashboard/WatchlistTableView';
-import { MarketStatus } from '../components/dashboard/MarketStatus';
+import { MarketStatusBar } from '../components/dashboard/MarketStatusBar';
 import { calculateAiRating, calculateUpside } from '../lib/rating-utils';
 
 function StatPill({
@@ -172,26 +172,15 @@ export function Dashboard() {
       <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-8 animate-in fade-in duration-500">
-        <section className="style-hero rgb-border relative overflow-hidden rounded-lg border border-border bg-card p-8">
-          <div className="style-hero-grid absolute inset-0 pointer-events-none" aria-hidden />
-          <div className="absolute inset-x-8 bottom-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-70" />
-
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between z-30">
-              <div className="flex items-center gap-3">
-                <Brain className="w-10 h-10 text-primary" />
-                <div>
-                  <h1 className="text-3xl font-semibold tracking-tight">AI assisted stock analyzer</h1>
-                  <p className="text-sm text-muted-foreground mt-1">Stocks, risks, news, chat ...</p>
-                </div>
-              </div>
-
-            
-            <div className="flex flex-col items-end gap-2">
-                 <MarketStatus />
-            </div>
+        {/* Market Status and Stats */}
+        <section className="space-y-4">
+          {/* Market Status Buttons */}
+          <div className="flex justify-center sm:justify-end">
+            <MarketStatusBar />
           </div>
 
-          <div className="relative mt-6 grid grid-cols-2 gap-2 sm:gap-4 sm:mt-8 lg:grid-cols-4">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
             <div className="cursor-pointer transition-transform hover:scale-[1.02]" onClick={() => navigate('/analyzer')}>
               <StatPill icon={Activity} label="Tickers Tracked" value={stats?.tickers ? String(stats.tickers) : '...'} tone="primary" />
             </div>
@@ -225,10 +214,10 @@ type Category = 'yolo' | 'conservative' | 'shorts';
 function TopOpportunitiesSection() {
   const [category, setCategory] = useState<Category>(() => {
     if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved === 'yolo' || saved === 'conservative' || saved === 'shorts') {
-            return saved;
-        }
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === 'yolo' || saved === 'conservative' || saved === 'shorts') {
+        return saved;
+      }
     }
     return 'yolo';
   });

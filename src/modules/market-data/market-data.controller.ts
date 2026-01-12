@@ -8,6 +8,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
+import { MarketStatusService } from './market-status.service';
 
 import { Public } from '../auth/public.decorator';
 
@@ -16,7 +17,10 @@ import { Public } from '../auth/public.decorator';
 @Controller('v1/tickers/:symbol')
 @Public()
 export class MarketDataController {
-  constructor(private readonly service: MarketDataService) {}
+  constructor(
+    private readonly service: MarketDataService,
+    private readonly marketStatusService: MarketStatusService,
+  ) {}
 
   @ApiOperation({
     summary: 'Get latest snapshot (price + fundamentals)',
@@ -114,39 +118,28 @@ export class MarketDataController {
       return [];
     });
   }
-  @ApiOperation({ summary: 'Get Market Status' })
-  @ApiResponse({ status: 200, description: 'Market Status Object' })
+
+  @ApiOperation({
+    summary: 'Get Market Status for a Symbol',
+    description:
+      'Returns market status (open/closed/pre/post) for a specific ticker. Uses Yahoo Finance for EU stocks and Finnhub for US stocks.',
+  })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiResponse({
+    status: 200,
+    description: 'Market status including session state and timezone.',
+    schema: {
+      example: {
+        isOpen: false,
+        session: 'pre',
+        timezone: 'America/New_York',
+        exchange: 'NASDAQ',
+        region: 'US',
+      },
+    },
+  })
   @Get('status')
-  async getMarketStatus(@Query('exchange') exchange: string = 'US') {
-    const status = await this.service.getMarketStatus(exchange);
-    // If Finnhub returns null (access restricted), return a time-based fallback
-    if (!status) {
-      return this.getMarketStatusFallback(exchange);
-    }
-    return status;
-  }
-
-  private getMarketStatusFallback(exchange: string) {
-    // Simple heuristic for US market: Mon-Fri, 9:30 AM - 4:00 PM ET
-    const now = new Date();
-    const nyOptions = { timeZone: 'America/New_York' };
-    const nyTimeStr = now.toLocaleString('en-US', nyOptions);
-    const nyTime = new Date(nyTimeStr);
-    const day = nyTime.getDay();
-    const hours = nyTime.getHours();
-    const minutes = nyTime.getMinutes();
-    const timeInMinutes = hours * 60 + minutes;
-
-    const isWeekday = day >= 1 && day <= 5;
-    const isMarketHours = timeInMinutes >= 570 && timeInMinutes < 960; // 9:30 AM - 4:00 PM
-    const isOpen = isWeekday && isMarketHours;
-
-    return {
-      exchange,
-      isOpen,
-      session: isOpen ? 'market' : 'closed',
-      timezone: 'America/New_York',
-      fallback: true, // Indicate this is a calculated fallback
-    };
+  async getMarketStatus(@Param('symbol') symbol: string) {
+    return this.marketStatusService.getMarketStatus(symbol);
   }
 }

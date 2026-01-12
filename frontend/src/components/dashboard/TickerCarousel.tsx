@@ -53,10 +53,6 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                     />
                 ))}
             </div>
-            
-            {/* Fade Edges */}
-            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none md:hidden" />
-            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none md:hidden" />
         </div>
     );
 }
