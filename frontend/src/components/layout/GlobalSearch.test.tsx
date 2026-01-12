@@ -70,9 +70,36 @@ describe('GlobalSearch', () => {
         // Wait for debounce (300ms)
         await waitFor(() => {
             expect(api.get).toHaveBeenCalledWith('/tickers', {
-                params: { search: 'NVDA', external: 'true' },
+                params: { search: 'NVDA', external: 'false' },
             });
         }, { timeout: 1000 });
+    });
+
+    it('triggers external search on Enter when local results are empty', async () => {
+        (api.get as Mock).mockResolvedValueOnce({ data: [] }); // Local search returns empty
+        renderWithContext(<GlobalSearch />);
+        const input = screen.getByPlaceholderText(/search tickers/i);
+
+        // Type query
+        fireEvent.change(input, { target: { value: 'UNKNOWN' } });
+
+        // Wait for debounce local search
+        await waitFor(() => {
+            expect(api.get).toHaveBeenCalledWith('/tickers', {
+                params: { search: 'UNKNOWN', external: 'false' },
+            });
+        });
+
+        // Press Enter
+        fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+        // Verify external search is triggered
+        await waitFor(() => {
+            expect(api.get).toHaveBeenCalledWith('/tickers', {
+                params: { search: 'UNKNOWN', external: 'true' },
+            });
+        });
+
     });
 
     it('displays results and navigates on click', async () => {

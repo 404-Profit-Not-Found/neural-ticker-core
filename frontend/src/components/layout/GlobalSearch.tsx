@@ -78,9 +78,9 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
 
             setIsLoading(true);
             try {
-                // Search both local and external (if pro/admin on backend)
+                // Search local only first
                 const { data } = await api.get<TickerResult[]>('/tickers', {
-                    params: { search: query, external: 'true' },
+                    params: { search: query, external: 'false' },
                 });
                 if (active) {
                     setResults(data);
@@ -254,6 +254,19 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {isOpen && results.length === 0 && query.trim().length > 0 && !isLoading && (
+                <div className="absolute top-full mt-2 w-full bg-popover !bg-opacity-100 border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 !opacity-100">
+                    <div
+                        className="px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 cursor-pointer flex items-center gap-2"
+                        onClick={performExternalSearch}
+                    >
+                        <Search className="w-4 h-4" />
+                        <span>Search "<strong>{query}</strong>" externally...</span>
+                        <kbd className="ml-auto text-[10px] border px-1 rounded bg-muted/50">↵ Enter</kbd>
                     </div>
                 </div>
             )}
