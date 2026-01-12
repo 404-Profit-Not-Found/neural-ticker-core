@@ -4,6 +4,7 @@ import { Sparkline } from '../ui/Sparkline';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { VerdictBadge } from './VerdictBadge';
+import type { MarketStatusData } from '../../hooks/useMarketStatus';
 
 export interface TickerCardProps {
     symbol: string;
@@ -29,6 +30,7 @@ export interface TickerCardProps {
     fiftyTwoWeekHigh?: number;
     className?: string;
     children?: React.ReactNode;
+    marketStatus?: MarketStatusData | null; // Allow passing status directly to avoid hook call
 }
 
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
@@ -57,15 +59,21 @@ export function TickerCard({
     fiftyTwoWeekLow,
     fiftyTwoWeekHigh,
     className,
-    children
+    children,
+    marketStatus
 }: TickerCardProps) {
     const navigate = useNavigate();
     // Use per-ticker market status based on symbol's exchange
-    const { data: marketStatus } = useTickerMarketStatus(symbol);
+    // If status is passed via props, use it. Otherwise fetch it.
+    // Note: useTickerMarketStatus needs to be updated to accept an "enabled" option
+    const shouldFetch = !marketStatus;
+    const { data: fetchedStatus } = useTickerMarketStatus(symbol, shouldFetch);
+
+    const status = marketStatus || fetchedStatus;
 
     // Market session display
-    const sessionLabel = marketStatus?.session ? getSessionLabel(marketStatus.session) : 'Closed';
-    const sessionColor = marketStatus?.session ? getSessionColor(marketStatus.session) : 'text-muted-foreground';
+    const sessionLabel = status?.session ? getSessionLabel(status.session) : 'Closed';
+    const sessionColor = status?.session ? getSessionColor(status.session) : 'text-muted-foreground';
 
     // --- Risk Logic ---
     let riskColorClass = "text-muted-foreground";

@@ -20,7 +20,7 @@ export interface AllMarketsStatusData {
  * Fetches market status for a specific ticker symbol.
  * Routes to Yahoo Finance for EU stocks and Finnhub for US stocks.
  */
-export function useTickerMarketStatus(symbol: string) {
+export function useTickerMarketStatus(symbol: string, enabled: boolean = true) {
     return useQuery({
         queryKey: ['market-status', 'ticker', symbol],
         queryFn: async (): Promise<MarketStatusData> => {
@@ -33,7 +33,7 @@ export function useTickerMarketStatus(symbol: string) {
         },
         refetchInterval: 60000,
         staleTime: 30000,
-        enabled: !!symbol,
+        enabled: !!symbol && enabled,
     });
 }
 
@@ -152,9 +152,11 @@ export function getSessionLabel(session: MarketStatusData['session']): string {
         case 'regular':
             return 'Market Open';
         case 'pre':
-            return 'Premarket';
+            // return 'Premarket'; // Disabled per user request
+            return 'Closed'; 
         case 'post':
-            return 'Postmarket';
+            // return 'Postmarket'; // Disabled per user request
+             return 'Closed';
         case 'closed':
         default:
             return 'Closed';
@@ -170,9 +172,24 @@ export function getSessionColor(session: MarketStatusData['session']): string {
             return 'text-emerald-500';
         case 'pre':
         case 'post':
-            return 'text-amber-500';
+            // return 'text-amber-500'; // Disabled per user request
+            return 'text-muted-foreground';
         case 'closed':
         default:
             return 'text-muted-foreground';
     }
+}
+
+// Helpers logic to determine region
+export function getRegionForStatus(symbol: string): 'US' | 'EU' {
+    const s = symbol.toUpperCase();
+    // Known EU Extensions
+    const euExts = ['.DE', '.L', '.PA', '.AS', '.MC', '.MI', '.SW', '.VI', '.BR', '.HE', '.CO', '.ST', '.OL'];
+    
+    // Check for extension
+    for (const ext of euExts) {
+        if (s.endsWith(ext)) return 'EU';
+    }
+    
+    return 'US';
 }

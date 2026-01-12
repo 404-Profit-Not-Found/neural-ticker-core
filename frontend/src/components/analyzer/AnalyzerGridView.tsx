@@ -2,12 +2,16 @@ import { TickerCard } from '../ticker/TickerCard';
 import type { StockSnapshot } from '../../hooks/useStockAnalyzer';
 import { calculateLiveUpside } from '../../lib/rating-utils';
 
+import { useAllMarketsStatus, getRegionForStatus } from '../../hooks/useMarketStatus';
+
 interface AnalyzerGridViewProps {
     data: StockSnapshot[];
     isLoading: boolean;
 }
 
 export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
+    const { data: marketStatusRaw } = useAllMarketsStatus();
+
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -38,7 +42,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                 const bearPrice = aiAnalysis?.bear_price;
 
                 let upside = 0;
-                
+
                 // Unified Upside Calculation
                 upside = calculateLiveUpside(price, basePrice, aiAnalysis?.upside_percent);
 
@@ -50,6 +54,9 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                 } else {
                     downside = -(risk * 2.5);
                 }
+
+                const region = getRegionForStatus(ticker.symbol);
+                const status = marketStatusRaw ? (region === 'EU' ? marketStatusRaw.eu : marketStatusRaw.us) : undefined;
 
                 return (
                     <TickerCard
@@ -75,6 +82,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                         sparkline={item.sparkline}
                         fiftyTwoWeekLow={fundamentals?.fifty_two_week_low ? Number(fundamentals.fifty_two_week_low) : undefined}
                         fiftyTwoWeekHigh={fundamentals?.fifty_two_week_high ? Number(fundamentals.fifty_two_week_high) : undefined}
+                        marketStatus={status}
                     />
                 );
             })}

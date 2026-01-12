@@ -66,6 +66,18 @@ function TickerMarketStatusBadge({ symbol }: { symbol?: string }) {
     );
 }
 
+// Market Status Icon (Dot) for mobile
+function TickerMarketStatusIcon({ symbol }: { symbol?: string }) {
+    const { data: status } = useTickerMarketStatus(symbol || '');
+    if (!status) return null;
+
+    const colorClass = status.session === 'regular' ? 'bg-emerald-500' : 'bg-muted-foreground';
+
+    return (
+        <div className={`w-2 h-2 rounded-full ${colorClass} self-center`} />
+    );
+}
+
 const RESEARCH_PENDING_GRACE_MS = 45000;
 export function TickerDetail() {
     const { symbol } = useParams();
@@ -557,17 +569,17 @@ export function TickerDetail() {
                                         <div className="text-xs text-muted-foreground font-medium truncate mt-0.5 mb-2">
                                             {profile?.name}
                                         </div>
+                                        <div className="flex items-baseline gap-1.5 mt-1">
+                                            {/* Market Status Dot */}
+                                            <TickerMarketStatusIcon symbol={symbol} />
 
-                                        <div className="flex items-baseline gap-2 mt-1">
-                                            <span className="text-lg font-mono font-bold tracking-tight">
+                                            <span className="text-3xl font-mono font-bold tracking-tight">
                                                 ${market_data?.price?.toFixed(2)}
                                             </span>
-                                            <span className={`flex items-center text-xs font-bold ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
-                                                {isPriceUp ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
+                                            <span className={`flex items-center text-sm font-bold ml-1 ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
+                                                {isPriceUp ? <TrendingUp size={14} className="mr-0.5" /> : <TrendingDown size={14} className="mr-0.5" />}
                                                 {Math.abs(market_data?.change_percent || 0).toFixed(2)}%
                                             </span>
-                                            {/* Market Status */}
-                                            <TickerMarketStatusBadge symbol={symbol} />
                                         </div>
                                     </div>
                                 </div>
