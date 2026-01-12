@@ -57,11 +57,11 @@ describe('GlobalSearch', () => {
         expect(input.value).toBe('AAPL');
     });
 
-    it('calls api with debounced query', async () => {
+    it('calls api with debounced query (works for 1+ char)', async () => {
         (api.get as Mock).mockResolvedValue({ data: [] });
         renderWithContext(<GlobalSearch />);
         const input = screen.getByPlaceholderText(/search tickers/i);
-        fireEvent.change(input, { target: { value: 'NA' } });
+        fireEvent.change(input, { target: { value: 'N' } });
         fireEvent.change(input, { target: { value: 'NVDA' } });
 
         // Should not be called immediately
@@ -70,7 +70,7 @@ describe('GlobalSearch', () => {
         // Wait for debounce (300ms)
         await waitFor(() => {
             expect(api.get).toHaveBeenCalledWith('/tickers', {
-                params: { search: 'NVDA', external: 'false' },
+                params: { search: 'NVDA', external: 'true' },
             });
         }, { timeout: 1000 });
     });
