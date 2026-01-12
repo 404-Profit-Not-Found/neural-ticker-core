@@ -95,9 +95,7 @@ export class YahooFinanceService implements OnModuleInit {
    * Gets market status for a symbol from its quote data.
    * Useful for EU stocks where Finnhub doesn't provide market status.
    */
-  async getMarketStatus(
-    symbol: string,
-  ): Promise<{
+  async getMarketStatus(symbol: string): Promise<{
     isOpen: boolean;
     session: string;
     timezone: string;

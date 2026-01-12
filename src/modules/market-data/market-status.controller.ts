@@ -1,5 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { MarketStatusService } from './market-status.service';
 import { Public } from '../auth/public.decorator';
 
@@ -40,7 +45,7 @@ export class MarketStatusController {
     },
   })
   @Get('status/all')
-  async getAllMarketsStatus() {
+  getAllMarketsStatus() {
     return this.marketStatusService.getAllMarketsStatus();
   }
 }

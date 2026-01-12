@@ -35,8 +35,6 @@ describe('JobsService', () => {
     reprocessFinancials: jest.fn(),
   };
 
-
-
   const mockRequestQueueRepo = {
     find: jest.fn().mockResolvedValue([]),
     save: jest.fn(),
@@ -143,6 +141,4 @@ describe('JobsService', () => {
       sleepSpy.mockRestore();
     });
   });
-
-
 });

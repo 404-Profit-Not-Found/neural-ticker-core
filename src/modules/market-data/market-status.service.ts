@@ -17,8 +17,32 @@ export class MarketStatusService {
 
   // Known EU exchange suffixes and codes
   private readonly EU_EXCHANGES = [
-    'LSE', 'XETRA', 'PA', 'AS', 'MC', 'MI', 'SW', 'VI', 'BR', 'HE', 'CO', 'ST', 'OL',
-    '.DE', '.L', '.PA', '.AS', '.MC', '.MI', '.SW', '.VI', '.BR', '.HE', '.CO', '.ST', '.OL',
+    'LSE',
+    'XETRA',
+    'PA',
+    'AS',
+    'MC',
+    'MI',
+    'SW',
+    'VI',
+    'BR',
+    'HE',
+    'CO',
+    'ST',
+    'OL',
+    '.DE',
+    '.L',
+    '.PA',
+    '.AS',
+    '.MC',
+    '.MI',
+    '.SW',
+    '.VI',
+    '.BR',
+    '.HE',
+    '.CO',
+    '.ST',
+    '.OL',
   ];
 
   constructor(
@@ -40,7 +64,11 @@ export class MarketStatusService {
     }
 
     // Default to US for common US exchanges or no suffix
-    if (!symbol.includes('.') || upperExchange.includes('NASDAQ') || upperExchange.includes('NYSE')) {
+    if (
+      !symbol.includes('.') ||
+      upperExchange.includes('NASDAQ') ||
+      upperExchange.includes('NYSE')
+    ) {
       return 'US';
     }
 
@@ -51,8 +79,15 @@ export class MarketStatusService {
    * Gets market status for a specific symbol.
    * Routes to Yahoo Finance for EU stocks, Finnhub for US.
    */
-  async getMarketStatus(symbol?: string, exchange?: string): Promise<MarketStatusResult> {
-    const region = symbol ? this.getRegion(symbol, exchange) : (exchange === 'US' ? 'US' : 'EU');
+  async getMarketStatus(
+    symbol?: string,
+    exchange?: string,
+  ): Promise<MarketStatusResult> {
+    const region = symbol
+      ? this.getRegion(symbol, exchange)
+      : exchange === 'US'
+        ? 'US'
+        : 'EU';
 
     if (region === 'EU' || region === 'OTHER') {
       // Use Yahoo Finance for EU stocks
@@ -70,15 +105,16 @@ export class MarketStatusService {
   /**
    * Gets market status for all major markets (for the MarketStatusBar).
    */
-  async getAllMarketsStatus(): Promise<{ us: MarketStatusResult; eu: MarketStatusResult }> {
-    const [us, eu] = await Promise.all([
-      this.getUSFallback(), // Use time-based for global status
-      this.getEUFallback(),
-    ]);
+  getAllMarketsStatus(): { us: MarketStatusResult; eu: MarketStatusResult } {
+    const us = this.getUSFallback();
+    const eu = this.getEUFallback();
     return { us, eu };
   }
 
-  private async getStatusFromYahoo(symbol: string, region: 'US' | 'EU' | 'OTHER'): Promise<MarketStatusResult> {
+  private async getStatusFromYahoo(
+    symbol: string,
+    region: 'US' | 'EU' | 'OTHER',
+  ): Promise<MarketStatusResult> {
     try {
       const status = await this.yahooFinanceService.getMarketStatus(symbol);
       return {
@@ -88,13 +124,18 @@ export class MarketStatusService {
         exchange: status.exchange,
         region,
       };
-    } catch (error) {
-      this.logger.warn(`Yahoo Finance status failed for ${symbol}, using fallback`);
+    } catch {
+      this.logger.warn(
+        `Yahoo Finance status failed for ${symbol}, using fallback`,
+      );
       return region === 'EU' ? this.getEUFallback() : this.getUSFallback();
     }
   }
 
-  private async getStatusFromFinnhub(symbol?: string, exchange: string = 'US'): Promise<MarketStatusResult> {
+  private async getStatusFromFinnhub(
+    symbol?: string,
+    exchange: string = 'US',
+  ): Promise<MarketStatusResult> {
     try {
       const status = await this.finnhubService.getMarketStatus(exchange);
       if (status) {
@@ -106,13 +147,15 @@ export class MarketStatusService {
           region: 'US',
         };
       }
-    } catch (error) {
+    } catch {
       this.logger.warn(`Finnhub status failed, using fallback`);
     }
     return this.getUSFallback();
   }
 
-  private normalizeSession(session: string): 'pre' | 'regular' | 'post' | 'closed' {
+  private normalizeSession(
+    session: string,
+  ): 'pre' | 'regular' | 'post' | 'closed' {
     const s = session.toLowerCase();
     if (s === 'regular') return 'regular';
     if (s === 'pre' || s === 'prepre') return 'pre';
@@ -148,9 +191,15 @@ export class MarketStatusService {
       if (timeInMinutes >= marketOpen && timeInMinutes < marketClose) {
         session = 'regular';
         isOpen = true;
-      } else if (timeInMinutes >= preMarketStart && timeInMinutes < marketOpen) {
+      } else if (
+        timeInMinutes >= preMarketStart &&
+        timeInMinutes < marketOpen
+      ) {
         session = 'pre';
-      } else if (timeInMinutes >= marketClose && timeInMinutes < postMarketEnd) {
+      } else if (
+        timeInMinutes >= marketClose &&
+        timeInMinutes < postMarketEnd
+      ) {
         session = 'post';
       }
     }
@@ -171,7 +220,9 @@ export class MarketStatusService {
    */
   private getEUFallback(): MarketStatusResult {
     const now = new Date();
-    const cetTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const cetTime = new Date(
+      now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }),
+    );
     const day = cetTime.getDay();
     const hours = cetTime.getHours();
     const minutes = cetTime.getMinutes();
@@ -181,7 +232,8 @@ export class MarketStatusService {
     const marketOpen = 8 * 60; // 8:00 AM CET
     const marketClose = 16 * 60 + 30; // 4:30 PM CET
 
-    const isOpen = isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+    const isOpen =
+      isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
 
     return {
       isOpen,
