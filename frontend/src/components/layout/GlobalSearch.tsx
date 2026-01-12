@@ -68,7 +68,7 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
     useEffect(() => {
         let active = true;
         const timer = setTimeout(async () => {
-            if (query.trim().length === 0) {
+            if (query.trim().length < 1) {
                 if (active) {
                     setResults([]);
                     setIsOpen(false);
@@ -78,20 +78,21 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
 
             setIsLoading(true);
             try {
+                // Search both local and external (if pro/admin on backend)
                 const { data } = await api.get<TickerResult[]>('/tickers', {
-                    params: { search: query, external: 'false' }, // Typing only searches local DB
+                    params: { search: query, external: 'true' },
                 });
                 if (active) {
                     setResults(data);
                     setIsOpen(true);
-                    setHighlightedIndex(-1); // Reset highlight on new results
+                    setHighlightedIndex(-1);
                 }
             } catch (error) {
                 if (active) console.error('Search failed', error);
             } finally {
                 if (active) setIsLoading(false);
             }
-        }, 300); // 300ms debounce
+        }, 300);
 
         return () => {
             active = false;
@@ -112,12 +113,11 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
             e.preventDefault();
             if (highlightedIndex >= 0 && results[highlightedIndex]) {
                 selectTicker(results[highlightedIndex]);
-            } else if (results.length > 0 && results[0].is_locally_tracked) {
-                // If top result is local, auto-select it? Or wait for explicit highlight?
-                // Standard behavior: select top result.
+            } else if (results.length > 0) {
+                // Select top result
                 selectTicker(results[0]);
-            } else {
-                // If no local result selected/found, trigger external search
+            } else if (query.trim().length >= 1) {
+                // Still allow explicit trigger if results are empty
                 performExternalSearch();
             }
         } else if (e.key === 'Escape') {
@@ -139,16 +139,11 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
         e.stopPropagation();
         try {
             await requestTickerMutation.mutateAsync(symbol);
-            // Optimistically update UI to show as queued/requested
             setResults(prev => prev.map(t => t.symbol === symbol ? { ...t, is_queued: true } : t));
         } catch (error) {
             console.error('Failed to request ticker', error);
         }
     };
-
-    // Legacy direct add is disabled for new flow, but we keep this function if we need it for admins later?
-    // User requested "Request" flow.
-
 
     const performExternalSearch = async () => {
         setIsLoading(true);
@@ -182,12 +177,6 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
                     }}
                 />
 
-                {/* Visual feedback or button to force external search */}
-                {results.length === 0 && query.length >= 2 && !isLoading && (
-                    <div className="absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none text-[10px] text-muted-foreground opacity-50">
-                        Press Enter to search market
-                    </div>
-                )}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                     {isLoading && (
                         <Loader2 className="w-3 h-3 animate-spin text-primary" />
