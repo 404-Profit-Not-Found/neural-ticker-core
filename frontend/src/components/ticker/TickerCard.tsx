@@ -206,7 +206,7 @@ export function TickerCard({
                 {/* Stats Grid */}
                 <div className="flex items-center gap-2 mt-3 mb-1 w-full">
                     <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
-                        <RiskIcon size={12} className={riskColorClass.replace('text-', 'text-').split(' ')[0]} />
+                        <RiskIcon size={12} className={riskColorClass.split(' ')[0]} />
                         <span className="text-muted-foreground whitespace-nowrap">Risk:</span>
                         <span className={riskColorClass}>
                             {Math.round(risk)}

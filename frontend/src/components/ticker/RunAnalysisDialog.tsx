@@ -32,7 +32,7 @@ export function RunAnalysisDialog({ onTrigger, isAnalyzing, defaultTicker, trigg
         let question = customQuestion;
 
         if (!question && questionTemplate && defaultTicker) {
-            question = questionTemplate.replace(/{ticker}/g, defaultTicker);
+            question = questionTemplate.replace(/{ticker}/g, () => defaultTicker);
         }
 
         onTrigger({
