@@ -23,6 +23,12 @@ import {
     MessageCircle,
     Trash2
 } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "../ui/tooltip";
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
@@ -64,7 +70,7 @@ export interface TickerData {
 interface WatchlistTableViewProps {
     data: TickerData[];
     isLoading: boolean;
-    onRemove: (itemId: string, symbol: string) => void;
+    onRemove?: (itemId: string, symbol: string) => void;
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
     columnFilters: ColumnFiltersState;
@@ -376,22 +382,33 @@ export function WatchlistTableView({
             columnHelper.display({
                 id: 'actions',
                 header: '',
-                cell: (info) => (
-                    <div className="flex items-center gap-1 justify-end">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
-                            }}
-                            title="Remove from this list"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                ),
+                cell: (info) => {
+                    if (!onRemove) return null;
+                    return (
+                        <div className="flex items-center gap-1 justify-end">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Remove ticker from the list</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    );
+                },
             }),
         ];
     }, [navigate, onRemove]);

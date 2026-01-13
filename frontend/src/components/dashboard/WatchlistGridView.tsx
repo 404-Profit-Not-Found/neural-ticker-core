@@ -3,6 +3,12 @@ import { Button } from '../ui/button';
 import type { TickerData } from './WatchlistTableView';
 import { TickerCard } from '../ticker/TickerCard';
 import { FavoriteStar } from '../watchlist/FavoriteStar';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "../ui/tooltip";
 
 import { useAllMarketsStatus, getRegionForStatus } from '../../hooks/useMarketStatus';
 
@@ -65,18 +71,26 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                         {/* Action Overlays */}
                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             {onRemove ? (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
-                                    title="Remove from watchlist"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onRemove(item.itemId || '', item.symbol);
-                                    }}
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                </Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onRemove(item.itemId || '', item.symbol);
+                                                }}
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Remove ticker from the list</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             ) : (
                                 <FavoriteStar symbol={item.symbol} className="bg-card/80 backdrop-blur-sm p-1 rounded-md" />
                             )}

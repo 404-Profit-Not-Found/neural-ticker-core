@@ -129,8 +129,33 @@ export function useRemoveTickerFromWatchlist() {
       await api.delete(`/watchlists/${watchlistId}/items/${itemId}`);
       return itemId;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
+    onMutate: async ({ watchlistId, itemId }) => {
+      // Cancel refetches
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+
+      // Snapshot previous
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      // Optimistically update
+      if (previousWatchlists) {
+        queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+            if (!old) return [];
+            return old.map(wl => {
+                if (wl.id !== watchlistId) return wl;
+                return {
+                    ...wl,
+                    items: wl.items.filter(item => item.id !== itemId)
+                };
+            });
+        });
+      }
+
+      return { previousWatchlists };
+    },
+    onError: (err, variables, context) => {
+        if (context?.previousWatchlists) {
+            queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+        }
     },
   });
 }

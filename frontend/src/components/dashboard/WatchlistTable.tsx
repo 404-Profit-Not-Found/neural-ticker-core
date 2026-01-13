@@ -345,6 +345,7 @@ export function WatchlistTable() {
     }, [watchlists, deleteListMutation, showToast]);
 
     const handleRemoveTicker = useCallback((itemId: string, symbol: string) => {
+        console.log('[WatchlistTable] Removing ticker:', { itemId, symbol, activeWatchlistId });
         if (!activeWatchlistId) return;
         removeTickerMutation.mutate({ watchlistId: activeWatchlistId, itemId }, {
             onSuccess: () => showToast(`${symbol} removed`, 'success'),
@@ -587,7 +588,7 @@ export function WatchlistTable() {
                     <WatchlistTableView
                         data={filteredTableData}
                         isLoading={isGlobalLoading}
-                        onRemove={handleRemoveTicker}
+                        onRemove={activeWatchlist?.name === 'Favourites' ? undefined : handleRemoveTicker}
                         sorting={sorting}
                         setSorting={setSorting}
                         columnFilters={columnFilters}
@@ -611,7 +612,7 @@ export function WatchlistTable() {
                             return true;
                         })}
                         isLoading={isGlobalLoading}
-                        onRemove={handleRemoveTicker}
+                        onRemove={activeWatchlist?.name === 'Favourites' ? undefined : handleRemoveTicker}
                     />
                 )
             }
