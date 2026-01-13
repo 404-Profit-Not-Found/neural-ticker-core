@@ -27,8 +27,11 @@ import {
     useRemoveTickerFromWatchlist,
     useMarketSnapshots,
     useTickerSearch,
-    type WatchlistItem
+    type WatchlistItem,
+    type Watchlist,
+    watchlistKeys
 } from '../../hooks/useWatchlist';
+import { useQueryClient } from '@tanstack/react-query';
 import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
@@ -248,7 +251,7 @@ export function WatchlistTable() {
                     sparkline: s.sparkline
                 };
             });
-    }, [snapshotData, activeWatchlist, watchlistItems]);
+    }, [snapshotData, activeWatchlist, watchlistItems, symbols]);
 
     const filteredTableData = useMemo(() => {
         return tableData.filter(item => {
@@ -345,7 +348,6 @@ export function WatchlistTable() {
     }, [watchlists, deleteListMutation, showToast]);
 
     const handleRemoveTicker = useCallback((itemId: string, symbol: string) => {
-        console.log('[WatchlistTable] Removing ticker:', { itemId, symbol, activeWatchlistId });
         if (!activeWatchlistId) return;
         removeTickerMutation.mutate({ watchlistId: activeWatchlistId, itemId }, {
             onSuccess: () => showToast(`${symbol} removed`, 'success'),
@@ -353,12 +355,22 @@ export function WatchlistTable() {
         });
     }, [activeWatchlistId, removeTickerMutation, showToast]);
 
+    const queryClient = useQueryClient();
+
     const selectSuggestion = useCallback((symbol: string) => {
         if (!activeWatchlistId) {
             showToast("No active watchlist", 'error');
             return;
         }
-        if (watchlistItems && watchlistItems.some(i => i.ticker.symbol === symbol)) {
+
+        // Get fresh data from cache to avoid stale props during optimistic updates
+        const freshWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all) || [];
+        const freshActiveList = freshWatchlists.find(w => w.id === activeWatchlistId);
+        const freshItems = freshActiveList?.items || [];
+
+
+
+        if (freshItems.some(i => i.ticker.symbol === symbol)) {
             showToast(`${symbol} is already in the watchlist`, 'error');
             setSearchTerm('');
             setShowSuggestions(false);
@@ -375,7 +387,7 @@ export function WatchlistTable() {
                 showToast(msg, 'error');
             }
         });
-    }, [activeWatchlistId, watchlistItems, addTickerMutation, showToast]);
+    }, [activeWatchlistId, addTickerMutation, showToast, queryClient]);
 
     // -- Search & Dropdown Effects --
     useEffect(() => {

@@ -14,7 +14,7 @@ import {
     useFavorite
 } from './useWatchlist';
 import { api } from '../lib/api';
-import type { Watchlist } from './useWatchlist';
+
 
 // Mock API
 vi.mock('../lib/api', () => ({

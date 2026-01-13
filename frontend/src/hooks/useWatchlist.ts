@@ -142,9 +142,10 @@ export function useRemoveTickerFromWatchlist() {
             if (!old) return [];
             return old.map(wl => {
                 if (wl.id !== watchlistId) return wl;
+                const newItems = wl.items.filter(item => item.id !== itemId);
                 return {
                     ...wl,
-                    items: wl.items.filter(item => item.id !== itemId)
+                    items: newItems
                 };
             });
         });
@@ -156,6 +157,9 @@ export function useRemoveTickerFromWatchlist() {
         if (context?.previousWatchlists) {
             queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
         }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
     },
   });
 }
