@@ -27,8 +27,11 @@ import {
     useRemoveTickerFromWatchlist,
     useMarketSnapshots,
     useTickerSearch,
-    type WatchlistItem
+    type WatchlistItem,
+    type Watchlist,
+    watchlistKeys
 } from '../../hooks/useWatchlist';
+import { useQueryClient } from '@tanstack/react-query';
 import { TickerLogo } from './TickerLogo';
 import { WatchlistTableView, type TickerData } from './WatchlistTableView';
 import { WatchlistGridView } from './WatchlistGridView';
@@ -160,7 +163,7 @@ export function WatchlistTable() {
         if (!activeWatchlist || !snapshotData || !Array.isArray(snapshotData)) return EMPTY_TABLE_DATA;
 
         return snapshotData
-            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
+            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol && symbols.includes(s.ticker.symbol))
             .map((s: MarketSnapshot) => {
                 const price = Number(s.latestPrice?.close || 0);
                 const prevClose = Number(s.latestPrice?.prevClose || price);
@@ -181,7 +184,7 @@ export function WatchlistTable() {
                         s.aiAnalysis.base_price,
                         s.aiAnalysis.upside_percent
                     );
-                    
+
                     let downside = 0;
                     const bearPrice = s.aiAnalysis.bear_price;
                     if (typeof bearPrice === 'number' && price > 0) {
@@ -208,7 +211,7 @@ export function WatchlistTable() {
                 const bearPrice = s.aiAnalysis?.bear_price;
                 const basePrice = s.aiAnalysis?.base_price;
                 let potentialDownside: number | null = null;
-                
+
                 // Use Standardized Upside Calculation
                 const potentialUpside = calculateLiveUpside(
                     price,
@@ -248,7 +251,7 @@ export function WatchlistTable() {
                     sparkline: s.sparkline
                 };
             });
-    }, [snapshotData, activeWatchlist, watchlistItems]);
+    }, [snapshotData, activeWatchlist, watchlistItems, symbols]);
 
     const filteredTableData = useMemo(() => {
         return tableData.filter(item => {
@@ -282,9 +285,9 @@ export function WatchlistTable() {
 
             // 5. Overall Score (Risk/Reward)
             if (filters.overallScore && item.overallScore !== null) {
-                 if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
-                 if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
-                 if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
+                if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
+                if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
+                if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
             }
 
             return true;
@@ -352,12 +355,22 @@ export function WatchlistTable() {
         });
     }, [activeWatchlistId, removeTickerMutation, showToast]);
 
+    const queryClient = useQueryClient();
+
     const selectSuggestion = useCallback((symbol: string) => {
         if (!activeWatchlistId) {
             showToast("No active watchlist", 'error');
             return;
         }
-        if (watchlistItems && watchlistItems.some(i => i.ticker.symbol === symbol)) {
+
+        // Get fresh data from cache to avoid stale props during optimistic updates
+        const freshWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all) || [];
+        const freshActiveList = freshWatchlists.find(w => w.id === activeWatchlistId);
+        const freshItems = freshActiveList?.items || [];
+
+
+
+        if (freshItems.some(i => i.ticker.symbol === symbol)) {
             showToast(`${symbol} is already in the watchlist`, 'error');
             setSearchTerm('');
             setShowSuggestions(false);
@@ -374,7 +387,7 @@ export function WatchlistTable() {
                 showToast(msg, 'error');
             }
         });
-    }, [activeWatchlistId, watchlistItems, addTickerMutation, showToast]);
+    }, [activeWatchlistId, addTickerMutation, showToast, queryClient]);
 
     // -- Search & Dropdown Effects --
     useEffect(() => {
@@ -473,7 +486,7 @@ export function WatchlistTable() {
                                 )}
                             </div>
 
-                            {activeWatchlistId && (
+                            {activeWatchlistId && activeWatchlist?.name !== 'Favourites' && (
                                 <div className="flex items-center">
                                     <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List" aria-label="Rename watchlist">
                                         <Pencil className="w-3.5 h-3.5" />
@@ -587,7 +600,7 @@ export function WatchlistTable() {
                     <WatchlistTableView
                         data={filteredTableData}
                         isLoading={isGlobalLoading}
-                        onRemove={handleRemoveTicker}
+                        onRemove={activeWatchlist?.name === 'Favourites' ? undefined : handleRemoveTicker}
                         sorting={sorting}
                         setSorting={setSorting}
                         columnFilters={columnFilters}
@@ -611,7 +624,7 @@ export function WatchlistTable() {
                             return true;
                         })}
                         isLoading={isGlobalLoading}
-                        onRemove={handleRemoveTicker}
+                        onRemove={activeWatchlist?.name === 'Favourites' ? undefined : handleRemoveTicker}
                     />
                 )
             }

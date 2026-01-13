@@ -53,6 +53,10 @@ export function AnalyzerTableView({
                                     key={header.id}
                                     className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap first:pl-6 last:pr-6"
                                     onClick={header.column.getToggleSortingHandler()}
+                                    style={{
+                                        width: header.column.columnDef.size,
+                                        minWidth: header.column.columnDef.minSize
+                                    }}
                                 >
                                     <div className="flex items-center gap-1 group">
                                         {flexRender(header.column.columnDef.header, header.getContext())}
@@ -103,8 +107,8 @@ export function AnalyzerTableView({
                                 onClick={() => navigate(`/ticker/${row.original.ticker.symbol}`)}
                             >
                                 {row.getVisibleCells().map((cell, idx) => (
-                                    <td 
-                                        key={cell.id} 
+                                    <td
+                                        key={cell.id}
                                         className={cn(
                                             "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 group-hover:bg-muted/30 transition-colors first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg shadow-sm",
                                             idx === 0 && "pl-6",

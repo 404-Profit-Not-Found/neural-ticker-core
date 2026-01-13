@@ -24,6 +24,10 @@ import type { Request, Response } from 'express';
 import { Public } from './public.decorator';
 import { GoogleAuthExceptionFilter } from './filters/google-auth-exception.filter';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
+import {
+  CreateUserTokenDto,
+  FirebaseLoginDto,
+} from './dto/create-user-token.dto';
 
 @Public()
 @ApiTags('Auth')
@@ -102,7 +106,7 @@ export class AuthController {
   @ApiBody({ schema: { example: { token: 'firebase_id_token' } } })
   @ApiResponse({ status: 200, description: 'App JWT token and user info' })
   @Post('firebase')
-  async firebaseLogin(@Body() body: { token: string }) {
+  async firebaseLogin(@Body() body: FirebaseLoginDto) {
     if (!body.token) throw new UnauthorizedException('Token required');
     const user = await this.authService.loginWithFirebase(body.token);
     return this.authService.login(user);
@@ -116,7 +120,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'App JWT token and user info' })
   @Post('dev/token')
   async devLogin(
-    @Body() body: { email: string },
+    @Body() body: CreateUserTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     // SECURITY: Disable in production

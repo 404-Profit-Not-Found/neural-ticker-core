@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 
 import { MiniTickerTile } from './MiniTickerTile';
 import { ModelBadge } from '../ui/model-badge';
+import { useWatchlists } from '../../hooks/useWatchlist';
 
 interface NewsItem {
     id: number;
@@ -43,20 +44,96 @@ export function NewsFeed() {
     const [news, setNews] = useState<NewsItem[]>([]);
     const [loadingDigest, setLoadingDigest] = useState(true);
     const [loadingNews, setLoadingNews] = useState(true);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    // Check if user has watchlist items
+    const { data: watchlists = [] } = useWatchlists();
+    const watchlistItemCount = watchlists.reduce((acc, wl) => acc + (wl.items?.length || 0), 0);
+    const [portfolioCount, setPortfolioCount] = useState(0);
+    const hasItems = watchlistItemCount > 0 || portfolioCount > 0;
+
+    // Fetch portfolio count
+    useEffect(() => {
+        const fetchPortfolioCount = async () => {
+            try {
+                const res = await api.get('/portfolio/positions');
+                if (Array.isArray(res.data)) {
+                    setPortfolioCount(res.data.length);
+                }
+            } catch {
+                // Silently fail - portfolio count is optional display
+            }
+        };
+        fetchPortfolioCount();
+    }, []);
+
+
+
+    // Auto-trigger digest ONLY for returning users (who have a previous digest)
+    // If digest is null, it's a new user -> Wait for manual button click.
+    // If digest exists but is old -> Auto-generate today's.
+    useEffect(() => {
+        if (!loadingDigest && digest && !isGenerating && hasItems) {
+            const digestDate = new Date(digest.created_at).setHours(0, 0, 0, 0);
+            const today = new Date().setHours(0, 0, 0, 0);
+
+            if (digestDate < today) {
+                console.log("Returning user with old digest - Auto-generating for today...");
+                triggerDigest();
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loadingDigest, digest, isGenerating, hasItems]);
+
+    const fetchDigest = async () => {
+        try {
+            const res = await api.get('/news/digest');
+            if (res.data && res.data.id) {
+                setDigest(res.data);
+            }
+        } catch {
+            console.error("Failed to load digest");
+        } finally {
+            setLoadingDigest(false);
+        }
+    };
+
+    const triggerDigest = async () => {
+        if (!hasItems) return;
+        setIsGenerating(true);
+        try {
+            await api.get('/news/digest/trigger');
+            // Poll for the digest to be ready
+            let attempts = 0;
+            const poll = async () => {
+                if (attempts >= 60) { // Max 60 seconds
+                    setIsGenerating(false);
+                    return;
+                }
+                attempts++;
+                try {
+                    const res = await api.get('/news/digest');
+                    if (res.data && res.data.id && res.data.answer_markdown) {
+                        setDigest(res.data);
+                        setIsGenerating(false);
+                        return;
+                    }
+                } catch {
+                    // Keep polling
+                }
+                setTimeout(poll, 1000);
+            };
+            setTimeout(poll, 2000); // Start polling after 2 seconds
+        } catch {
+            console.error("Failed to trigger digest");
+            setIsGenerating(false);
+        }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
             // 1. Fetch Digest
-            try {
-                const res = await api.get('/news/digest');
-                if (res.data && res.data.id) {
-                    setDigest(res.data);
-                }
-            } catch {
-                console.error("Failed to load news");
-            } finally {
-                setLoadingDigest(false);
-            }
+            await fetchDigest();
 
             // 2. Fetch General News
             try {
@@ -79,7 +156,7 @@ export function NewsFeed() {
         try {
             // Robust parsing for numeric strings
             const val = typeof ts === 'string' && !isNaN(parseFloat(ts)) ? parseFloat(ts) : ts;
-            
+
             let date: Date;
             if (typeof val === 'number') {
                 // Finnhub returns seconds, but check if it's ms (huge number)
@@ -89,7 +166,7 @@ export function NewsFeed() {
             }
 
             if (isNaN(date.getTime())) return 'Recently';
-            
+
             return date.toLocaleDateString(undefined, {
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
@@ -142,9 +219,43 @@ export function NewsFeed() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-y-auto p-6 min-h-[80vh] md:min-h-0">
-                    {loadingDigest ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Generated just now...
+                    {loadingDigest || isGenerating ? (
+                        <div className="space-y-6 animate-pulse">
+                            {/* Generating Header */}
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="relative">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                                        <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                                        <Loader2 className="w-3 h-3 text-primary-foreground animate-spin" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-sm font-medium">Generating Your Digest</div>
+                                    <div className="text-xs text-muted-foreground">Analyzing your watchlist and market news...</div>
+                                </div>
+                            </div>
+
+                            {/* Skeleton Content */}
+                            <div className="space-y-4">
+                                <div className="h-6 bg-muted/50 rounded w-3/4" />
+                                <div className="h-4 bg-muted/30 rounded w-full" />
+                                <div className="h-4 bg-muted/30 rounded w-5/6" />
+                                <div className="h-4 bg-muted/30 rounded w-4/5" />
+                                <div className="h-4 bg-muted/30 rounded w-2/3" />
+                            </div>
+
+                            <div className="space-y-4 pt-4">
+                                <div className="h-5 bg-muted/40 rounded w-1/2" />
+                                <div className="h-4 bg-muted/30 rounded w-full" />
+                                <div className="h-4 bg-muted/30 rounded w-5/6" />
+                                <div className="h-4 bg-muted/30 rounded w-3/4" />
+                            </div>
+
+                            <div className="text-xs text-muted-foreground text-center pt-8">
+                                This usually takes 20-40 seconds...
+                            </div>
                         </div>
                     ) : digest ? (
                         <div className="space-y-4">
@@ -210,8 +321,91 @@ export function NewsFeed() {
 
                         </div>
                     ) : (
-                        <div className="text-sm text-muted-foreground italic">
-                            Digest arriving soon...
+                        <div className="space-y-6 py-4">
+                            {/* Onboarding Message */}
+                            <div className="text-center space-y-3">
+                                <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+                                    <Sparkles className="w-8 h-8 text-primary" />
+                                </div>
+                                <h3 className="text-lg font-semibold">Your AI Digest is Waiting</h3>
+                                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                                    Get personalized market insights based on your watchlist and portfolio.
+                                    Follow these steps to get started:
+                                </p>
+                            </div>
+
+                            {/* Tutorial Steps */}
+                            <div className="space-y-3 max-w-md mx-auto">
+                                <a
+                                    href="/analyzer"
+                                    className="flex items-start gap-4 p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/30 transition-all group"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-sm shrink-0">
+                                        1
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="font-medium group-hover:text-primary transition-colors">Browse Tickers</div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Explore our library of 30+ analyzed stocks in the Analyzer
+                                        </p>
+                                    </div>
+                                </a>
+
+                                <a
+                                    href="/watchlist"
+                                    className="flex items-start gap-4 p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/30 transition-all group"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-sm shrink-0">
+                                        2
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="font-medium group-hover:text-primary transition-colors">Add to Watchlist</div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Click the ⭐ star on any ticker to track it
+                                        </p>
+                                    </div>
+                                </a>
+
+                                <a
+                                    href="/portfolio"
+                                    className="flex items-start gap-4 p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/30 transition-all group"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold text-sm shrink-0">
+                                        3
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="font-medium group-hover:text-primary transition-colors">Build Your Portfolio</div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Add positions to track your investments and P&L
+                                        </p>
+                                    </div>
+                                </a>
+                            </div>
+
+                            {/* Generate Button or Disabled State */}
+                            <div className="pt-6 text-center">
+                                {portfolioCount > 0 ? (
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={triggerDigest}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-indigo-600 text-white font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02]"
+                                        >
+                                            <Sparkles size={18} />
+                                            Generate Your Digest
+                                        </button>
+                                        <p className="text-xs text-muted-foreground">
+                                            Analyzing {watchlistItemCount + portfolioCount} tracked items
+                                            {watchlistItemCount > 0 && portfolioCount > 0 && (
+                                                <span className="text-muted-foreground/60"> ({watchlistItemCount} watchlist + {portfolioCount} portfolio)</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        Add stocks to your watchlist or portfolio above, then come back to generate your personalized AI digest.
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -251,7 +445,7 @@ export function NewsFeed() {
                                                     </Badge>
                                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                                         <Calendar className="w-3 h-3" />
-                                                        {formatDate(item.datetime)}
+                                                        {formatDate(item.datetime).replace(/,/g, ' ·')}
                                                     </span>
                                                 </div>
                                                 <a

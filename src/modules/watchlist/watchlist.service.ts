@@ -118,10 +118,7 @@ export class WatchlistService {
   async removeItemFromWatchlist(
     userId: string,
     watchlistId: string,
-    tickerId: string, // Pass item ID or Ticker ID? Let's assume Ticker ID for ease, or Item ID.
-    // Usually easier to delete by Item ID if the UI has it.
-    // But UI might just say "Delete AAPL".
-    // Let's implement delete by TickerID within Watchlist context.
+    itemId: string,
   ): Promise<void> {
     // 1. Verify owner
     const watchlist = await this.watchlistRepo.findOne({
@@ -131,11 +128,18 @@ export class WatchlistService {
       throw new NotFoundException('Watchlist not found or access denied');
     }
 
-    // 2. Delete
-    await this.itemRepo.delete({
+    // 2. Delete by Primary Key (id) and ensure it belongs to this watchlist
+    const result = await this.itemRepo.delete({
+      id: itemId,
       watchlist_id: watchlistId,
-      ticker_id: tickerId,
     });
+
+    // Optional: Check if affected > 0? Not strictly necessary for void return but good for debugging.
+    if (result.affected === 0) {
+      // It implies item didn't exist or mismatch, but idempotent delete is often fine.
+      // Check if we want to throw NotFound if ID provided but not found?
+      // For now, silent success is standard for delete.
+    }
   }
 
   // Helper delete by ItemId if needed

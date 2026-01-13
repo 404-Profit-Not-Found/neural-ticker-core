@@ -65,10 +65,6 @@ export class WatchlistController {
   })
   @Post()
   async createWatchlist(@Req() req: any, @Body('name') name: string) {
-    console.log('DEBUG: createWatchlist req.user:', req.user);
-    if (!req.user || !req.user.id) {
-      console.error('DEBUG: User ID missing in request', req.user);
-    }
     return this.watchlistService.createWatchlist(req.user.id, name);
   }
 
@@ -137,21 +133,21 @@ export class WatchlistController {
   })
   @ApiParam({ name: 'id', example: '1', description: 'Watchlist ID' })
   @ApiParam({
-    name: 'tickerId',
-    example: '42',
-    description: 'Ticker ID (BigInt)',
+    name: 'itemId',
+    example: '67',
+    description: 'Watchlist Item ID (Primary Key)',
   })
-  @ApiResponse({ status: 200, description: 'Ticker removed.' })
-  @Delete(':id/items/:tickerId')
+  @ApiResponse({ status: 200, description: 'Item removed.' })
+  @Delete(':id/items/:itemId')
   async removeItem(
     @Req() req: any,
     @Param('id') watchlistId: string,
-    @Param('tickerId') tickerId: string,
+    @Param('itemId') itemId: string,
   ) {
     await this.watchlistService.removeItemFromWatchlist(
       req.user.id,
       watchlistId,
-      tickerId,
+      itemId,
     );
     return { success: true };
   }

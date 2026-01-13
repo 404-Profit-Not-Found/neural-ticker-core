@@ -18,6 +18,7 @@ import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 import { CreditService } from '../users/credit.service'; // Added
 import { WatchlistService } from '../watchlist/watchlist.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
@@ -49,6 +50,7 @@ export class ResearchService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly watchlistService: WatchlistService,
+    private readonly portfolioService: PortfolioService,
 
     private readonly creditService: CreditService,
     private readonly qualityScoringService: QualityScoringService,
@@ -868,9 +870,9 @@ Title:`;
   // --- DAILY DIGEST PERSISTENCE (PERSONALIZED) ---
 
   async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
-    if (!userId) {
+    if (!userId || userId === 'system-trigger') {
       this.logger.warn(
-        'Attempted to generate digest without User ID. Blocking.',
+        `Attempted to generate digest with invalid User ID: ${userId}. Blocking.`,
       );
       return null;
     }
@@ -893,6 +895,30 @@ Title:`;
     }
 
     // 2. Not found? Generate it.
+
+    // CHECK TUTORIAL COMPLETION (Implied by Portfolio Existence)
+    // User Requirement: "digest runs daily for users who have completed tutorial"
+    try {
+      const portfolio = await this.portfolioService.findAll(userId);
+      if (!portfolio || portfolio.length === 0) {
+        // Double check specifically for "Tutorial" preference if we want to be strict,
+        // but explicit user request implies preventing it if they just added favorites.
+        // So we strictly enforce Portfolio presence.
+        this.logger.log(
+          `Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`,
+        );
+        return null;
+      }
+    } catch (e) {
+      this.logger.warn(
+        `Failed to check portfolio for digest eligibility: ${e.message}`,
+      );
+      // Fail safe: If we can't check, maybe we shouldn't block? Or should we?
+      // Let's assume safe to proceed if check fails, or maybe safe to block.
+      // Blocking is safer to prevent spam.
+      return null;
+    }
+
     // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
     const pendingNote = this.noteRepo.create({
       user_id: userId,
@@ -933,6 +959,24 @@ Title:`;
           }
         });
       });
+
+      // 2. Fetch Portfolio Positions and add their symbols
+      try {
+        const portfolioPositions = await this.portfolioService.findAll(userId);
+        portfolioPositions.forEach((position) => {
+          if (position.symbol) {
+            allTickers.add(position.symbol);
+          }
+        });
+        this.logger.log(
+          `Digest sources: ${watchlists.flatMap((w) => w.items).length} watchlist items, ${portfolioPositions.length} portfolio positions`,
+        );
+      } catch (portfolioError) {
+        this.logger.warn(
+          `Failed to fetch portfolio positions: ${portfolioError}`,
+        );
+        // Continue with watchlist items only
+      }
 
       const distinctSymbols = Array.from(allTickers);
 
@@ -1133,6 +1177,22 @@ Title:`;
   // Helper alias
   async getCachedDigest(userId: string): Promise<ResearchNote | null> {
     return this.getOrGenerateDailyDigest(userId);
+  }
+
+  async deletePersonalizedDigest(userId: string): Promise<void> {
+    const digests = await this.noteRepo.find({
+      where: {
+        user_id: userId,
+        title: Like('Smart News Briefing%'),
+      },
+    });
+
+    if (digests.length > 0) {
+      await this.noteRepo.remove(digests);
+      this.logger.log(
+        `Deleted ${digests.length} personalized digests for user ${userId}`,
+      );
+    }
   }
 
   private async processMarketNewsTicket(note: ResearchNote): Promise<void> {

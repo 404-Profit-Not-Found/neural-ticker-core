@@ -135,6 +135,16 @@ export const AdminService = {
     }
   },
 
+  resetTutorial: async (userId: string) => {
+    try {
+      const { data } = await api.delete<{ message: string }>(`/admin/users/${userId}/reset-tutorial`);
+      return data;
+    } catch (error) {
+      handleAdminError(error);
+      throw error;
+    }
+  },
+
   // Ticker Shadow Ban Management
   getHiddenTickers: async () => {
     try {

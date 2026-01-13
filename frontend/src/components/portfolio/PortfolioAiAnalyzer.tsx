@@ -432,7 +432,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: false
-                          }).replace(',', ' ·')}
+                          }).replace(/,/g, ' ·')}
                         </div>
                         <div className="text-sm font-bold flex items-center gap-1.5 capitalize">
                           {item.goal} Focused Strategy
@@ -445,7 +445,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                         {item.riskAppetite} Risk
                       </Badge>
                       <Badge variant="outline" className="text-[9px] h-4 px-1 capitalize border-sky-500/20 text-sky-400">
-                        {item.horizon.replace('-', ' ')}
+                        {item.horizon.replace(/-/g, ' ')}
                       </Badge>
                       <Badge variant="outline" className="text-[9px] h-4 px-1 capitalize border-amber-500/20 text-amber-500">
                         {item.model}

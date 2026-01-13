@@ -137,34 +137,25 @@ export function Dashboard() {
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-6">
-            {/* 1. Portfolio (or fallback to AI Reports) */}
-            {stats?.portfolio && stats.portfolio.value > 0 ? (
-              <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/portfolio')}>
-                <StatPill
-                  icon={PieChart}
-                  label="My Portfolio"
-                  value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.portfolio.value)}
-                  subValue={(
-                    <span className={cn(
-                      "text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
-                      stats.portfolio.gainPct >= 0 ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
-                    )}>
-                      {stats.portfolio.gainPct >= 0 ? '+' : ''}{stats.portfolio.gainPct.toFixed(2)}%
-                    </span>
-                  )}
-                  tone="accent"
-                />
-              </div>
-            ) : (
-              <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/research?filter=recent')}>
-                <StatPill
-                  icon={Brain}
-                  label="AI Reports (24h)"
-                  value={stats?.recentResearch ? String(stats.recentResearch) : '0'}
-                  tone="accent"
-                />
-              </div>
-            )}
+            {/* 1. My Portfolio (always first) */}
+            <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/portfolio')}>
+              <StatPill
+                icon={PieChart}
+                label="My Portfolio"
+                value={stats?.portfolio && stats.portfolio.value > 0
+                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.portfolio.value)
+                  : '$0.00'}
+                subValue={stats?.portfolio && stats.portfolio.value > 0 ? (
+                  <span className={cn(
+                    "text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+                    stats.portfolio.gainPct >= 0 ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
+                  )}>
+                    {stats.portfolio.gainPct >= 0 ? '+' : ''}{stats.portfolio.gainPct.toFixed(2)}%
+                  </span>
+                ) : undefined}
+                tone="accent"
+              />
+            </div>
 
             {/* 2. Strong Buy */}
             <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/analyzer?filter=strong_buy')}>
@@ -181,21 +172,15 @@ export function Dashboard() {
               <StatPill icon={Activity} label="Tickers Tracked" value={stats?.tickers ? String(stats.tickers) : '...'} tone="primary" />
             </div>
 
-            {/* 5. AI Reports (Only if not already shown in slot 1) */}
-            {stats?.portfolio && stats.portfolio.value > 0 ? (
-              <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/research?filter=recent')}>
-                <StatPill
-                  icon={Brain}
-                  label="AI Reports (24h)"
-                  value={stats?.recentResearch ? String(stats.recentResearch) : '0'}
-                  tone="muted"
-                />
-              </div>
-            ) : (
-              <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/analyzer?filter=strong_buy')}>
-                <StatPill icon={Zap} label="Strong Buy" value={stats?.strongBuy ? String(stats.strongBuy) : '...'} tone="emerald" />
-              </div>
-            )}
+            {/* 5. AI Reports (24h) */}
+            <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/research?filter=recent')}>
+              <StatPill
+                icon={Brain}
+                label="AI Reports (24h)"
+                value={stats?.recentResearch ? String(stats.recentResearch) : '0'}
+                tone="muted"
+              />
+            </div>
 
             {/* 6. Market News */}
             <div className="cursor-pointer transition-transform hover:scale-[1.02] h-full" onClick={() => navigate('/news')}>

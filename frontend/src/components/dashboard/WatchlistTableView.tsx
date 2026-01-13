@@ -19,11 +19,16 @@ import {
     AlertTriangle,
     Flame,
     Newspaper,
-    MoreVertical,
-    Trash2,
     Search,
-    MessageCircle
+    MessageCircle,
+    Trash2
 } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "../ui/tooltip";
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
@@ -34,6 +39,7 @@ import { useMemo } from 'react';
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
 import { Sparkline } from "../ui/Sparkline";
+import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -64,7 +70,7 @@ export interface TickerData {
 interface WatchlistTableViewProps {
     data: TickerData[];
     isLoading: boolean;
-    onRemove: (itemId: string, symbol: string) => void;
+    onRemove?: (itemId: string, symbol: string) => void;
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
     columnFilters: ColumnFiltersState;
@@ -91,20 +97,23 @@ export function WatchlistTableView({
     const columns = useMemo(() => {
         const columnHelper = createColumnHelper<TickerData>();
         return [
-            // 1. Asset Column (Symbol, Name, Insights Next to Symbol)
+            // 1. Asset Column (Logo, Symbol + Star, Company, Industry + Icons)
             columnHelper.accessor('symbol', {
                 header: 'Asset',
+                size: 280,
+                minSize: 220,
                 cell: (info) => {
-                    // Watchlist uses flat counts in TickerData
                     const research = info.row.original.researchCount;
                     const news = info.row.original.newsCount;
                     const social = info.row.original.socialCount;
                     const hasInsights = (research || 0) + (news || 0) + (social || 0) > 0;
+                    const sector = info.row.original.sector;
 
                     return (
-                        <div className="flex items-start gap-3">
-                            <div 
-                                className="cursor-pointer"
+                        <div className="flex items-center gap-3">
+                            {/* Logo */}
+                            <div
+                                className="cursor-pointer shrink-0"
                                 onClick={() => navigate(`/ticker/${info.getValue()}`)}
                             >
                                 <TickerLogo
@@ -113,18 +122,33 @@ export function WatchlistTableView({
                                     className="w-10 h-10 rounded-full"
                                 />
                             </div>
+
+                            {/* Text Content */}
                             <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-2">
-                                    <span 
+                                {/* Row 1: Symbol + Star next to it */}
+                                <div className="flex items-center gap-1.5">
+                                    <span
                                         className="text-base font-bold text-foreground hover:underline cursor-pointer"
                                         onClick={() => navigate(`/ticker/${info.getValue()}`)}
                                     >
                                         {info.getValue()}
                                     </span>
-                                    
-                                    {/* Insight Icons Next to Symbol */}
+                                    {/* Star - Favorite indicator (next to symbol) */}
+                                    <FavoriteStar symbol={info.getValue()} />
+                                </div>
+
+                                {/* Row 2: Company Name */}
+                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.company}>
+                                    {info.row.original.company}
+                                </span>
+
+                                {/* Row 3: Industry + Insight Icons */}
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={sector}>
+                                        {sector || 'Unknown'}
+                                    </span>
                                     {hasInsights && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1.5">
                                             {research ? (
                                                 <div className="flex items-center gap-0.5 text-purple-400" title={`${research} Reports`}>
                                                     <Brain size={10} />
@@ -146,10 +170,6 @@ export function WatchlistTableView({
                                         </div>
                                     )}
                                 </div>
-                                
-                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.company}>
-                                    {info.row.original.company}
-                                </span>
                             </div>
                         </div>
                     );
@@ -163,21 +183,21 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const change = info.getValue();
                     const price = info.row.original.price;
-                    
+
                     if (!price) return '-';
 
                     const isPositive = (change || 0) >= 0;
-                    
+
                     return (
                         <div className="flex flex-col items-end">
                             <span className="text-sm font-mono font-medium text-foreground/70">
                                 ${price.toFixed(2)}
                             </span>
                             {change !== undefined && change !== null ? (
-                               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
-                                    {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
+                                <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                                    {isPositive ? <ArrowUp size={12} className="mr-0.5" /> : <ArrowDown size={12} className="mr-0.5" />}
                                     {Math.abs(change).toFixed(2)}%
-                               </div>
+                                </div>
                             ) : <span className="text-xs text-muted-foreground">-</span>}
                         </div>
                     );
@@ -192,10 +212,10 @@ export function WatchlistTableView({
                     if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
                     return (
                         <div className="w-[100px] h-8 flex items-center justify-center">
-                            <Sparkline 
-                                data={data} 
-                                width={100} 
-                                height={32} 
+                            <Sparkline
+                                data={data}
+                                width={100}
+                                height={32}
                                 className="opacity-80 group-hover:opacity-100 transition-opacity"
                             />
                         </div>
@@ -212,10 +232,10 @@ export function WatchlistTableView({
                     if (!row.fiftyTwoWeekHigh || !row.fiftyTwoWeekLow) return <span className="text-muted-foreground text-xs">-</span>;
 
                     return (
-                        <FiftyTwoWeekRange 
-                            low={row.fiftyTwoWeekLow} 
-                            high={row.fiftyTwoWeekHigh} 
-                            current={row.price} 
+                        <FiftyTwoWeekRange
+                            low={row.fiftyTwoWeekLow}
+                            high={row.fiftyTwoWeekHigh}
+                            current={row.price}
                             showLabels={true}
                         />
                     );
@@ -240,7 +260,7 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const val = info.getValue();
                     if (val === undefined || val === null) return '-';
-                    
+
                     let colorClass = 'text-muted-foreground';
                     let Icon = ShieldCheck;
                     if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
@@ -263,7 +283,7 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const val = info.getValue();
                     if (val === undefined || val === null) return '-';
-                    
+
                     let colorClass = 'text-muted-foreground';
                     if (val >= 7.5) colorClass = 'text-emerald-500';
                     else if (val >= 5.0) colorClass = 'text-yellow-500';
@@ -288,10 +308,10 @@ export function WatchlistTableView({
                     const isPositive = num > 0;
 
                     return (
-                    <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
-                        {isPositive && <ArrowUp size={12} className="mr-0.5" />}
-                        {num.toFixed(1)}%
-                    </div>
+                        <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                            {isPositive && <ArrowUp size={12} className="mr-0.5" />}
+                            {num.toFixed(1)}%
+                        </div>
                     );
                 },
             }),
@@ -306,10 +326,10 @@ export function WatchlistTableView({
                     const risk = row.riskScore ?? 0;
                     const upside = row.potentialUpside ?? 0;
                     const downside = row.potentialDownside ?? 0;
-                    
+
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
-                            <VerdictBadge 
+                            <VerdictBadge
                                 risk={risk}
                                 upside={upside}
                                 downside={downside}
@@ -358,29 +378,37 @@ export function WatchlistTableView({
                 }
             }),
 
-            // Actions (Keep as is)
+            // Actions: Explicit Remove
             columnHelper.display({
                 id: 'actions',
                 header: '',
-                cell: (info) => (
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
-                            }}
-                            title="Remove from watchlist"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                ),
+                cell: (info) => {
+                    if (!onRemove) return null;
+                    return (
+                        <div className="flex items-center gap-1 justify-end">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Remove ticker from the list</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    );
+                },
             }),
         ];
     }, [navigate, onRemove]);
@@ -397,7 +425,7 @@ export function WatchlistTableView({
         onColumnFiltersChange: setColumnFilters,
         state: { sorting, globalFilter, columnFilters },
         initialState: {
-            columnVisibility: { sector: false },
+            columnVisibility: {}, // Sector is now visible by default
         }
     });
 
@@ -406,73 +434,92 @@ export function WatchlistTableView({
     }
 
     return (
-        <div className="rounded-md border border-border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b">
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                {headerGroup.headers.map((header) => (
-                                    <th
-                                        key={header.id}
-                                        className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none whitespace-nowrap"
-                                        onClick={header.column.getToggleSortingHandler()}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            {flexRender(header.column.columnDef.header, header.getContext())}
+        <div className="overflow-x-auto px-1 pb-2">
+            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
+                <thead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <tr key={headerGroup.id} className="bg-transparent">
+                            {headerGroup.headers.map((header) => (
+                                <th
+                                    key={header.id}
+                                    className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap first:pl-6 last:pr-6"
+                                    onClick={header.column.getToggleSortingHandler()}
+                                    style={{
+                                        width: header.column.columnDef.size,
+                                        minWidth: header.column.columnDef.minSize
+                                    }}
+                                >
+                                    <div className="flex items-center gap-1 group">
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                                             {{
                                                 asc: <ArrowUpRight className="ml-1 h-3 w-3" />,
                                                 desc: <ArrowDownRight className="ml-1 h-3 w-3" />,
                                             }[header.column.getIsSorted() as string] ?? null}
-                                        </div>
-                                    </th>
+                                        </span>
+                                    </div>
+                                </th>
+                            ))}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody className="space-y-4">
+                    {isLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={i} className="bg-card shadow-sm rounded-lg">
+                                {table.getVisibleFlatColumns().map((col, idx) => (
+                                    <td key={col.id} className={cn("p-4 border-y border-border/40 first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg bg-card", idx === 0 && "pl-6", idx === table.getVisibleFlatColumns().length - 1 && "pr-6")}>
+                                        {col.id === 'symbol' ? (
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="h-8 w-8 rounded-full" />
+                                                <div className="space-y-1">
+                                                    <Skeleton className="h-4 w-12" />
+                                                    <Skeleton className="h-3 w-20" />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <Skeleton className="h-4 w-full max-w-[80px]" />
+                                        )}
+                                    </td>
                                 ))}
                             </tr>
-                        ))}
-                    </thead>
-                    <tbody className="[&_tr:last-child]:border-0">
-                        {isLoading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <tr key={i} className="border-b">
-                                    <td className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-12" /><Skeleton className="h-3 w-20" /></div></div></td>
-                                    {/* Sector (hidden by default) but if visible needs skeleton? table handles visibility, here we act dumb or map columns */}
-                                    {/* Actually simpler to just render generic generic cells matching column count approx or just a few key ones */}
-                                    {/* Iterate columns to match layout */}
-                                    {table.getVisibleFlatColumns().slice(1).map((col) => (
-                                        <td key={col.id} className="p-4"><Skeleton className="h-4 w-full" /></td>
-                                    ))}
-                                </tr>
-                            ))
-                        ) : table.getRowModel().rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
-                                        <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                            <Search className="w-6 h-6 text-muted-foreground/50" />
-                                        </div>
-                                        <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>
-                                        <p className="text-sm text-muted-foreground mb-4">Add your first ticker to track its performance.</p>
+                        ))
+                    ) : table.getRowModel().rows.length === 0 ? (
+                        <tr>
+                            <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
+                                    <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                                        <Search className="w-6 h-6 text-muted-foreground/50" />
                                     </div>
-                                </td>
+                                    <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">Add your first ticker to track its performance.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    ) : (
+                        table.getRowModel().rows.map((row) => (
+                            <tr
+                                key={row.id}
+                                className="group transition-all hover:bg-muted/30 cursor-pointer relative"
+                                onClick={() => navigate(`/ticker/${row.original.symbol}`)}
+                            >
+                                {row.getVisibleCells().map((cell, idx) => (
+                                    <td
+                                        key={cell.id}
+                                        className={cn(
+                                            "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 group-hover:bg-muted/30 transition-colors first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg shadow-sm",
+                                            idx === 0 && "pl-6",
+                                            idx === row.getVisibleCells().length - 1 && "pr-6"
+                                        )}
+                                    >
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                ))}
                             </tr>
-                        ) : (
-                            table.getRowModel().rows.map((row) => (
-                                <tr
-                                    key={row.id}
-                                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
-                                    onClick={() => navigate(`/ticker/${row.original.symbol}`)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <td key={cell.id} className="p-4 align-middle whitespace-nowrap">
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                        ))
+                    )}
+                </tbody>
+            </table>
         </div>
     );
 }

@@ -26,7 +26,6 @@ import { Public } from '../auth/public.decorator';
 @ApiTags('StockTwits')
 @ApiExtraModels(StockTwitsPost)
 @Controller('v1/stocktwits')
-@Public()
 export class StockTwitsController {
   private readonly logger = new Logger(StockTwitsController.name);
 
@@ -40,6 +39,7 @@ export class StockTwitsController {
   }
 
   @Get(':symbol/posts')
+  @Public()
   @ApiOperation({
     summary: 'Get cached posts for a symbol',
     description: 'Returns paginated cached StockTwits posts.',
@@ -68,6 +68,7 @@ export class StockTwitsController {
   }
 
   @Get(':symbol/watchers')
+  @Public()
   @ApiOperation({
     summary: 'Get watcher count history for a symbol',
     description:

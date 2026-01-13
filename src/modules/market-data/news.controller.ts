@@ -79,10 +79,9 @@ export class NewsController {
   @ApiOperation({ summary: 'Force trigger digest generation' })
   @ApiResponse({ status: 200, description: 'Digest object' })
   @Get('digest/trigger')
-  @Public()
-  async triggerDigest() {
-    // Forcing generation for a 'system' user or similar.
-    return this.researchService.getOrGenerateDailyDigest('system-trigger');
+  async triggerDigest(@Request() req: any) {
+    // Forcing generation for the authenticated user
+    return this.researchService.getOrGenerateDailyDigest(req.user.id);
   }
 
   @ApiOperation({

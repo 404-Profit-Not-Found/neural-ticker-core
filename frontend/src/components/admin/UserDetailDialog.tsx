@@ -22,6 +22,7 @@ interface UserDetailDialogProps {
     onUnban: (user: AdminUser) => void;
     onApprove: (email: string) => void;
     onGiftCredits: (user: AdminUser) => void;
+    onResetTutorial: (userId: string) => void;
 }
 
 export function UserDetailDialog({
@@ -33,7 +34,8 @@ export function UserDetailDialog({
     onRevoke,
     onUnban,
     onApprove,
-    onGiftCredits
+    onGiftCredits,
+    onResetTutorial
 }: UserDetailDialogProps) {
     if (!user) return null;
 
@@ -63,7 +65,7 @@ export function UserDetailDialog({
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
-        }).replace(',', '');
+        }).replace(/,/g, '');
     };
 
     return (
@@ -184,6 +186,17 @@ export function UserDetailDialog({
                             >
                                 <CheckCircle size={16} />
                                 Unban User
+                            </Button>
+                        )}
+
+                        {user.id && (
+                            <Button
+                                variant="outline"
+                                className="justify-start gap-2 h-10 hover:bg-orange-500/10 hover:text-orange-500 hover:border-orange-500/30"
+                                onClick={() => user.id && onResetTutorial(user.id)}
+                            >
+                                <Clock size={16} className="text-orange-500" />
+                                Reset Tutorial State
                             </Button>
                         )}
                     </div>

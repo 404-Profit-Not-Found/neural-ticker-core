@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Flame,
-  MessageCircle,
+  MessageCircle
 } from 'lucide-react';
 import {
   useStockAnalyzer,
@@ -29,6 +29,7 @@ import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils'
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
 import { Sparkline } from "../ui/Sparkline";
+import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 import { FilterBar, type AnalyzerFilters } from './FilterBar';
 
@@ -81,17 +82,21 @@ export function AnalyzerTable({
   // Column Definitions (passed to Table View)
   const columnHelper = createColumnHelper<StockSnapshot>();
   const columns = [
-    // 1. Asset Column (Symbol, Name, Insights Next to Symbol)
+    // 1. Asset Column (Logo, Symbol + Star, Company, Industry + Icons)
     columnHelper.accessor('ticker.symbol', {
       header: 'Asset',
+      size: 280, // Constrain width based on user feedback
+      minSize: 220,
       cell: (info) => {
         const { research, news, social } = info.row.original.counts || {};
         const hasInsights = (research || 0) + (news || 0) + (social || 0) > 0;
+        const sector = info.row.original.ticker.sector;
 
         return (
-          <div className="flex items-start gap-3">
+          <div className="flex items-center gap-3">
+            {/* Logo */}
             <div
-              className="cursor-pointer"
+              className="cursor-pointer shrink-0"
               onClick={() => navigate(`/ticker/${info.getValue()}`)}
             >
               <TickerLogo
@@ -100,8 +105,11 @@ export function AnalyzerTable({
                 className="w-10 h-10 rounded-full"
               />
             </div>
+
+            {/* Text Content */}
             <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
+              {/* Row 1: Symbol */}
+              <div className="flex items-center gap-1.5">
                 <span
                   className="text-base font-bold text-foreground hover:underline cursor-pointer"
                   onClick={() => navigate(`/ticker/${info.getValue()}`)}
@@ -109,9 +117,22 @@ export function AnalyzerTable({
                   {info.getValue()}
                 </span>
 
-                {/* Insight Icons Next to Symbol */}
+                {/* Star - Interactive Watchlist Toggle */}
+                <FavoriteStar symbol={info.getValue()} size={16} />
+              </div>
+
+              {/* Row 2: Company Name */}
+              <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.ticker.name}>
+                {info.row.original.ticker.name}
+              </span>
+
+              {/* Row 3: Industry + Insight Icons */}
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={sector}>
+                  {sector || 'Unknown'}
+                </span>
                 {hasInsights && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {research ? (
                       <div className="flex items-center gap-0.5 text-purple-400" title={`${research} Reports`}>
                         <Brain size={10} />
@@ -131,17 +152,6 @@ export function AnalyzerTable({
                       </div>
                     ) : null}
                   </div>
-                )}
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.ticker.name}>
-                  {info.row.original.ticker.name}
-                </span>
-                {info.row.original.ticker.sector && (
-                  <span className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">
-                    {info.row.original.ticker.sector}
-                  </span>
                 )}
               </div>
             </div>
@@ -187,10 +197,10 @@ export function AnalyzerTable({
         if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
         return (
           <div className="w-[100px] h-8 flex items-center justify-center">
-            <Sparkline 
-              data={data} 
-              width={100} 
-              height={32} 
+            <Sparkline
+              data={data}
+              width={100}
+              height={32}
               className="opacity-80 group-hover:opacity-100 transition-opacity"
             />
           </div>
@@ -209,16 +219,16 @@ export function AnalyzerTable({
         const price = row.latestPrice?.close;
 
         if (!low || !high || !price) return <span className="text-muted-foreground text-xs">-</span>;
-        
+
         return (
-            <div className="w-[180px]">
-                <FiftyTwoWeekRange 
-                    low={Number(low)} 
-                    high={Number(high)} 
-                    current={price} 
-                    showLabels={true}
-                />
-            </div>
+          <div className="w-[180px]">
+            <FiftyTwoWeekRange
+              low={Number(low)}
+              high={Number(high)}
+              current={price}
+              showLabels={true}
+            />
+          </div>
         );
       },
     }),
@@ -329,25 +339,25 @@ export function AnalyzerTable({
           const risk = Number(riskRaw);
           const price = info.row.original.latestPrice?.close ?? 0;
           const upside = calculateLiveUpside(price, info.row.original.aiAnalysis?.base_price, info.row.original.aiAnalysis?.upside_percent);
-          
+
           let downside = 0;
           const bearPrice = info.row.original.aiAnalysis?.bear_price;
           if (typeof bearPrice === 'number' && price > 0) {
-             downside = ((bearPrice - price) / price) * 100;
+            downside = ((bearPrice - price) / price) * 100;
           } else {
-             downside = -(risk * 5);
+            downside = -(risk * 5);
           }
 
           const overallScore = info.row.original.aiAnalysis?.overall_score;
 
           return (
-            <VerdictBadge 
-                risk={risk}
-                upside={upside}
-                downside={downside}
-                consensus={info.row.original.fundamentals?.consensus_rating ? String(info.row.original.fundamentals.consensus_rating) : undefined}
-                overallScore={overallScore}
-                pe={info.row.original.fundamentals?.pe_ttm}
+            <VerdictBadge
+              risk={risk}
+              upside={upside}
+              downside={downside}
+              consensus={info.row.original.fundamentals?.consensus_rating ? String(info.row.original.fundamentals.consensus_rating) : undefined}
+              overallScore={overallScore}
+              pe={info.row.original.fundamentals?.pe_ttm}
             />
           );
         }
@@ -414,8 +424,8 @@ export function AnalyzerTable({
 
           <FilterBar
             filters={filters || { risk: [], aiRating: [], sector: [], upside: null, overallScore: null }}
-            onFilterChange={onFilterChange || (() => {})}
-            onReset={onReset || (() => {})}
+            onFilterChange={onFilterChange || (() => { })}
+            onReset={onReset || (() => { })}
           />
         </div>
 

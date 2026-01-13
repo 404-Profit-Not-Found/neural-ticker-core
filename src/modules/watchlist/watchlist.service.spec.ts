@@ -130,7 +130,7 @@ describe('WatchlistService', () => {
 
       expect(mockItemRepo.delete).toHaveBeenCalledWith({
         watchlist_id: listId,
-        ticker_id: tickerId,
+        id: tickerId,
       });
     });
   });

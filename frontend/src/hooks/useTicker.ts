@@ -17,7 +17,14 @@ export function useTickerLogo(symbol: string, url?: string) {
         queryKey: tickerKeys.logo(symbol),
         queryFn: async () => {
             if (!url) return null;
-            const isProxy = url.includes('finnhub.io');
+            let isProxy = false;
+            try {
+                const urlObj = new URL(url);
+                isProxy = urlObj.hostname === 'finnhub.io' || urlObj.hostname.endsWith('.finnhub.io');
+            } catch {
+                // Invalid URL, treat as not proxy
+                isProxy = false;
+            }
             
             let blob: Blob;
             try {
@@ -205,20 +212,7 @@ export function useUpdateResearchTitle() {
     });
 }
 
-export function useToggleFavorite() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async (symbol: string) => {
-            const res = await api.post('/watchlists/favorites/toggle', { symbol });
-            return res.data;
-        },
-        onSuccess: (_, symbol) => {
-            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
-            // Ideally we invalidate watchlist queries too
-            queryClient.invalidateQueries({ queryKey: ['watchlists'] }); 
-        }
-    });
-}
+
 
 export function useActiveResearchCount() {
     return useQuery({

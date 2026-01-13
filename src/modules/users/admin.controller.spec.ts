@@ -6,6 +6,9 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreditService } from './credit.service';
+import { WatchlistService } from '../watchlist/watchlist.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
+import { ResearchService } from '../research/research.service';
 
 describe('AdminController', () => {
   let controller: AdminController;
@@ -35,6 +38,18 @@ describe('AdminController', () => {
         {
           provide: CreditService,
           useValue: mockCreditService,
+        },
+        {
+          provide: WatchlistService,
+          useValue: {},
+        },
+        {
+          provide: PortfolioService,
+          useValue: {},
+        },
+        {
+          provide: ResearchService,
+          useValue: {},
         },
       ],
     })

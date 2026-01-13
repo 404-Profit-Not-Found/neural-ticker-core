@@ -103,7 +103,7 @@ describe('WatchlistTable Sorting', () => {
         queryClient.clear();
     });
 
-    it.skip('sorts by Potential Upside numerically', async () => {
+    it('sorts by Potential Upside numerically', async () => {
         renderWithProviders();
 
         // Wait for data to load
@@ -114,15 +114,15 @@ describe('WatchlistTable Sorting', () => {
         expect(screen.getByText('10.0%')).toBeInTheDocument();
         expect(screen.getByText('-5.0%')).toBeInTheDocument();
 
-        // Click Potential Upside header to sort
-        const upsideHeader = await screen.findByRole('columnheader', { name: /Potential Upside/i });
+        // Click Upside header to sort
+        const upsideHeader = await screen.findByRole('columnheader', { name: /Upside/i });
         fireEvent.click(upsideHeader);
 
         // Helper to get text from specific column in row
         const getUpsideFromRow = (row: HTMLElement) => {
             const cells = row.querySelectorAll('td');
-            // Columns: Symbol(0), Price(1), Change(2), Potential Upside(3)
-            return cells[3]?.textContent;
+            // Columns: Asset(0), Price(1), Trend(2), 52Wk(3), P/E(4), Risk(5), Score(6), Upside(7)
+            return cells[7]?.textContent;
         };
 
         // Wait a bit for sorting to apply

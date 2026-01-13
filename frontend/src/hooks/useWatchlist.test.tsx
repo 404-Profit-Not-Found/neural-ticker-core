@@ -9,9 +9,12 @@ import {
     useAddTickerToWatchlist,
     useRemoveTickerFromWatchlist,
     useMarketSnapshots,
-    useTickerSearch
+    useTickerSearch,
+    useToggleFavorite,
+    useFavorite
 } from './useWatchlist';
 import { api } from '../lib/api';
+
 
 // Mock API
 vi.mock('../lib/api', () => ({
@@ -43,14 +46,22 @@ describe('useWatchlist Hooks', () => {
     });
 
     describe('useWatchlists', () => {
-        it('fetches watchlists successfully', async () => {
-            const mockData = [{ id: '1', name: 'My List', items: [] }];
+        it('fetches watchlists and sorts Favourites first', async () => {
+            const mockData = [
+                { id: '1', name: 'Zebra', items: [] },
+                { id: '2', name: 'Favourites', items: [] },
+                { id: '3', name: 'Alpha', items: [] }
+            ];
             (api.get as Mock).mockResolvedValueOnce({ data: mockData });
 
             const { result } = renderHook(() => useWatchlists(), { wrapper });
 
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
-            expect(result.current.data).toEqual(mockData);
+            // Expect Favourites first, then Alpha, then Zebra
+            expect(result.current.data).toHaveLength(3);
+            expect(result.current.data[0].name).toBe('Favourites');
+            expect(result.current.data[1].name).toBe('Alpha');
+            expect(result.current.data[2].name).toBe('Zebra');
             expect(api.get).toHaveBeenCalledWith('/watchlists');
         });
 
@@ -139,7 +150,7 @@ describe('useWatchlist Hooks', () => {
             // but useMarketSnapshots sets enabled: symbol.length > 0.
             // So it starts in pending/idle state but should likely return cached placeholder.
             // Wait, placeholderData is EMPTY_SNAPSHOTS.
-            expect(result.current.data).toEqual([]);
+            expect(result.current.data).toBeUndefined();
         });
     });
 
@@ -160,6 +171,64 @@ describe('useWatchlist Hooks', () => {
             // Enabled is false
             expect(result.current.isPending).toBe(true);
             expect(result.current.fetchStatus).toBe('idle');
+        });
+    });
+
+    describe('useToggleFavorite', () => {
+        it('calls toggle endpoint', async () => {
+            (api.post as Mock).mockResolvedValueOnce({ data: { added: true } });
+            const { result } = renderHook(() => useToggleFavorite(), { wrapper });
+
+            result.current.mutate('AAPL');
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(api.post).toHaveBeenCalledWith('/watchlists/favorites/toggle', { symbol: 'AAPL' });
+        });
+    });
+
+    describe('useFavorite', () => {
+        it('returns true if symbol is in Favourites list', async () => {
+            const mockWatchlists = [
+                {
+                    id: 'fav-id',
+                    name: 'Favourites',
+                    items: [{ ticker: { symbol: 'AAPL' } }]
+                }
+            ];
+            (api.get as Mock).mockResolvedValue({ data: mockWatchlists });
+
+            const { result } = renderHook(() => useFavorite('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isFavorite).toBe(true));
+        });
+
+        it('returns false if symbol is in another list but not Favourites', async () => {
+            const mockWatchlists = [
+                {
+                    id: 'other-id',
+                    name: 'Other List',
+                    items: [{ ticker: { symbol: 'AAPL' } }]
+                },
+                {
+                    id: 'fav-id',
+                    name: 'Favourites',
+                    items: []
+                }
+            ];
+            (api.get as Mock).mockResolvedValue({ data: mockWatchlists });
+
+            const { result } = renderHook(() => useFavorite('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isFavorite).toBe(false));
+        });
+
+        it('returns false if symbol is not in any list', async () => {
+            const mockWatchlists = [{ id: 'fav-id', name: 'Favourites', items: [] }];
+            (api.get as Mock).mockResolvedValue({ data: mockWatchlists });
+
+            const { result } = renderHook(() => useFavorite('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isFavorite).toBe(false));
         });
     });
 });

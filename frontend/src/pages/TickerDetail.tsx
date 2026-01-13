@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
     TrendingUp,
     TrendingDown,
@@ -40,10 +40,9 @@ import {
     useTickerResearch,
     useTriggerResearch,
     usePostComment,
-    useDeleteResearch,
-    useToggleFavorite
+    useDeleteResearch
 } from '../hooks/useTicker';
-import { useWatchlists } from '../hooks/useWatchlist';
+import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
@@ -149,21 +148,14 @@ export function TickerDetail() {
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
-    const { data: watchlists = [] } = useWatchlists();
 
-    const isFavorite = watchlists?.some(wl =>
-        wl.items?.some(item => item.ticker.symbol === symbol)
-    ) ?? false;
-
-    // Optimistic Favorite State
-    const [optimisticFavorite, setOptimisticFavorite] = useState<boolean | null>(null);
-    const isFavEffectively = optimisticFavorite !== null ? optimisticFavorite : isFavorite;
+    // Unified Favorite Hook
+    const { isFavorite, toggle, isLoading: isFavLoading } = useFavorite(symbol);
 
     // -- Mutations --
     const triggerResearchMutation = useTriggerResearch();
     const postCommentMutation = usePostComment();
     const deleteResearchMutation = useDeleteResearch();
-    const favoriteMutation = useToggleFavorite();
 
     const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
         if (!symbol) return;
@@ -315,13 +307,13 @@ export function TickerDetail() {
                                 {/* Row 1: Identity & Actions */}
                                 <div className="flex items-start gap-4 py-2 mb-2">
                                     {/* Left: Identity - Logo & Back */}
-                                    <Link
-                                        to="/dashboard"
-                                        aria-label="Back to dashboard"
-                                        className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1"
+                                    <button
+                                        onClick={() => location.key !== 'default' ? navigate(-1) : navigate('/dashboard')}
+                                        aria-label="Go back"
+                                        className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1 transition-colors"
                                     >
                                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                                    </Link>
+                                    </button>
                                     <div
                                         className="relative w-14 h-14 shrink-0"
                                         onDoubleClick={handleLogoDoubleClick}
@@ -398,17 +390,13 @@ export function TickerDetail() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="h-6 gap-1.5 rounded-full border-yellow-500/50 text-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400 text-xs font-semibold uppercase tracking-wider px-2"
-                                                    onClick={() => {
-                                                        if (symbol) {
-                                                            setOptimisticFavorite(!isFavEffectively);
-                                                            favoriteMutation.mutate(symbol);
-                                                        }
-                                                    }}
-                                                    title={isFavEffectively ? "Remove from Favorites" : "Add to Favorites"}
+                                                    onClick={() => toggle()}
+                                                    disabled={isFavLoading}
+                                                    title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                                                 >
                                                     <Star
                                                         size={14}
-                                                        className={isFavEffectively ? "fill-yellow-500" : ""}
+                                                        className={isFavorite ? "fill-yellow-500" : ""}
                                                     />
                                                     <span>Favourite</span>
                                                 </Button>
@@ -495,13 +483,13 @@ export function TickerDetail() {
                             <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
                                 <div className="flex items-start gap-3 relative">
-                                    <Link
-                                        to="/dashboard"
-                                        aria-label="Back to dashboard"
-                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center"
+                                    <button
+                                        onClick={() => location.key !== 'default' ? navigate(-1) : navigate('/dashboard')}
+                                        aria-label="Go back"
+                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center transition-colors"
                                     >
                                         <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                                    </Link>
+                                    </button>
 
                                     <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 
@@ -551,16 +539,12 @@ export function TickerDetail() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-6 w-6 rounded-full -ml-1 hover:bg-transparent text-muted-foreground"
-                                                    onClick={() => {
-                                                        if (symbol) {
-                                                            setOptimisticFavorite(!isFavEffectively);
-                                                            favoriteMutation.mutate(symbol);
-                                                        }
-                                                    }}
+                                                    onClick={() => toggle()}
+                                                    disabled={isFavLoading}
                                                 >
                                                     <Star
                                                         size={16}
-                                                        className={isFavEffectively ? "fill-yellow-500 text-yellow-500" : ""}
+                                                        className={isFavorite ? "fill-yellow-500 text-yellow-500" : ""}
                                                     />
                                                 </Button>
                                             </div>

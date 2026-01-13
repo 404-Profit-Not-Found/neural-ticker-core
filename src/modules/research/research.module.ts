@@ -9,6 +9,7 @@ import { MarketDataModule } from '../market-data/market-data.module';
 import { UsersModule } from '../users/users.module';
 import { WatchlistModule } from '../watchlist/watchlist.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
+import { PortfolioModule } from '../portfolio/portfolio.module';
 
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -20,9 +21,10 @@ import { QualityScoringService } from './quality-scoring.service';
     LlmModule,
     forwardRef(() => TickersModule),
     forwardRef(() => MarketDataModule),
-    UsersModule,
+    forwardRef(() => UsersModule),
     forwardRef(() => RiskRewardModule),
     forwardRef(() => WatchlistModule),
+    forwardRef(() => PortfolioModule),
     NotificationsModule,
   ],
   controllers: [ResearchController],

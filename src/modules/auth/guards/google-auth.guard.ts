@@ -41,6 +41,7 @@ export class GoogleAuthGuard extends AuthGuard('google') {
     return {
       callbackURL,
       state,
+      prompt: 'select_account',
     };
   }
 }
