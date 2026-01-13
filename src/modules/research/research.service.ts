@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not } from 'typeorm';
+import { Repository, Like, LessThan, Not, MoreThanOrEqual } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -18,6 +18,7 @@ import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 import { CreditService } from '../users/credit.service'; // Added
 import { WatchlistService } from '../watchlist/watchlist.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
@@ -49,6 +50,7 @@ export class ResearchService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly watchlistService: WatchlistService,
+    private readonly portfolioService: PortfolioService,
 
     private readonly creditService: CreditService,
     private readonly qualityScoringService: QualityScoringService,
@@ -934,6 +936,22 @@ Title:`;
         });
       });
 
+      // 2. Fetch Portfolio Positions and add their symbols
+      try {
+        const portfolioPositions = await this.portfolioService.findAll(userId);
+        portfolioPositions.forEach((position) => {
+          if (position.symbol) {
+            allTickers.add(position.symbol);
+          }
+        });
+        this.logger.log(
+          `Digest sources: ${watchlists.flatMap((w) => w.items).length} watchlist items, ${portfolioPositions.length} portfolio positions`,
+        );
+      } catch (portfolioError) {
+        this.logger.warn(`Failed to fetch portfolio positions: ${portfolioError}`);
+        // Continue with watchlist items only
+      }
+
       const distinctSymbols = Array.from(allTickers);
 
       if (distinctSymbols.length > 0) {
@@ -1133,6 +1151,20 @@ Title:`;
   // Helper alias
   async getCachedDigest(userId: string): Promise<ResearchNote | null> {
     return this.getOrGenerateDailyDigest(userId);
+  }
+
+  async deletePersonalizedDigest(userId: string): Promise<void> {
+    const digests = await this.noteRepo.find({
+      where: {
+        user_id: userId,
+        title: Like('Smart News Briefing%'),
+      },
+    });
+
+    if (digests.length > 0) {
+      await this.noteRepo.remove(digests);
+      this.logger.log(`Deleted ${digests.length} personalized digests for user ${userId}`);
+    }
   }
 
   private async processMarketNewsTicket(note: ResearchNote): Promise<void> {

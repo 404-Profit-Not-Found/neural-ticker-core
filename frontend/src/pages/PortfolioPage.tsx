@@ -246,13 +246,13 @@ export function PortfolioPage() {
             <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
               <Button
                 onClick={() => setIsAddOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-10 shadow-sm flex-1 sm:flex-initial"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-8 shadow-sm flex-1 sm:flex-initial"
               >
                 <Plus size={16} />
                 Add Position
               </Button>
 
-              <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-10">
+              <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-8">
                 <button
                   onClick={() => setViewMode('table')}
                   className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}

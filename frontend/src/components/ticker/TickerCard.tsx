@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle } from 'lucide-react';
+import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle, Star } from 'lucide-react';
 import { Sparkline } from '../ui/Sparkline';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { VerdictBadge } from './VerdictBadge';
+import { useWatchlists } from '../../hooks/useWatchlist';
+import { useToggleFavorite } from '../../hooks/useTicker';
 import type { MarketStatusData } from '../../hooks/useMarketStatus';
 
 export interface TickerCardProps {
@@ -71,6 +74,21 @@ export function TickerCard({
 
     const status = marketStatus || fetchedStatus;
 
+    // Watchlist / Favorite state
+    const { data: watchlists = [] } = useWatchlists();
+    const toggleFavoriteMutation = useToggleFavorite();
+    const isFavorite = watchlists?.some(wl =>
+        wl.items?.some(item => item.ticker.symbol === symbol)
+    ) ?? false;
+    const [optimisticFavorite, setOptimisticFavorite] = useState<boolean | null>(null);
+    const isFavEffectively = optimisticFavorite !== null ? optimisticFavorite : isFavorite;
+
+    const handleToggleFavorite = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent card navigation
+        setOptimisticFavorite(!isFavEffectively);
+        toggleFavoriteMutation.mutate(symbol);
+    };
+
     // Market session display
     const sessionLabel = status?.session ? getSessionLabel(status.session) : 'Closed';
     const sessionColor = status?.session ? getSessionColor(status.session) : 'text-muted-foreground';
@@ -93,7 +111,7 @@ export function TickerCard({
         <div
             onClick={() => navigate(`/ticker/${symbol}`)}
             className={cn(
-                "group flex flex-col p-4 rounded-lg border border-border sm:border-border/50 bg-transparent hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full min-w-[320px] sm:min-w-0",
+                "ticker-card group flex flex-col p-4 rounded-lg border border-border sm:border-border/50 bg-transparent hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full min-w-[320px] sm:min-w-0",
                 className
             )}
         >
@@ -103,7 +121,20 @@ export function TickerCard({
                     <TickerLogo url={logoUrl} symbol={symbol} className="w-12 h-12 shrink-0" />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                            <div className="font-bold text-xl leading-none">{symbol}</div>
+                            <div className="flex items-center gap-1">
+                                <span className="font-bold text-xl leading-none">{symbol}</span>
+                                {/* Star / Favorite Button */}
+                                <button
+                                    onClick={handleToggleFavorite}
+                                    className="p-0.5 rounded-full hover:bg-muted/50 transition-colors"
+                                    title={isFavEffectively ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                                >
+                                    <Star
+                                        size={16}
+                                        className={isFavEffectively ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground/50 hover:text-yellow-500'}
+                                    />
+                                </button>
+                            </div>
                             {/* AI Badge (Aligned Right) */}
                             <VerdictBadge
                                 risk={risk}

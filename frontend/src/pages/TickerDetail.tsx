@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
     TrendingUp,
     TrendingDown,
@@ -315,13 +315,13 @@ export function TickerDetail() {
                                 {/* Row 1: Identity & Actions */}
                                 <div className="flex items-start gap-4 py-2 mb-2">
                                     {/* Left: Identity - Logo & Back */}
-                                    <Link
-                                        to="/dashboard"
-                                        aria-label="Back to dashboard"
-                                        className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1"
+                                    <button
+                                        onClick={() => location.key !== 'default' ? navigate(-1) : navigate('/dashboard')}
+                                        aria-label="Go back"
+                                        className="relative z-50 rounded-full hover:bg-muted h-10 w-10 shrink-0 flex items-center justify-center mt-1 transition-colors"
                                     >
                                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                                    </Link>
+                                    </button>
                                     <div
                                         className="relative w-14 h-14 shrink-0"
                                         onDoubleClick={handleLogoDoubleClick}
@@ -495,13 +495,13 @@ export function TickerDetail() {
                             <div className="md:hidden py-4 border-b border-border/40 mb-6">
                                 {/* Top: Back + Logo + Symbol/Name */}
                                 <div className="flex items-start gap-3 relative">
-                                    <Link
-                                        to="/dashboard"
-                                        aria-label="Back to dashboard"
-                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center"
+                                    <button
+                                        onClick={() => location.key !== 'default' ? navigate(-1) : navigate('/dashboard')}
+                                        aria-label="Go back"
+                                        className="relative z-50 rounded-full hover:bg-muted h-8 w-8 shrink-0 mt-1 flex items-center justify-center transition-colors"
                                     >
                                         <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                                    </Link>
+                                    </button>
 
                                     <TickerLogo url={profile?.logo_url} symbol={profile?.symbol} className="w-10 h-10 shrink-0" />
 

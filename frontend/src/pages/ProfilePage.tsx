@@ -17,6 +17,8 @@ import {
     Plus,
     Camera,
     Cloud,
+    Check,
+    Loader2,
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -30,6 +32,8 @@ declare const __APP_VERSION__: string;
 export function ProfilePage() {
     const { user, refreshSession } = useAuth();
     const [nickname, setNickname] = useState('');
+    const [originalNickname, setOriginalNickname] = useState('');
+    const [isSavingNickname, setIsSavingNickname] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState('');
     const [theme, setTheme] = useState('g100');
     const [isEditingAvatar, setIsEditingAvatar] = useState(false);
@@ -53,7 +57,9 @@ export function ProfilePage() {
 
     useEffect(() => {
         if (user) {
-            setNickname(user.nickname || '');
+            const nick = user.nickname || '';
+            setNickname(nick);
+            setOriginalNickname(nick);
             setAvatarUrl(user.avatar_url || '');
             setTheme(user.theme || 'g100');
         }
@@ -89,11 +95,21 @@ export function ProfilePage() {
         [saveChanges]
     );
 
-    // Handle nickname change with auto-save
+    // Handle nickname change (no auto-save, user must click confirm)
     const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newNickname = e.target.value;
-        setNickname(newNickname);
-        debouncedSave(newNickname, avatarUrl, theme);
+        setNickname(e.target.value);
+    };
+
+    // Explicit save for nickname
+    const handleNicknameSave = async () => {
+        if (nickname === originalNickname) return;
+        setIsSavingNickname(true);
+        try {
+            await saveChanges(nickname, avatarUrl, theme);
+            setOriginalNickname(nickname);
+        } finally {
+            setIsSavingNickname(false);
+        }
     };
 
     // Handle avatar URL change with auto-save
@@ -227,12 +243,29 @@ export function ProfilePage() {
                                     <div className="text-xs text-muted-foreground">Your public display name</div>
                                 </div>
                             </div>
-                            <Input
-                                value={nickname}
-                                onChange={handleNicknameChange}
-                                placeholder="Enter nickname"
-                                className="bg-muted/30 border-border/40 h-11"
-                            />
+                            <div className="relative">
+                                <Input
+                                    value={nickname}
+                                    onChange={handleNicknameChange}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleNicknameSave()}
+                                    placeholder="Enter nickname"
+                                    className="bg-muted/30 border-border/40 h-11 pr-10"
+                                />
+                                {nickname !== originalNickname && (
+                                    <button
+                                        onClick={handleNicknameSave}
+                                        disabled={isSavingNickname}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                                        title="Save nickname"
+                                    >
+                                        {isSavingNickname ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                            <Check size={14} />
+                                        )}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         <div className="h-px bg-border/40" />
@@ -316,7 +349,7 @@ export function ProfilePage() {
                                     onClick={() => handleThemeChange(t.id)}
                                     className={cn(
                                         "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all",
-                                        (theme === t.id || (t.id === 'dark' && theme.startsWith('g')))
+                                        (theme === t.id || (t.id === 'dark' && theme.startsWith('g') && theme !== 'gray'))
                                             ? "bg-background text-foreground shadow-sm border border-border/50"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}

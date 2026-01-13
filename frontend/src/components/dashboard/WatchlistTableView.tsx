@@ -20,9 +20,9 @@ import {
     Flame,
     Newspaper,
     MoreVertical,
-    Trash2,
     Search,
-    MessageCircle
+    MessageCircle,
+    Star
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -91,20 +91,23 @@ export function WatchlistTableView({
     const columns = useMemo(() => {
         const columnHelper = createColumnHelper<TickerData>();
         return [
-            // 1. Asset Column (Symbol, Name, Insights Next to Symbol)
+            // 1. Asset Column (Logo, Symbol + Star, Company, Industry + Icons)
             columnHelper.accessor('symbol', {
                 header: 'Asset',
+                size: 280,
+                minSize: 220,
                 cell: (info) => {
-                    // Watchlist uses flat counts in TickerData
                     const research = info.row.original.researchCount;
                     const news = info.row.original.newsCount;
                     const social = info.row.original.socialCount;
                     const hasInsights = (research || 0) + (news || 0) + (social || 0) > 0;
+                    const sector = info.row.original.sector;
 
                     return (
-                        <div className="flex items-start gap-3">
-                            <div 
-                                className="cursor-pointer"
+                        <div className="flex items-center gap-3">
+                            {/* Logo */}
+                            <div
+                                className="cursor-pointer shrink-0"
                                 onClick={() => navigate(`/ticker/${info.getValue()}`)}
                             >
                                 <TickerLogo
@@ -113,18 +116,42 @@ export function WatchlistTableView({
                                     className="w-10 h-10 rounded-full"
                                 />
                             </div>
+
+                            {/* Text Content */}
                             <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-2">
-                                    <span 
+                                {/* Row 1: Symbol + Star next to it */}
+                                <div className="flex items-center gap-1.5">
+                                    <span
                                         className="text-base font-bold text-foreground hover:underline cursor-pointer"
                                         onClick={() => navigate(`/ticker/${info.getValue()}`)}
                                     >
                                         {info.getValue()}
                                     </span>
-                                    
-                                    {/* Insight Icons Next to Symbol */}
+                                    {/* Star - Favorite indicator (next to symbol) */}
+                                    <span
+                                        title="Remove from watchlist"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemove(info.row.original.itemId || '', info.row.original.symbol);
+                                        }}
+                                        className="cursor-pointer"
+                                    >
+                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 hover:text-yellow-500 hover:fill-yellow-500" />
+                                    </span>
+                                </div>
+
+                                {/* Row 2: Company Name */}
+                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.company}>
+                                    {info.row.original.company}
+                                </span>
+
+                                {/* Row 3: Industry + Insight Icons */}
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={sector}>
+                                        {sector || 'Unknown'}
+                                    </span>
                                     {hasInsights && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1.5">
                                             {research ? (
                                                 <div className="flex items-center gap-0.5 text-purple-400" title={`${research} Reports`}>
                                                     <Brain size={10} />
@@ -146,10 +173,6 @@ export function WatchlistTableView({
                                         </div>
                                     )}
                                 </div>
-                                
-                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={info.row.original.company}>
-                                    {info.row.original.company}
-                                </span>
                             </div>
                         </div>
                     );
@@ -163,21 +186,21 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const change = info.getValue();
                     const price = info.row.original.price;
-                    
+
                     if (!price) return '-';
 
                     const isPositive = (change || 0) >= 0;
-                    
+
                     return (
                         <div className="flex flex-col items-end">
                             <span className="text-sm font-mono font-medium text-foreground/70">
                                 ${price.toFixed(2)}
                             </span>
                             {change !== undefined && change !== null ? (
-                               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
-                                    {isPositive ? <ArrowUp size={12} className="mr-0.5"/> : <ArrowDown size={12} className="mr-0.5"/>}
+                                <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                                    {isPositive ? <ArrowUp size={12} className="mr-0.5" /> : <ArrowDown size={12} className="mr-0.5" />}
                                     {Math.abs(change).toFixed(2)}%
-                               </div>
+                                </div>
                             ) : <span className="text-xs text-muted-foreground">-</span>}
                         </div>
                     );
@@ -192,10 +215,10 @@ export function WatchlistTableView({
                     if (!data || data.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
                     return (
                         <div className="w-[100px] h-8 flex items-center justify-center">
-                            <Sparkline 
-                                data={data} 
-                                width={100} 
-                                height={32} 
+                            <Sparkline
+                                data={data}
+                                width={100}
+                                height={32}
                                 className="opacity-80 group-hover:opacity-100 transition-opacity"
                             />
                         </div>
@@ -212,10 +235,10 @@ export function WatchlistTableView({
                     if (!row.fiftyTwoWeekHigh || !row.fiftyTwoWeekLow) return <span className="text-muted-foreground text-xs">-</span>;
 
                     return (
-                        <FiftyTwoWeekRange 
-                            low={row.fiftyTwoWeekLow} 
-                            high={row.fiftyTwoWeekHigh} 
-                            current={row.price} 
+                        <FiftyTwoWeekRange
+                            low={row.fiftyTwoWeekLow}
+                            high={row.fiftyTwoWeekHigh}
+                            current={row.price}
                             showLabels={true}
                         />
                     );
@@ -240,7 +263,7 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const val = info.getValue();
                     if (val === undefined || val === null) return '-';
-                    
+
                     let colorClass = 'text-muted-foreground';
                     let Icon = ShieldCheck;
                     if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
@@ -263,7 +286,7 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const val = info.getValue();
                     if (val === undefined || val === null) return '-';
-                    
+
                     let colorClass = 'text-muted-foreground';
                     if (val >= 7.5) colorClass = 'text-emerald-500';
                     else if (val >= 5.0) colorClass = 'text-yellow-500';
@@ -288,10 +311,10 @@ export function WatchlistTableView({
                     const isPositive = num > 0;
 
                     return (
-                    <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
-                        {isPositive && <ArrowUp size={12} className="mr-0.5" />}
-                        {num.toFixed(1)}%
-                    </div>
+                        <div className={cn('flex items-center font-bold text-xs', isPositive ? 'text-emerald-500' : 'text-muted-foreground')}>
+                            {isPositive && <ArrowUp size={12} className="mr-0.5" />}
+                            {num.toFixed(1)}%
+                        </div>
                     );
                 },
             }),
@@ -306,10 +329,10 @@ export function WatchlistTableView({
                     const risk = row.riskScore ?? 0;
                     const upside = row.potentialUpside ?? 0;
                     const downside = row.potentialDownside ?? 0;
-                    
+
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
-                            <VerdictBadge 
+                            <VerdictBadge
                                 risk={risk}
                                 upside={upside}
                                 downside={downside}
@@ -358,26 +381,15 @@ export function WatchlistTableView({
                 }
             }),
 
-            // Actions (Keep as is)
+            // Actions (Keep as is - but maybe redundant now that we have star?)
+            // Keeping for "More" menu potential later
             columnHelper.display({
                 id: 'actions',
                 header: '',
-                cell: (info) => (
-                    <div className="flex items-center gap-1">
+                cell: () => (
+                    <div className="flex items-center gap-1 justify-end">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                             <MoreVertical className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
-                            }}
-                            title="Remove from watchlist"
-                        >
-                            <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
                 ),
@@ -397,7 +409,7 @@ export function WatchlistTableView({
         onColumnFiltersChange: setColumnFilters,
         state: { sorting, globalFilter, columnFilters },
         initialState: {
-            columnVisibility: { sector: false },
+            columnVisibility: {}, // Sector is now visible by default
         }
     });
 
@@ -417,6 +429,10 @@ export function WatchlistTableView({
                                         key={header.id}
                                         className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none whitespace-nowrap"
                                         onClick={header.column.getToggleSortingHandler()}
+                                        style={{
+                                            width: header.column.columnDef.size,
+                                            minWidth: header.column.columnDef.minSize
+                                        }}
                                     >
                                         <div className="flex items-center gap-1">
                                             {flexRender(header.column.columnDef.header, header.getContext())}

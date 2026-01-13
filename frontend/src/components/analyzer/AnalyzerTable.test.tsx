@@ -23,6 +23,16 @@ vi.mock('../analyzer/FilterBar', () => ({
   FilterBar: () => <div data-testid="filter-bar">Filter Bar</div>,
 }));
 
+vi.mock('../../hooks/useWatchlist', () => ({
+  useWatchlists: vi.fn(() => ({ data: [] })),
+  useAddTickerToWatchlist: vi.fn(() => ({ mutate: vi.fn() })),
+  useRemoveTickerFromWatchlist: vi.fn(() => ({ mutate: vi.fn() })),
+}));
+
+vi.mock('../ui/toast', () => ({
+  useToast: vi.fn(() => ({ showToast: vi.fn() })),
+}));
+
 
 import { useStockAnalyzer } from '../../hooks/useStockAnalyzer';
 
@@ -70,7 +80,7 @@ describe('AnalyzerTable', () => {
   it('renders table view correctly', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
     renderWithRouter(<AnalyzerTable {...defaultProps} viewMode="table" />);
-    
+
     expect(screen.getByTestId('table-view')).toBeInTheDocument();
     expect(screen.queryByTestId('grid-view')).not.toBeInTheDocument();
   });
@@ -78,7 +88,7 @@ describe('AnalyzerTable', () => {
   it('renders grid view correctly', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
     renderWithRouter(<AnalyzerTable {...defaultProps} viewMode="grid" />);
-    
+
     expect(screen.getByTestId('grid-view')).toBeInTheDocument();
     expect(screen.queryByTestId('table-view')).not.toBeInTheDocument();
   });
@@ -86,7 +96,7 @@ describe('AnalyzerTable', () => {
   it('calls onViewModeChange when toggled', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
     renderWithRouter(<AnalyzerTable {...defaultProps} />);
-    
+
     const gridBtn = screen.getByTitle('Grid View');
     fireEvent.click(gridBtn);
     expect(defaultProps.onViewModeChange).toHaveBeenCalledWith('grid');
@@ -99,9 +109,9 @@ describe('AnalyzerTable', () => {
   it('passes filters to hook', () => {
     mockUseStockAnalyzer.mockReturnValue({ data: mockData, isLoading: false });
     const filters = { risk: ['High'], aiRating: ['Buy'], upside: '>20%', sector: [], overallScore: null };
-    
+
     renderWithRouter(<AnalyzerTable {...defaultProps} filters={filters} />);
-    
+
     expect(mockUseStockAnalyzer).toHaveBeenCalledWith(expect.objectContaining({
       risk: ['High'],
       aiRating: ['Buy'],

@@ -315,6 +315,19 @@ export function AdminConsole() {
         }
     };
 
+    const handleResetTutorial = async (userId: string) => {
+        if (!confirm('Are you sure you want to reset the tutorial state for this user? This will wipe their Watchlist, Portfolio, and Digest.')) return;
+        try {
+            await AdminService.resetTutorial(userId);
+            toast.success('User tutorial state reset successfully');
+            setIsUserDetailOpen(false);
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = (err as any).response?.data?.message || 'Failed to reset tutorial state';
+            toast.error(msg);
+        }
+    };
+
     // Requests Actions
     const handleApproveRequest = async (id: string, symbol: string) => {
         try {
@@ -756,7 +769,11 @@ export function AdminConsole() {
                                                                 </TableHeader>
                                                                 <TableBody className="space-y-2">
                                                                     {paginatedData.map((user, index) => (
-                                                                        <TableRow key={user.id || user.email || `user-${index}`} className="bg-card hover:bg-card/80 transition-colors border-none rounded-lg group text-xs sm:text-sm">
+                                                                        <TableRow
+                                                                            key={user.id || user.email || `user-${index}`}
+                                                                            className="bg-card hover:bg-card/80 transition-colors border-none rounded-lg group text-xs sm:text-sm cursor-pointer"
+                                                                            onClick={() => openUserDetail(user)}
+                                                                        >
                                                                             <TableCell className="pl-6 font-medium rounded-l-lg py-3">
                                                                                 <div className="flex items-center gap-3">
                                                                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground ring-1 ring-border/50 overflow-hidden shrink-0">
@@ -787,12 +804,16 @@ export function AdminConsole() {
                                                                                 {formatTimestamp(user.created_at || user.invited_at)}
                                                                             </TableCell>
                                                                             <TableCell className="text-right pr-6 rounded-r-lg py-3">
-                                                                                <div className="flex items-center justify-end gap-1">
+                                                                                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                                                                                     {/* DESKTOP ACTIONS - Always Visible with Text */}
                                                                                     <Popover>
                                                                                         <PopoverTrigger asChild>
-                                                                                            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs hover:bg-primary/10 hover:text-primary transition-colors">
-                                                                                                <Sparkles size={12} />
+                                                                                            <Button
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                className="h-7 gap-1.5 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                                                                            >
+                                                                                                <Sparkles size={12} className="text-purple-400" />
                                                                                                 Tier
                                                                                             </Button>
                                                                                         </PopoverTrigger>
@@ -819,10 +840,10 @@ export function AdminConsole() {
                                                                                     <Button
                                                                                         variant="ghost"
                                                                                         size="sm"
-                                                                                        className="h-7 gap-1.5 text-xs hover:bg-amber-400/10 hover:text-amber-400 transition-colors"
+                                                                                        className="h-7 gap-1.5 text-xs text-muted-foreground hover:bg-pink-500/10 hover:text-pink-500 transition-colors"
                                                                                         onClick={() => handleGiftCredits(user)}
                                                                                     >
-                                                                                        <Gift size={12} />
+                                                                                        <Gift size={12} className="text-pink-500" />
                                                                                         Gift
                                                                                     </Button>
 
@@ -830,23 +851,33 @@ export function AdminConsole() {
                                                                                         <Button
                                                                                             variant="ghost"
                                                                                             size="sm"
-                                                                                            className="h-7 gap-1.5 text-xs hover:bg-destructive/10 hover:text-destructive"
+                                                                                            className="h-7 gap-1.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                                                                             onClick={() => handleRevoke(user)}
                                                                                         >
-                                                                                            <Ban size={12} />
+                                                                                            <Ban size={12} className="text-destructive" />
                                                                                             Ban
                                                                                         </Button>
                                                                                     ) : (
                                                                                         <Button
                                                                                             variant="ghost"
                                                                                             size="sm"
-                                                                                            className="h-7 gap-1.5 text-xs hover:bg-emerald-500/10 hover:text-emerald-500 text-emerald-500"
+                                                                                            className="h-7 gap-1.5 text-xs text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500"
                                                                                             onClick={() => handleUnban(user)}
                                                                                         >
-                                                                                            <CheckCircle size={12} />
+                                                                                            <CheckCircle size={12} className="text-emerald-500" />
                                                                                             Unban
                                                                                         </Button>
                                                                                     )}
+
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                                                                        onClick={() => openUserDetail(user)}
+                                                                                        title="View Details / Reset Tutorial"
+                                                                                    >
+                                                                                        <List size={16} className="text-blue-500" />
+                                                                                    </Button>
                                                                                 </div>
                                                                             </TableCell>
                                                                         </TableRow>
@@ -913,6 +944,7 @@ export function AdminConsole() {
                 onUnban={handleUnban}
                 onApprove={handleApprove}
                 onGiftCredits={handleGiftCredits}
+                onResetTutorial={handleResetTutorial}
             />
         </div>
     );

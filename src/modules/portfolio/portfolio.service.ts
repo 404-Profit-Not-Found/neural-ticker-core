@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PortfolioPosition } from './entities/portfolio-position.entity';
@@ -19,7 +19,9 @@ export class PortfolioService {
     private readonly analysisRepo: Repository<PortfolioAnalysis>,
     private readonly marketDataService: MarketDataService,
     private readonly llmService: LlmService,
+    @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
+    @Inject(forwardRef(() => CreditService))
     private readonly creditService: CreditService,
   ) {}
 
