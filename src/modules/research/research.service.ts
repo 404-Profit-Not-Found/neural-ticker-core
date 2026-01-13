@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not, MoreThanOrEqual } from 'typeorm';
+import { Repository, Like, LessThan, Not } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -904,11 +904,15 @@ Title:`;
         // Double check specifically for "Tutorial" preference if we want to be strict,
         // but explicit user request implies preventing it if they just added favorites.
         // So we strictly enforce Portfolio presence.
-        this.logger.log(`Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`);
+        this.logger.log(
+          `Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`,
+        );
         return null;
       }
     } catch (e) {
-      this.logger.warn(`Failed to check portfolio for digest eligibility: ${e.message}`);
+      this.logger.warn(
+        `Failed to check portfolio for digest eligibility: ${e.message}`,
+      );
       // Fail safe: If we can't check, maybe we shouldn't block? Or should we?
       // Let's assume safe to proceed if check fails, or maybe safe to block.
       // Blocking is safer to prevent spam.
@@ -968,7 +972,9 @@ Title:`;
           `Digest sources: ${watchlists.flatMap((w) => w.items).length} watchlist items, ${portfolioPositions.length} portfolio positions`,
         );
       } catch (portfolioError) {
-        this.logger.warn(`Failed to fetch portfolio positions: ${portfolioError}`);
+        this.logger.warn(
+          `Failed to fetch portfolio positions: ${portfolioError}`,
+        );
         // Continue with watchlist items only
       }
 
@@ -1183,7 +1189,9 @@ Title:`;
 
     if (digests.length > 0) {
       await this.noteRepo.remove(digests);
-      this.logger.log(`Deleted ${digests.length} personalized digests for user ${userId}`);
+      this.logger.log(
+        `Deleted ${digests.length} personalized digests for user ${userId}`,
+      );
     }
   }
 

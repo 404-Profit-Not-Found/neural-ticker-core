@@ -445,7 +445,7 @@ export function NewsFeed() {
                                                     </Badge>
                                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                                         <Calendar className="w-3 h-3" />
-                                                        {formatDate(item.datetime)}
+                                                        {formatDate(item.datetime).replace(/,/g, ' ·')}
                                                     </span>
                                                 </div>
                                                 <a

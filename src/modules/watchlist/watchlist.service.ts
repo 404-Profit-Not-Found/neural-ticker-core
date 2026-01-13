@@ -133,12 +133,12 @@ export class WatchlistService {
       id: itemId,
       watchlist_id: watchlistId,
     });
-    
+
     // Optional: Check if affected > 0? Not strictly necessary for void return but good for debugging.
     if (result.affected === 0) {
-       // It implies item didn't exist or mismatch, but idempotent delete is often fine.
-       // Check if we want to throw NotFound if ID provided but not found?
-       // For now, silent success is standard for delete.
+      // It implies item didn't exist or mismatch, but idempotent delete is often fine.
+      // Check if we want to throw NotFound if ID provided but not found?
+      // For now, silent success is standard for delete.
     }
   }
 

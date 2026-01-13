@@ -24,7 +24,10 @@ import type { Request, Response } from 'express';
 import { Public } from './public.decorator';
 import { GoogleAuthExceptionFilter } from './filters/google-auth-exception.filter';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { CreateUserTokenDto, FirebaseLoginDto } from './dto/create-user-token.dto';
+import {
+  CreateUserTokenDto,
+  FirebaseLoginDto,
+} from './dto/create-user-token.dto';
 
 @Public()
 @ApiTags('Auth')

@@ -153,7 +153,7 @@ export function useRemoveTickerFromWatchlist() {
 
       return { previousWatchlists };
     },
-    onError: (err, variables, context) => {
+    onError: (_err, _variables, context) => {
         if (context?.previousWatchlists) {
             queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
         }

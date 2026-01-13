@@ -78,6 +78,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
+                                                title="Remove from watchlist" // Added for test stability
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onRemove(item.itemId || '', item.symbol);

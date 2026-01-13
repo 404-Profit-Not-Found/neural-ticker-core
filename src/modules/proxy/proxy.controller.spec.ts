@@ -66,7 +66,10 @@ describe('ProxyController', () => {
         send: jest.fn(),
       };
 
-      await controller.proxyImage('https://evilfinnhub.io/image.png', res as any);
+      await controller.proxyImage(
+        'https://evilfinnhub.io/image.png',
+        res as any,
+      );
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');

@@ -9,7 +9,10 @@ export class CreateUserTokenDto {
 }
 
 export class FirebaseLoginDto {
-  @ApiProperty({ example: 'firebase_id_token', description: 'Firebase ID Token' })
+  @ApiProperty({
+    example: 'firebase_id_token',
+    description: 'Firebase ID Token',
+  })
   @IsNotEmpty()
   @IsString()
   token: string;

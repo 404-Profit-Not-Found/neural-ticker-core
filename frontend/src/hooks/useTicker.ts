@@ -17,7 +17,14 @@ export function useTickerLogo(symbol: string, url?: string) {
         queryKey: tickerKeys.logo(symbol),
         queryFn: async () => {
             if (!url) return null;
-            const isProxy = url.includes('finnhub.io');
+            let isProxy = false;
+            try {
+                const urlObj = new URL(url);
+                isProxy = urlObj.hostname === 'finnhub.io' || urlObj.hostname.endsWith('.finnhub.io');
+            } catch {
+                // Invalid URL, treat as not proxy
+                isProxy = false;
+            }
             
             let blob: Blob;
             try {

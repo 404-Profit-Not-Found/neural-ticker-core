@@ -74,7 +74,7 @@ describe('ResearchService', () => {
   const mockQualityScoringService = {
     score: jest.fn(),
   };
-  
+
   const mockPortfolioService = {
     findAll: jest.fn(),
   };
