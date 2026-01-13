@@ -862,23 +862,40 @@ export class MarketDataService {
 
     // Fetch from API
     let news;
-    try {
-      news = await this.finnhubService.getCompanyNews(
-        symbol,
-        fromDate.toISOString().split('T')[0],
-        toDate.toISOString().split('T')[0],
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Finnhub news fetch failed for ${symbol}: ${getErrorMessage(error)}. Trying Yahoo fallback...`,
+    const isNonUSStock = symbol.includes('.');
+
+    if (isNonUSStock) {
+      this.logger.log(
+        `Non-US stock ${symbol} detected, skipping Finnhub news (often maps incorrectly). Using Yahoo Finance...`,
       );
       try {
         news = await this.fetchNewsFromYahoo(symbol);
       } catch (yError) {
         this.logger.error(
-          `Yahoo news fallback also failed: ${getErrorMessage(yError)}`,
+          `Yahoo news fallback for ${symbol} failed: ${getErrorMessage(yError)}`,
         );
-        throw error; // Re-throw original error if fallback fails
+        // Don't throw, just return empty so we don't break the snapshot
+        return [];
+      }
+    } else {
+      try {
+        news = await this.finnhubService.getCompanyNews(
+          symbol,
+          fromDate.toISOString().split('T')[0],
+          toDate.toISOString().split('T')[0],
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Finnhub news fetch failed for ${symbol}: ${getErrorMessage(error)}. Trying Yahoo fallback...`,
+        );
+        try {
+          news = await this.fetchNewsFromYahoo(symbol);
+        } catch (yError) {
+          this.logger.error(
+            `Yahoo news fallback also failed: ${getErrorMessage(yError)}`,
+          );
+          throw error; // Re-throw original error if fallback fails
+        }
       }
     }
 
