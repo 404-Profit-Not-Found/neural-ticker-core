@@ -13,19 +13,12 @@ import {
   ShieldCheck,
   AlertTriangle,
   Flame,
-  MessageCircle,
-  Star
+  MessageCircle
 } from 'lucide-react';
 import {
   useStockAnalyzer,
   type StockSnapshot,
 } from '../../hooks/useStockAnalyzer';
-import {
-  useWatchlists,
-  useAddTickerToWatchlist,
-  useRemoveTickerFromWatchlist,
-} from '../../hooks/useWatchlist';
-import { useToast } from '../ui/toast';
 import { useNavigate } from 'react-router-dom';
 import { AnalyzerTableView } from './AnalyzerTableView';
 import { AnalyzerGridView } from './AnalyzerGridView';
@@ -36,6 +29,7 @@ import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils'
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
 import { Sparkline } from "../ui/Sparkline";
+import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 import { FilterBar, type AnalyzerFilters } from './FilterBar';
 
@@ -66,49 +60,6 @@ export function AnalyzerTable({
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'ai_rating', desc: true },
   ]);
-
-  // Watchlist Data & Mutations
-  const { showToast } = useToast();
-  const { data: watchlists = [] } = useWatchlists();
-  const addTickerMutation = useAddTickerToWatchlist();
-  const removeTickerMutation = useRemoveTickerFromWatchlist();
-
-  // Simplified Watchlist Logic: Use the first watchlist by default for quick starring
-  const activeWatchlist = watchlists[0];
-  const watchlistItems = activeWatchlist?.items || []; // items are { id, ticker: { symbol } }
-
-  const isTickerInWatchlist = (symbol: string) => {
-    return watchlistItems.some((item) => item.ticker.symbol === symbol);
-  };
-
-  const toggleWatchlist = (symbol: string) => {
-    if (!activeWatchlist) {
-      showToast('No watchlist available. Please create one on the dashboard first.', 'error');
-      return;
-    }
-
-    const existingItem = watchlistItems.find((item) => item.ticker.symbol === symbol);
-
-    if (existingItem) {
-      // Remove
-      removeTickerMutation.mutate(
-        { watchlistId: activeWatchlist.id, itemId: existingItem.id },
-        {
-          onSuccess: () => showToast(`${symbol} removed from favorites`, 'success'),
-          onError: () => showToast('Failed to remove from favorites', 'error'),
-        }
-      );
-    } else {
-      // Add
-      addTickerMutation.mutate(
-        { watchlistId: activeWatchlist.id, symbol },
-        {
-          onSuccess: () => showToast(`${symbol} added to favorites`, 'success'),
-          onError: () => showToast('Failed to add to favorites', 'error'),
-        }
-      );
-    }
-  };
 
   // Fetch Data
   const { data, isLoading } = useStockAnalyzer({
@@ -167,23 +118,7 @@ export function AnalyzerTable({
                 </span>
 
                 {/* Star - Interactive Watchlist Toggle */}
-                <div
-                  className="cursor-pointer transition-transform active:scale-90"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleWatchlist(info.getValue());
-                  }}
-                  title={isTickerInWatchlist(info.getValue()) ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <Star
-                    className={cn(
-                      "h-4 w-4 transition-colors",
-                      isTickerInWatchlist(info.getValue())
-                        ? "text-yellow-400 fill-yellow-400 hover:text-yellow-500"
-                        : "text-muted-foreground/30 hover:text-yellow-400"
-                    )}
-                  />
-                </div>
+                <FavoriteStar symbol={info.getValue()} size={16} />
               </div>
 
               {/* Row 2: Company Name */}

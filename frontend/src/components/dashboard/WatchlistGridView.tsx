@@ -1,10 +1,8 @@
-import { Trash2, Star } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { cn } from '../../lib/api';
 import type { TickerData } from './WatchlistTableView';
-import { useToggleFavorite } from '../../hooks/useTicker';
-import { useWatchlists } from '../../hooks/useWatchlist';
 import { TickerCard } from '../ticker/TickerCard';
+import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 import { useAllMarketsStatus, getRegionForStatus } from '../../hooks/useMarketStatus';
 
@@ -15,14 +13,7 @@ interface WatchlistGridViewProps {
 }
 
 export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridViewProps) {
-    const { data: watchlists } = useWatchlists();
-    const toggleFavorite = useToggleFavorite();
     const { data: marketStatusRaw } = useAllMarketsStatus();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const favoritesList = watchlists?.find((w: any) => w.name === 'Favourites');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const favoritesSet = new Set(favoritesList?.items?.map((i: any) => i.ticker.symbol) || []);
 
     if (isLoading) {
         return (
@@ -78,6 +69,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6 text-muted-foreground hover:text-destructive bg-card/80 backdrop-blur-sm"
+                                    title="Remove from watchlist"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onRemove(item.itemId || '', item.symbol);
@@ -86,21 +78,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                                     <Trash2 className="h-3 w-3" />
                                 </Button>
                             ) : (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={cn(
-                                        "h-6 w-6 bg-card/80 backdrop-blur-sm transition-colors",
-                                        favoritesSet.has(item.symbol) ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
-                                    )}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleFavorite.mutate(item.symbol);
-                                    }}
-                                    disabled={toggleFavorite.isPending}
-                                >
-                                    <Star className={cn("h-4 w-4", favoritesSet.has(item.symbol) && "fill-current")} />
-                                </Button>
+                                <FavoriteStar symbol={item.symbol} className="bg-card/80 backdrop-blur-sm p-1 rounded-md" />
                             )}
                         </div>
                     </TickerCard>

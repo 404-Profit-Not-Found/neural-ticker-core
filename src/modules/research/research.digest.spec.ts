@@ -10,12 +10,14 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
 import { CreditService } from '../users/credit.service';
 
 describe('ResearchService - Digest', () => {
   let service: ResearchService;
   let marketDataService: any;
   let llmService: any;
+  let portfolioService: any;
 
   const mockRepo = {
     create: jest.fn().mockImplementation((dto) => dto),
@@ -25,6 +27,7 @@ describe('ResearchService - Digest', () => {
         Promise.resolve({ ...entity, id: 'saved-id' }),
       ),
     findOne: jest.fn(),
+    delete: jest.fn(),
   };
 
   const mockLlmService = {
@@ -44,6 +47,10 @@ describe('ResearchService - Digest', () => {
     getUserWatchlists: jest.fn(),
   };
 
+  const mockPortfolioService = {
+    findAll: jest.fn(),
+  };
+
   // Mock other dependencies to avoid errors
   const mockUsersService = {};
   const mockRiskRewardService = {};
@@ -61,6 +68,7 @@ describe('ResearchService - Digest', () => {
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: WatchlistService, useValue: mockWatchlistService },
+        { provide: PortfolioService, useValue: mockPortfolioService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QualityScoringService, useValue: { score: jest.fn() } },
         {
@@ -73,7 +81,11 @@ describe('ResearchService - Digest', () => {
     service = module.get<ResearchService>(ResearchService);
     marketDataService = module.get<MarketDataService>(MarketDataService);
     llmService = module.get<LlmService>(LlmService);
+    portfolioService = module.get<PortfolioService>(PortfolioService);
     jest.clearAllMocks();
+
+    // Default mock behavior: User HAS portfolio (Tutorial complete)
+    mockPortfolioService.findAll.mockResolvedValue([{ symbol: 'AAPL' }]);
   });
 
   it('should filter top tickers by impact score', async () => {
@@ -164,6 +176,7 @@ describe('ResearchService - Digest', () => {
 
   it('should return null if user has no watchlist tickers (strict mode)', async () => {
     mockWatchlistService.getUserWatchlists.mockResolvedValue([]);
+    mockPortfolioService.findAll.mockResolvedValueOnce([]); // Also no portfolio for this test
 
     // Even if market data has global opportunities, we should NOT use them
     mockMarketDataService.getAnalyzerTickers.mockResolvedValue({
@@ -216,5 +229,19 @@ describe('ResearchService - Digest', () => {
         tickers: expect.arrayContaining(['BORING1', 'BORING2', 'BORING3']),
       }),
     );
+  });
+
+  it('should return null if user has no portfolio positions (tutorial incomplete)', async () => {
+    mockWatchlistService.getUserWatchlists.mockResolvedValue([
+      { items: [{ ticker: { symbol: 'AAPL' } }] },
+    ]);
+    mockPortfolioService.findAll.mockResolvedValueOnce([]); // No positions
+
+    const result = await service.getOrGenerateDailyDigest('user-1');
+
+    expect(result).toBeNull();
+    expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+    // Should NOT create pending record? We check before creating.
+    expect(mockRepo.create).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,7 @@ vi.mock('./context/AuthContext', () => ({
 
 describe('App Component', () => {
     it('renders without crashing', () => {
+        window.scrollTo = vi.fn();
         // This is a basic "smoke test" to ensure the root component tree can mount
         // It validates that no syntax errors or immediate runtime errors prevent rendering
         render(<App />);

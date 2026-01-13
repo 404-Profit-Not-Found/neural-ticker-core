@@ -2,11 +2,32 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { WatchlistGridView } from './WatchlistGridView';
 import { vi, describe, it, expect } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock TickerLogo to avoid image loading issues in tests
 vi.mock('./TickerLogo', () => ({
     TickerLogo: ({ symbol }: { symbol: string }) => <div data-testid={`logo-${symbol}`}>Logo</div>
 }));
+
+// Mock useAllMarketsStatus
+vi.mock('../../hooks/useMarketStatus', () => ({
+    useAllMarketsStatus: vi.fn(() => ({ data: null, isLoading: false })),
+    useTickerMarketStatus: vi.fn(() => ({ data: null, isLoading: false })),
+    getRegionForStatus: vi.fn(() => 'US')
+}));
+
+// Mock FavoriteStar
+vi.mock('../watchlist/FavoriteStar', () => ({
+    FavoriteStar: ({ symbol }: { symbol: string }) => <div data-testid={`star-${symbol}`}>Star</div>
+}));
+
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: false,
+        },
+    },
+});
 
 const mockData = [
     {
@@ -50,29 +71,31 @@ const mockData = [
 describe('WatchlistGridView', () => {
     const renderComponent = (props: Partial<React.ComponentProps<typeof WatchlistGridView>> = {}) => {
         return render(
-            <BrowserRouter>
-                <WatchlistGridView
-                    data={mockData}
-                    isLoading={false}
-                    {...props}
-                />
-            </BrowserRouter>
+            <QueryClientProvider client={queryClient}>
+                <BrowserRouter>
+                    <WatchlistGridView
+                        data={mockData}
+                        isLoading={false}
+                        {...props}
+                    />
+                </BrowserRouter>
+            </QueryClientProvider>
         );
     };
 
-    it.skip('renders loading state', () => {
+    it('renders loading state', () => {
         renderComponent({ isLoading: true });
         // Check for skeleton loader pulse classes
         const skeletons = screen.getAllByText('', { selector: '.animate-pulse' });
         expect(skeletons.length).toBeGreaterThan(0);
     });
 
-    it.skip('renders empty state', () => {
+    it('renders empty state', () => {
         renderComponent({ data: [] });
         expect(screen.getByText('Watchlist is empty.')).toBeInTheDocument();
     });
 
-    it.skip('renders ticker cards with correct data', () => {
+    it('renders ticker cards with correct data', () => {
         renderComponent();
         expect(screen.getByText('AAPL')).toBeInTheDocument();
         expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
@@ -84,7 +107,7 @@ describe('WatchlistGridView', () => {
         expect(screen.getByText('1.20%')).toBeInTheDocument();
     });
 
-    it.skip('displays correct risk and upside styling', () => {
+    it('displays correct risk and upside styling', () => {
         renderComponent();
         // AAPL (Low Risk, High Upside)
         expect(screen.getByText('Apple Inc.').closest('div')).toBeInTheDocument();
@@ -94,22 +117,17 @@ describe('WatchlistGridView', () => {
         expect(teslaCard).toBeInTheDocument();
     });
 
-    it.skip('handles remove action if onRemove is provided', () => {
+    it('handles remove action if onRemove is provided', () => {
         const onRemove = vi.fn();
         renderComponent({ onRemove });
 
-        // Buttons are hidden by opacity but present. We can click them.
-        const removeButtons = screen.getAllByRole('button');
+        // Select the specific remove button by its title
+        const removeButtons = screen.getAllByTitle('Remove from watchlist');
         expect(removeButtons).toHaveLength(2);
-        // Filter for trash button (usually has Trash icon)
-        // Since we didn't add aria-label to the button in GridView (maybe we should have), 
-        // we can find it by looking for the one that calls the function.
-        // Actually best to add verify via click.
 
-        // Let's find the button inside the first card
-        // Note: The button is rendered ONLY if onRemove is passed.
+        // Click the remove button in the AAPL card
         const appleCard = screen.getByText('AAPL').closest('.group');
-        const removeButton = appleCard?.querySelector('button');
+        const removeButton = appleCard?.querySelector('[title="Remove from watchlist"]');
 
         expect(removeButton).toBeInTheDocument();
         fireEvent.click(removeButton!);
@@ -117,14 +135,14 @@ describe('WatchlistGridView', () => {
         expect(onRemove).toHaveBeenCalledWith('item-1', 'AAPL');
     });
 
-    it.skip('does not render remove button if onRemove is undefined', () => {
+    it('does not render remove button if onRemove is undefined', () => {
         renderComponent({ onRemove: undefined });
         const appleCard = screen.getByText('AAPL').closest('.group');
-        const removeButton = appleCard?.querySelector('button');
+        const removeButton = appleCard?.querySelector('[title="Remove from watchlist"]');
         expect(removeButton).not.toBeInTheDocument();
     });
 
-    it.skip('navigates to ticker page on card click', () => {
+    it('navigates to ticker page on card click', () => {
         renderComponent();
         // The clickable area is the div inside the card
         const clickableArea = screen.getByText('AAPL').closest('.cursor-pointer');
@@ -133,7 +151,7 @@ describe('WatchlistGridView', () => {
         expect(window.location.pathname).toBe('/ticker/AAPL');
     });
 
-    it.skip('safely handles missing or partial data', () => {
+    it('safely handles missing or partial data', () => {
         const partialData = [{
             symbol: 'PARTIAL',
             company: 'Partial Corp',

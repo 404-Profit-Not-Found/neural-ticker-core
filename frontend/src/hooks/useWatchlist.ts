@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
 export interface Watchlist {
@@ -33,7 +33,15 @@ export function useWatchlists() {
     queryFn: async () => {
       try {
         const { data } = await api.get<Watchlist[]>('/watchlists');
-        return Array.isArray(data) && data.length > 0 ? data : EMPTY_WATCHLISTS;
+        if (Array.isArray(data) && data.length > 0) {
+            // Sort: Favourites first, then others alphabetically
+            return data.sort((a, b) => {
+                if (a.name === 'Favourites') return -1;
+                if (b.name === 'Favourites') return 1;
+                return a.name.localeCompare(b.name);
+            });
+        }
+        return EMPTY_WATCHLISTS;
       } catch (error) {
         console.error('Failed to fetch watchlists:', error);
         // Return the constant empty array to prevent infinite loops
@@ -147,7 +155,7 @@ export function useMarketSnapshots(symbols: string[]) {
       }
     },
     enabled: symbols.length > 0,
-    placeholderData: EMPTY_SNAPSHOTS,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 30, // 30s fresh
     retry: 1,
     refetchOnWindowFocus: false,
@@ -177,4 +185,97 @@ export function useTickerSearch(query: string) {
     refetchOnWindowFocus: false,
     staleTime: 1000 * 10, // Cache results for 10 seconds
   });
+}
+
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (symbol: string) => {
+      console.log(`[useToggleFavorite] Mutating symbol: ${symbol}`);
+      const { data } = await api.post('/watchlists/favorites/toggle', { symbol });
+      console.log(`[useToggleFavorite] Mutation response for ${symbol}:`, data);
+      return data;
+    },
+    onMutate: async (symbol) => {
+      console.log(`[useToggleFavorite] Optimistic update for ${symbol}`);
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.all });
+
+      // Snapshot the previous value
+      const previousWatchlists = queryClient.getQueryData<Watchlist[]>(watchlistKeys.all);
+
+      // Optimistically update to the new value
+      if (previousWatchlists) {
+        queryClient.setQueryData<Watchlist[]>(watchlistKeys.all, (old) => {
+          if (!old) return [];
+          return old.map(wl => {
+             // Logic: Only affect 'Favourites' list
+             if (wl.name !== 'Favourites') return wl;
+             
+             const exists = wl.items?.some(item => item.ticker.symbol === symbol);
+             
+             if (exists) {
+                 // Remove
+                 return {
+                     ...wl,
+                     items: wl.items.filter(item => item.ticker.symbol !== symbol)
+                 };
+             } else {
+                 // Add (Mock)
+                 const newItem: WatchlistItem = {
+                     id: 'temp-id-' + Math.random(),
+                     ticker: { id: 'temp-ticker-id', symbol },
+                     addedAt: new Date().toISOString()
+                 };
+                 return {
+                     ...wl,
+                     items: [...(wl.items || []), newItem]
+                     // items: [newItem, ...(wl.items || [])] // Add to top? Backend usually appends or specific order?
+                 };
+             }
+          });
+        });
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousWatchlists };
+    },
+    onError: (err, symbol, context) => {
+      console.error(`[useToggleFavorite] Mutation error for ${symbol}:`, err);
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousWatchlists) {
+        queryClient.setQueryData(watchlistKeys.all, context.previousWatchlists);
+      }
+    },
+    onSettled: (_, __, symbol) => {
+      console.log(`[useToggleFavorite] Settled for ${symbol}, invalidating queries...`);
+      queryClient.invalidateQueries({ queryKey: watchlistKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['tickers', 'details', symbol] });
+    },
+  });
+}
+
+export function useFavorite(symbol?: string) {
+  const { data: watchlists = [] } = useWatchlists();
+  const toggleMutation = useToggleFavorite();
+
+  const isFavorite = !!symbol && watchlists.some(wl =>
+    wl.name === 'Favourites' && wl.items?.some(item => item.ticker.symbol === symbol)
+  );
+
+  const toggle = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    console.log(`[useFavorite] Toggle clicked for ${symbol}. Current isFavorite: ${isFavorite}`);
+    if (symbol) {
+      toggleMutation.mutate(symbol);
+    } else {
+        console.warn('[useFavorite] No symbol provided for toggle');
+    }
+  };
+
+  return {
+    isFavorite,
+    toggle,
+    isLoading: toggleMutation.isPending
+  };
 }

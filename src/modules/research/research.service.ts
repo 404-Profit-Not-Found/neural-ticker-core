@@ -870,9 +870,9 @@ Title:`;
   // --- DAILY DIGEST PERSISTENCE (PERSONALIZED) ---
 
   async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
-    if (!userId) {
+    if (!userId || userId === 'system-trigger') {
       this.logger.warn(
-        'Attempted to generate digest without User ID. Blocking.',
+        `Attempted to generate digest with invalid User ID: ${userId}. Blocking.`,
       );
       return null;
     }
@@ -895,6 +895,26 @@ Title:`;
     }
 
     // 2. Not found? Generate it.
+
+    // CHECK TUTORIAL COMPLETION (Implied by Portfolio Existence)
+    // User Requirement: "digest runs daily for users who have completed tutorial"
+    try {
+      const portfolio = await this.portfolioService.findAll(userId);
+      if (!portfolio || portfolio.length === 0) {
+        // Double check specifically for "Tutorial" preference if we want to be strict,
+        // but explicit user request implies preventing it if they just added favorites.
+        // So we strictly enforce Portfolio presence.
+        this.logger.log(`Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`);
+        return null;
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to check portfolio for digest eligibility: ${e.message}`);
+      // Fail safe: If we can't check, maybe we shouldn't block? Or should we?
+      // Let's assume safe to proceed if check fails, or maybe safe to block.
+      // Blocking is safer to prevent spam.
+      return null;
+    }
+
     // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
     const pendingNote = this.noteRepo.create({
       user_id: userId,

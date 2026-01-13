@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle, Star } from 'lucide-react';
 import { Sparkline } from '../ui/Sparkline';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { VerdictBadge } from './VerdictBadge';
-import { useWatchlists } from '../../hooks/useWatchlist';
-import { useToggleFavorite } from '../../hooks/useTicker';
+import { useFavorite } from '../../hooks/useWatchlist';
 import type { MarketStatusData } from '../../hooks/useMarketStatus';
 
 export interface TickerCardProps {
@@ -75,18 +73,10 @@ export function TickerCard({
     const status = marketStatus || fetchedStatus;
 
     // Watchlist / Favorite state
-    const { data: watchlists = [] } = useWatchlists();
-    const toggleFavoriteMutation = useToggleFavorite();
-    const isFavorite = watchlists?.some(wl =>
-        wl.items?.some(item => item.ticker.symbol === symbol)
-    ) ?? false;
-    const [optimisticFavorite, setOptimisticFavorite] = useState<boolean | null>(null);
-    const isFavEffectively = optimisticFavorite !== null ? optimisticFavorite : isFavorite;
+    const { isFavorite, toggle } = useFavorite(symbol);
 
     const handleToggleFavorite = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent card navigation
-        setOptimisticFavorite(!isFavEffectively);
-        toggleFavoriteMutation.mutate(symbol);
+        toggle(e);
     };
 
     // Market session display
@@ -127,11 +117,11 @@ export function TickerCard({
                                 <button
                                     onClick={handleToggleFavorite}
                                     className="p-0.5 rounded-full hover:bg-muted/50 transition-colors"
-                                    title={isFavEffectively ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                                    title={isFavorite ? 'Remove from Watchlist' : 'Add to Watchlist'}
                                 >
                                     <Star
                                         size={16}
-                                        className={isFavEffectively ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground/50 hover:text-yellow-500'}
+                                        className={isFavorite ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground/50 hover:text-yellow-500'}
                                     />
                                 </button>
                             </div>

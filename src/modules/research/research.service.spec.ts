@@ -15,6 +15,7 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 console.log('NotificationsService:', NotificationsService);
 
@@ -73,6 +74,10 @@ describe('ResearchService', () => {
   const mockQualityScoringService = {
     score: jest.fn(),
   };
+  
+  const mockPortfolioService = {
+    findAll: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -87,6 +92,7 @@ describe('ResearchService', () => {
         { provide: QualityScoringService, useValue: mockQualityScoringService }, // Added
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: CreditService, useValue: mockCreditService },
+        { provide: PortfolioService, useValue: mockPortfolioService },
         {
           provide: ConfigService,
           useValue: {
@@ -362,6 +368,21 @@ describe('ResearchService', () => {
       await service.processTicket('999');
 
       expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getOrGenerateDailyDigest', () => {
+    it('should return null if user has no portfolio positions (tutorial gating)', async () => {
+      mockPortfolioService.findAll.mockResolvedValueOnce([]);
+      const result = await service.getOrGenerateDailyDigest('user-1');
+      expect(result).toBeNull();
+      expect(mockPortfolioService.findAll).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should return null if userId is invalid (security guard)', async () => {
+      const result = await service.getOrGenerateDailyDigest('system-trigger');
+      expect(result).toBeNull();
+      expect(mockPortfolioService.findAll).not.toHaveBeenCalled();
     });
   });
 });

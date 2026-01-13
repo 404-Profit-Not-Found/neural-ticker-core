@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Header } from './Header';
 
 vi.mock('../../context/AuthContext', () => ({
@@ -11,14 +11,34 @@ vi.mock('../../context/AuthContext', () => ({
   }),
 }));
 
+// Mock EventSource and scrollTo
+if (typeof window !== 'undefined') {
+  window.EventSource = vi.fn().mockImplementation(() => ({
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    close: vi.fn(),
+  })) as unknown as typeof EventSource;
+  window.scrollTo = vi.fn();
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
 function renderWithRouter(initialPath = '/dashboard') {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route path="/dashboard" element={<HeaderWrapper />} />
-        <Route path="/settings/style" element={<div data-testid="style-page">Style Guide Page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/dashboard" element={<HeaderWrapper />} />
+          <Route path="/profile" element={<div data-testid="profile-page">Profile Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -32,15 +52,23 @@ function HeaderWrapper() {
 }
 
 describe('Header navigation', () => {
-  it.skip('navigates to style guide when clicking Settings', async () => {
+  it('navigates to profile when clicking My Profile', async () => {
     renderWithRouter();
-    const user = userEvent.setup();
 
     // open menu
-    await user.click(screen.getByLabelText(/user menu/i));
-    // click Settings link
-    await user.click(screen.getByRole('button', { name: /settings/i }));
+    fireEvent.click(screen.getByLabelText(/user menu/i));
 
-    expect(screen.getByTestId('style-page')).toBeInTheDocument();
+    // click My Profile link - wait for it to be visible
+    const profileBtn = await screen.findByText(/My Profile/i);
+    fireEvent.click(profileBtn);
+
+    // If it fails, let's see why
+    try {
+      expect(await screen.findByTestId('profile-page')).toBeInTheDocument();
+    } catch (e) {
+      console.log('--- TEST FAILED ---');
+      screen.debug();
+      throw e;
+    }
   });
 });

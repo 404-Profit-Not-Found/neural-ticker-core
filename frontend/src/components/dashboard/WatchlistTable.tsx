@@ -160,7 +160,7 @@ export function WatchlistTable() {
         if (!activeWatchlist || !snapshotData || !Array.isArray(snapshotData)) return EMPTY_TABLE_DATA;
 
         return snapshotData
-            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
+            .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol && symbols.includes(s.ticker.symbol))
             .map((s: MarketSnapshot) => {
                 const price = Number(s.latestPrice?.close || 0);
                 const prevClose = Number(s.latestPrice?.prevClose || price);
@@ -181,7 +181,7 @@ export function WatchlistTable() {
                         s.aiAnalysis.base_price,
                         s.aiAnalysis.upside_percent
                     );
-                    
+
                     let downside = 0;
                     const bearPrice = s.aiAnalysis.bear_price;
                     if (typeof bearPrice === 'number' && price > 0) {
@@ -208,7 +208,7 @@ export function WatchlistTable() {
                 const bearPrice = s.aiAnalysis?.bear_price;
                 const basePrice = s.aiAnalysis?.base_price;
                 let potentialDownside: number | null = null;
-                
+
                 // Use Standardized Upside Calculation
                 const potentialUpside = calculateLiveUpside(
                     price,
@@ -282,9 +282,9 @@ export function WatchlistTable() {
 
             // 5. Overall Score (Risk/Reward)
             if (filters.overallScore && item.overallScore !== null) {
-                 if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
-                 if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
-                 if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
+                if (filters.overallScore === '> 5.0' && item.overallScore <= 5.0) return false;
+                if (filters.overallScore === '> 7.5' && item.overallScore <= 7.5) return false;
+                if (filters.overallScore === '> 8.5' && item.overallScore <= 8.5) return false;
             }
 
             return true;
@@ -473,7 +473,7 @@ export function WatchlistTable() {
                                 )}
                             </div>
 
-                            {activeWatchlistId && (
+                            {activeWatchlistId && activeWatchlist?.name !== 'Favourites' && (
                                 <div className="flex items-center">
                                     <Button variant="ghost" size="icon" onClick={handleRenameList} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename List" aria-label="Rename watchlist">
                                         <Pencil className="w-3.5 h-3.5" />

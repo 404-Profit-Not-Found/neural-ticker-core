@@ -384,7 +384,7 @@ export function NewsFeed() {
 
                             {/* Generate Button or Disabled State */}
                             <div className="pt-6 text-center">
-                                {hasItems ? (
+                                {portfolioCount > 0 ? (
                                     <div className="space-y-3">
                                         <button
                                             onClick={triggerDigest}

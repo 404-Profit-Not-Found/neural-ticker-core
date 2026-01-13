@@ -19,10 +19,9 @@ import {
     AlertTriangle,
     Flame,
     Newspaper,
-    MoreVertical,
     Search,
     MessageCircle,
-    Star
+    Trash2
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -34,6 +33,7 @@ import { useMemo } from 'react';
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
 import { Sparkline } from "../ui/Sparkline";
+import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -128,16 +128,7 @@ export function WatchlistTableView({
                                         {info.getValue()}
                                     </span>
                                     {/* Star - Favorite indicator (next to symbol) */}
-                                    <span
-                                        title="Remove from watchlist"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onRemove(info.row.original.itemId || '', info.row.original.symbol);
-                                        }}
-                                        className="cursor-pointer"
-                                    >
-                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 hover:text-yellow-500 hover:fill-yellow-500" />
-                                    </span>
+                                    <FavoriteStar symbol={info.getValue()} />
                                 </div>
 
                                 {/* Row 2: Company Name */}
@@ -381,15 +372,23 @@ export function WatchlistTableView({
                 }
             }),
 
-            // Actions (Keep as is - but maybe redundant now that we have star?)
-            // Keeping for "More" menu potential later
+            // Actions: Explicit Remove
             columnHelper.display({
                 id: 'actions',
                 header: '',
-                cell: () => (
+                cell: (info) => (
                     <div className="flex items-center gap-1 justify-end">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <MoreVertical className="h-4 w-4" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRemove(info.row.original.itemId || '', info.row.original.symbol);
+                            }}
+                            title="Remove from this list"
+                        >
+                            <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
                 ),
@@ -418,77 +417,92 @@ export function WatchlistTableView({
     }
 
     return (
-        <div className="rounded-md border border-border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b">
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                {headerGroup.headers.map((header) => (
-                                    <th
-                                        key={header.id}
-                                        className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none whitespace-nowrap"
-                                        onClick={header.column.getToggleSortingHandler()}
-                                        style={{
-                                            width: header.column.columnDef.size,
-                                            minWidth: header.column.columnDef.minSize
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            {flexRender(header.column.columnDef.header, header.getContext())}
+        <div className="overflow-x-auto px-1 pb-2">
+            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
+                <thead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <tr key={headerGroup.id} className="bg-transparent">
+                            {headerGroup.headers.map((header) => (
+                                <th
+                                    key={header.id}
+                                    className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap first:pl-6 last:pr-6"
+                                    onClick={header.column.getToggleSortingHandler()}
+                                    style={{
+                                        width: header.column.columnDef.size,
+                                        minWidth: header.column.columnDef.minSize
+                                    }}
+                                >
+                                    <div className="flex items-center gap-1 group">
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                                             {{
                                                 asc: <ArrowUpRight className="ml-1 h-3 w-3" />,
                                                 desc: <ArrowDownRight className="ml-1 h-3 w-3" />,
                                             }[header.column.getIsSorted() as string] ?? null}
-                                        </div>
-                                    </th>
+                                        </span>
+                                    </div>
+                                </th>
+                            ))}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody className="space-y-4">
+                    {isLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={i} className="bg-card shadow-sm rounded-lg">
+                                {table.getVisibleFlatColumns().map((col, idx) => (
+                                    <td key={col.id} className={cn("p-4 border-y border-border/40 first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg bg-card", idx === 0 && "pl-6", idx === table.getVisibleFlatColumns().length - 1 && "pr-6")}>
+                                        {col.id === 'symbol' ? (
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="h-8 w-8 rounded-full" />
+                                                <div className="space-y-1">
+                                                    <Skeleton className="h-4 w-12" />
+                                                    <Skeleton className="h-3 w-20" />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <Skeleton className="h-4 w-full max-w-[80px]" />
+                                        )}
+                                    </td>
                                 ))}
                             </tr>
-                        ))}
-                    </thead>
-                    <tbody className="[&_tr:last-child]:border-0">
-                        {isLoading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <tr key={i} className="border-b">
-                                    <td className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-12" /><Skeleton className="h-3 w-20" /></div></div></td>
-                                    {/* Sector (hidden by default) but if visible needs skeleton? table handles visibility, here we act dumb or map columns */}
-                                    {/* Actually simpler to just render generic generic cells matching column count approx or just a few key ones */}
-                                    {/* Iterate columns to match layout */}
-                                    {table.getVisibleFlatColumns().slice(1).map((col) => (
-                                        <td key={col.id} className="p-4"><Skeleton className="h-4 w-full" /></td>
-                                    ))}
-                                </tr>
-                            ))
-                        ) : table.getRowModel().rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
-                                        <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                            <Search className="w-6 h-6 text-muted-foreground/50" />
-                                        </div>
-                                        <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>
-                                        <p className="text-sm text-muted-foreground mb-4">Add your first ticker to track its performance.</p>
+                        ))
+                    ) : table.getRowModel().rows.length === 0 ? (
+                        <tr>
+                            <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                <div className="flex flex-col items-center justify-center max-w-sm mx-auto p-6 text-center">
+                                    <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                                        <Search className="w-6 h-6 text-muted-foreground/50" />
                                     </div>
-                                </td>
+                                    <h3 className="font-medium text-foreground mb-1">Watchlist is empty</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">Add your first ticker to track its performance.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    ) : (
+                        table.getRowModel().rows.map((row) => (
+                            <tr
+                                key={row.id}
+                                className="group transition-all hover:bg-muted/30 cursor-pointer relative"
+                                onClick={() => navigate(`/ticker/${row.original.symbol}`)}
+                            >
+                                {row.getVisibleCells().map((cell, idx) => (
+                                    <td
+                                        key={cell.id}
+                                        className={cn(
+                                            "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 group-hover:bg-muted/30 transition-colors first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg shadow-sm",
+                                            idx === 0 && "pl-6",
+                                            idx === row.getVisibleCells().length - 1 && "pr-6"
+                                        )}
+                                    >
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                ))}
                             </tr>
-                        ) : (
-                            table.getRowModel().rows.map((row) => (
-                                <tr
-                                    key={row.id}
-                                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
-                                    onClick={() => navigate(`/ticker/${row.original.symbol}`)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <td key={cell.id} className="p-4 align-middle whitespace-nowrap">
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                        ))
+                    )}
+                </tbody>
+            </table>
         </div>
     );
 }

@@ -205,20 +205,7 @@ export function useUpdateResearchTitle() {
     });
 }
 
-export function useToggleFavorite() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async (symbol: string) => {
-            const res = await api.post('/watchlists/favorites/toggle', { symbol });
-            return res.data;
-        },
-        onSuccess: (_, symbol) => {
-            queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
-            // Ideally we invalidate watchlist queries too
-            queryClient.invalidateQueries({ queryKey: ['watchlists'] }); 
-        }
-    });
-}
+
 
 export function useActiveResearchCount() {
     return useQuery({

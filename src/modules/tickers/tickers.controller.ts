@@ -156,7 +156,6 @@ export class TickersController {
     status: 202,
     description: 'Ticker addition queued due to rate limiting.',
   }) // Added
-  @Public()
   @Post()
   ensureBody(@Body('symbol') symbol: string) {
     if (!symbol) return;
@@ -168,7 +167,6 @@ export class TickersController {
     status: 202,
     description: 'Ticker addition queued due to rate limiting.',
   }) // Added
-  @Public()
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
     return this.tickersService.ensureTicker(symbol.trim());

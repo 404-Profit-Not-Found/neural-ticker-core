@@ -8,6 +8,7 @@ import { queryClient } from '../../lib/queryClient';
 import { Badge } from '../ui/badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
+import { SuperLoading } from '../ui/SuperLoading';
 
 interface Notification {
   id: string;
@@ -64,7 +65,8 @@ export function Header() {
   const [notificationsMenuOpen, setNotificationsMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);;
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Lifted state to synchronize notifications
   const { data: researchCount = 0 } = useActiveResearchCount();
@@ -199,6 +201,20 @@ export function Header() {
     closeMenus();
     navigate(path);
   };
+
+  const handleLogout = () => {
+    // Optimistic: Show SuperLoading immediately
+    setIsLoggingOut(true);
+    // Close all menus
+    closeMenus();
+    // Call the async logout (redirect happens automatically)
+    logout();
+  };
+
+  // Show full-screen loader when signing out
+  if (isLoggingOut) {
+    return <SuperLoading text="Signing out..." fullScreen={true} />;
+  }
 
   return (
     <>
@@ -395,7 +411,7 @@ export function Header() {
 
                 <div className="p-2 border-t border-border">
                   <button
-                    onClick={() => logout()}
+                    onClick={() => handleLogout()}
                     className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                   >
                     Sign Out
