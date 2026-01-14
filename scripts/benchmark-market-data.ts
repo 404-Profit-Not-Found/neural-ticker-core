@@ -11,7 +11,7 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 if (!FINNHUB_API_KEY) {
     console.warn("⚠️  FINNHUB_API_KEY not found in .env, Finnhub tests will fail/be limited");
 } else {
-    console.log("ℹ️  Finnhub API Key found (starts with " + FINNHUB_API_KEY.substring(0, 4) + ")");
+    console.log("ℹ️  Finnhub API Key found and loaded from environment");
 }
 
 const yahoo = new YahooFinance({
