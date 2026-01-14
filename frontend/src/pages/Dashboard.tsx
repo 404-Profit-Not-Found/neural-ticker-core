@@ -42,7 +42,21 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
   if (item.aiAnalysis) {
     const { base_price, overall_score, upside_percent: fallbackUpside } = item.aiAnalysis;
     potentialUpside = calculateUpside(currentPrice, base_price, fallbackUpside);
-    const { rating } = calculateAiRating(risk, potentialUpside, overall_score);
+
+    // Construct full input for accurate rating
+    const input = {
+      risk,
+      upside: potentialUpside,
+      downside: potentialDownside ?? 0,
+      consensus: item.fundamentals?.consensus_rating as string,
+      overallScore: overall_score,
+      peRatio: Number(item.fundamentals?.pe_ttm) || null,
+      newsSentiment: item.ticker.news_sentiment,
+      newsImpact: item.ticker.news_impact_score,
+      currentPrice
+    };
+
+    const { rating } = calculateAiRating(input);
     derivedAiRating = rating;
   }
 
@@ -237,6 +251,7 @@ function TopOpportunitiesSection() {
   if (category === 'yolo') {
     analyzerParams.sortBy = 'upside_percent';
     analyzerParams.sortDir = 'DESC';
+    analyzerParams.aiRating = ['Strong Buy', 'Buy', 'Speculative Buy'];
   } else if (category === 'conservative') {
     analyzerParams.aiRating = ['Strong Buy', 'Buy'];
     analyzerParams.sortBy = 'market_cap';

@@ -1440,6 +1440,15 @@ export class MarketDataService {
             WHEN fund.pe_ttm <= 25 THEN 5            -- Fair Value
             ELSE 0 
           END
+
+        -- 7. Smart News Integration (High Impact Only)
+        + CASE
+            WHEN ticker.news_impact_score >= 8 AND UPPER(ticker.news_sentiment) = 'BULLISH' THEN 15
+            WHEN ticker.news_impact_score >= 8 AND UPPER(ticker.news_sentiment) = 'BEARISH' THEN -15
+            WHEN ticker.news_impact_score >= 5 AND UPPER(ticker.news_sentiment) = 'BULLISH' THEN 5
+            WHEN ticker.news_impact_score >= 5 AND UPPER(ticker.news_sentiment) = 'BEARISH' THEN -5
+            ELSE 0
+          END
       )`;
 
     qb.addSelect('base_scenario.price_mid', 'base_price');
