@@ -74,3 +74,19 @@ The discrepancy you noticed ("different versions have different background color
 
 *   **Always edit properties via CSS Variables**: Do not hardcode colors in [SuperLoading.tsx](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/src/components/ui/SuperLoading.tsx). Always use `var(--boot-...)`.
 *   **Update [index.html](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/index.html) script**: If you add a new theme, you must add its color logic to the inline script in [index.html](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/index.html) AND [ThemeController](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/src/App.tsx#122-207) in [App.tsx](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/src/App.tsx).
+
+## Auth & Logout Transitions
+
+`SuperLoading` is used for:
+- Initial session check (`ProtectedRoute` loading state)
+- OAuth callback (`OAuthCallback` component)
+- Any other fullscreen loading states
+
+**Critical Requirements**:
+1. All auth-related `SuperLoading` usages must set `fullScreen={true}`.
+2. `SuperLoading` must be **opaque** (uses `var(--boot-bg)`), not transparent.
+3. Progress bar animation must remain visible throughout (0% → 233%).
+
+## Login Page Consistency
+
+[Login.tsx](file:///Users/branislavlang/Documents/GitHub/neural-ticket-core/frontend/src/pages/Login.tsx) must consume `var(--boot-*)` variables to ensure it matches the Boot Loader and SuperLoading visually. Never hardcode theme colors.

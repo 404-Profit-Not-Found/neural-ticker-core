@@ -1,7 +1,6 @@
 import { Badge } from '../ui/badge';
-import { Crown, Sparkles, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { UserTierBadge } from '../ui/user-tier-badge';
-import { UserStatusBadge } from '../ui/user-status-badge';
 
 // Define interface compatible with AdminConsole user objects
 export interface AdminUser {

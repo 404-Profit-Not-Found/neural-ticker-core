@@ -6,7 +6,6 @@ import {
     Search,
     ChevronLeft,
     ArrowUpDown,
-    Shield,
     Crown,
     Sparkles,
     Gift,
@@ -44,7 +43,6 @@ import {
 import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
 import { UserDetailDialog } from '../components/admin/UserDetailDialog';
 import { UserTierBadge } from '../components/ui/user-tier-badge';
-import { UserStatusBadge } from '../components/ui/user-status-badge';
 
 type SortConfig = {
     key: string;

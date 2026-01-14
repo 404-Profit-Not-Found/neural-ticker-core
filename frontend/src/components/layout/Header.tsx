@@ -2,10 +2,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, User as UserIcon, Shield, Menu, X, Brain, Search, Crown, Sparkles } from 'lucide-react';
+import { Bell, User as UserIcon, Shield, Menu, X, Brain, Search } from 'lucide-react';
 import { api } from '../../lib/api';
 import { queryClient } from '../../lib/queryClient';
-import { Badge } from '../ui/badge';
 import { UserTierBadge } from '../ui/user-tier-badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
@@ -405,7 +404,7 @@ export function Header() {
                 <div className="p-2 border-t border-border">
                   <button
                     onClick={() => handleLogout()}
-                    className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-foreground hover:bg-muted/50 rounded-md transition-colors"
                   >
                     Sign Out
                   </button>

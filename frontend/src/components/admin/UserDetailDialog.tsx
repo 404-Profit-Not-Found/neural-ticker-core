@@ -7,11 +7,10 @@ import {
     DialogFooter,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { UserTierBadge } from '../ui/user-tier-badge';
 import { UserStatusBadge } from '../ui/user-status-badge';
 import type { AdminUser } from './UserAdminCard';
-import { Crown, Sparkles, Gift, Ban, CheckCircle, Clock, Shield, Copy } from 'lucide-react';
+import { Gift, Ban, CheckCircle, Clock, Shield, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 

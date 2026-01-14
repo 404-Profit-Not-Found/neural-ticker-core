@@ -1,7 +1,7 @@
 import { Badge } from '../ui/badge';
 import { UserTierBadge } from '../ui/user-tier-badge';
 import { Button } from '../ui/button';
-import { Check, X, Star, Crown } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/utils';
 import { useState, useEffect } from 'react';
@@ -52,21 +52,7 @@ export function TickerRequestRow({ request, onApprove, onReject, isFirst, isLast
         fetchInfo();
     }, [request.symbol]);
 
-    const getTierIcon = (tier: string) => {
-        switch (tier) {
-            case 'whale': return <Crown size={12} className="text-amber-700 dark:text-amber-400" />;
-            case 'pro': return <Star size={12} className="text-purple-700 dark:text-purple-400" />;
-            default: return null;
-        }
-    };
 
-    const getTierBadgeStyle = (tier: string) => {
-        switch (tier) {
-            case 'whale': return "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-400"; // Manual match for tierWhale
-            case 'pro': return "border-purple-200 bg-purple-100 text-purple-700 dark:border-purple-500/50 dark:bg-purple-500/10 dark:text-purple-400"; // Manual match for tierPro
-            default: return "border-muted text-muted-foreground";
-        }
-    };
 
     const cellClass = (index: number, total: number) => cn(
         "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 transition-colors shadow-sm",

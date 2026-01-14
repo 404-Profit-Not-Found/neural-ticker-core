@@ -460,6 +460,7 @@ export class RiskRewardService {
       8. Numeric fields must be FINAL CALCULATED NUMBERS (e.g., 150.50).
       9. DO NOT include equations, math, or "show your work" (e.g., NEVER output "100 * 1.5").
       10. DO NOT include comments like "// this is a comment".
+      11. expected_market_cap must be a FULL NUMBER (e.g. 50000000000), NOT "50B" or "50".
       `,
       tickers: [symbol],
       numericContext: context,
@@ -691,7 +692,21 @@ export class RiskRewardService {
         scenario.price_low = data.price_target_low || 0;
         scenario.price_high = data.price_target_high || 0;
         scenario.price_mid = data.price_target_mid || 0;
-        scenario.expected_market_cap = data.expected_market_cap || 0;
+
+        // Dynamic Market Cap Calculation Fallback
+        // If LLM returned 0, null, or a "billions" shorthand (e.g. "50" for 50B), we assume it's wrong -> Recalculate.
+        // Threshold: If cap < 1,000,000 (1M), it's likely wrong for any public co in this context.
+        if (
+          (!data.expected_market_cap || data.expected_market_cap < 1000000) &&
+          context.fundamentals?.shares_outstanding &&
+          scenario.price_mid
+        ) {
+          scenario.expected_market_cap =
+            scenario.price_mid * context.fundamentals.shares_outstanding;
+        } else {
+          scenario.expected_market_cap = data.expected_market_cap || 0;
+        }
+
         scenario.key_drivers = data.key_drivers || [];
         analysis.scenarios.push(scenario);
       }

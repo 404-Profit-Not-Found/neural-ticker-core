@@ -47,19 +47,14 @@ function ScrollToTop() {
 }
 
 
-import { Header } from './components/layout/Header';
+
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <>
-        <Header />
-        <SuperLoading text="Initializing..." fullScreen={false} />
-      </>
-    );
+    return <SuperLoading text="Initializing..." fullScreen={true} />;
   }
 
   if (!user) {

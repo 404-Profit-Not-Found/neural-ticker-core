@@ -114,7 +114,7 @@ export function SuperLoading({ text, symbol, className, fullScreen = false }: Su
                             style={{
                                 width: '30%',
                                 backgroundSize: '200% 100%',
-                                animation: 'progressMove 2s infinite linear'
+                                animation: 'superProgressMove 2s infinite linear'
                             }}
                         ></div>
                     </div>

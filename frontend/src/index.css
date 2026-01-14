@@ -527,13 +527,13 @@
   }
 }
 
-@keyframes progressMove {
+@keyframes superProgressMove {
   0% {
-    transform: translateX(0%);
+    transform: translateX(-100%);
   }
 
   100% {
-    transform: translateX(233%);
+    transform: translateX(333%);
   }
 }
 
@@ -552,7 +552,7 @@
 }
 
 .animate-progress-bar {
-  animation: progressMove 2s infinite linear;
+  animation: superProgressMove 2s infinite linear;
 }
 
 .animate-pulse-slow {

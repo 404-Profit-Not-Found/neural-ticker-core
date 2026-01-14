@@ -86,6 +86,8 @@ describe('AdminConsole', () => {
 
         fireEvent.click(approveBtns[0]);
 
-        expect(AdminService.approveUser).toHaveBeenCalledWith('2');
+        await waitFor(() => {
+            expect(AdminService.approveUser).toHaveBeenCalledWith('2');
+        });
     });
 });

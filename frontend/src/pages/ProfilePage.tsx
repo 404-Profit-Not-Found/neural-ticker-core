@@ -11,8 +11,6 @@ import {
     Moon,
     Sun,
     Palette,
-    Crown,
-    Sparkles,
     Mail,
     Plus,
     Camera,
@@ -21,7 +19,6 @@ import {
     Loader2,
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
 import { UserTierBadge } from '../components/ui/user-tier-badge';
 import { UserStatusBadge } from '../components/ui/user-status-badge';
 import { useQuery } from '@tanstack/react-query';

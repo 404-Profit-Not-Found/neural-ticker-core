@@ -4,7 +4,6 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '../ui/badge';
 import { UserTierBadge } from '../ui/user-tier-badge';
 import { useAuth } from '../../context/AuthContext';
 import type { SocialComment } from '../../types/ticker';

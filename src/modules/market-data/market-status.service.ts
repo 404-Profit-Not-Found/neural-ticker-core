@@ -228,24 +228,31 @@ export class MarketStatusService {
    */
   private getUSFallback(): MarketStatusResult {
     const now = new Date();
-    
+
     // Robust time extraction using Intl
     const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: false,
-        weekday: 'short'
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+      weekday: 'short',
     });
-    
+
     const parts = formatter.formatToParts(now);
-    const hourPart = parts.find(p => p.type === 'hour')?.value;
-    const minutePart = parts.find(p => p.type === 'minute')?.value;
-    const weekdayPart = parts.find(p => p.type === 'weekday')?.value;
+    const hourPart = parts.find((p) => p.type === 'hour')?.value;
+    const minutePart = parts.find((p) => p.type === 'minute')?.value;
+    const weekdayPart = parts.find((p) => p.type === 'weekday')?.value;
 
     if (!hourPart || !minutePart || !weekdayPart) {
-        // Absolute fallback if Intl fails
-        return { isOpen: false, session: 'closed', timezone: 'America/New_York', exchange: 'US', region: 'US', fallback: true };
+      // Absolute fallback if Intl fails
+      return {
+        isOpen: false,
+        session: 'closed',
+        timezone: 'America/New_York',
+        exchange: 'US',
+        region: 'US',
+        fallback: true,
+      };
     }
 
     const hours = parseInt(hourPart === '24' ? '0' : hourPart, 10);
@@ -300,23 +307,30 @@ export class MarketStatusService {
    */
   private getEUFallback(): MarketStatusResult {
     const now = new Date();
-    
+
     // Robust time extraction using Intl
     const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Europe/Berlin',
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: false,
-        weekday: 'short'
+      timeZone: 'Europe/Berlin',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+      weekday: 'short',
     });
-    
+
     const parts = formatter.formatToParts(now);
-    const hourPart = parts.find(p => p.type === 'hour')?.value;
-    const minutePart = parts.find(p => p.type === 'minute')?.value;
-    const weekdayPart = parts.find(p => p.type === 'weekday')?.value;
+    const hourPart = parts.find((p) => p.type === 'hour')?.value;
+    const minutePart = parts.find((p) => p.type === 'minute')?.value;
+    const weekdayPart = parts.find((p) => p.type === 'weekday')?.value;
 
     if (!hourPart || !minutePart || !weekdayPart) {
-         return { isOpen: false, session: 'closed', timezone: 'Europe/Berlin', exchange: 'EU', region: 'EU', fallback: true };
+      return {
+        isOpen: false,
+        session: 'closed',
+        timezone: 'Europe/Berlin',
+        exchange: 'EU',
+        region: 'EU',
+        fallback: true,
+      };
     }
 
     const hours = parseInt(hourPart === '24' ? '0' : hourPart, 10);
