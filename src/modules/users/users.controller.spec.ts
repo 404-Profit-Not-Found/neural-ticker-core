@@ -15,6 +15,7 @@ describe('UsersController', () => {
     findAll: jest.fn(),
     updateRole: jest.fn(),
     updateProfile: jest.fn(),
+    approveUser: jest.fn(),
   };
 
   const mockAuthService = {
@@ -96,6 +97,18 @@ describe('UsersController', () => {
       const result = await controller.updateUserRole('user-1', 'user');
 
       expect(result).toEqual(user);
+    });
+  });
+
+  describe('approveUser', () => {
+    it('should call service.approveUser', async () => {
+      const user = { id: 'user-id', role: 'user', status: 'active' };
+      mockUsersService.approveUser.mockResolvedValue(user);
+
+      const result = await controller.approveUser('user-id');
+
+      expect(result).toEqual(user);
+      expect(service.approveUser).toHaveBeenCalledWith('user-id');
     });
   });
 

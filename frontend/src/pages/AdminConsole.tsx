@@ -847,6 +847,18 @@ export function AdminConsole() {
                                                                                         Gift
                                                                                     </Button>
 
+                                                                                    {user.status === 'WAITLIST' && (
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            className="h-7 gap-1.5 text-xs text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
+                                                                                            onClick={() => user.email && handleApprove(user.email)}
+                                                                                        >
+                                                                                            <CheckCircle size={12} className="text-emerald-500" />
+                                                                                            Approve
+                                                                                        </Button>
+                                                                                    )}
+
                                                                                     {user.status !== 'BANNED' ? (
                                                                                         <Button
                                                                                             variant="ghost"

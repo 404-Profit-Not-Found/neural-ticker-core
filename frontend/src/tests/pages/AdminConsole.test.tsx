@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { AdminConsole } from '../../pages/AdminConsole';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +35,8 @@ describe('AdminConsole', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         vi.mocked(AdminService.getIdentities).mockResolvedValue(mockIdentities as any);
         vi.mocked(AdminService.getTickerRequests).mockResolvedValue([]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        AdminService.approveUser = vi.fn().mockResolvedValue({}) as any;
     });
 
     const renderComponent = () => {
@@ -70,5 +72,20 @@ describe('AdminConsole', () => {
         // Testing navigation requires mocking useNavigate from react-router-dom, or checking if path changes in memory router.
         // For unit test, we can check if AdminService is NOT called.
         expect(AdminService.getIdentities).not.toHaveBeenCalled();
+    });
+
+    it('calls approveUser when approve button is clicked for waitlisted user', async () => {
+        renderComponent();
+
+        await waitFor(() => {
+            expect(screen.getByText('user2@test.com')).toBeInTheDocument();
+        });
+
+        const approveBtns = screen.getAllByText('Approve');
+        expect(approveBtns.length).toBeGreaterThan(0);
+
+        fireEvent.click(approveBtns[0]);
+
+        expect(AdminService.approveUser).toHaveBeenCalledWith('2');
     });
 });
