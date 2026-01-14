@@ -97,11 +97,20 @@ export function TickerCard({
         RiskIcon = Flame;
     }
 
+    // --- Styling Logic (Gradient Border match) ---
+    // Adapting StatPill logic:
+    // Determined tone for RGB hover effects
+    let tone = 'primary';
+    if (risk > 6.5) tone = 'red';
+    else if (risk <= 3.5) tone = 'emerald';
+    else if (overallScore && overallScore >= 7) tone = 'yellow';
+
     return (
         <div
             onClick={() => navigate(`/ticker/${symbol}`)}
+            data-tone={tone}
             className={cn(
-                "ticker-card group flex flex-col p-4 rounded-lg border border-border sm:border-border/50 bg-transparent hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full min-w-[320px] sm:min-w-0",
+                "ticker-card group flex flex-col p-4 rounded-lg border border-border sm:border-border/50 bg-card hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md h-full relative w-full min-w-[320px] sm:min-w-0",
                 className
             )}
         >

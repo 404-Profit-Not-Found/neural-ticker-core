@@ -1,5 +1,7 @@
 
 import { TrendingUp, TrendingDown, ArrowUpCircle, Zap } from 'lucide-react';
+
+
 import { ScenarioCards } from './ScenarioCards';
 import type { TickerData } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -24,10 +26,10 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
         const now = new Date();
         const diffMs = now.getTime() - date.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        
+
         // "Few trading days" ~ 4-5 days to account for weekends
         if (diffDays > 5) return { isFresh: false, timeAgo: '' };
-        
+
         const diffHours = diffMs / (1000 * 60 * 60);
         if (diffHours < 1) return { isFresh: true, timeAgo: 'Just now' };
         if (diffHours < 24) return { isFresh: true, timeAgo: `${Math.floor(diffHours)}h ago` };
@@ -36,70 +38,25 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
 
     const { isFresh, timeAgo } = getNewsStatus(news?.updated_at);
 
+
     return (
         <div className="flex flex-col gap-6">
             {/* Breaking News Alert */}
             {news && (news.score || 0) >= 5 && isFresh && (
-                <section className={`relative rounded-xl border p-0.5 overflow-hidden group ${
-                    news.sentiment === 'BULLISH' ? 'border-emerald-500/30' :
-                    news.sentiment === 'BEARISH' ? 'border-red-500/30' :
-                    'border-blue-500/30'
-                }`}>
-                     {/* Animated Gradient Border/Glow Background */}
-                    <div className={`absolute inset-0 opacity-20 ${
-                        news.sentiment === 'BULLISH' ? 'bg-gradient-to-r from-emerald-500 via-transparent to-transparent' :
-                        news.sentiment === 'BEARISH' ? 'bg-gradient-to-r from-red-500 via-transparent to-transparent' :
-                        'bg-gradient-to-r from-blue-500 via-transparent to-transparent'
-                    }`} />
-                    
-                    <div className={`relative rounded-[10px] p-4 ${
-                         news.sentiment === 'BULLISH' ? 'bg-emerald-950/10' :
-                         news.sentiment === 'BEARISH' ? 'bg-red-950/10' :
-                         'bg-blue-950/10'
-                    }`}>
-                         {/* Scanline/Grid Effect */}
-                        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:16px_16px] [mask-image:linear-gradient(to_right,black,transparent)] pointer-events-none" />
-
-                        <div className="relative flex items-start gap-4 z-10">
-                             {/* Icon Box */}
-                             <div className={`shrink-0 p-2 rounded-lg border shadow-[0_0_15px_-3px_var(--shadow-color)] ${
-                                news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 [--shadow-color:theme(colors.emerald.500)]' :
-                                news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-500 [--shadow-color:theme(colors.red.500)]' :
-                                'bg-blue-500/10 border-blue-500/20 text-blue-500 [--shadow-color:theme(colors.blue.500)]'
-                             }`}>
-                                <Zap size={20} className="fill-current animate-pulse" />
-                             </div>
-
-                             <div className="space-y-1.5 flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${
-                                        news.sentiment === 'BULLISH' ? 'text-emerald-400' :
-                                        news.sentiment === 'BEARISH' ? 'text-red-400' :
-                                        'text-blue-400'
-                                    }`}>
-                                        {news.score && (news.score >= 8) ? 'Breaking News' : 'Market Update'}
-                                    </h3>
-                                    
-                                    <div className="flex items-center gap-2 ml-auto">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shadow-sm ${
-                                             news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                                             news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
-                                             'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                                        }`}>
-                                            IMPACT {news.score}/10
-                                        </span>
-                                        <span className="text-[10px] text-muted-foreground font-mono">
-                                            {timeAgo}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <p className="text-sm md:text-base text-foreground/90 font-medium leading-relaxed">
-                                    {news.summary}
-                                </p>
-                             </div>
+                <section className="relative">
+                    {/* Interaction Wrapper */}
+                    {news.research_id ? (
+                        <a
+                            href={`/ticker/${profile.symbol}/research/${news.research_id}`}
+                            className="block group relative rounded-xl border p-0.5 overflow-hidden transition-all hover:scale-[1.005] hover:shadow-lg cursor-pointer"
+                        >
+                            <NewsCardContent news={news} timeAgo={timeAgo} />
+                        </a>
+                    ) : (
+                        <div className="relative rounded-xl border p-0.5 overflow-hidden">
+                            <NewsCardContent news={news} timeAgo={timeAgo} />
                         </div>
-                    </div>
+                    )}
                 </section>
             )}
 
@@ -199,4 +156,71 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
         </div>
     );
 }
+
+function NewsCardContent({ news, timeAgo }: { news: NonNullable<TickerData['news']>, timeAgo: string }) {
+    const borderColor = news.sentiment === 'BULLISH' ? 'border-emerald-500/30' : news.sentiment === 'BEARISH' ? 'border-red-500/30' : 'border-blue-500/30';
+
+
+    // Improved Background Logic for Contrast safety
+    // Using bg-card (white/dark-gray) with a tinted overlay instead of pure 950/10
+    const bgTint = news.sentiment === 'BULLISH' ? 'bg-emerald-100/50 dark:bg-emerald-950/10' :
+        news.sentiment === 'BEARISH' ? 'bg-red-100/50 dark:bg-red-950/10' :
+            'bg-blue-100/50 dark:bg-blue-950/10';
+
+    const textColor = news.sentiment === 'BULLISH' ? 'text-emerald-700 dark:text-emerald-400' :
+        news.sentiment === 'BEARISH' ? 'text-red-700 dark:text-red-400' :
+            'text-blue-700 dark:text-blue-400';
+
+    const iconBg = news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-500' :
+        news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-500' :
+            'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-500';
+
+    const badgeStyle = news.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' :
+        news.sentiment === 'BEARISH' ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400' :
+            'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400';
+
+    return (
+        <div className={`relative rounded-[10px] w-full h-full border ${borderColor}`}>
+            {/* Background with Theme Support */}
+            <div className={`absolute inset-0 ${bgTint}`} />
+
+            {/* Scanline/Grid Effect - Reduced intensity */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
+
+            <div className="relative flex items-start gap-4 z-10 p-4">
+                {/* Icon Box */}
+                <div className={`shrink-0 p-2 rounded-lg border shadow-[0_0_15px_-3px_rgba(0,0,0,0.1)] dark:shadow-[0_0_15px_-3px_var(--shadow-color)] ${iconBg} ${news.sentiment === 'BULLISH' ? '[--shadow-color:theme(colors.emerald.500)]' :
+                    news.sentiment === 'BEARISH' ? '[--shadow-color:theme(colors.red.500)]' :
+                        '[--shadow-color:theme(colors.blue.500)]'
+                    }`}>
+                    <Zap size={20} className="fill-current animate-pulse" />
+                </div>
+
+                <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${textColor}`}>
+                            {news.score && (news.score >= 8) ? 'Breaking News' : 'Market Update'}
+                        </h3>
+
+                        <div className="flex items-center gap-2 ml-auto">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shadow-sm ${badgeStyle}`}>
+                                IMPACT {news.score}/10
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                                {timeAgo}
+                            </span>
+                        </div>
+                    </div>
+
+                    <p className="text-sm md:text-base text-foreground font-medium leading-relaxed">
+                        {news.summary}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Re-export specific sub-components if needed externally, but here just TickerOverview
+
 

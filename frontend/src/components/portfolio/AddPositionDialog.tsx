@@ -33,6 +33,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
+  const isSelectionRef = useRef(false);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -50,6 +51,12 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
 
   // Debounced Search
   useEffect(() => {
+    // Skip search if the update was triggered by selecting an item
+    if (isSelectionRef.current) {
+      isSelectionRef.current = false;
+      return;
+    }
+
     const timer = setTimeout(async () => {
       if (!symbol.trim()) {
         setResults([]);
@@ -86,6 +93,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   }, []);
 
   const selectTicker = (ticker: TickerResult) => {
+    isSelectionRef.current = true;
     setSymbol(ticker.symbol);
     setShowResults(false);
   };
@@ -164,7 +172,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               onFocus={() => {
                 if (results.length > 0) setShowResults(true);
               }}
-               className="pl-9 uppercase placeholder:normal-case font-mono font-bold transition-all placeholder:text-muted-foreground/50 focus-visible:ring-primary/50"
+              className="pl-9 uppercase placeholder:normal-case font-mono font-bold transition-all placeholder:text-muted-foreground/50 focus-visible:ring-primary/50"
             />
             {isLoadingSearch && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">

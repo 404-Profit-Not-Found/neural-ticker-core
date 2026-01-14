@@ -138,8 +138,8 @@ export class TickersService {
             fullErrorString.includes('429');
 
           if (isRateLimit) {
-            this.logger.warn(
-              `Rate limit hit for ${upperSymbol}, queueing for background retry.`,
+            this.logger.error(
+              `🚨 YAHOO RATE LIMIT HIT for ${upperSymbol}, queueing for background retry.`,
             );
             await this.jobsService.queueRequest(RequestType.ADD_TICKER, {
               symbol: upperSymbol,
@@ -393,6 +393,7 @@ export class TickersService {
           Array.isArray(finnhubResult.value.result)
         ) {
           finnhubResult.value.result.forEach((item: any) => {
+            if (!item.symbol) return;
             const sym = item.symbol.toUpperCase();
             // Filter out dots if needed, but keeping them allows more matches.
             // Just filter duplicates.
@@ -418,6 +419,7 @@ export class TickersService {
           Array.isArray(yahooResult.value.quotes)
         ) {
           yahooResult.value.quotes.forEach((item: any) => {
+            if (!item.symbol) return;
             const sym = item.symbol.toUpperCase();
             if (!existingSymbols.has(sym)) {
               existingSymbols.add(sym);

@@ -32,15 +32,16 @@ export function ModelBadge({ model, rarity, className, showIcon = true }: ModelB
     const getRarityStyles = (rarity: string) => {
         switch (rarity) {
             case 'Legendary':
-                return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/40';
+                return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:bg-yellow-500/20 dark:text-yellow-500 dark:border-yellow-500/40';
             case 'Epic':
-                return 'bg-purple-500/20 text-purple-400 border-purple-500/40';
+                return 'bg-purple-500/10 text-purple-600 border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/40';
             case 'Rare':
-                return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+                return 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/40';
             case 'Uncommon':
-                return 'bg-green-500/20 text-green-400 border-green-500/40';
+                return 'bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/40';
             default:
-                return 'bg-white/5 text-white/70 border-white/10';
+                // Common / Default
+                return 'bg-muted/50 text-muted-foreground border-border dark:bg-white/5 dark:text-white/70 dark:border-white/10';
         }
     };
 

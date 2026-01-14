@@ -11,6 +11,10 @@ vi.mock('../../context/AuthContext', () => ({
   }),
 }));
 
+vi.mock('../../hooks/useTicker', () => ({
+  useActiveResearchCount: () => ({ data: 0 }),
+}));
+
 // Mock EventSource and scrollTo
 if (typeof window !== 'undefined') {
   window.EventSource = vi.fn().mockImplementation(() => ({

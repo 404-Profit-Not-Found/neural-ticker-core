@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { UserTierBadge } from '../components/ui/user-tier-badge';
+import { UserStatusBadge } from '../components/ui/user-status-badge';
 import { useQuery } from '@tanstack/react-query';
 import { cn, debounce } from '../lib/utils';
 import { TransactionHistoryDialog } from '../components/profile/TransactionHistoryDialog';
@@ -127,22 +129,16 @@ export function ProfilePage() {
 
     // Get tier badge (exact match to Admin Console UserAdminCard)
     const getTierBadge = (tier: string | undefined) => {
-        switch (tier) {
-            case 'whale':
-                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
-            case 'pro':
-                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
-            default:
-                return null;
-        }
+        return <UserTierBadge tier={tier} />;
     };
 
     // Get status badge (exact match to Admin Console UserAdminCard)
     const getStatusBadge = (role: string | undefined) => {
+        // Since profile page only shows ACTIVE/ADMIN usually
         if (role === 'admin') {
-            return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 h-5 text-[10px]">ADMIN</Badge>;
+            return <UserTierBadge tier="admin" />;
         }
-        return <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5 h-5 text-[10px]">ACTIVE</Badge>;
+        return <UserStatusBadge status="ACTIVE" />;
     };
 
     return (

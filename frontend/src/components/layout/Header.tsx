@@ -6,6 +6,7 @@ import { Bell, User as UserIcon, Shield, Menu, X, Brain, Search, Crown, Sparkles
 import { api } from '../../lib/api';
 import { queryClient } from '../../lib/queryClient';
 import { Badge } from '../ui/badge';
+import { UserTierBadge } from '../ui/user-tier-badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
 import { SuperLoading } from '../ui/SuperLoading';
@@ -374,16 +375,8 @@ export function Header() {
                 <div className="p-4 border-b border-border">
                   <div className="font-semibold text-foreground flex items-center gap-2">
                     {user?.nickname || 'Trader'}
-                    {user?.tier === 'whale' && (
-                      <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5">
-                        <Crown size={10} /> WHALE
-                      </Badge>
-                    )}
-                    {user?.tier === 'pro' && (
-                      <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5">
-                        <Sparkles size={10} /> PRO
-                      </Badge>
-                    )}
+                    {user?.tier === 'whale' && <UserTierBadge tier="whale" />}
+                    {user?.tier === 'pro' && <UserTierBadge tier="pro" />}
                   </div>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>

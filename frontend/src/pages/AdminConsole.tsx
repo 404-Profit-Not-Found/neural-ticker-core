@@ -43,6 +43,8 @@ import {
 } from '../components/ui/popover';
 import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
 import { UserDetailDialog } from '../components/admin/UserDetailDialog';
+import { UserTierBadge } from '../components/ui/user-tier-badge';
+import { UserStatusBadge } from '../components/ui/user-status-badge';
 
 type SortConfig = {
     key: string;
@@ -431,7 +433,7 @@ export function AdminConsole() {
         const isAdmin = role === 'admin' || status === 'ADMIN';
 
         if (isAdmin) {
-            badges.push(<Badge key="admin" variant="secondary" className="gap-1 bg-red-500/10 text-red-500 border-red-500/20"><Shield size={10} /> ADMIN</Badge>);
+            badges.push(<UserTierBadge key="admin" tier="admin" />);
         }
 
         if (status !== 'ADMIN') {
@@ -457,16 +459,7 @@ export function AdminConsole() {
     };
 
     // Get tier badge - matches mobile card styling (UserAdminCard)
-    const getTierBadge = (tier: string | undefined) => {
-        switch (tier) {
-            case 'whale':
-                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
-            case 'pro':
-                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
-            default:
-                return null; // Don't show badge for free users to reduce noise
-        }
-    };
+    const getTierBadge = (tier: string | undefined) => <UserTierBadge tier={tier} />;
 
     // Loading skeleton - view-aware to avoid hydration errors
     const LoadingSkeleton = ({ mode = viewMode }: { mode?: 'list' | 'grid' }) => {

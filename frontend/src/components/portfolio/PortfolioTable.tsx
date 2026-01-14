@@ -137,7 +137,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         // 2. Value / Return (Merged)
         columnHelper.accessor('gain_loss_percent', {
             id: 'gain_loss_percent', // Sort by percentage
-            header: () => <span className="hidden md:inline">Value / Return</span>,
+            header: 'Value / Return',
             cell: (info) => {
                 const val = info.row.original.current_value;
                 const gainLoss = info.row.original.gain_loss;
@@ -145,7 +145,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const isProfit = gainLoss >= 0;
 
                 return (
-                    <div className="hidden md:flex flex-col items-start min-w-[100px]">
+                    <div className="flex flex-col items-start min-w-[100px]">
                         <span className="font-bold text-foreground text-sm">
                             {formatCurrency(val)}
                         </span>
@@ -160,9 +160,9 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
         // 3. Position (Shares) (Moved Here)
         columnHelper.accessor('shares', {
-            header: 'Position',
+            header: () => <span className="hidden md:inline">Position</span>,
             cell: (info) => (
-                <div className="flex flex-col min-w-[80px]">
+                <div className="hidden md:flex flex-col min-w-[80px]">
                     <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
                     <span className="text-xs text-muted-foreground">Avg: {formatCurrency(Number(info.row.original.buy_price))}</span>
                 </div>
@@ -171,14 +171,14 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
         // 4. Price / Change
         columnHelper.accessor('current_price', {
-            header: 'Price / Change',
+            header: () => <span className="hidden md:inline">Price / Change</span>,
             cell: (info) => {
                 const price = info.getValue();
                 const change = info.row.original.change_percent || 0;
                 const isPositive = change >= 0;
 
                 return (
-                    <div className="flex flex-col items-start min-w-[90px]">
+                    <div className="hidden md:flex flex-col items-start min-w-[90px]">
                         <span className="text-sm font-mono font-medium text-foreground/90">
                             {formatCurrency(price)}
                         </span>

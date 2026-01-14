@@ -1,5 +1,7 @@
 import { Badge } from '../ui/badge';
 import { Crown, Sparkles, Mail } from 'lucide-react';
+import { UserTierBadge } from '../ui/user-tier-badge';
+import { UserStatusBadge } from '../ui/user-status-badge';
 
 // Define interface compatible with AdminConsole user objects
 export interface AdminUser {
@@ -23,23 +25,14 @@ interface UserAdminCardProps {
 
 export function UserAdminCard({ user, onClick }: UserAdminCardProps) {
 
-    const getTierBadge = (tier: string) => {
-        switch (tier) {
-            case 'whale':
-                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
-            case 'pro':
-                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
-            default:
-                return null; // Don't show badge for free users to reduce noise
-        }
-    };
+    const getTierBadge = (tier: string) => <UserTierBadge tier={tier} />;
 
     const getStatusBadge = (status: string, role: string) => {
         const badges = [];
         const isAdmin = role === 'admin' || status === 'ADMIN';
 
         if (isAdmin) {
-            badges.push(<Badge key="admin" className="bg-red-500/10 text-red-500 border-red-500/20 h-5 text-[10px]">ADMIN</Badge>);
+            badges.push(<UserTierBadge key="admin" tier="admin" />);
         }
 
         if (status !== 'ADMIN') {

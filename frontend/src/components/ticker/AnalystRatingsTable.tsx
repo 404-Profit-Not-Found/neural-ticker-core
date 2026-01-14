@@ -11,8 +11,8 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
     if (!ratings || ratings.length === 0) return null;
 
     return (
-        <Card>
-            <CardHeader className="pb-3">
+        <Card className="bg-transparent shadow-sm border border-border/50">
+            <CardHeader className="pb-3 bg-transparent border-b border-border/50">
                 <CardTitle>Analyst Ratings</CardTitle>
             </CardHeader>
             <CardContent>
