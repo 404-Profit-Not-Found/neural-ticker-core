@@ -162,16 +162,24 @@ export function ProfilePage() {
                                 <div className="w-full h-full rounded-full overflow-hidden bg-background">
                                     {(() => {
                                         const url = avatarUrl || user?.avatar_url;
-                                        const isSafeUrl = (u: string) => {
+                                        const getSafeUrl = (u: string): string | null => {
                                             try {
                                                 const parsed = new URL(u);
-                                                return ['http:', 'https:'].includes(parsed.protocol);
+                                                if (
+                                                    ['http:', 'https:'].includes(parsed.protocol) &&
+                                                    parsed.hostname
+                                                ) {
+                                                    // Use the canonical href to avoid odd relative/invalid forms
+                                                    return parsed.href;
+                                                }
+                                                return null;
                                             } catch {
-                                                return false;
+                                                return null;
                                             }
                                         };
-                                        return url && isSafeUrl(url) ? (
-                                            <img src={url} alt="Profile" className="w-full h-full object-cover" />
+                                        const safeUrl = url ? getSafeUrl(url) : null;
+                                        return safeUrl ? (
+                                            <img src={safeUrl} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-lg font-medium">
                                                 {(user?.nickname || user?.email || '??').slice(0, 2).toUpperCase()}
