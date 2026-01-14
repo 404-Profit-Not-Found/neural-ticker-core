@@ -699,46 +699,50 @@ export function AdminConsole() {
                                                     <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')}><List size={14} /></Button>
                                                     <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')}><LayoutGrid size={14} /></Button>
                                                 </div>
-
-                                                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                                                    <DialogTrigger asChild>
-                                                        <Button className="gap-2 h-9">
-                                                            <Plus size={16} />
-                                                            Add User
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogHeader>
-                                                            <DialogTitle>Add to Waitlist / Invite</DialogTitle>
-                                                            <DialogDescription>
-                                                                Enter the email address to add.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <div className="grid gap-4 py-4">
-                                                            <Input
-                                                                value={newEmail}
-                                                                onChange={(e) => setNewEmail(e.target.value)}
-                                                                placeholder="user@example.com"
-                                                            />
-                                                        </div>
-                                                        <DialogFooter>
-                                                            <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                                                            <Button onClick={handleAddEmail}>Add User</Button>
-                                                        </DialogFooter>
-                                                    </DialogContent>
-                                                </Dialog>
                                             </div>
                                         </div>
 
-                                        {/* Search Only (Filters are in StatsBar) */}
-                                        <div className="relative w-full">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                placeholder="Search by email or nickname..."
-                                                className="pl-10 bg-muted/20 border-border/40 focus:bg-background transition-colors"
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                            />
+                                        {/* Search & Actions Row */}
+                                        <div className="flex flex-col sm:flex-row gap-4 items-center w-full">
+                                            <div className="relative flex-1 w-full">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    placeholder="Search by email or nickname..."
+                                                    className="pl-10 bg-muted/20 border-border/40 focus:bg-background transition-colors"
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <Button
+                                                className="gap-2 h-9 w-full sm:w-auto shrink-0 bg-primary text-primary-foreground"
+                                                onClick={() => setIsInviteOpen(true)}
+                                            >
+                                                <Plus size={16} />
+                                                Add User
+                                            </Button>
+
+                                            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Add to Waitlist / Invite</DialogTitle>
+                                                        <DialogDescription>
+                                                            Enter the email address to add.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="grid gap-4 py-4">
+                                                        <Input
+                                                            value={newEmail}
+                                                            onChange={(e) => setNewEmail(e.target.value)}
+                                                            placeholder="user@example.com"
+                                                        />
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
+                                                        <Button onClick={handleAddEmail}>Add User</Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
                                         </div>
 
                                         {/* Consolidated List/Grid View */}

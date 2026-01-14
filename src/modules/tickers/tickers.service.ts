@@ -9,9 +9,10 @@ import {
 } from '@nestjs/common';
 import { getErrorMessage } from '../../utils/error.util';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
+import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity'; // Added
 import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
@@ -31,11 +32,13 @@ export class TickersService {
     private readonly logoRepo: Repository<TickerLogoEntity>,
     @InjectRepository(PriceOhlcv)
     private readonly ohlcvRepo: Repository<PriceOhlcv>,
+    @InjectRepository(TickerRequestEntity) // Added
+    private readonly requestRepo: Repository<TickerRequestEntity>, // Added
     @Inject(forwardRef(() => FinnhubService))
     private readonly finnhubService: FinnhubService,
     private readonly yahooFinanceService: YahooFinanceService,
-    @Inject(forwardRef(() => JobsService)) // Added
-    private readonly jobsService: JobsService, // Added
+    @Inject(forwardRef(() => JobsService))
+    private readonly jobsService: JobsService,
     private readonly httpService: HttpService,
   ) {}
 
@@ -274,7 +277,11 @@ export class TickersService {
   async searchTickers(
     search?: string,
     includeExternal = false,
-  ): Promise<Partial<TickerEntity & { is_locally_tracked: boolean }>[]> {
+  ): Promise<
+    Partial<
+      TickerEntity & { is_locally_tracked: boolean; is_queued?: boolean }
+    >[]
+  > {
     if (!search || search.trim() === '') {
       const all = await this.getAllTickers();
       return all.map((t) => ({ ...t, is_locally_tracked: true }));
@@ -282,31 +289,40 @@ export class TickersService {
 
     const searchPattern = `${search.toUpperCase()}%`;
 
-    // 1. Local DB Search
-    const dbResults = await this.tickerRepo
-      .createQueryBuilder('ticker')
-      .select([
-        'ticker.id',
-        'ticker.symbol',
-        'ticker.name',
-        'ticker.exchange',
-        'ticker.logo_url',
-      ])
-      .where('ticker.is_hidden = :hidden', { hidden: false })
-      .andWhere(
-        '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
-        { pattern: searchPattern },
-      )
-      .orderBy(
-        'CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END',
-        'ASC',
-      )
-      .addOrderBy('ticker.symbol', 'ASC')
-      .setParameter('exact', search.toUpperCase())
-      .limit(20)
-      .getMany();
+    // 1. Local DB Search & Pending Request Search
+    const [dbResults, pendingRequests] = await Promise.all([
+      this.tickerRepo
+        .createQueryBuilder('ticker')
+        .select([
+          'ticker.id',
+          'ticker.symbol',
+          'ticker.name',
+          'ticker.exchange',
+          'ticker.logo_url',
+        ])
+        .where('ticker.is_hidden = :hidden', { hidden: false })
+        .andWhere(
+          '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
+          { pattern: searchPattern },
+        )
+        .orderBy(
+          'CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END',
+          'ASC',
+        )
+        .addOrderBy('ticker.symbol', 'ASC')
+        .setParameter('exact', search.toUpperCase())
+        .limit(20)
+        .getMany(),
+      this.requestRepo.find({
+        where: {
+          symbol: ILike(`${searchPattern}`),
+          status: 'PENDING',
+        },
+        take: 10,
+      }),
+    ]);
 
-    const mappedDbResults = await Promise.all(
+    const mappedDbResults: any[] = await Promise.all(
       dbResults.map(async (t) => {
         // Fetch last 14 days of prices for sparkline
         const prices = await this.ohlcvRepo.find({
@@ -324,13 +340,46 @@ export class TickersService {
       }),
     );
 
+    // Map pending requests to results
+    const mappedPendingResults = pendingRequests.map((req) => ({
+      symbol: req.symbol,
+      name: 'Requested Ticker',
+      exchange: 'Unknown',
+      logo_url: null,
+      is_locally_tracked: false,
+      is_queued: true,
+      sparkline: null,
+    }));
+
+    // Combine Local + Pending (Deduplicate)
+    const combinedResults = [...mappedDbResults];
+    const existingSymbols = new Set(
+      combinedResults.map((r) => r.symbol.toUpperCase()),
+    );
+
+    mappedPendingResults.forEach((r) => {
+      if (!existingSymbols.has(r.symbol.toUpperCase())) {
+        combinedResults.push(r);
+        existingSymbols.add(r.symbol.toUpperCase());
+      }
+    });
+
     // 2. External Search (Fallback/Supplement)
     if (search.length >= 2 && includeExternal) {
       try {
-        const [finnhubResult, yahooResult] = await Promise.allSettled([
-          this.finnhubService.searchSymbols(search),
-          this.yahooFinanceService.search(search),
-        ]);
+        const [finnhubResult, yahooResult, pendingRequests] =
+          await Promise.allSettled([
+            this.finnhubService.searchSymbols(search),
+            this.yahooFinanceService.search(search),
+            this.requestRepo.find({ where: { status: 'PENDING' } }), // Fetch pending requests
+          ]);
+
+        const pendingSymbols = new Set<string>();
+        if (pendingRequests.status === 'fulfilled') {
+          pendingRequests.value.forEach((req) =>
+            pendingSymbols.add(req.symbol.toUpperCase()),
+          );
+        }
 
         const existingSymbols = new Set(
           mappedDbResults.map((t) => t.symbol.toUpperCase()),
@@ -355,6 +404,7 @@ export class TickersService {
                 exchange: item.type || 'External',
                 logo_url: null,
                 is_locally_tracked: false,
+                is_queued: pendingSymbols.has(sym), // Check if pending
                 sparkline: null,
               });
             }
@@ -377,6 +427,7 @@ export class TickersService {
                 exchange: item.exchDisp || item.exchange || 'External',
                 logo_url: null,
                 is_locally_tracked: false,
+                is_queued: pendingSymbols.has(sym),
                 sparkline: null,
               });
             }
@@ -384,7 +435,7 @@ export class TickersService {
         }
 
         // Return combined (limit external results to avoid huge payload? 20 is safe)
-        return [...mappedDbResults, ...externalResults.slice(0, 20)];
+        return [...combinedResults, ...externalResults.slice(0, 20)];
       } catch (err) {
         this.logger.error(`External search failed: ${getErrorMessage(err)}`);
         // If external fails, just return strict DB results
