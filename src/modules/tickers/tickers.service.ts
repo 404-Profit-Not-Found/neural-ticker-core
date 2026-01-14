@@ -365,12 +365,15 @@ export class TickersService {
     });
 
     // 2. External Search (Fallback/Supplement)
-    if (search.length >= 2 && includeExternal) {
+    const searchStr =
+      typeof search === 'string' ? search.trim() : '';
+
+    if (searchStr.length >= 2 && includeExternal) {
       try {
         const [finnhubResult, yahooResult, pendingRequests] =
           await Promise.allSettled([
-            this.finnhubService.searchSymbols(search),
-            this.yahooFinanceService.search(search),
+            this.finnhubService.searchSymbols(searchStr),
+            this.yahooFinanceService.search(searchStr),
             this.requestRepo.find({ where: { status: 'PENDING' } }), // Fetch pending requests
           ]);
 
