@@ -322,23 +322,46 @@ export class TickersService {
       }),
     ]);
 
-    const mappedDbResults: any[] = await Promise.all(
-      dbResults.map(async (t) => {
-        // Fetch last 14 days of prices for sparkline
-        const prices = await this.ohlcvRepo.find({
-          where: { symbol_id: t.id, timeframe: '1d' },
-          order: { ts: 'DESC' },
-          take: 14,
-          select: ['close', 'ts'],
-        });
+    // Batch fetch sparklines for all results in a single query (avoiding N+1)
+    const symbolIds = dbResults.map((t) => t.id);
+    const sparklineMap = new Map<string, number[]>();
 
-        return {
-          ...t,
-          is_locally_tracked: true,
-          sparkline: prices.reverse().map((p) => p.close),
-        };
-      }),
-    );
+    if (symbolIds.length > 0) {
+      // Single query to get last 14 days of prices for ALL tickers at once
+      const allPrices = await this.ohlcvRepo
+        .createQueryBuilder('ohlcv')
+        .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
+        .where('ohlcv.symbol_id IN (:...symbolIds)', { symbolIds })
+        .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
+        .orderBy('ohlcv.symbol_id', 'ASC')
+        .addOrderBy('ohlcv.ts', 'DESC')
+        .take(symbolIds.length * 14) // Max 14 per ticker
+        .getMany();
+
+      // Group by symbol_id and take first 14 (most recent) for each
+      const groupedPrices = new Map<string, { close: number; ts: Date }[]>();
+      for (const price of allPrices) {
+        const existing = groupedPrices.get(price.symbol_id) || [];
+        if (existing.length < 14) {
+          existing.push({ close: price.close, ts: price.ts });
+          groupedPrices.set(price.symbol_id, existing);
+        }
+      }
+
+      // Convert to sparkline arrays (reversed for chronological order)
+      for (const [symbolId, prices] of groupedPrices) {
+        sparklineMap.set(
+          symbolId,
+          prices.reverse().map((p) => p.close),
+        );
+      }
+    }
+
+    const mappedDbResults = dbResults.map((t) => ({
+      ...t,
+      is_locally_tracked: true,
+      sparkline: sparklineMap.get(t.id) || [],
+    }));
 
     // Map pending requests to results
     const mappedPendingResults = pendingRequests.map((req) => ({
@@ -352,7 +375,7 @@ export class TickersService {
     }));
 
     // Combine Local + Pending (Deduplicate)
-    const combinedResults = [...mappedDbResults];
+    const combinedResults: any[] = [...mappedDbResults];
     const existingSymbols = new Set(
       combinedResults.map((r) => r.symbol.toUpperCase()),
     );
