@@ -53,13 +53,23 @@ export class TickersController {
   })
   @Get()
   getAll(
-    @Query('search') search: string,
+    @Query('search') search: string | string[],
     @Query('external') external: string,
     @Req() req: any,
   ) {
+    // Normalize `search` to a single string or undefined to avoid type confusion
+    let normalizedSearch: string | undefined;
+    if (typeof search === 'string') {
+      normalizedSearch = search;
+    } else if (Array.isArray(search)) {
+      normalizedSearch = search.find((v) => typeof v === 'string' && v.length > 0);
+    } else {
+      normalizedSearch = undefined;
+    }
+
     const isPro = req.user?.tier === 'pro' || req.user?.role === 'admin';
     const shouldSearchExternal = isPro && external === 'true';
-    return this.tickersService.searchTickers(search, shouldSearchExternal);
+    return this.tickersService.searchTickers(normalizedSearch, shouldSearchExternal);
   }
 
   @ApiOperation({
