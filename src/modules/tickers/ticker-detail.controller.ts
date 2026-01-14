@@ -40,7 +40,7 @@ export class TickerDetailController {
     try {
       snapshot = await this.marketDataService.getSnapshot(symbol);
     } catch (e) {
-      console.error(`Error getting snapshot for ${symbol}:`, e);
+      console.error('Error getting snapshot for %s:', symbol, e);
       throw e;
     }
 
