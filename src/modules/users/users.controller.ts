@@ -65,6 +65,14 @@ export class UsersController {
     return this.usersService.updateRole(id, role);
   }
 
+  @Roles('admin')
+  @ApiOperation({ summary: 'Approve User (Waitlist -> Active)' })
+  @ApiResponse({ status: 200, description: 'User approved' })
+  @Post(':id/approve')
+  async approveUser(@Param('id') id: string) {
+    return this.usersService.approveUser(id);
+  }
+
   @ApiOperation({
     summary: 'Update User Preferences (API Keys)',
     description: `

@@ -153,6 +153,8 @@ export interface TickerData {
         sentiment?: string;
         score?: number;
         summary?: string;
+
         updated_at?: string;
+        research_id?: string;
     };
 }

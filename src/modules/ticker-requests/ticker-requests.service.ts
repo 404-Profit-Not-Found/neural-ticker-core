@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,8 @@ import { TickersService } from '../tickers/tickers.service';
 
 @Injectable()
 export class TickerRequestsService {
+  private readonly logger = new Logger(TickerRequestsService.name);
+
   constructor(
     @InjectRepository(TickerRequestEntity)
     private readonly requestRepo: Repository<TickerRequestEntity>,
@@ -18,37 +21,72 @@ export class TickerRequestsService {
 
   async createRequest(userId: string, symbol: string) {
     const startSymbol = symbol.trim().toUpperCase();
+    this.logger.log(`Received request for ${startSymbol} from user ${userId}`);
 
-    // 1. Check if already tracked
-    const existing = await this.tickersService.findOneBySymbol(startSymbol);
-    if (existing) {
+    try {
+      // 1. Check if already tracked
+      const existing = await this.tickersService.findOneBySymbol(startSymbol);
+      if (existing) {
+        this.logger.warn(
+          `Ticker ${startSymbol} already exists. Returning conflict.`,
+        );
+        throw new BadRequestException(
+          `Ticker ${startSymbol} is currently being tracked. You can search for it now.`,
+        );
+      }
+
+      // 2. Check for duplicate pending request for this specific symbol (Global or User?)
+      // We check globally for PENDING to avoid clutter? Or User?
+      // Existing logic was global. Let's keep it but handle potential errors.
+      const existingRequest = await this.requestRepo.findOne({
+        where: { symbol: startSymbol, status: 'PENDING' },
+      });
+
+      if (existingRequest) {
+        this.logger.log(`Pending request already exists for ${startSymbol}`);
+        return existingRequest;
+      }
+
+      // 3. Create request
+      // Guard against potential unique constraint on (user_id, symbol) if the user requested it before (REJECTED/APPROVED)
+      const userRequest = await this.requestRepo.findOne({
+        where: { user_id: userId, symbol: startSymbol },
+      });
+
+      if (userRequest) {
+        // If they have an old request, we might want to revive it or just return it?
+        // If REJECTED, maybe they can request again?
+        // For now, let's update status to PENDING if it was REJECTED?
+        // Or just return it to avoid unique violation.
+        if (userRequest.status !== 'PENDING') {
+          this.logger.log(
+            `Updating existing ${userRequest.status} request for ${startSymbol} to PENDING`,
+          );
+          userRequest.status = 'PENDING';
+          return this.requestRepo.save(userRequest);
+        }
+        return userRequest;
+      }
+
+      const request = this.requestRepo.create({
+        user_id: userId,
+        symbol: startSymbol,
+        status: 'PENDING',
+      });
+
+      return await this.requestRepo.save(request);
+    } catch (error) {
+      this.logger.error(
+        `Failed to create request for ${startSymbol}: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException(
-        `Ticker ${startSymbol} is already tracked.`,
+        'Failed to submit request. Please try again.',
       );
     }
-
-    // 2. Check if pending request exists for this user (or globally? User specific avoids spam, global avoids dupes. Let's do user specific for now to allow multiple people to vote/request)
-    // Actually, if someone else requested it, we might just want to return that.
-    // Let's prevent duplicate pending requests for the SAME symbol regardless of user to keep DB clean,
-    // OR allow multiple to show "demand". Plan didn't specify.
-    // Implementation: Prevent duplicate pending requests for the SAME symbol globally to keep it simple.
-
-    const existingRequest = await this.requestRepo.findOne({
-      where: { symbol: startSymbol, status: 'PENDING' },
-    });
-
-    if (existingRequest) {
-      // Just return the existing one, effectively "upvoting" logic could go here later
-      return existingRequest;
-    }
-
-    const request = this.requestRepo.create({
-      user_id: userId,
-      symbol: startSymbol,
-      status: 'PENDING',
-    });
-
-    return this.requestRepo.save(request);
   }
 
   async getRequests() {

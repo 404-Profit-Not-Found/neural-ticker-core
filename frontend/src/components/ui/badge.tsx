@@ -28,9 +28,15 @@ const badgeVariants = cva(
                 waitlist: "border-amber-500/50 bg-amber-500/10 text-amber-400",
                 invited: "border-blue-500/50 bg-blue-500/10 text-blue-400",
                 // Tier Badges (not currently used - using inline styling instead)
-                tierFree: "border-zinc-600 bg-zinc-800/50 text-zinc-400",
-                tierPro: "border-purple-500/50 bg-purple-500/10 text-purple-400",
-                tierWhale: "border-amber-500/50 bg-amber-500/10 text-amber-400",
+                tierFree: "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400",
+                tierPro: "border-purple-200 bg-purple-100 text-purple-700 dark:border-purple-500/50 dark:bg-purple-500/10 dark:text-purple-400",
+                tierAdmin: "border-red-200 bg-red-100 text-red-700 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400",
+                tierWhale: "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-400",
+                // Status Badges (Pastel Solid)
+                statusActive: "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-500/50 dark:bg-emerald-500/10 dark:text-emerald-400",
+                statusInvited: "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-400",
+                statusWaitlist: "border-orange-200 bg-orange-100 text-orange-800 dark:border-orange-500/50 dark:bg-orange-500/10 dark:text-orange-400",
+                statusBanned: "border-red-200 bg-red-100 text-red-700 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400", // Same as admin but context differs
             },
         },
         defaultVariants: {

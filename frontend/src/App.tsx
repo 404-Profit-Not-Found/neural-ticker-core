@@ -47,11 +47,15 @@ function ScrollToTop() {
 }
 
 
+
+
 // Protected Route Wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <SuperLoading text="Initializing..." fullScreen />;
+  if (loading) {
+    return <SuperLoading text="Initializing..." fullScreen={true} />;
+  }
 
   if (!user) {
     // Redirect to internal login page instead of auto-redirecting to Google
@@ -115,8 +119,10 @@ function ThemeController() {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Map legacy 'g100' or default to 'dark'
-    let theme = user?.theme || 'dark';
+    // Priority: 1. User Profile (Auth) 2. LocalStorage (Cached) 3. Default (Dark)
+    const cachedTheme = localStorage.getItem('theme-preference');
+    let theme = user?.theme || cachedTheme || 'dark';
+
     if (theme.startsWith('g') && theme !== 'gray') theme = 'dark'; // Fallback for old themes
     if (!['light', 'dark', 'rgb', 'gray'].includes(theme)) theme = 'dark';
 
@@ -144,6 +150,42 @@ function ThemeController() {
         metaThemeColor.setAttribute('content', '#09090b');
       }
     }
+
+    // Also sync the boot variables so SuperLoading remains correct if theme changes live
+    let bg = '#09090b';
+    let text = 'rgba(255, 255, 255, 0.6)';
+    let grid = 'rgba(128, 128, 128, 0.05)';
+    let blob1 = 'rgba(148, 163, 184, 0.08)';
+    let blob2 = 'rgba(148, 163, 184, 0.06)';
+    let shadow = '0 0 20px rgba(255, 255, 255, 0.3)';
+
+    if (theme === 'light') {
+      bg = '#ffffff';
+      text = '#000000';
+      shadow = 'none';
+      grid = 'rgba(0, 0, 0, 0.04)';
+      blob1 = 'rgba(37, 99, 235, 0.05)';
+      blob2 = 'rgba(37, 99, 235, 0.03)';
+    } else if (theme === 'gray') {
+      bg = '#f3f4f6';
+      text = '#111827';
+      shadow = 'none';
+      grid = 'rgba(0, 0, 0, 0.04)';
+    } else if (theme === 'rgb') {
+      blob1 = 'rgba(139, 92, 246, 0.15)';
+      blob2 = 'rgba(16, 185, 129, 0.15)';
+    }
+
+    const root = document.documentElement;
+    root.style.setProperty('--boot-bg', bg);
+    root.style.setProperty('--boot-text', text);
+    root.style.setProperty('--boot-grid', grid);
+    root.style.setProperty('--boot-blob', blob1);
+    root.style.setProperty('--boot-blob-2', blob2);
+    root.style.setProperty('--boot-shadow', shadow);
+
+    // Cache theme for next boot (index.html)
+    localStorage.setItem('theme-preference', theme);
 
   }, [user?.theme]);
 

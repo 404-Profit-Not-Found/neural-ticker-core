@@ -1,6 +1,7 @@
 import { Badge } from '../ui/badge';
+import { UserTierBadge } from '../ui/user-tier-badge';
 import { Button } from '../ui/button';
-import { Check, X, Star, Crown } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/utils';
 import { useState, useEffect } from 'react';
@@ -51,21 +52,7 @@ export function TickerRequestRow({ request, onApprove, onReject, isFirst, isLast
         fetchInfo();
     }, [request.symbol]);
 
-    const getTierIcon = (tier: string) => {
-        switch (tier) {
-            case 'whale': return <Crown size={12} className="text-amber-400" />;
-            case 'pro': return <Star size={12} className="text-purple-400" />;
-            default: return null;
-        }
-    };
 
-    const getTierBadgeStyle = (tier: string) => {
-        switch (tier) {
-            case 'whale': return "border-amber-500/20 text-amber-500 bg-amber-500/5";
-            case 'pro': return "border-purple-500/20 text-purple-400 bg-purple-500/5";
-            default: return "border-muted text-muted-foreground";
-        }
-    };
 
     const cellClass = (index: number, total: number) => cn(
         "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 transition-colors shadow-sm",
@@ -135,10 +122,7 @@ export function TickerRequestRow({ request, onApprove, onReject, isFirst, isLast
                                 {request.user?.nickname || request.user?.email?.split('@')[0]}
                             </span>
                             {tier !== 'free' && (
-                                <Badge variant="outline" className={cn("text-[10px] h-4 px-1 gap-0.5", getTierBadgeStyle(tier))}>
-                                    {getTierIcon(tier)}
-                                    <span className="uppercase">{tier}</span>
-                                </Badge>
+                                <UserTierBadge tier={tier} className="text-[10px] h-4 px-1 gap-0.5" />
                             )}
                         </div>
                         <span className="text-xs text-muted-foreground">{request.user?.email}</span>

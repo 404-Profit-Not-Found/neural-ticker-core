@@ -178,6 +178,12 @@ export class FinnhubService implements OnModuleInit {
 
     // Downgrade noise for common restricted access errors (where we usually fallback)
     if (
+      msg.includes('429') ||
+      msg.toLowerCase().includes('limit') ||
+      msg.toLowerCase().includes('too many')
+    ) {
+      this.logger.error(`🚨 FINNHUB RATE LIMIT EXCEEDED [${context}]: ${msg}`);
+    } else if (
       msg.toLowerCase().includes('access') ||
       msg.toLowerCase().includes('restricted') ||
       msg.toLowerCase().includes('plan')

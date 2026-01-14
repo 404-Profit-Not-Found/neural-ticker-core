@@ -1,56 +1,113 @@
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
+import { cn } from '../lib/utils';
+
+// Candlestick data matching SuperLoading.tsx
+const CANDLE_DATA = [
+    { left: '5%', bottom: '30%', height: '35%', isGreen: true },
+    { left: '13%', bottom: '40%', height: '25%', isGreen: false },
+    { left: '21%', bottom: '45%', height: '30%', isGreen: true },
+    { left: '29%', bottom: '50%', height: '15%', isGreen: false },
+    { left: '37%', bottom: '48%', height: '40%', isGreen: true },
+    { left: '45%', bottom: '70%', height: '25%', isGreen: true },
+    { left: '53%', bottom: '55%', height: '35%', isGreen: false },
+    { left: '61%', bottom: '40%', height: '20%', isGreen: false },
+    { left: '69%', bottom: '42%', height: '15%', isGreen: true },
+    { left: '77%', bottom: '48%', height: '45%', isGreen: true },
+    { left: '85%', bottom: '75%', height: '20%', isGreen: true },
+];
 
 export function Login() {
     const { loginWithGoogle } = useAuth();
-    
+
     return (
-        <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#09090b] text-foreground">
-             {/* Hero Background - Matched to Loading Screen */}
-             <div className="absolute inset-0 z-0">
-                {/* Manual Grid to ensure exact match with index.html */}
-                <div 
-                    className="absolute inset-0" 
+        <div
+            className="relative min-h-screen flex items-center justify-center overflow-hidden text-foreground"
+            style={{ backgroundColor: 'var(--boot-bg)' }}
+        >
+            {/* Hero Background - Uses shared boot variables */}
+            <div className="absolute inset-0 z-0">
+                {/* Grid - Uses boot variable */}
+                <div
+                    className="absolute inset-0"
                     style={{
                         backgroundImage: `
-                            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), 
-                            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
+                            linear-gradient(var(--boot-grid, rgba(128, 128, 128, 0.05)) 1px, transparent 1px), 
+                            linear-gradient(90deg, var(--boot-grid, rgba(128, 128, 128, 0.05)) 1px, transparent 1px)
                         `,
                         backgroundSize: '28px 28px',
                         backgroundPosition: 'center top'
                     }}
                 ></div>
-                
-                {/* Manual Blobs to ensure exact match with index.html */}
-                <div 
+
+                {/* Blobs - Uses boot variables */}
+                <div
                     className="absolute inset-0"
                     style={{
                         backgroundImage: `
-                            radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.15), transparent 35%),
-                            radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.12), transparent 30%)
+                            radial-gradient(circle at 15% 20%, var(--boot-blob, rgba(148, 163, 184, 0.08)), transparent 35%),
+                            radial-gradient(circle at 80% 0%, var(--boot-blob-2, rgba(148, 163, 184, 0.06)), transparent 30%)
                         `,
                         backgroundRepeat: 'no-repeat',
                         backgroundSize: '100% 100%'
                     }}
                 ></div>
 
-                 {/* Subtle Gradient Overlay for depth at bottom only */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-80"></div>
+                {/* Subtle Gradient Overlay for depth at bottom only */}
+                <div
+                    className="absolute inset-0 opacity-80"
+                    style={{
+                        background: `linear-gradient(to top, var(--boot-bg), transparent, transparent)`
+                    }}
+                ></div>
             </div>
 
-            <div className="relative z-10 w-full max-w-[350px] space-y-12 animate-in fade-in zoom-in-95 duration-500 p-4">
+            <div className="relative z-10 w-full max-w-[350px] space-y-6 animate-in fade-in zoom-in-95 duration-500 p-4 flex flex-col items-center">
                 {/* Header Section - JUST THE TITLE */}
-                <div className="flex flex-col items-center space-y-4 text-center">
-                    <div className="space-y-2">
-                        {/* Title with Gradient - Matched to Loading Screen */}
-                        <h1 className="text-[3.5rem] leading-none font-light tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
-                            Neural Ticker
-                        </h1>
-                    </div>
+                <div className="flex flex-col items-center text-center">
+                    <h1
+                        className="text-[3.5rem] leading-none font-light tracking-tight animate-pulse-slow"
+                        style={{
+                            color: 'var(--boot-text)',
+                            textShadow: 'var(--boot-shadow)'
+                        }}
+                    >
+                        Neural Ticker
+                    </h1>
+                </div>
+
+                {/* Candlestick Chart (Matches SuperLoading) */}
+                <div className="chart-wrapper relative h-[200px] w-[280px] rounded">
+                    {CANDLE_DATA.map((c, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "candle absolute w-[10px]",
+                                c.isGreen ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                            )}
+                            style={{
+                                left: c.left,
+                                bottom: c.bottom,
+                                height: c.height
+                            }}
+                        >
+                            {/* Wick */}
+                            <div
+                                className={cn(
+                                    "absolute left-1/2 -translate-x-1/2 w-[2px] opacity-50 -z-10",
+                                    c.isGreen ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                                )}
+                                style={{
+                                    top: '-12px',
+                                    bottom: '-12px'
+                                }}
+                            />
+                        </div>
+                    ))}
                 </div>
 
                 {/* Action Section - Simplified */}
-                <div className="bg-card/30 backdrop-blur-md border border-white/5 rounded-xl p-1 pt-1 pb-1 shadow-2xl overflow-hidden">
+                <div className="bg-card/30 backdrop-blur-md border border-white/5 rounded-xl p-1 shadow-2xl overflow-hidden w-full">
                     <Button
                         variant="ghost"
                         size="lg"
@@ -64,14 +121,14 @@ export function Login() {
                             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" fill="#FBBC05" />
                             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                         </svg>
-                        <span className="text-white/90 group-hover:text-white transition-colors">Sign in with Google</span>
+                        <span style={{ color: 'var(--boot-text)', opacity: 0.9 }} className="group-hover:opacity-100 transition-opacity">Sign in with Google</span>
                     </Button>
                 </div>
             </div>
-            
+
             {/* Version Number (Bottom Left) */}
             <div className="absolute bottom-8 left-8 text-left z-20">
-                <span className="text-xs font-mono text-white/20">v{__APP_VERSION__}</span>
+                <span className="text-xs font-mono opacity-20" style={{ color: 'var(--boot-text)' }}>v{__APP_VERSION__}</span>
             </div>
         </div>
     );

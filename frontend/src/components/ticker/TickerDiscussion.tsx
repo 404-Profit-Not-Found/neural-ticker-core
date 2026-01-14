@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '../ui/badge';
+import { UserTierBadge } from '../ui/user-tier-badge';
 import { useAuth } from '../../context/AuthContext';
 import type { SocialComment } from '../../types/ticker';
 
@@ -26,8 +26,8 @@ export function TickerDiscussion({ comments, onPostComment, isPosting }: TickerD
     };
 
     return (
-        <Card className="flex flex-col h-[600px] border-border shadow-lg">
-            <CardHeader className="py-4 border-b border-border bg-muted/5 flex flex-row items-center justify-between space-y-0">
+        <Card className="flex flex-col h-[600px] border-border/50 shadow-lg bg-transparent">
+            <CardHeader className="py-4 border-b border-border/50 bg-transparent flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="font-bold flex items-center gap-2 text-base">
                     <MessageSquare className="w-4 h-4 text-primary" />
                     Community Discussion
@@ -56,16 +56,7 @@ export function TickerDiscussion({ comments, onPostComment, isPosting }: TickerD
                                                 <span className="font-semibold text-sm text-foreground">
                                                     {comment.user?.nickname || comment.user?.email?.split('@')[0] || 'Anonymous'}
                                                 </span>
-                                                <Badge
-                                                    variant="outline"
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                    className={`text-[9px] h-4 px-1 ${(comment.user?.tier === 'pro' || (comment.user as any)?.role === 'admin')
-                                                        ? 'border-purple-500 text-purple-500 uppercase'
-                                                        : 'border-emerald-500 text-emerald-500 uppercase'
-                                                        }`}
-                                                >
-                                                    {(comment.user?.tier || 'free').toUpperCase()}
-                                                </Badge>
+                                                <UserTierBadge tier={comment.user?.tier} />
                                                 <span className="text-xs text-muted-foreground">•</span>
                                                 <span className="text-xs text-muted-foreground">
                                                     {new Date(comment.created_at).toLocaleDateString()}
@@ -107,7 +98,7 @@ export function TickerDiscussion({ comments, onPostComment, isPosting }: TickerD
                     </div>
                 </ScrollArea>
 
-                <div className="p-4 bg-background border-t border-border">
+                <div className="p-4 bg-transparent border-t border-border/50">
                     <div className="flex gap-3 items-start">
                         <Avatar className="w-8 h-8 shrink-0">
                             <AvatarImage src={user?.avatar_url} />

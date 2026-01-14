@@ -5,6 +5,7 @@ import { TickersController } from './tickers.controller';
 import { TickerDetailController } from './ticker-detail.controller';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
+import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity'; // Added
 import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
 import { HttpModule } from '@nestjs/axios';
@@ -16,7 +17,12 @@ import { JobsModule } from '../jobs/jobs.module'; // Added
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TickerEntity, TickerLogoEntity, PriceOhlcv]),
+    TypeOrmModule.forFeature([
+      TickerEntity,
+      TickerLogoEntity,
+      PriceOhlcv,
+      TickerRequestEntity, // Added
+    ]),
     FinnhubModule,
     HttpModule,
     forwardRef(() => MarketDataModule),

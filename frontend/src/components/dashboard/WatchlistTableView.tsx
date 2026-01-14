@@ -500,14 +500,14 @@ export function WatchlistTableView({
                         table.getRowModel().rows.map((row) => (
                             <tr
                                 key={row.id}
-                                className="group transition-all hover:bg-muted/30 cursor-pointer relative"
+                                className="group transition-all hover:bg-accent cursor-pointer relative"
                                 onClick={() => navigate(`/ticker/${row.original.symbol}`)}
                             >
                                 {row.getVisibleCells().map((cell, idx) => (
                                     <td
                                         key={cell.id}
                                         className={cn(
-                                            "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 group-hover:bg-muted/30 transition-colors first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg shadow-sm",
+                                            "p-4 align-middle whitespace-nowrap bg-card border-y border-border/40 group-hover:bg-accent transition-colors first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg shadow-sm",
                                             idx === 0 && "pl-6",
                                             idx === row.getVisibleCells().length - 1 && "pr-6"
                                         )}

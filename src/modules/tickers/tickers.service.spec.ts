@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { TickersService } from './tickers.service';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
+import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { NotFoundException } from '@nestjs/common';
@@ -76,6 +77,14 @@ describe('TickersService', () => {
     initializeTicker: jest.fn(),
   };
 
+  const mockRequestRepo = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn(),
+    create: jest.fn().mockImplementation((dto) => dto),
+    save: jest.fn(),
+    count: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,6 +116,10 @@ describe('TickersService', () => {
         {
           provide: JobsService,
           useValue: mockJobsService,
+        },
+        {
+          provide: getRepositoryToken(TickerRequestEntity),
+          useValue: mockRequestRepo,
         },
       ],
     }).compile();

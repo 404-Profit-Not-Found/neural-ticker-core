@@ -7,10 +7,12 @@ import {
     DialogFooter,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { UserTierBadge } from '../ui/user-tier-badge';
+import { UserStatusBadge } from '../ui/user-status-badge';
 import type { AdminUser } from './UserAdminCard';
-import { Crown, Sparkles, Gift, Ban, CheckCircle, Clock, Shield, Copy } from 'lucide-react';
+import { Gift, Ban, CheckCircle, Clock, Shield, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '../../lib/utils';
 
 interface UserDetailDialogProps {
     user: AdminUser | null;
@@ -44,16 +46,7 @@ export function UserDetailDialog({
         toast.success('Copied to clipboard');
     };
 
-    const getTierBadge = (tier: string) => {
-        switch (tier) {
-            case 'whale':
-                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
-            case 'pro':
-                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
-            default:
-                return null; // Don't show badge for free users
-        }
-    };
+    const getTierBadge = (tier: string) => <UserTierBadge tier={tier} />;
 
     const formatFullTimestamp = (dateString: string | undefined) => {
         if (!dateString) return 'N/A';
@@ -72,7 +65,7 @@ export function UserDetailDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <div className="flex items-center gap-4 mb-2">
+                    <div className="flex items-start gap-4 mb-2">
                         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-2xl font-bold text-muted-foreground overflow-hidden ring-2 ring-border">
                             {user.avatar_url ? (
                                 <img src={user.avatar_url} alt="User" className="w-full h-full object-cover" />
@@ -89,11 +82,8 @@ export function UserDetailDialog({
                             </DialogDescription>
                             <div className="flex gap-2 mt-2">
                                 {getTierBadge(user.tier)}
-                                {(user.role === 'admin' || user.status === 'ADMIN') && <Badge variant="destructive" className="gap-1"><Shield size={10} /> ADMIN</Badge>}
-                                {user.status === 'ACTIVE' && <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5">ACTIVE</Badge>}
-                                {user.status === 'WAITLIST' && <Badge variant="secondary">WAITLIST</Badge>}
-                                {user.status === 'INVITED' && <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/50">INVITED</Badge>}
-                                {user.status === 'BANNED' && <Badge variant="destructive">BANNED</Badge>}
+                                {(user.role === 'admin' || user.status === 'ADMIN') && <UserTierBadge tier="admin" />}
+                                <UserStatusBadge status={user.status} />
                             </div>
                         </div>
                     </div>
@@ -133,17 +123,33 @@ export function UserDetailDialog({
 
                         {/* Tier Selection */}
                         <div className="grid grid-cols-3 gap-2">
-                            {(['free', 'pro', 'whale'] as const).map((tier) => (
-                                <Button
-                                    key={tier}
-                                    variant={user.tier === tier ? 'default' : 'outline'}
-                                    className="h-9 text-xs capitalize"
-                                    onClick={() => user.id && onUpdateTier(user.id, tier)}
-                                    disabled={!user.id}
-                                >
-                                    {tier}
-                                </Button>
-                            ))}
+                            {(['free', 'pro', 'whale'] as const).map((tier) => {
+                                const isActive = user.tier === tier;
+                                let activeClass = '';
+
+                                if (isActive) {
+                                    if (tier === 'whale') activeClass = 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/50';
+                                    else if (tier === 'pro') activeClass = 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/50';
+                                    else activeClass = 'bg-zinc-100 text-zinc-900 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700';
+                                }
+
+                                return (
+                                    <Button
+                                        key={tier}
+                                        variant={isActive ? 'outline' : 'outline'}
+                                        className={cn(
+                                            "h-9 text-xs capitalize transition-all border",
+                                            isActive
+                                                ? `${activeClass} font-bold shadow-sm`
+                                                : "text-muted-foreground hover:text-foreground",
+                                        )}
+                                        onClick={() => user.id && onUpdateTier(user.id, tier)}
+                                        disabled={!user.id}
+                                    >
+                                        {tier}
+                                    </Button>
+                                );
+                            })}
                         </div>
 
                         {user.status === 'WAITLIST' && (

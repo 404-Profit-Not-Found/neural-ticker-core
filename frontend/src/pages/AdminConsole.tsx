@@ -6,7 +6,6 @@ import {
     Search,
     ChevronLeft,
     ArrowUpDown,
-    Shield,
     Crown,
     Sparkles,
     Gift,
@@ -28,7 +27,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import {
     TableBody,
     TableCell,
@@ -43,6 +42,7 @@ import {
 } from '../components/ui/popover';
 import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
 import { UserDetailDialog } from '../components/admin/UserDetailDialog';
+import { UserTierBadge } from '../components/ui/user-tier-badge';
 
 type SortConfig = {
     key: string;
@@ -431,7 +431,7 @@ export function AdminConsole() {
         const isAdmin = role === 'admin' || status === 'ADMIN';
 
         if (isAdmin) {
-            badges.push(<Badge key="admin" variant="secondary" className="gap-1 bg-red-500/10 text-red-500 border-red-500/20"><Shield size={10} /> ADMIN</Badge>);
+            badges.push(<UserTierBadge key="admin" tier="admin" />);
         }
 
         if (status !== 'ADMIN') {
@@ -457,16 +457,7 @@ export function AdminConsole() {
     };
 
     // Get tier badge - matches mobile card styling (UserAdminCard)
-    const getTierBadge = (tier: string | undefined) => {
-        switch (tier) {
-            case 'whale':
-                return <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 gap-1 h-5 text-[10px] px-1.5"><Crown size={10} /> WHALE</Badge>;
-            case 'pro':
-                return <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 gap-1 h-5 text-[10px] px-1.5"><Sparkles size={10} /> PRO</Badge>;
-            default:
-                return null; // Don't show badge for free users to reduce noise
-        }
-    };
+    const getTierBadge = (tier: string | undefined) => <UserTierBadge tier={tier} />;
 
     // Loading skeleton - view-aware to avoid hydration errors
     const LoadingSkeleton = ({ mode = viewMode }: { mode?: 'list' | 'grid' }) => {
@@ -699,46 +690,50 @@ export function AdminConsole() {
                                                     <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')}><List size={14} /></Button>
                                                     <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')}><LayoutGrid size={14} /></Button>
                                                 </div>
-
-                                                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                                                    <DialogTrigger asChild>
-                                                        <Button className="gap-2 h-9">
-                                                            <Plus size={16} />
-                                                            Add User
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogHeader>
-                                                            <DialogTitle>Add to Waitlist / Invite</DialogTitle>
-                                                            <DialogDescription>
-                                                                Enter the email address to add.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <div className="grid gap-4 py-4">
-                                                            <Input
-                                                                value={newEmail}
-                                                                onChange={(e) => setNewEmail(e.target.value)}
-                                                                placeholder="user@example.com"
-                                                            />
-                                                        </div>
-                                                        <DialogFooter>
-                                                            <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                                                            <Button onClick={handleAddEmail}>Add User</Button>
-                                                        </DialogFooter>
-                                                    </DialogContent>
-                                                </Dialog>
                                             </div>
                                         </div>
 
-                                        {/* Search Only (Filters are in StatsBar) */}
-                                        <div className="relative w-full">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                placeholder="Search by email or nickname..."
-                                                className="pl-10 bg-muted/20 border-border/40 focus:bg-background transition-colors"
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                            />
+                                        {/* Search & Actions Row */}
+                                        <div className="flex flex-col sm:flex-row gap-4 items-center w-full">
+                                            <div className="relative flex-1 w-full">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    placeholder="Search by email or nickname..."
+                                                    className="pl-10 bg-muted/20 border-border/40 focus:bg-background transition-colors"
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <Button
+                                                className="gap-2 h-9 w-full sm:w-auto shrink-0 bg-primary text-primary-foreground"
+                                                onClick={() => setIsInviteOpen(true)}
+                                            >
+                                                <Plus size={16} />
+                                                Add User
+                                            </Button>
+
+                                            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Add to Waitlist / Invite</DialogTitle>
+                                                        <DialogDescription>
+                                                            Enter the email address to add.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="grid gap-4 py-4">
+                                                        <Input
+                                                            value={newEmail}
+                                                            onChange={(e) => setNewEmail(e.target.value)}
+                                                            placeholder="user@example.com"
+                                                        />
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
+                                                        <Button onClick={handleAddEmail}>Add User</Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
                                         </div>
 
                                         {/* Consolidated List/Grid View */}
@@ -846,6 +841,18 @@ export function AdminConsole() {
                                                                                         <Gift size={12} className="text-pink-500" />
                                                                                         Gift
                                                                                     </Button>
+
+                                                                                    {user.status === 'WAITLIST' && (
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            className="h-7 gap-1.5 text-xs text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
+                                                                                            onClick={() => user.email && handleApprove(user.email)}
+                                                                                        >
+                                                                                            <CheckCircle size={12} className="text-emerald-500" />
+                                                                                            Approve
+                                                                                        </Button>
+                                                                                    )}
 
                                                                                     {user.status !== 'BANNED' ? (
                                                                                         <Button

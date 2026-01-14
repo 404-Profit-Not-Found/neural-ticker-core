@@ -85,16 +85,37 @@ export function useMarketStatus() {
 function getMarketStatusFromTime(region: 'US' | 'EU'): MarketStatusData {
     const now = new Date();
     
-    if (region === 'EU') {
-        const cetTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
-        const day = cetTime.getDay();
-        const hours = cetTime.getHours();
-        const minutes = cetTime.getMinutes();
-        const timeInMinutes = hours * 60 + minutes;
+    const timeZone = region === 'EU' ? 'Europe/Berlin' : 'America/New_York';
+    
+    // Robust time extraction
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+        weekday: 'short'
+    });
 
-        const isWeekday = day >= 1 && day <= 5;
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find(p => p.type === 'hour')?.value;
+    const minutePart = parts.find(p => p.type === 'minute')?.value;
+    const weekdayPart = parts.find(p => p.type === 'weekday')?.value;
+
+    if (!hourPart || !minutePart || !weekdayPart) {
+         return { isOpen: false, session: 'closed', timezone: timeZone, exchange: region, region, fallback: true };
+    }
+
+    const hours = parseInt(hourPart === '24' ? '0' : hourPart, 10);
+    const minutes = parseInt(minutePart, 10);
+    const timeInMinutes = hours * 60 + minutes;
+    
+    const isWeekend = weekdayPart === 'Sat' || weekdayPart === 'Sun';
+    const isWeekday = !isWeekend;
+    
+    if (region === 'EU') {
         const marketOpen = 8 * 60; // 8:00 AM CET
-        const marketClose = 16 * 60 + 30; // 4:30 PM CET
+        const marketClose = 17 * 60 + 30; // 5:30 PM CET
+
         const isOpen = isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
 
         return {
@@ -107,14 +128,7 @@ function getMarketStatusFromTime(region: 'US' | 'EU'): MarketStatusData {
         };
     }
 
-    // US Market with premarket/postmarket
-    const nyTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const day = nyTime.getDay();
-    const hours = nyTime.getHours();
-    const minutes = nyTime.getMinutes();
-    const timeInMinutes = hours * 60 + minutes;
-
-    const isWeekday = day >= 1 && day <= 5;
+    // US Market
     const preMarketStart = 4 * 60; // 4:00 AM
     const marketOpen = 9 * 60 + 30; // 9:30 AM
     const marketClose = 16 * 60; // 4:00 PM
@@ -136,9 +150,9 @@ function getMarketStatusFromTime(region: 'US' | 'EU'): MarketStatusData {
 
     return {
         isOpen,
-        exchange: 'US',
         session,
         timezone: 'America/New_York',
+        exchange: 'US',
         region: 'US',
         fallback: true,
     };

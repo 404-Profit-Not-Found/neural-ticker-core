@@ -145,6 +145,7 @@ export class TickerDetailController {
         score: ticker.news_impact_score,
         summary: ticker.news_summary,
         updated_at: ticker.last_news_update,
+        research_id: researchNote?.id,
       },
     };
   }
