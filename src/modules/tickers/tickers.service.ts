@@ -290,37 +290,47 @@ export class TickersService {
     const searchPattern = `${search.toUpperCase()}%`;
 
     // 1. Local DB Search & Pending Request Search
-    const [dbResults, pendingRequests] = await Promise.all([
-      this.tickerRepo
-        .createQueryBuilder('ticker')
-        .select([
-          'ticker.id',
-          'ticker.symbol',
-          'ticker.name',
-          'ticker.exchange',
-          'ticker.logo_url',
-        ])
-        .where('ticker.is_hidden = :hidden', { hidden: false })
-        .andWhere(
-          '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
-          { pattern: searchPattern },
-        )
-        .orderBy(
-          'CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END',
-          'ASC',
-        )
-        .addOrderBy('ticker.symbol', 'ASC')
-        .setParameter('exact', search.toUpperCase())
-        .limit(20)
-        .getMany(),
-      this.requestRepo.find({
-        where: {
-          symbol: ILike(`${searchPattern}`),
-          status: 'PENDING',
-        },
-        take: 10,
-      }),
-    ]);
+    let dbResults: TickerEntity[] = [];
+    let pendingRequests: TickerRequestEntity[] = [];
+
+    try {
+      const [results, requests] = await Promise.all([
+        this.tickerRepo
+          .createQueryBuilder('ticker')
+          .select([
+            'ticker.id',
+            'ticker.symbol',
+            'ticker.name',
+            'ticker.exchange',
+            'ticker.logo_url',
+          ])
+          .where('ticker.is_hidden = :hidden', { hidden: false })
+          .andWhere(
+            '(UPPER(ticker.symbol) LIKE :pattern OR UPPER(ticker.name) LIKE :pattern)',
+            { pattern: searchPattern },
+          )
+          .orderBy(
+            'CASE WHEN UPPER(ticker.symbol) = :exact THEN 1 ELSE 2 END',
+            'ASC',
+          )
+          .addOrderBy('ticker.symbol', 'ASC')
+          .setParameter('exact', search.toUpperCase())
+          .limit(20)
+          .getMany(),
+        this.requestRepo.find({
+          where: {
+            symbol: ILike(`${searchPattern}`),
+            status: 'PENDING',
+          },
+          take: 10,
+        }),
+      ]);
+      dbResults = results;
+      pendingRequests = requests;
+    } catch (err) {
+      this.logger.error(`Local search failed: ${getErrorMessage(err)}`);
+      // dbResults and pendingRequests remain empty arrays
+    }
 
     // Batch fetch sparklines for all results in a single query (avoiding N+1)
     const symbolIds = dbResults.map((t) => t.id);
@@ -398,7 +408,7 @@ export class TickersService {
 
     if (searchStr.length >= 2 && includeExternal) {
       try {
-        const [finnhubResult, yahooResult, pendingRequests] =
+        const [finnhubResult, yahooResult, extPendingRequests] =
           await Promise.allSettled([
             this.finnhubService.searchSymbols(searchStr),
             this.yahooFinanceService.search(searchStr),
@@ -406,8 +416,8 @@ export class TickersService {
           ]);
 
         const pendingSymbols = new Set<string>();
-        if (pendingRequests.status === 'fulfilled') {
-          pendingRequests.value.forEach((req) =>
+        if (extPendingRequests.status === 'fulfilled') {
+          extPendingRequests.value.forEach((req) =>
             pendingSymbols.add(req.symbol.toUpperCase()),
           );
         }

@@ -14,7 +14,7 @@
     </filter>
   </defs>
 
-  <g transform="translate(64, 64) scale(0.75)">
+  <g transform="translate(106, 64) scale(0.75)">
     
     <!-- LAYER 1: Right Vertical Bar (Blue) -->
     <rect x="300" y="0" width="100" height="512" rx="50" fill="#4285F4" />

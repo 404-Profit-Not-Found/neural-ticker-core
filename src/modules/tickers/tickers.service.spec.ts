@@ -407,6 +407,26 @@ describe('TickersService', () => {
       expect(result[0].sparkline).toEqual([]); // Empty array, not undefined
     });
 
+    it('should handle local database failure gracefully by returning external results', async () => {
+      // Force local DB to fail ONCE to avoid bleeding into other tests
+      mockTickerRepo.createQueryBuilder.mockImplementationOnce(() => {
+        throw new Error('Relation "tickers" does not exist');
+      });
+
+      // Mock external results to ensure we still get something
+      mockFinnhubService.searchSymbols.mockResolvedValue({
+        result: [{ symbol: 'EXT', description: 'External Co', type: 'Common' }],
+      });
+      mockYahooService.search.mockResolvedValue({ quotes: [] });
+
+      const result = await service.searchTickers('EXT', true);
+
+      // Should not throw, and should contain external result
+      expect(result).toContainEqual(
+        expect.objectContaining({ symbol: 'EXT', is_locally_tracked: false }),
+      );
+    });
+
     it('should return empty sparklines for tickers with no price data', async () => {
       const dbResults = [
         { id: '1', symbol: 'NEW', name: 'New Stock', exchange: 'NYSE' },
