@@ -57,8 +57,8 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
     };
 
     return (
-        <Card className="h-full flex flex-col overflow-hidden">
-            <CardHeader className="py-3 px-3 md:py-4 md:px-4 border-b border-border bg-muted/10">
+        <Card className="h-full flex flex-col overflow-hidden bg-transparent border-border/50 shadow-lg">
+            <CardHeader className="py-3 px-3 md:py-4 md:px-4 border-b border-border/50 bg-transparent">
                 <div className="flex items-center justify-between gap-2">
                     <CardTitle className="font-bold text-sm flex items-center gap-2 shrink-0">
                         <Brain className="w-4 h-4 text-primary" />

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
 import { PortfolioTable } from '../components/portfolio/PortfolioTable';
 import { PortfolioGridView } from '../components/portfolio/PortfolioGridView';
@@ -201,6 +202,8 @@ export function PortfolioPage() {
     }
   };
 
+  const { user } = useAuth();
+
   return (
     <div className="dark min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <div className="fixed inset-0 bg-black -z-10" /> {/* Fallback/Reinforce Black BG */}
@@ -216,11 +219,12 @@ export function PortfolioPage() {
           totalGainLossPercent={stats.totalGainPct}
           positions={positions}
           onAnalyze={() => setIsAiOpen(true)}
+          credits={user?.credits_balance}
         />
 
         {/* TOOLBAR: SEARCH & FILTERS */}
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 bg-card/30 p-2 sm:p-3 rounded-lg border border-border/50">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 bg-card/30 p-2 sm:p-3 rounded-lg border border-border/40">
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:flex-1 gap-3">
               <div className="relative w-full sm:w-64">
@@ -252,7 +256,7 @@ export function PortfolioPage() {
                 Add Position
               </Button>
 
-              <div className="flex items-center space-x-1 border border-border rounded-md p-1 bg-card h-8">
+              <div className="flex items-center space-x-1 border border-border/50 rounded-md p-1 bg-card h-8">
                 <button
                   onClick={() => setViewMode('table')}
                   className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
@@ -274,7 +278,7 @@ export function PortfolioPage() {
 
         {/* CONTENT */}
         {viewMode === 'table' ? (
-          <div className="border border-border rounded-lg bg-card overflow-hidden">
+          <div className="border border-border/50 rounded-xl bg-card overflow-hidden">
             <PortfolioTable
               positions={filteredPositions}
               loading={isLoading}
@@ -328,9 +332,15 @@ export function PortfolioPage() {
               <span className="bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold shadow-lg border border-purple-500/20 text-purple-400">AI Analysis</span>
               <Button
                 onClick={() => { setIsAiOpen(true); setIsFabOpen(false); }}
-                className="h-14 w-14 rounded-full shadow-[0_8px_30px_rgb(168,85,247,0.4)] bg-gradient-to-r from-violet-600 to-fuchsia-600 border-0 flex items-center justify-center p-0 transition-all active:scale-90"
+                disabled={(user?.credits_balance || 0) <= 0}
+                className={cn(
+                  "h-14 w-14 rounded-full shadow-[0_8px_30px_rgb(168,85,247,0.4)] border-0 flex items-center justify-center p-0 transition-all active:scale-90",
+                  (user?.credits_balance || 0) > 0
+                    ? "bg-gradient-to-r from-violet-600 to-fuchsia-600"
+                    : "bg-muted cursor-not-allowed opacity-70 shadow-none grayscale"
+                )}
               >
-                <Bot size={26} className="text-white" />
+                <Bot size={26} className={cn((user?.credits_balance || 0) > 0 ? "text-white" : "text-muted-foreground")} />
               </Button>
             </div>
           </div>

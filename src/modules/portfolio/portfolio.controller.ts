@@ -14,6 +14,7 @@ import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreditGuard } from '../research/guards/credit.guard';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
@@ -56,6 +57,7 @@ export class PortfolioController {
     return this.portfolioService.remove(req.user.id, id);
   }
 
+  @UseGuards(CreditGuard)
   @Post('analyze')
   @ApiOperation({ summary: 'Generate AI analysis for portfolio' })
   @ApiBody({

@@ -43,6 +43,7 @@ import {
 import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
 import { UserDetailDialog } from '../components/admin/UserDetailDialog';
 import { UserTierBadge } from '../components/ui/user-tier-badge';
+import { RequestStatsBar, type RequestFilterKey } from '../components/admin/RequestStatsBar';
 
 type SortConfig = {
     key: string;
@@ -103,6 +104,7 @@ export function AdminConsole() {
     // Table State
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<AdminFilterKey>('ALL');
+    const [requestFilter, setRequestFilter] = useState<RequestFilterKey>('ALL');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
@@ -398,6 +400,15 @@ export function AdminConsole() {
         });
     }, [identities, searchTerm, statusFilter, sortConfig]);
 
+    // Processed Requests with Filter
+    const processedRequests = useMemo(() => {
+        let filtered = requests;
+        if (requestFilter !== 'ALL') {
+            filtered = filtered.filter(r => r.status?.toUpperCase() === requestFilter);
+        }
+        return filtered;
+    }, [requests, requestFilter]);
+
     // Stats calculations
     const stats = useMemo(() => {
         const total = identities.length;
@@ -408,6 +419,14 @@ export function AdminConsole() {
         const whale = identities.filter(u => u.tier === 'whale').length;
         return { total, active, waitlist, banned, pro, whale };
     }, [identities]);
+
+    const requestStats = useMemo(() => {
+        const total = requests.length;
+        const pending = requests.filter(r => r.status?.toUpperCase() === 'PENDING').length;
+        const approved = requests.filter(r => r.status?.toUpperCase() === 'APPROVED').length;
+        const rejected = requests.filter(r => r.status?.toUpperCase() === 'REJECTED').length;
+        return { total, pending, approved, rejected };
+    }, [requests]);
 
     // Pagination
     const totalPages = Math.ceil(processedData.length / itemsPerPage);
@@ -583,7 +602,11 @@ export function AdminConsole() {
                         {
                             activeTab === 'requests' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
-                                    {/* ... Requests Content ... */}
+                                    <RequestStatsBar
+                                        stats={requestStats}
+                                        selectedFilter={requestFilter}
+                                        onFilterChange={setRequestFilter}
+                                    />
                                     {/* Re-implementing Requests Header for view toggle */}
                                     <div className="flex items-center justify-between pb-2 border-b border-border/50">
                                         <div className="flex items-center gap-3">
@@ -626,12 +649,12 @@ export function AdminConsole() {
                                                 <TableBody className="space-y-2">
                                                     {loading ? (
                                                         <TableRow><TableCell colSpan={5} className="h-24 text-center"><LoadingSkeleton /></TableCell></TableRow>
-                                                    ) : requests.length === 0 ? (
+                                                    ) : processedRequests.length === 0 ? (
                                                         <TableRow className="bg-card hover:bg-card border-none rounded-lg">
-                                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No pending requests</TableCell>
+                                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No {requestFilter.toLowerCase()} requests</TableCell>
                                                         </TableRow>
                                                     ) : (
-                                                        requests.map((req) => (
+                                                        processedRequests.map((req) => (
                                                             <TickerRequestRow
                                                                 key={req.id}
                                                                 request={req}
@@ -647,11 +670,11 @@ export function AdminConsole() {
                                         <div className="w-full">
                                             {loading ? (
                                                 <LoadingSkeleton mode="grid" />
-                                            ) : requests.length === 0 ? (
-                                                <div className="h-32 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg col-span-full">No requests</div>
+                                            ) : processedRequests.length === 0 ? (
+                                                <div className="h-32 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg col-span-full">No {requestFilter.toLowerCase()} requests</div>
                                             ) : (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {requests.map((req) => (
+                                                    {processedRequests.map((req) => (
                                                         <TickerRequestCard
                                                             key={req.id}
                                                             request={req}

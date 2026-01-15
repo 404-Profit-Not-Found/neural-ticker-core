@@ -20,7 +20,7 @@ const Dialog = React.forwardRef<
             <div
                 ref={ref}
                 className={cn(
-                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-card p-6 text-left text-foreground shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95",
+                    "relative w-full max-w-lg transform overflow-hidden rounded-lg border bg-card p-6 text-left text-foreground shadow-xl transition-all animate-in slide-in-from-bottom-10 sm:max-w-lg sm:slide-in-from-bottom-0 sm:zoom-in-95",
                     className
                 )}
             >

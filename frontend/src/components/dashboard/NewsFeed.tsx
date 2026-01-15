@@ -39,7 +39,7 @@ interface ResearchNote {
     tokens_out?: number;
 }
 
-export function NewsFeed() {
+export function NewsFeed({ tickerCount }: { tickerCount?: number }) {
     const [digest, setDigest] = useState<ResearchNote | null>(null);
     const [news, setNews] = useState<NewsItem[]>([]);
     const [loadingDigest, setLoadingDigest] = useState(true);
@@ -346,7 +346,7 @@ export function NewsFeed() {
                                     <div className="space-y-1">
                                         <div className="font-medium group-hover:text-primary transition-colors">Browse Tickers</div>
                                         <p className="text-xs text-muted-foreground">
-                                            Explore our library of 30+ analyzed stocks in the Analyzer
+                                            Explore our library of {tickerCount ? `${tickerCount}+` : '30+'} analyzed stocks in the Analyzer
                                         </p>
                                     </div>
                                 </a>

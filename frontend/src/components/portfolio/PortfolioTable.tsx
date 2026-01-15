@@ -335,7 +335,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
 
     if (positions.length === 0 && !loading) {
         return (
-            <div className="mt-8 p-12 text-center border border-dashed border-border rounded-xl bg-muted/20">
+            <div className="mt-8 p-12 text-center border border-dashed border-border/40 rounded-xl bg-muted/20">
                 <h3 className="text-xl font-medium text-foreground">Your portfolio is empty</h3>
                 <p className="text-muted-foreground mt-2">Add your first position to start tracking performance and get AI insights.</p>
             </div>

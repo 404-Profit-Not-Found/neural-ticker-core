@@ -61,8 +61,13 @@ export function SharePopover({ researchId, title }: { researchId: string; title:
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2">
-                    <Share2 size={10} /> <span className="hidden md:inline">Share</span>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-2 h-auto px-3 py-1.5 bg-muted/30 rounded-full border border-border/40 text-xs font-semibold text-foreground hover:bg-muted/50 transition-colors"
+                >
+                    <Share2 size={14} className="text-muted-foreground" />
+                    <span className="hidden md:inline">Share</span>
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-48 p-2" align="end">

@@ -232,9 +232,9 @@ export function Header() {
 
             <Link
               to="/dashboard"
-              className="flex text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
+              className="flex items-center gap-2 text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
             >
-              NeuralTicker.com
+              <span>NeuralTicker.com</span>
             </Link>
           </div>
 

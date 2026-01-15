@@ -339,24 +339,25 @@ export class TickersService {
     if (symbolIds.length > 0) {
       try {
         // Single query to get last 14 days of prices for ALL tickers at once
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
         const allPrices = await this.ohlcvRepo
           .createQueryBuilder('ohlcv')
           .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
           .where('ohlcv.symbol_id IN (:...symbolIds)', { symbolIds })
           .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
+          .andWhere('ohlcv.ts >= :fromDate', { fromDate: fourteenDaysAgo })
           .orderBy('ohlcv.symbol_id', 'ASC')
           .addOrderBy('ohlcv.ts', 'DESC')
-          .take(symbolIds.length * 14) // Max 14 per ticker
           .getMany();
 
-        // Group by symbol_id and take first 14 (most recent) for each
+        // Group by symbol_id
         const groupedPrices = new Map<string, { close: number; ts: Date }[]>();
         for (const price of allPrices) {
           const existing = groupedPrices.get(price.symbol_id) || [];
-          if (existing.length < 14) {
-            existing.push({ close: price.close, ts: price.ts });
-            groupedPrices.set(price.symbol_id, existing);
-          }
+          existing.push({ close: price.close, ts: price.ts });
+          groupedPrices.set(price.symbol_id, existing);
         }
 
         // Convert to sparkline arrays (reversed for chronological order)
@@ -366,9 +367,9 @@ export class TickersService {
             prices.reverse().map((p) => p.close),
           );
         }
-      } catch (err) {
+      } catch {
         // Gracefully handle sparkline fetch failure (table may not exist or other DB issues)
-        this.logger.warn(`Sparkline fetch failed: ${getErrorMessage(err)}`);
+        this.logger.warn('Sparkline fetch failed');
       }
     }
 
@@ -403,15 +404,12 @@ export class TickersService {
     });
 
     // 2. External Search (Fallback/Supplement)
-    const searchStr =
-      typeof search === 'string' ? search.trim() : '';
-
-    if (searchStr.length >= 2 && includeExternal) {
+    if (search.length >= 2 && includeExternal) {
       try {
         const [finnhubResult, yahooResult, extPendingRequests] =
           await Promise.allSettled([
-            this.finnhubService.searchSymbols(searchStr),
-            this.yahooFinanceService.search(searchStr),
+            this.finnhubService.searchSymbols(search),
+            this.yahooFinanceService.search(search),
             this.requestRepo.find({ where: { status: 'PENDING' } }), // Fetch pending requests
           ]);
 
@@ -499,6 +497,96 @@ export class TickersService {
       .getMany();
 
     return tickers.map((t) => t.symbol);
+  }
+
+  async getBulkSparklines(
+    symbols: string[],
+  ): Promise<Record<string, number[]>> {
+    if (!symbols || symbols.length === 0) return {};
+
+    const upperSymbols = symbols.map((s) => s.toUpperCase());
+    const results: Record<string, number[]> = {};
+
+    // 1. Fetch from Local DB
+    // Symbols passed might be external too.
+    // Let's just find tickers in DB for these symbols.
+    const dbTickers = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .where('ticker.symbol IN (:...upperSymbols)', {
+        upperSymbols,
+      })
+      .getMany();
+
+    const dbSymbolIds = dbTickers.map((t) => t.id);
+    const idToSymbol = new Map(dbTickers.map((t) => [t.id, t.symbol]));
+
+    if (dbSymbolIds.length > 0) {
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+      const allPrices = await this.ohlcvRepo
+        .createQueryBuilder('ohlcv')
+        .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
+        .where('ohlcv.symbol_id IN (:...dbSymbolIds)', {
+          dbSymbolIds,
+        })
+        .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
+        .andWhere('ohlcv.ts >= :fromDate', { fromDate: fourteenDaysAgo })
+        .orderBy('ohlcv.ts', 'DESC')
+        .getMany();
+
+      const grouped = new Map<string, number[]>();
+      for (const p of allPrices) {
+        const sym = idToSymbol.get(p.symbol_id);
+        if (sym) {
+          const existing = grouped.get(sym) || [];
+          existing.push(p.close);
+          grouped.set(sym, existing);
+        }
+      }
+
+      for (const [sym, prices] of grouped) {
+        results[sym] = prices.reverse();
+      }
+    }
+
+    // 2. Fetch missing from Yahoo Finance in bulk
+    const missingSymbols = upperSymbols.filter((s) => !results[s]);
+    if (missingSymbols.length > 0) {
+      this.logger.log(
+        `Fetching bulk sparklines for ${missingSymbols.join(', ')} from Yahoo Finance`,
+      );
+      const from = new Date();
+      from.setDate(from.getDate() - 20); // Get slightly more to ensure 14 close prices
+
+      // Process in smaller chunks to avoid too long URLs or Yahoo limits
+      const chunkSize = 10;
+      for (let i = 0; i < missingSymbols.length; i += chunkSize) {
+        const chunk = missingSymbols.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map(async (symbol) => {
+            try {
+              const history = await this.yahooFinanceService.getHistorical(
+                symbol,
+                from,
+                new Date(),
+                '1d',
+              );
+              if (Array.isArray(history)) {
+                results[symbol] = history
+                  .slice(-14)
+                  .map((h: any) => h.close)
+                  .filter((c) => c !== undefined && c !== null);
+              }
+            } catch {
+              this.logger.warn(`Bulk sparkline fetch failed for ${symbol}`);
+            }
+          }),
+        );
+      }
+    }
+
+    return results;
   }
 
   getRepo(): Repository<TickerEntity> {
