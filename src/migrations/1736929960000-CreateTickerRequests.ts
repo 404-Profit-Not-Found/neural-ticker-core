@@ -43,8 +43,12 @@ export class CreateTickerRequests1736929960000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_ticker_requests_symbol_status"`);
-    await queryRunner.query(`ALTER TABLE "ticker_requests" DROP CONSTRAINT IF EXISTS "FK_ticker_requests_user"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_ticker_requests_symbol_status"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "ticker_requests" DROP CONSTRAINT IF EXISTS "FK_ticker_requests_user"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "ticker_requests"`);
   }
 }

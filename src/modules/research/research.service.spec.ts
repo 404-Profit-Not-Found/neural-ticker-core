@@ -12,6 +12,7 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
 import { CreditService } from '../users/credit.service'; // Added
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
+import { TickersService } from '../tickers/tickers.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QualityScoringService } from './quality-scoring.service';
@@ -79,6 +80,10 @@ describe('ResearchService', () => {
     findAll: jest.fn(),
   };
 
+  const mockTickersService = {
+    getTicker: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -92,7 +97,9 @@ describe('ResearchService', () => {
         { provide: QualityScoringService, useValue: mockQualityScoringService }, // Added
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: CreditService, useValue: mockCreditService },
+        { provide: CreditService, useValue: mockCreditService },
         { provide: PortfolioService, useValue: mockPortfolioService },
+        { provide: TickersService, useValue: mockTickersService },
         {
           provide: ConfigService,
           useValue: {

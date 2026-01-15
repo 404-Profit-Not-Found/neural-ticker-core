@@ -16,6 +16,7 @@ import { ResearchPage } from './pages/ResearchPage';
 import { ResearchListPage } from './pages/ResearchListPage';
 import { NewsPage } from './pages/NewsPage';
 import { PortfolioPage } from './pages/PortfolioPage';
+import { PublicResearchPage } from './pages/PublicResearchPage';
 
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -78,6 +79,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
+            <Route path="/report/:researchId/:signature" element={<PublicResearchPage />} />
 
             {/* Protected Routes */}
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

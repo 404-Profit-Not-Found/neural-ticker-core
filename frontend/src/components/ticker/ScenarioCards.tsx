@@ -30,7 +30,10 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {sortedScenarios.map((scenario) => {
-                const upside = ((Number(scenario.price_mid) - currentPrice) / currentPrice) * 100;
+                const targetPrice = Number(scenario.price_mid) || 0;
+                const upside = currentPrice > 0
+                    ? ((targetPrice - currentPrice) / currentPrice) * 100
+                    : 0;
                 const isPositive = upside > 0;
 
                 return (
@@ -55,7 +58,9 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
 
                         {/* Probability Badge */}
                         <div className="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full bg-background/50 backdrop-blur-sm border z-10 shadow-sm">
-                            {(Number(scenario.probability) * 100).toFixed(0)}% Prob
+                            {(!isNaN(Number(scenario.probability)))
+                                ? `${(Number(scenario.probability) * 100).toFixed(0)}% Prob`
+                                : '0% Prob'}
                         </div>
 
                         <CardContent className="p-3 flex flex-col gap-2 flex-1">
@@ -72,13 +77,13 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                                             {scenario.scenario_type} CASE
                                         </h3>
                                         <div className="text-lg font-bold flex items-center gap-1.5 leading-tight mt-0.5">
-                                            ${Number(scenario.price_mid).toFixed(2)}
+                                            ${targetPrice.toFixed(2)}
                                             <span className={cn(
                                                 "text-sm font-medium flex items-center",
                                                 isPositive ? "text-green-500" : "text-red-500"
                                             )}>
                                                 {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                                                {Math.abs(upside).toFixed(1)}%
+                                                {(!isNaN(upside)) ? Math.abs(upside).toFixed(1) : '0.0'}%
                                             </span>
                                         </div>
                                     </div>
