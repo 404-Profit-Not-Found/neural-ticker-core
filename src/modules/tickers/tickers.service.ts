@@ -327,33 +327,38 @@ export class TickersService {
     const sparklineMap = new Map<string, number[]>();
 
     if (symbolIds.length > 0) {
-      // Single query to get last 14 days of prices for ALL tickers at once
-      const allPrices = await this.ohlcvRepo
-        .createQueryBuilder('ohlcv')
-        .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
-        .where('ohlcv.symbol_id IN (:...symbolIds)', { symbolIds })
-        .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
-        .orderBy('ohlcv.symbol_id', 'ASC')
-        .addOrderBy('ohlcv.ts', 'DESC')
-        .take(symbolIds.length * 14) // Max 14 per ticker
-        .getMany();
+      try {
+        // Single query to get last 14 days of prices for ALL tickers at once
+        const allPrices = await this.ohlcvRepo
+          .createQueryBuilder('ohlcv')
+          .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
+          .where('ohlcv.symbol_id IN (:...symbolIds)', { symbolIds })
+          .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
+          .orderBy('ohlcv.symbol_id', 'ASC')
+          .addOrderBy('ohlcv.ts', 'DESC')
+          .take(symbolIds.length * 14) // Max 14 per ticker
+          .getMany();
 
-      // Group by symbol_id and take first 14 (most recent) for each
-      const groupedPrices = new Map<string, { close: number; ts: Date }[]>();
-      for (const price of allPrices) {
-        const existing = groupedPrices.get(price.symbol_id) || [];
-        if (existing.length < 14) {
-          existing.push({ close: price.close, ts: price.ts });
-          groupedPrices.set(price.symbol_id, existing);
+        // Group by symbol_id and take first 14 (most recent) for each
+        const groupedPrices = new Map<string, { close: number; ts: Date }[]>();
+        for (const price of allPrices) {
+          const existing = groupedPrices.get(price.symbol_id) || [];
+          if (existing.length < 14) {
+            existing.push({ close: price.close, ts: price.ts });
+            groupedPrices.set(price.symbol_id, existing);
+          }
         }
-      }
 
-      // Convert to sparkline arrays (reversed for chronological order)
-      for (const [symbolId, prices] of groupedPrices) {
-        sparklineMap.set(
-          symbolId,
-          prices.reverse().map((p) => p.close),
-        );
+        // Convert to sparkline arrays (reversed for chronological order)
+        for (const [symbolId, prices] of groupedPrices) {
+          sparklineMap.set(
+            symbolId,
+            prices.reverse().map((p) => p.close),
+          );
+        }
+      } catch (err) {
+        // Gracefully handle sparkline fetch failure (table may not exist or other DB issues)
+        this.logger.warn(`Sparkline fetch failed: ${getErrorMessage(err)}`);
       }
     }
 
@@ -466,11 +471,12 @@ export class TickersService {
         return [...combinedResults, ...externalResults.slice(0, 20)];
       } catch (err) {
         this.logger.error(`External search failed: ${getErrorMessage(err)}`);
-        // If external fails, just return strict DB results
+        // If external fails, return combined results
+        return combinedResults;
       }
     }
 
-    return mappedDbResults;
+    return combinedResults;
   }
 
   async getSymbolsByIds(ids: string[] | number[]): Promise<string[]> {

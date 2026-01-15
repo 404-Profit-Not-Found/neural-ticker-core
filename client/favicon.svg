@@ -1,34 +1,34 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="f1" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="15" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    <!-- Basic Drop Shadows for depth -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="15"/>
+      <feOffset dx="0" dy="10" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
     </filter>
   </defs>
 
-  <!-- Left Green Candle (Bullish Pillar) -->
-  <line x1="128" y1="64" x2="128" y2="448" stroke="#4ade80" stroke-width="6" stroke-linecap="round"/>
-  <rect x="100" y="100" width="56" height="312" rx="4" fill="#22c55e" filter="url(#f1)" opacity="0.4"/>
-  <rect x="104" y="104" width="48" height="304" rx="3" fill="#22c55e" stroke="#4ade80" stroke-width="3"/>
+  <g transform="translate(64, 64) scale(0.75)">
+    
+    <!-- LAYER 1: Right Vertical Bar (Blue) -->
+    <rect x="300" y="0" width="100" height="512" rx="50" fill="#4285F4" />
 
-  <!-- Right Red Candle (Bearish Pillar - Forming Right Leg of N) -->
-  <!-- Using Red for contrast and N shape appeal -->
-  <line x1="384" y1="64" x2="384" y2="448" stroke="#f87171" stroke-width="6" stroke-linecap="round"/>
-  <rect x="356" y="100" width="56" height="312" rx="4" fill="#ef4444" filter="url(#f1)" opacity="0.4"/>
-  <rect x="360" y="104" width="48" height="304" rx="3" fill="#ef4444" stroke="#f87171" stroke-width="3"/>
+    <!-- LAYER 2: Left Vertical Bar (Red) -->
+    <rect x="0" y="0" width="100" height="512" rx="50" fill="#EA4335" />
 
-  <!-- Diagonal Red Candles (Cascading Trend) -->
-  <g opacity="0.95">
-      <!-- Step 1 -->
-      <line x1="192" y1="130" x2="192" y2="230" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
-      <rect x="180" y="150" width="24" height="60" rx="2" fill="#ef4444" stroke="#fca5a5" stroke-width="2"/>
-      
-      <!-- Step 2 -->
-      <line x1="256" y1="206" x2="256" y2="306" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
-      <rect x="244" y="226" width="24" height="60" rx="2" fill="#ef4444" stroke="#fca5a5" stroke-width="2"/>
+    <!-- LAYER 3 (Top): Green Diagonal -->
+    <!-- Drawn LAST so it overlays OVER both Red and Blue -->
+    <!-- Added a slight shadow filter to it to make it pop off the pillars -->
+    <line x1="50" y1="50" x2="350" y2="462" stroke="#34A853" stroke-width="100" stroke-linecap="round" filter="url(#shadow)" />
+    
+    <!-- Redrawing the line without shadow on top to clearer edges? -->
+    <!-- The filter merges SourceGraphic, so just one element is enough. -->
 
-      <!-- Step 3 -->
-      <line x1="320" y1="282" x2="320" y2="382" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
-      <rect x="308" y="302" width="24" height="60" rx="2" fill="#ef4444" stroke="#fca5a5" stroke-width="2"/>
   </g>
 </svg>

@@ -14,7 +14,6 @@ import {
     Database,
     Printer,
     Calendar,
-    CheckCircle2,
     Clock,
     TrendingUp,
     TrendingDown
@@ -26,7 +25,10 @@ import { Header } from '../components/layout/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { InlineAlert } from '../components/ui/inline-alert';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { VerdictBadge } from '../components/ticker/VerdictBadge';
 import { ModelBadge } from '../components/ui/model-badge';
+import { calculateLiveUpside, calculateLiveDownside, getBasePriceFromScenarios } from '../lib/rating-utils';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
 import { useTickerDetails } from '../hooks/useTicker';
 
@@ -168,40 +170,98 @@ export function ResearchPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Status Badge */}
-                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wide ${isProcessing
-                            ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                            : isFailed
-                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                : 'bg-green-500/10 text-green-500 border-green-500/20'
-                            }`}>
-                            {isProcessing ? (
+                        {/* Status/Verdict Badge */}
+                        {isProcessing ? (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wide bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
                                 <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : isFailed ? (
+                                <span>Processing</span>
+                            </div>
+                        ) : isFailed ? (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wide bg-red-500/10 text-red-500 border-red-500/20">
                                 <AlertTriangle className="w-3 h-3" />
-                            ) : (
-                                <CheckCircle2 className="w-3 h-3" />
-                            )}
-                            <span className="capitalize">{note.status}</span>
-                        </div>
+                                <span>Failed</span>
+                            </div>
+                        ) : note.rarity && tickerData?.risk_analysis ? (() => {
+                            const { market_data, risk_analysis, fundamentals } = tickerData;
+                            const liveUpside = calculateLiveUpside(
+                                market_data.price,
+                                getBasePriceFromScenarios(risk_analysis.scenarios),
+                                risk_analysis.upside_percent
+                            );
+                            const liveDownside = calculateLiveDownside(
+                                market_data.price,
+                                risk_analysis.scenarios.find((s: { scenario_type: string; price_mid: number | string }) => s.scenario_type.toLowerCase() === 'bear')?.price_mid,
+                                risk_analysis.financial_risk
+                            );
 
-                        {/* Model & Rarity Badge */}
-                        {note.models_used && note.models_used.length > 0 && (
-                            <ModelBadge
-                                model={note.models_used[0]}
-                                rarity={note.rarity}
-                                className="h-6"
-                            />
-                        )}
+                            return (
+                                <VerdictBadge
+                                    risk={risk_analysis.financial_risk}
+                                    upside={liveUpside}
+                                    downside={liveDownside}
+                                    consensus={fundamentals?.consensus_rating}
+                                    overallScore={risk_analysis.overall_score}
+                                    pe={fundamentals?.pe_ratio}
+                                    newsSentiment={tickerData.news?.sentiment}
+                                    newsImpact={tickerData.news?.score}
+                                />
+                            );
+                        })() : null}
 
                         <div className="h-4 w-px bg-border mx-1 hidden md:block" />
 
                         <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2" onClick={() => window.print()}>
                             <Printer size={10} /> <span className="hidden md:inline">Print</span>
                         </Button>
-                        <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2">
-                            <Share2 size={10} /> <span className="hidden md:inline">Share</span>
-                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="gap-2 h-7 text-[10px] px-2">
+                                    <Share2 size={10} /> <span className="hidden md:inline">Share</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2" align="end">
+                                <div className="flex flex-col gap-1">
+                                    <button
+                                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-left"
+                                        onClick={async () => {
+                                            await navigator.clipboard.writeText(window.location.href);
+                                            alert('Link copied!');
+                                        }}
+                                    >
+                                        <LinkIcon size={12} />
+                                        Copy Link
+                                    </button>
+                                    <div className="h-px bg-border my-1" />
+                                    <a
+                                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(window.location.href)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                    >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                                        Share on X
+                                    </a>
+                                    <a
+                                        href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                    >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                                        Share on LinkedIn
+                                    </a>
+                                    <a
+                                        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                    >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                                        Share on Facebook
+                                    </a>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
 
@@ -214,17 +274,21 @@ export function ResearchPage() {
                             <span>{new Date(note.created_at).toLocaleString()}</span>
                         </div>
                         {note.tokens_in && note.tokens_out && (
-                            <div className="flex items-center gap-1.5">
-                                <Clock size={10} />
-                                <span className={note.rarity === 'Legendary' ? 'text-yellow-500' : ''}>{note.tokens_in + note.tokens_out} tokens</span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
+                                    <Clock size={10} />
+                                    <span className={note.rarity === 'Legendary' ? 'text-yellow-500' : ''}>{note.tokens_in + note.tokens_out} tokens</span>
+                                </div>
+                                <div className="h-3 w-px bg-border opacity-50" />
+                                <ModelBadge
+                                    model={note.models_used?.[0] || 'AI'}
+                                    rarity={note.rarity}
+                                    className="h-4 scale-90 origin-left"
+                                />
                             </div>
                         )}
 
-                        {note.rarity && (
-                            <div className="flex items-center gap-1.5">
-                                <ModelBadge model={note.models_used?.[0] || 'AI'} rarity={note.rarity} showIcon={false} />
-                            </div>
-                        )}
+
 
                         <span className="font-mono opacity-30 ml-auto">ID: {note.id}</span>
                     </div>

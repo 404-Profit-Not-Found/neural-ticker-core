@@ -319,6 +319,22 @@ describe('TickersService', () => {
   });
 
   describe('searchTickers', () => {
+    let mockOhlcvQueryBuilder: any;
+
+    beforeEach(() => {
+      // Setup ohlcv query builder mock for sparkline batch query
+      mockOhlcvQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockOhlcvRepo.createQueryBuilder = jest.fn(() => mockOhlcvQueryBuilder);
+    });
+
     it('should return all tickers when no search query', async () => {
       const tickers = [{ symbol: 'AAPL' }];
       mockTickerRepo.find.mockResolvedValue(tickers);
@@ -338,6 +354,144 @@ describe('TickersService', () => {
     it('should search with query pattern', async () => {
       await service.searchTickers('AAP');
       expect(mockTickerRepo.createQueryBuilder).toHaveBeenCalledWith('ticker');
+    });
+
+    it('should batch fetch sparklines for all results in a single query', async () => {
+      const dbResults = [
+        { id: '1', symbol: 'AAPL', name: 'Apple', exchange: 'NASDAQ' },
+        { id: '2', symbol: 'GOOGL', name: 'Google', exchange: 'NASDAQ' },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(dbResults);
+      mockRequestRepo.find.mockResolvedValue([]);
+
+      const priceData = [
+        { symbol_id: '1', close: 150, ts: new Date('2026-01-14') },
+        { symbol_id: '1', close: 149, ts: new Date('2026-01-13') },
+        { symbol_id: '2', close: 200, ts: new Date('2026-01-14') },
+        { symbol_id: '2', close: 199, ts: new Date('2026-01-13') },
+      ];
+      mockOhlcvQueryBuilder.getMany.mockResolvedValue(priceData);
+
+      const result = await service.searchTickers('A');
+
+      // Verify batch query was used
+      expect(mockOhlcvRepo.createQueryBuilder).toHaveBeenCalledWith('ohlcv');
+      expect(mockOhlcvQueryBuilder.where).toHaveBeenCalledWith(
+        'ohlcv.symbol_id IN (:...symbolIds)',
+        { symbolIds: ['1', '2'] },
+      );
+
+      // Verify sparklines are attached correctly
+      expect(result[0].sparkline).toEqual([149, 150]); // reversed for chronological order
+      expect(result[1].sparkline).toEqual([199, 200]);
+    });
+
+    it('should handle sparkline fetch failure gracefully', async () => {
+      const dbResults = [
+        { id: '1', symbol: 'AAPL', name: 'Apple', exchange: 'NASDAQ' },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(dbResults);
+      mockRequestRepo.find.mockResolvedValue([]);
+
+      // Simulate database error (like 42P01 - table not found)
+      mockOhlcvQueryBuilder.getMany.mockRejectedValue(
+        new Error('relation "price_ohlcv" does not exist'),
+      );
+
+      // Should NOT throw - graceful degradation
+      const result = await service.searchTickers('A');
+
+      // Should still return results, just without sparklines
+      expect(result).toHaveLength(1);
+      expect(result[0].symbol).toBe('AAPL');
+      expect(result[0].sparkline).toEqual([]); // Empty array, not undefined
+    });
+
+    it('should return empty sparklines for tickers with no price data', async () => {
+      const dbResults = [
+        { id: '1', symbol: 'NEW', name: 'New Stock', exchange: 'NYSE' },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(dbResults);
+      mockRequestRepo.find.mockResolvedValue([]);
+      mockOhlcvQueryBuilder.getMany.mockResolvedValue([]); // No price data
+
+      const result = await service.searchTickers('NEW');
+
+      expect(result[0].sparkline).toEqual([]);
+    });
+
+    it('should include pending requests in search results', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+      mockRequestRepo.find.mockResolvedValue([
+        { symbol: 'PENDING', status: 'PENDING' },
+      ]);
+
+      const result = await service.searchTickers('PEN');
+
+      const pendingResult = result.find((r) => r.symbol === 'PENDING');
+      expect(pendingResult).toBeDefined();
+      expect(pendingResult?.is_locally_tracked).toBe(false);
+      expect(pendingResult?.is_queued).toBe(true);
+    });
+
+    it('should deduplicate pending requests that match existing tickers', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([
+        { id: '1', symbol: 'AAPL', name: 'Apple', exchange: 'NASDAQ' },
+      ]);
+      mockRequestRepo.find.mockResolvedValue([
+        { symbol: 'AAPL', status: 'PENDING' },
+      ]);
+
+      const result = await service.searchTickers('AAP');
+
+      // Should only have one AAPL entry
+      const aaplResults = result.filter(
+        (r) => r.symbol?.toUpperCase() === 'AAPL',
+      );
+      expect(aaplResults).toHaveLength(1);
+      expect(aaplResults[0].is_locally_tracked).toBe(true);
+    });
+
+    it('should include external results when includeExternal is true', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+      mockRequestRepo.find.mockResolvedValue([]);
+
+      mockFinnhubService.searchSymbols.mockResolvedValue({
+        result: [{ symbol: 'EXTFIN', description: 'External from Finnhub' }],
+      });
+      mockYahooService.search.mockResolvedValue({
+        quotes: [{ symbol: 'EXTYAH', shortname: 'External from Yahoo' }],
+      });
+
+      const result = await service.searchTickers('EXT', true);
+
+      expect(mockFinnhubService.searchSymbols).toHaveBeenCalledWith('EXT');
+      expect(mockYahooService.search).toHaveBeenCalledWith('EXT');
+
+      const finnhubResult = result.find((r) => r.symbol === 'EXTFIN');
+      const yahooResult = result.find((r) => r.symbol === 'EXTYAH');
+      expect(finnhubResult).toBeDefined();
+      expect(yahooResult).toBeDefined();
+      expect(finnhubResult?.is_locally_tracked).toBe(false);
+    });
+
+    it('should handle external API failures gracefully', async () => {
+      const dbResults = [
+        { id: '1', symbol: 'LOCAL', name: 'Local Stock', exchange: 'NYSE' },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(dbResults);
+      mockRequestRepo.find.mockResolvedValue([]);
+
+      mockFinnhubService.searchSymbols.mockRejectedValue(
+        new Error('API rate limit'),
+      );
+      mockYahooService.search.mockRejectedValue(new Error('API error'));
+
+      // Should NOT throw - should return local results
+      const result = await service.searchTickers('LOC', true);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].symbol).toBe('LOCAL');
     });
   });
   describe('getUniqueSectors', () => {
