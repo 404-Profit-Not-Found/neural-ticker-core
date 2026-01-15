@@ -397,9 +397,9 @@ export function TickerDetail() {
                                                 </Button>
 
                                                 <Button
-                                                    variant="outline"
+                                                    variant="ghost"
                                                     size="sm"
-                                                    className="h-6 gap-1.5 rounded-full border-yellow-500/50 text-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400 text-xs font-semibold uppercase tracking-wider px-2"
+                                                    className="h-auto gap-1.5 rounded-full border border-yellow-500/40 text-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-400 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 transition-all"
                                                     onClick={() => toggle()}
                                                     disabled={isFavLoading}
                                                     title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
@@ -408,7 +408,7 @@ export function TickerDetail() {
                                                         size={14}
                                                         className={isFavorite ? "fill-yellow-500" : ""}
                                                     />
-                                                    <span>Favourite</span>
+                                                    <span>FAVOURITE</span>
                                                 </Button>
                                             </div>
                                         </div>

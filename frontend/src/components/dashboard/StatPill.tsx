@@ -54,7 +54,7 @@ export function StatPill({
             className={cn(
                 'style-kpi relative overflow-hidden rounded-md border-2 border-transparent px-3 py-2 sm:px-4 sm:py-3 h-full transition-all duration-200',
                 onClick && 'cursor-pointer hover:scale-[1.02]',
-                isActive && 'bg-accent/5 shadow-md ring-1 ring-primary/20', // distinct active state
+                isActive && 'bg-accent/10 shadow-md border-primary/50', // distinct active state
                 !isActive && onClick && 'opacity-90 hover:opacity-100', // slight fade for unselected
                 className
             )}

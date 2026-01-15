@@ -213,7 +213,7 @@ export function Dashboard() {
         </div>
 
         <div className="h-[950px]">
-          <NewsFeed />
+          <NewsFeed tickerCount={stats?.tickers} />
         </div>
       </main>
     </div>
@@ -288,8 +288,10 @@ function TopOpportunitiesSection() {
                 key={cat}
                 onClick={() => setCategory(cat)}
                 className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                  category === cat ? "bg-card text-foreground shadow-sm border border-border/10" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  "px-3 py-1 text-xs font-semibold rounded-md transition-all",
+                  category === cat
+                    ? "bg-background text-foreground shadow-sm border border-border/50"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
                 )}
               >
                 {cat === 'yolo' ? '🚀 YOLO' : cat === 'conservative' ? '🛡️ Classic' : '🐻 Shorts'}

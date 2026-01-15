@@ -40,7 +40,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-500">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-[200px] border border-border rounded-lg p-4 bg-card/50 space-y-4">
+          <div key={i} className="h-[200px] border border-border/50 rounded-lg p-4 bg-card/50 space-y-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 rounded-full" />
               <div className="space-y-2">
@@ -78,7 +78,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
         return (
           <div
             key={item.id}
-            className="group relative flex flex-col justify-between rounded-xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer"
+            className="group relative flex flex-col justify-between rounded-xl border border-border/50 bg-card p-5 transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer"
             onClick={() => navigate(`/ticker/${item.symbol}`)}
           >
             {/* Header */}
@@ -87,7 +87,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
                 <TickerLogo
                   url={item.ticker?.logo_url}
                   symbol={item.symbol}
-                  className="w-10 h-10 rounded-full border border-border"
+                  className="w-10 h-10 rounded-full border border-border/50"
                 />
                 <div>
                   <div className="font-bold text-lg leading-none">{item.symbol}</div>

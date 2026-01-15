@@ -5,10 +5,11 @@ import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Bot, Sparkles, Brain, Target, Clock, ArrowRight, RotateCcw, Zap, History, ChevronRight } from 'lucide-react';
+import { Bot, Sparkles, Brain, Target, Clock, ArrowRight, RotateCcw, Zap, History, ChevronRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
 
 interface PortfolioAiAnalyzerProps {
   open: boolean;
@@ -28,6 +29,7 @@ interface HistoricalAnalysis {
 }
 
 export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerProps) {
+  const { user, refreshSession } = useAuth();
   const [step, setStep] = useState<Step>('survey');
   const [riskAppetite, setRiskAppetite] = useState('medium');
   const [horizon, setHorizon] = useState('medium-term');
@@ -36,6 +38,17 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
   const [analysis, setAnalysis] = useState('');
   const [history, setHistory] = useState<HistoricalAnalysis[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const credits = user?.credits_balance || 0;
+
+  const getModelCost = (m: string) => {
+    if (m.includes('pro') || m === 'gpt-5.1') return 5;
+    if (m.includes('flash-preview') || m === 'gemini-3-flash-preview') return 2;
+    return 1;
+  };
+
+  const selectedCost = getModelCost(model);
+  const canAfford = credits >= selectedCost;
 
   const fetchHistory = async () => {
     setLoadingHistory(true);
@@ -60,6 +73,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
       });
       setAnalysis(data);
       setStep('result');
+      refreshSession();
     } catch (error: unknown) {
       const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to generate AI analysis';
       toast.error(message);
@@ -461,10 +475,22 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
 
       <DialogFooter className="pt-4 border-t border-border/50">
         {step === 'survey' && (
-          <Button className="w-full gap-2 text-base h-11" onClick={startAnalysis}>
-            Analyze Portfolio
-            <ArrowRight size={18} />
-          </Button>
+          <div className="w-full space-y-3">
+            {!canAfford && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-[11px] font-medium animate-in fade-in slide-in-from-top-2">
+                <AlertCircle size={14} />
+                Insufficient credits for this model. Need {selectedCost}, have {credits}.
+              </div>
+            )}
+            <Button
+              className="w-full gap-2 text-base h-11"
+              onClick={startAnalysis}
+              disabled={!canAfford}
+            >
+              Analyze Portfolio
+              <ArrowRight size={18} />
+            </Button>
+          </div>
         )}
         {step === 'result' && (
           <div className="flex gap-2 w-full">

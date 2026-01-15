@@ -693,9 +693,6 @@ export class RiskRewardService {
         scenario.price_high = data.price_target_high || 0;
         scenario.price_mid = data.price_target_mid || 0;
 
-        // Dynamic Market Cap Calculation Fallback
-        // If LLM returned 0, null, or a "billions" shorthand (e.g. "50" for 50B), we assume it's wrong -> Recalculate.
-        // Threshold: If cap < 1,000,000 (1M), it's likely wrong for any public co in this context.
         if (
           (!data.expected_market_cap || data.expected_market_cap < 1000000) &&
           context.fundamentals?.shares_outstanding &&
@@ -703,8 +700,14 @@ export class RiskRewardService {
         ) {
           scenario.expected_market_cap =
             scenario.price_mid * context.fundamentals.shares_outstanding;
+          this.logger.log(
+            `[${symbol}] Recalculated expected_market_cap: ${scenario.expected_market_cap} (LLM returned: ${data.expected_market_cap})`,
+          );
         } else {
           scenario.expected_market_cap = data.expected_market_cap || 0;
+          if (scenario.expected_market_cap > 0 && scenario.expected_market_cap < 1000000) {
+            this.logger.warn(`[${symbol}] Implausible market cap detected: ${scenario.expected_market_cap}. Scaling might be off.`);
+          }
         }
 
         scenario.key_drivers = data.key_drivers || [];

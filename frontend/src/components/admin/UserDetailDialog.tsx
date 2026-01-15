@@ -63,7 +63,7 @@ export function UserDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="w-full">
                 <DialogHeader>
                     <div className="flex items-start gap-4 mb-2">
                         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-2xl font-bold text-muted-foreground overflow-hidden ring-2 ring-border">
