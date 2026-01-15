@@ -705,8 +705,13 @@ export class RiskRewardService {
           );
         } else {
           scenario.expected_market_cap = data.expected_market_cap || 0;
-          if (scenario.expected_market_cap > 0 && scenario.expected_market_cap < 1000000) {
-            this.logger.warn(`[${symbol}] Implausible market cap detected: ${scenario.expected_market_cap}. Scaling might be off.`);
+          if (
+            scenario.expected_market_cap > 0 &&
+            scenario.expected_market_cap < 1000000
+          ) {
+            this.logger.warn(
+              `[${symbol}] Implausible market cap detected: ${scenario.expected_market_cap}. Scaling might be off.`,
+            );
           }
         }
 

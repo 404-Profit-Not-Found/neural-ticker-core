@@ -234,7 +234,7 @@ export function Header() {
               to="/dashboard"
               className="flex items-center gap-0 text-lg font-bold text-foreground tracking-tight hover:opacity-80 transition-opacity flex-shrink-0"
             >
-              <img src="/favicon.svg" alt="N" className="h-4 w-auto mb-0.5 ml-1 mr-0.5 animate-neural-pulse" />
+              <img src="/favicon.svg" alt="N" className="h-4 w-auto mb-0.5 ml-1 mr-0 animate-neural-pulse" />
               <span>euralTicker.com</span>
             </Link>
           </div>

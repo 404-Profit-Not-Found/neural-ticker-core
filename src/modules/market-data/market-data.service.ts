@@ -307,7 +307,9 @@ export class MarketDataService {
 
               if (profile) {
                 // Finnhub marketCapitalization is in Millions. Normalize to full Dollars.
-                entity.market_cap = profile.marketCapitalization ? profile.marketCapitalization * 1000000 : null;
+                entity.market_cap = profile.marketCapitalization
+                  ? profile.marketCapitalization * 1000000
+                  : null;
                 entity.sector = profile.finnhubIndustry;
               }
 
@@ -317,9 +319,10 @@ export class MarketDataService {
                 if (metrics.beta) entity.beta = metrics.beta;
                 if (metrics.dividendYieldIndicatedAnnual)
                   entity.dividend_yield = metrics.dividendYieldIndicatedAnnual;
-                
+
                 if (metrics.sharesOutstanding)
-                  entity.shares_outstanding = metrics.sharesOutstanding * 1000000; // Finnhub shares are also in Millions usually
+                  entity.shares_outstanding =
+                    metrics.sharesOutstanding * 1000000; // Finnhub shares are also in Millions usually
 
                 // Map 52-Week Range (Finnhub) - Verify currency consistency
                 // If the 52-week low is significantly higher than current price, or high is lower, it's likely a currency mismatch (e.g. DKK vs USD for NVO)

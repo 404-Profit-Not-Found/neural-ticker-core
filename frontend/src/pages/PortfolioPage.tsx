@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Header } from '../components/layout/Header';
@@ -202,7 +202,7 @@ export function PortfolioPage() {
     }
   };
 
-  const { user, refreshSession } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="dark min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">

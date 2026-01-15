@@ -367,7 +367,7 @@ export class TickersService {
             prices.reverse().map((p) => p.close),
           );
         }
-      } catch (_err) {
+      } catch {
         // Gracefully handle sparkline fetch failure (table may not exist or other DB issues)
         this.logger.warn('Sparkline fetch failed');
       }
@@ -578,7 +578,7 @@ export class TickersService {
                   .map((h: any) => h.close)
                   .filter((c) => c !== undefined && c !== null);
               }
-            } catch (_err) {
+            } catch {
               this.logger.warn(`Bulk sparkline fetch failed for ${symbol}`);
             }
           }),

@@ -62,14 +62,19 @@ export class TickersController {
     if (typeof search === 'string') {
       normalizedSearch = search;
     } else if (Array.isArray(search)) {
-      normalizedSearch = search.find((v) => typeof v === 'string' && v.length > 0);
+      normalizedSearch = search.find(
+        (v) => typeof v === 'string' && v.length > 0,
+      );
     } else {
       normalizedSearch = undefined;
     }
 
     const isPro = req.user?.tier === 'pro' || req.user?.role === 'admin';
     const shouldSearchExternal = isPro && external === 'true';
-    return this.tickersService.searchTickers(normalizedSearch, shouldSearchExternal);
+    return this.tickersService.searchTickers(
+      normalizedSearch,
+      shouldSearchExternal,
+    );
   }
 
   @ApiOperation({
