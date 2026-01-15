@@ -14,6 +14,7 @@ import { PortfolioModule } from '../portfolio/portfolio.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 import { QualityScoringService } from './quality-scoring.service';
+import { PublicViewController } from './public-view.controller';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { QualityScoringService } from './quality-scoring.service';
     forwardRef(() => PortfolioModule),
     NotificationsModule,
   ],
-  controllers: [ResearchController],
+  controllers: [ResearchController, PublicViewController],
   providers: [ResearchService, QualityScoringService],
   exports: [ResearchService, QualityScoringService],
 })

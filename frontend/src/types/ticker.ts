@@ -26,6 +26,10 @@ export interface NewsItem {
     source: string;
     datetime: number;
     headline: string;
+    sentiment?: string;
+    score?: number;
+    summary?: string;
+    updated_at?: string;
 }
 
 export interface SocialComment {

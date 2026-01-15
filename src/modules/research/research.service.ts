@@ -3,6 +3,8 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, LessThan, Not } from 'typeorm';
@@ -13,17 +15,19 @@ import {
   ResearchStatus,
 } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
-import { MarketDataService } from '../market-data/market-data.service';
+import { MarketDataService } from '../market-data/market-data.service'; // Added
+import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 import { CreditService } from '../users/credit.service'; // Added
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
 
-import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { Observable, Subject } from 'rxjs';
+import * as crypto from 'crypto';
+import { TickersService } from '../tickers/tickers.service';
 
 export interface ResearchEvent {
   type: 'status' | 'thought' | 'source' | 'content' | 'error';
@@ -44,9 +48,7 @@ export class ResearchService implements OnModuleInit {
     @InjectRepository(ResearchNote)
     private readonly noteRepo: Repository<ResearchNote>,
     private readonly llmService: LlmService,
-    private readonly marketDataService: MarketDataService,
     private readonly usersService: UsersService,
-    private readonly riskRewardService: RiskRewardService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly watchlistService: WatchlistService,
@@ -54,6 +56,13 @@ export class ResearchService implements OnModuleInit {
 
     private readonly creditService: CreditService,
     private readonly qualityScoringService: QualityScoringService,
+    // Inject TickersService to fetch profile data
+    @Inject(forwardRef(() => TickersService))
+    private readonly tickersService: TickersService,
+    @Inject(forwardRef(() => MarketDataService))
+    private readonly marketDataService: MarketDataService,
+    @Inject(forwardRef(() => RiskRewardService))
+    private readonly riskRewardService: RiskRewardService,
   ) {
     const apiKey = this.config.get<string>('gemini.apiKey');
     if (apiKey) {
@@ -988,7 +997,7 @@ Title:`;
         });
 
         // Scoring Logic: Impact Score
-        const scored = richData.items.map((item) => {
+        const scored = richData.items.map((item: any) => {
           const change = Math.abs(
             item.latestPrice?.changePercent || item.latestPrice?.change || 0,
           );
@@ -997,8 +1006,8 @@ Title:`;
           return { symbol: item.ticker.symbol, score, data: item };
         });
 
-        scored.sort((a, b) => b.score - a.score);
-        let active = scored.filter((s) => s.score > 2);
+        scored.sort((a: any, b: any) => b.score - a.score);
+        let active = scored.filter((s: any) => s.score > 2);
 
         if (active.length === 0 && scored.length > 0) {
           this.logger.log(
@@ -1008,7 +1017,7 @@ Title:`;
         }
 
         const topPicks = active.slice(0, 5);
-        symbols = topPicks.map((s) => s.symbol);
+        symbols = topPicks.map((s: any) => s.symbol);
 
         this.logger.log(
           `High Impact Filter: Selected ${symbols.join(', ')} from ${distinctSymbols.length} candidates.`,
@@ -1200,5 +1209,160 @@ Title:`;
     note.status = ResearchStatus.COMPLETED;
     note.answer_markdown = 'Deprecated: Please use the Daily Digest widget.';
     await this.noteRepo.save(note);
+  }
+
+  // --- SECURE PUBLIC VIEW IMPLEMENTATION ---
+
+  /**
+   * Generates a signature for the research ID to allow secure public sharing.
+   */
+  generatePublicSignature(researchId: string): string {
+    const secret = this.config.get<string>(
+      'RESEARCH_SHARE_SECRET',
+      'dev-secret-salt', // Fallback for dev convenience
+    );
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(researchId);
+    return hmac.digest('hex');
+  }
+
+  /**
+   * Verifies the signature and fetches the research note + all related ticker context.
+   * This is the "Composite Payload" getter.
+   */
+  async getPublicReportData(researchId: string, signature: string) {
+    // 1. Verify Signature
+    const expectedSignature = this.generatePublicSignature(researchId);
+
+    // Constant-time comparison to prevent timing attacks
+    // First check length to avoid timingSafeEqual throw
+    if (signature.length !== expectedSignature.length) {
+      throw new Error('Invalid signature');
+    }
+
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature),
+    );
+
+    if (!isValid) {
+      throw new Error('Invalid signature'); // Controller will catch and return 403
+    }
+
+    // 2. Fetch Research Note
+    const note = await this.getResearchNote(researchId);
+    if (!note) {
+      throw new NotFoundException('Research note not found');
+    }
+
+    // 3. Fetch Context Data in Parallel (Live/Latest Data to match Private View)
+    const mainTicker = note.tickers[0];
+    if (!mainTicker) {
+      return { note }; // Should not happen for valid notes
+    }
+
+    // Grab profile, snapshot, news, ratings in parallel
+    // (Risk and history require profile.id, so they are fetched waterfall style below)
+    const [profile, snapshot, newsData, ratings] = await Promise.all([
+      this.tickersService.getTicker(mainTicker),
+      this.marketDataService.getSnapshot(mainTicker).catch((e: any) => {
+        this.logger.warn(
+          `Failed to get snapshot for public view: ${e.message}`,
+        );
+        return { latestPrice: { close: 0, prevClose: 0, ts: new Date() } };
+      }),
+      this.marketDataService.getCompanyNews(mainTicker),
+      this.marketDataService.getAnalystRatings(mainTicker),
+      // Fetch fresh risk analysis for the live dashboard feel
+      // We need the ticker ID for this, which we can get from Profile if we chain,
+      // but getTicker fetches by symbol.
+      // Ideally we'd get risk via symbol wrapper or get profile first.
+      // For speed, let's assume we need to wait for profile or use a symbol-based lookup if available?
+      // RiskRewardService.getLatestAnalysis takes tickerId (number).
+      // So we must await profile first or find a way.
+      // Actually, getTicker returns the entity which has ID.
+      // So we can't do full parallel unless we have ID.
+      // Refactoring to serial/waterfall for ID dependency:
+    ]);
+
+    // Re-fetch risk/history now that we have profile (and thus ID) if needed,
+    // OR just chain it properly. A better way:
+    // Let's rely on TickersService to give us the ID, or use ensureTicker.
+    // profile (from getTicker) has the ID.
+
+    let riskAnalysis = null;
+    let priceHistory: any[] = [];
+
+    if (profile && profile.id) {
+      const [risk, hist] = await Promise.all([
+        this.riskRewardService.getLatestAnalysis(profile.id).catch(() => null),
+        this.marketDataService
+          .getHistory(
+            mainTicker,
+            '1d',
+            new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+            new Date().toISOString(),
+          )
+          .catch(() => []),
+      ]);
+      riskAnalysis = risk;
+      priceHistory = hist;
+    }
+
+    const marketData = snapshot.latestPrice || { close: 0, prevClose: 0 };
+
+    return {
+      note: {
+        id: note.id,
+        title: note.title,
+        content: note.answer_markdown,
+        created_at: note.created_at,
+        models_used: note.models_used,
+        rarity: note.rarity,
+        quality_score: note.quality_score,
+      },
+      profile: {
+        symbol: profile.symbol,
+        name: profile.name,
+        logo_url: profile.logo_url,
+        industry: profile.finnhub_industry || profile.sector,
+        description: profile.description,
+        web_url: profile.web_url,
+        exchange: profile.exchange,
+      },
+      market_context: {
+        price: marketData.close,
+        change_percent: marketData.prevClose
+          ? ((marketData.close - marketData.prevClose) / marketData.prevClose) *
+            100
+          : 0,
+        history: priceHistory.map((h) => ({
+          price: h.close,
+          date: h.ts, // Keep original TS for Chart mapping
+        })),
+      },
+      // Use Live Risk Analysis, fallback to null (frontend handles nulls)
+      risk_analysis: riskAnalysis
+        ? {
+            overall_score: riskAnalysis.overall_score,
+            financial_risk: riskAnalysis.financial_risk,
+            execution_risk: riskAnalysis.execution_risk,
+            dilution_risk: riskAnalysis.dilution_risk,
+            competitive_risk: riskAnalysis.competitive_risk,
+            regulatory_risk: riskAnalysis.regulatory_risk,
+            sentiment: riskAnalysis.sentiment,
+            upside_percent: riskAnalysis.upside_percent,
+            scenarios: riskAnalysis.scenarios,
+            red_flags: (riskAnalysis as any).red_flags || [],
+            catalysts: (riskAnalysis as any).catalysts || [],
+          }
+        : null,
+      ratings: ratings || [],
+      news: newsData && newsData.length > 0 ? newsData[0] : null,
+      fundamentals: {
+        ...snapshot.fundamentals,
+        pe_ratio: snapshot.fundamentals?.pe_ttm || snapshot.ticker?.pe_ratio,
+      },
+    };
   }
 }
