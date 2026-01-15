@@ -45,6 +45,7 @@ import {
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
+import { SharePopover } from '../components/common/SharePopover';
 import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
 import { Star } from 'lucide-react';
@@ -363,6 +364,15 @@ export function TickerDetail() {
                                                     <span className="text-xs font-semibold text-foreground">{(watchers ?? 0).toLocaleString()}</span>
                                                 </div>
 
+                                                {latestResearchId && (
+                                                    <div className="mr-2">
+                                                        <SharePopover
+                                                            researchId={latestResearchId}
+                                                            title={`${profile?.symbol} Research Analysis`}
+                                                        />
+                                                    </div>
+                                                )}
+
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -533,6 +543,13 @@ export function TickerDetail() {
                                                     <Eye size={12} />
                                                     <span className="font-semibold">{(watchers ?? 0).toLocaleString()}</span>
                                                 </div>
+
+                                                {latestResearchId && (
+                                                    <SharePopover
+                                                        researchId={latestResearchId}
+                                                        title={`${profile?.symbol} Research Analysis`}
+                                                    />
+                                                )}
 
                                                 {/* Star / Favorite */}
                                                 <Button
