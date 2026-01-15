@@ -63,6 +63,25 @@ export class TickersController {
   }
 
   @ApiOperation({
+    summary: 'Get bulk sparklines (14d history)',
+    description: 'Returns sparklines for multiple symbols.',
+  })
+  @ApiQuery({
+    name: 'symbols',
+    required: true,
+    description: 'Comma-separated symbols',
+    example: 'AAPL,MSFT,EKT.DE',
+  })
+  @ApiResponse({ status: 200, description: 'Bulk sparklines.' })
+  @Public()
+  @Get('bulk/sparklines')
+  getBulkSparklines(@Query('symbols') symbols: string) {
+    if (!symbols) return {};
+    const symbolList = symbols.split(',').map((s) => s.trim());
+    return this.tickersService.getBulkSparklines(symbolList);
+  }
+
+  @ApiOperation({
     summary: 'Get total ticker count',
     description: 'Returns the total number of tickers in the database.',
   })

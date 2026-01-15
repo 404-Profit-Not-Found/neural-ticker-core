@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Loader2, PlusCircle, Database, Clock } from 'lucide-react';
+import { Search, Loader2, PlusCircle, Clock } from 'lucide-react';
 import { api } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { cn } from '../../lib/api';
@@ -170,6 +170,37 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
         }
     };
 
+    // Bulk fetch missing sparklines
+    const lastFetchedSymbols = useRef<string>('');
+
+    useEffect(() => {
+        const missingSymbols = results
+            .filter(t => !t.sparkline || t.sparkline.length === 0)
+            .map(t => t.symbol);
+
+        const currentKey = missingSymbols.sort().join(',');
+        if (missingSymbols.length > 0 && currentKey !== lastFetchedSymbols.current) {
+            lastFetchedSymbols.current = currentKey;
+            const fetchMissing = async () => {
+                try {
+                    const { data } = await api.get<Record<string, number[]>>('/tickers/bulk/sparklines', {
+                        params: { symbols: missingSymbols.join(',') }
+                    });
+
+                    setResults(prev => prev.map(t => {
+                        if (data[t.symbol]) {
+                            return { ...t, sparkline: data[t.symbol] };
+                        }
+                        return t;
+                    }));
+                } catch (error) {
+                    console.error('Failed to fetch missing sparklines', error);
+                }
+            };
+            fetchMissing();
+        }
+    }, [results]);
+
     return (
         <div className={cn("relative w-full", className)} ref={wrapperRef}>
             <div className="relative">
@@ -234,7 +265,7 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
                                         <div className="flex items-center justify-between gap-4">
                                             <span className="font-bold text-sm shrink-0">{ticker.symbol}</span>
                                             <div className="flex items-center gap-2 shrink-0 h-6">
-                                                {ticker.is_locally_tracked && ticker.sparkline && ticker.sparkline.length > 0 ? (
+                                                {ticker.sparkline && ticker.sparkline.length > 0 ? (
                                                     <div className="flex items-center gap-3">
                                                         <Sparkline
                                                             data={ticker.sparkline}
@@ -244,10 +275,9 @@ export function GlobalSearch({ className = '', autoFocus = false, onSelect }: Gl
                                                         />
                                                     </div>
                                                 ) : ticker.is_locally_tracked ? (
-                                                    <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 whitespace-nowrap">
-                                                        <Database size={10} className="opacity-70" />
-                                                        Tracked
-                                                    </span>
+                                                    <div className="w-[60px] h-6 flex items-center justify-center">
+                                                        <Loader2 size={10} className="animate-spin text-muted-foreground/30" />
+                                                    </div>
                                                 ) : ticker.is_queued ? (
                                                     <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 whitespace-nowrap font-medium shadow-sm">
                                                         <Clock size={10} className="opacity-70" />

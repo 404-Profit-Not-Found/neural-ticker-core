@@ -304,15 +304,15 @@ export function calculateAiRating(
     // Verdict Determination
     // -------------------------------------------------------------------------
 
-    // Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
-    if (risk >= 9 && score < 70) {
-        return { rating: 'Sell', variant: 'sell', score };
-    }
-
-    // Speculative Buy Override
+    // 1. Speculative Buy Override (Check this BEFORE Veto to allow high-reward extreme risk plays)
     // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
     if (risk >= 8 && (effectiveUpside >= 100 || (overallScore && overallScore >= 7.5))) {
         return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
+    }
+
+    // 2. Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
+    if (risk >= 9 && score < 70) {
+        return { rating: 'Sell', variant: 'sell', score };
     }
 
     if (score >= 80) return { rating: 'Strong Buy', variant: 'strongBuy', score };
