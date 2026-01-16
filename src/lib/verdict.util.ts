@@ -110,7 +110,10 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
         score += 10; // At the bottom
       }
       // Tier 2: Bottom 20% of Range OR < 25% from Low (Value Zone)
-      else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) {
+      else if (
+        currentPrice <= 1.25 * fiftyTwoWeekLow ||
+        positionInRange <= 0.2
+      ) {
         score += 5; // Value zone
       }
     }

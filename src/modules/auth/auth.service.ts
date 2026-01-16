@@ -39,8 +39,8 @@ export class AuthService {
     // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
     const userEntity = await this.usersService.findByEmail(email);
     if (userEntity && userEntity.role === 'revoked') {
-       this.logger.warn(`Blocked banned user login attempt: ${email}`);
-       throw new UnauthorizedException('Your account has been suspended.');
+      this.logger.warn(`Blocked banned user login attempt: ${email}`);
+      throw new UnauthorizedException('Your account has been suspended.');
     }
 
     // Logic: If not allowed...
@@ -107,8 +107,10 @@ export class AuthService {
       // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
       const userEntity = await this.usersService.findByEmail(decoded.email);
       if (userEntity && userEntity.role === 'revoked') {
-         this.logger.warn(`Blocked banned user login attempt (Firebase): ${decoded.email}`);
-         throw new UnauthorizedException('Your account has been suspended.');
+        this.logger.warn(
+          `Blocked banned user login attempt (Firebase): ${decoded.email}`,
+        );
+        throw new UnauthorizedException('Your account has been suspended.');
       }
 
       const user = await this.usersService.createOrUpdateGoogleUser({

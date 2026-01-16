@@ -249,7 +249,7 @@ describe('VerdictUtil', () => {
         fiftyTwoWeekLow: 100,
         fiftyTwoWeekHigh: 200,
       }); // 1.20x Low
-      
+
       expect(result1.score).toBe(result2.score + 5); // +10 vs +5 = 5 diff
     });
 
@@ -257,7 +257,7 @@ describe('VerdictUtil', () => {
       // Scenario: Stock rallied > 25% from low, but range is HUGE, so it's still in bottom 20%
       // Low: 100, High: 1000. Range: 900.
       // Bottom 20% of range logic: Position = (Price - Low) / (High - Low)
-      
+
       const result = calculateAiRating({
         risk: 5,
         upside: 10,
@@ -271,7 +271,7 @@ describe('VerdictUtil', () => {
 
       // Position = (130 - 100) / 900 = 30 / 900 = 0.033 (3.3%)
       // This is <= 0.05 (Bottom 5%), so should get Tier 1 reward (+10)
-      
+
       // Control: High in range
       const resultHigh = calculateAiRating({
         risk: 5,
@@ -284,7 +284,7 @@ describe('VerdictUtil', () => {
         fiftyTwoWeekHigh: 1000,
       });
 
-      expect(result.score).toBe(resultHigh.score + 20); 
+      expect(result.score).toBe(resultHigh.score + 20);
       // resultHigh gets -10 penalty for being near high (900/1000=0.9 -> Very High -10)
       // resultLow gets +10 reward
       // Diff = 10 - (-10) = 20? No wait.
@@ -298,7 +298,7 @@ describe('VerdictUtil', () => {
       // Price: 250 (+150% from low, but still low in range).
       // Position = (250 - 100) / 900 = 150 / 900 = 0.166 (16.6%)
       // This is <= 0.20 (Bottom 20%), so should get Tier 2 reward (+5)
-      
+
       const result = calculateAiRating({
         risk: 5,
         upside: 10,
