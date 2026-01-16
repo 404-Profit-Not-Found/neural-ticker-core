@@ -381,8 +381,9 @@ export class JobsService {
     // The current requirement was "personalized per user".
     // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
     // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
-    await this.researchService.getOrGenerateDailyDigest('system-cron');
-    await this.researchService.getOrGenerateDailyDigest('system-cron');
+    // Using NIL UUID to prevent database "invalid input syntax for type uuid" error
+    const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
+    await this.researchService.getOrGenerateDailyDigest(SYSTEM_UUID);
   }
 
   // --- ASYNC REQUEST QUEUE ---

@@ -90,6 +90,8 @@ export class MarketDataBulkController {
     @Query('sector') sector?: string[],
     @Query('symbols') symbols?: string[],
     @Query('overallScore') overallScore?: string,
+    @Query('minMarketCap') minMarketCap?: number,
+    @Query('profitableOnly') profitableOnly?: boolean | string,
   ) {
     return this.service.getAnalyzerTickers({
       page,
@@ -103,6 +105,8 @@ export class MarketDataBulkController {
       sector: Array.isArray(sector) ? sector : sector ? [sector] : [],
       symbols: Array.isArray(symbols) ? symbols : symbols ? [symbols] : [],
       overallScore,
+      minMarketCap: minMarketCap ? Number(minMarketCap) : undefined,
+      profitableOnly: profitableOnly === true || profitableOnly === 'true',
       isAdmin: req.user?.role === 'admin',
     });
   }

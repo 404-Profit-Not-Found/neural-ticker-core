@@ -268,7 +268,7 @@ export function AnalyzerTable({
         if (val === undefined || val === null) return '-';
 
         let colorClass = 'text-muted-foreground';
-        if (val >= 7.5) colorClass = 'text-emerald-500';
+        if (val >= 7.0) colorClass = 'text-emerald-500'; // Matched to VerdictBadge (was 7.5)
         else if (val >= 5.0) colorClass = 'text-yellow-500';
         else colorClass = 'text-red-500';
 

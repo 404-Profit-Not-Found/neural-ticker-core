@@ -144,6 +144,9 @@ export function TickerCard({
                                 pe={pe as number}
                                 newsSentiment={newsSentiment}
                                 newsImpact={newsImpact}
+                                currentPrice={price}
+                                fiftyTwoWeekHigh={fiftyTwoWeekHigh}
+                                fiftyTwoWeekLow={fiftyTwoWeekLow}
                                 className="ml-auto"
                             />
                         </div>
@@ -223,9 +226,9 @@ export function TickerCard({
                     </div>
 
                     <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
-                        <Bot size={12} className={overallScore && overallScore >= 7.5 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500"} />
+                        <Bot size={12} className={overallScore && overallScore >= 7.0 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500"} />
                         <span className="text-muted-foreground whitespace-nowrap">R/R:</span>
-                        <span className={cn("font-bold", overallScore && overallScore >= 7.5 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500")}>
+                        <span className={cn("font-bold", overallScore && overallScore >= 7.0 ? "text-emerald-500" : overallScore && overallScore >= 5.0 ? "text-yellow-500" : "text-red-500")}>
                             {Number(overallScore || 0).toFixed(1)}
                         </span>
                     </div>

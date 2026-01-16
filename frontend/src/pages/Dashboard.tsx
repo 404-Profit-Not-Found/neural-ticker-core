@@ -80,7 +80,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
       'Unknown',
     price: currentPrice,
     change: Number(item.latestPrice?.change ?? 0),
-    pe: Number(item.fundamentals?.pe_ratio ?? 0) || null,
+    pe: Number(item.fundamentals?.pe_ttm ?? 0) || null,
     marketCap: Number(item.fundamentals?.market_cap ?? 0) || null,
     fiftyTwoWeekHigh: Number(item.fundamentals?.fifty_two_week_high ?? 0) || null,
     fiftyTwoWeekLow: Number(item.fundamentals?.fifty_two_week_low ?? 0) || null,
@@ -251,11 +251,14 @@ function TopOpportunitiesSection() {
   if (category === 'yolo') {
     analyzerParams.sortBy = 'upside_percent';
     analyzerParams.sortDir = 'DESC';
-    analyzerParams.aiRating = ['Strong Buy', 'Buy', 'Speculative Buy'];
+    analyzerParams.aiRating = ['Speculative Buy', 'No Brainer', 'Strong Buy'];
   } else if (category === 'conservative') {
-    analyzerParams.aiRating = ['Strong Buy', 'Buy'];
-    analyzerParams.sortBy = 'market_cap';
+    analyzerParams.aiRating = ['Strong Buy', 'No Brainer'];
+    analyzerParams.sortBy = 'ai_rating';
     analyzerParams.sortDir = 'DESC';
+    analyzerParams.risk = ['Low', 'Very Low']; // Strict Low Risk
+    analyzerParams.profitableOnly = true;      // Must be profitable
+    analyzerParams.minMarketCap = 5000000000;  // > $5 Billion (Big Companies)
   } else if (category === 'shorts') {
     analyzerParams.aiRating = ['Sell'];
     analyzerParams.sortBy = 'upside_percent';
@@ -267,11 +270,11 @@ function TopOpportunitiesSection() {
   let tickerData: TickerData[] = items.map(mapSnapshotToTickerData);
 
   if (category === 'conservative') {
-    tickerData = tickerData.filter(t => ['Strong Buy', 'Buy'].includes(t.aiRating));
+    tickerData = tickerData.filter(t => ['Strong Buy', 'No Brainer'].includes(t.aiRating));
   } else if (category === 'shorts') {
     tickerData = tickerData.filter(t => t.aiRating === 'Sell');
   } else if (category === 'yolo') {
-    tickerData = tickerData.filter(t => ['Strong Buy', 'Buy', 'Speculative Buy'].includes(t.aiRating));
+    tickerData = tickerData.filter(t => ['Speculative Buy', 'No Brainer', 'Strong Buy'].includes(t.aiRating));
   }
 
   return (

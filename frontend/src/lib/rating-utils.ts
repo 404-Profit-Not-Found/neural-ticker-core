@@ -1,9 +1,10 @@
-export type RatingVariant = 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'speculativeBuy' | 'outline';
+export type RatingVariant = 'default' | 'strongBuy' | 'buy' | 'hold' | 'sell' | 'speculativeBuy' | 'legendary' | 'outline';
 
 export interface RatingResult {
   rating: string;
   variant: RatingVariant;
   score?: number;
+  fiftyTwoWeekScore?: number;
 }
 
 /**
@@ -98,6 +99,10 @@ export interface VerdictInput {
         bear?: ScenarioInput;
     };
     currentPrice?: number;
+    // NEW: ATH and Revenue Data for penalties
+    fiftyTwoWeekHigh?: number | null;
+    fiftyTwoWeekLow?: number | null; // NEW
+    revenueTTM?: number | null;
 }
 
 /** Loss Aversion Factor - downside is penalized 2x vs upside (behavioral economics) */
@@ -218,6 +223,7 @@ export function calculateAiRating(
         pe = peArg;
         newsSentiment = newsSentimentArg;
         newsImpact = newsImpactArg;
+        // Legacy call - no penalties
     }
 
     // NEW: Probability-Weighted integration
@@ -265,6 +271,50 @@ export function calculateAiRating(
     else if (risk >= 6) score -= 10; // Moderate penalty
     else if (risk <= 3) score += 5;  // Safety bonus
 
+    // 3.5. 52-Week High Penalty (Progressive)
+    // Buying at the top?
+    if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekHigh && riskOrInput.fiftyTwoWeekHigh > 0) {
+        const { currentPrice, fiftyTwoWeekHigh } = riskOrInput;
+        if (currentPrice >= 0.98 * fiftyTwoWeekHigh) {
+            score -= 20; // Extreme High
+        } else if (currentPrice >= 0.90 * fiftyTwoWeekHigh) {
+            score -= 10; // Very High
+        } else if (currentPrice >= 0.80 * fiftyTwoWeekHigh) {
+            score -= 5;  // High
+        }
+    }
+
+    // 3.6. 52-Week Low Reward (Buy the Dip)
+    // Reward value/dip buying, but avoid "Falling Knives"
+    if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekLow && riskOrInput.fiftyTwoWeekLow > 0) {
+        const { currentPrice, fiftyTwoWeekLow, fiftyTwoWeekHigh, consensus, downside } = riskOrInput;
+        const actualDownside = downside ?? 0;
+        
+        const isFallingKnife = consensus?.toLowerCase().includes('sell') && actualDownside <= -99;
+        
+        // Calculate Position in Range (0.0 = Low, 1.0 = High)
+        let positionInRange = 1.0;
+        if (fiftyTwoWeekHigh && fiftyTwoWeekHigh > fiftyTwoWeekLow) {
+            positionInRange = (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+        }
+
+        if (!isFallingKnife) {
+            // Tier 1: Bottom 5% of Range OR < 5% from Low (Deep Value)
+            if (currentPrice <= 1.05 * fiftyTwoWeekLow || positionInRange <= 0.05) {
+                score += 10; 
+            } 
+            // Tier 2: Bottom 20% of Range OR < 25% from Low (Value Zone)
+            else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) {
+                score += 5;  
+            }
+        }
+    }
+
+    // 3.7. No Revenue Penalty (Speculative/Pre-revenue)
+    if (typeof riskOrInput === 'object' && (riskOrInput.revenueTTM === 0 || riskOrInput.revenueTTM === null || riskOrInput.revenueTTM === undefined)) {
+        score -= 5;
+    }
+
     // 4. Neural Score Bonus (Weight Increased)
     if (overallScore) {
         if (overallScore >= 8) score += 20; // Was +10
@@ -304,20 +354,55 @@ export function calculateAiRating(
     // Verdict Determination
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Verdict Determination
+    // -------------------------------------------------------------------------
+
+    // Capture the 52-week score impact for the tooltip
+    // We recreate the logic here to isolate the value for display since it was applied inline above
+    let fiftyTwoWeekScore = 0;
+    
+    // High Penalty
+    if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekHigh && riskOrInput.fiftyTwoWeekHigh > 0) {
+        const { currentPrice, fiftyTwoWeekHigh } = riskOrInput;
+        if (currentPrice >= 0.98 * fiftyTwoWeekHigh) fiftyTwoWeekScore -= 20;
+        else if (currentPrice >= 0.90 * fiftyTwoWeekHigh) fiftyTwoWeekScore -= 10;
+        else if (currentPrice >= 0.80 * fiftyTwoWeekHigh) fiftyTwoWeekScore -= 5;
+    }
+
+    // Low Reward
+    if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekLow && riskOrInput.fiftyTwoWeekLow > 0) {
+        const { currentPrice, fiftyTwoWeekLow, fiftyTwoWeekHigh, consensus, downside } = riskOrInput;
+        const actualDownside = downside ?? 0;
+        const isFallingKnife = consensus?.toLowerCase().includes('sell') && actualDownside <= -99;
+        
+        // Calculate Position in Range
+        let positionInRange = 1.0;
+        if (fiftyTwoWeekHigh && fiftyTwoWeekHigh > fiftyTwoWeekLow) {
+            positionInRange = (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+        }
+
+        if (!isFallingKnife) {
+            if (currentPrice <= 1.05 * fiftyTwoWeekLow || positionInRange <= 0.05) fiftyTwoWeekScore += 10;
+            else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) fiftyTwoWeekScore += 5;
+        }
+    }
+
     // Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
     if (risk >= 9 && score < 70) {
-        return { rating: 'Sell', variant: 'sell', score };
+        return { rating: 'Sell', variant: 'sell', score, fiftyTwoWeekScore };
     }
 
     // Speculative Buy Override
     // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
     if (risk >= 8 && (effectiveUpside >= 100 || (overallScore && overallScore >= 7.5))) {
-        return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
+        return { rating: 'Speculative Buy', variant: 'speculativeBuy', score, fiftyTwoWeekScore };
     }
 
-    if (score >= 80) return { rating: 'Strong Buy', variant: 'strongBuy', score };
-    if (score >= 65) return { rating: 'Buy', variant: 'buy', score };
-    if (score >= 45) return { rating: 'Hold', variant: 'hold', score };
+    if (score > 105) return { rating: 'No Brainer', variant: 'legendary', score, fiftyTwoWeekScore };
+    if (score >= 80) return { rating: 'Strong Buy', variant: 'strongBuy', score, fiftyTwoWeekScore };
+    if (score >= 65) return { rating: 'Buy', variant: 'buy', score, fiftyTwoWeekScore };
+    if (score >= 45) return { rating: 'Hold', variant: 'hold', score, fiftyTwoWeekScore };
     
-    return { rating: 'Sell', variant: 'sell', score };
+    return { rating: 'Sell', variant: 'sell', score, fiftyTwoWeekScore };
 }

@@ -20,6 +20,8 @@ const badgeVariants = cva(
                 hold: "border-transparent bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 badge-light-hold",
                 purple: "border-transparent bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 badge-light-purple",
                 speculativeBuy: "border-transparent bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 badge-light-purple",
+                // Colors: Smashed Pumpkin (#FF6C33) - Solid as requested
+                legendary: "border-transparent bg-[#FF6C33] text-white hover:bg-[#FF6C33]/90 ring-1 ring-[#FF6C33]/50 shadow-[0_0_12px_rgba(255,108,51,0.4)]",
                 sell: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
                 success: "border-transparent bg-green-500/20 text-green-400 hover:bg-green-500/30",
                 // Admin Console Status Badges (keeping simple to match app style)

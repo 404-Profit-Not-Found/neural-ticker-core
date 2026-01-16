@@ -11,5 +11,7 @@ export interface GetAnalyzerTickersOptions {
   upside?: string;
   sector?: string[];
   overallScore?: string;
+  minMarketCap?: number;
+  profitableOnly?: boolean;
   isAdmin?: boolean;
 }
