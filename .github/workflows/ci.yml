@@ -104,3 +104,9 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm run build
+    - name: Install Frontend Dependencies
+      run: npm ci
+      working-directory: ./frontend
+    - name: Build Frontend
+      run: npm run build
+      working-directory: ./frontend
