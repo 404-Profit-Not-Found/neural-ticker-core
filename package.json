@@ -1,6 +1,6 @@
 {
   "name": "neural-ticker-core",
-  "version": "0.3.1",
+  "version": "alpha-0.3.3",
   "description": "agentic market research",
   "author": "branislavlang@gmail.com",
   "private": true,
