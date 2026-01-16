@@ -162,15 +162,16 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
   // Missing P/E (pre-revenue) or negative (loss-making) = neutral, no penalty
 
   // Verdict Determination
+  // Speculative Buy Override
+  // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
+  // Moved BEFORE Hard Veto to allow high-upside plays (YOLO) to exist.
+  if (risk >= 8 && (upside >= 100 || (overallScore && overallScore >= 7.5))) {
+    return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
+  }
+
   // Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
   if (risk >= 9 && score < 70) {
     return { rating: 'Sell', variant: 'sell', score };
-  }
-
-  // Speculative Buy Override
-  // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
-  if (risk >= 8 && (upside >= 100 || (overallScore && overallScore >= 7.5))) {
-    return { rating: 'Speculative Buy', variant: 'speculativeBuy', score };
   }
 
   if (score > 105) return { rating: 'No Brainer', variant: 'legendary', score };

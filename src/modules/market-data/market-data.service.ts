@@ -1236,7 +1236,10 @@ export class MarketDataService {
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
     const tickers = await this.getTickersWithRiskData();
-    const strongBuys = tickers.filter((t) => t.verdict.variant === 'strongBuy');
+    // Include Strong Buy, No Brainer (Legendary), and Speculative Buy
+    const strongBuys = tickers.filter((t) => 
+      ['strongBuy', 'legendary', 'speculativeBuy'].includes(t.verdict.variant),
+    );
     return {
       count: strongBuys.length,
       symbols: strongBuys.map((t) => t.symbol),

@@ -36,7 +36,13 @@ export class AuthService {
     // Access Control: Check Whitelist
     const isAllowed = await this.usersService.isEmailAllowed(email);
 
-    // Logic: If not allowed...
+    // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
+    const userEntity = await this.usersService.findByEmail(email);
+    if (userEntity && userEntity.role === 'revoked') {
+       this.logger.warn(`Blocked banned user login attempt: ${email}`);
+       throw new UnauthorizedException('Your account has been suspended.');
+    }
+
     // Logic: If not allowed...
     if (!isAllowed) {
       // Check if user is requesting to join the waitlist
@@ -96,6 +102,13 @@ export class AuthService {
         throw new UnauthorizedException(
           'Firebase account must have an email address.',
         );
+      }
+
+      // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
+      const userEntity = await this.usersService.findByEmail(decoded.email);
+      if (userEntity && userEntity.role === 'revoked') {
+         this.logger.warn(`Blocked banned user login attempt (Firebase): ${decoded.email}`);
+         throw new UnauthorizedException('Your account has been suspended.');
       }
 
       const user = await this.usersService.createOrUpdateGoogleUser({

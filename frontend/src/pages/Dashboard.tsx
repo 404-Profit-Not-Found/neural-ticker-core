@@ -242,7 +242,7 @@ function TopOpportunitiesSection() {
 
   const analyzerParams: AnalyzerParams = {
     page: 1,
-    limit: 4,
+    limit: 6, // Fetch a small buffer to ensure 4 valid picks after filtering
     search: '',
     sortBy: 'upside_percent',
     sortDir: 'DESC',
@@ -307,7 +307,7 @@ function TopOpportunitiesSection() {
         </Button>
       </div>
 
-      <TickerCarousel data={tickerData} isLoading={isLoading} />
+      <TickerCarousel data={tickerData.slice(0, 4)} isLoading={isLoading} />
     </div>
   );
 }
