@@ -97,10 +97,20 @@ export function calculateAiRating(input: VerdictInput): RatingResult {
     const isFallingKnife =
       consensus?.toLowerCase().includes('sell') && downside <= -99;
 
+    // Calculate Position in Range (0.0 = Low, 1.0 = High)
+    let positionInRange = 1.0;
+    if (fiftyTwoWeekHigh && fiftyTwoWeekHigh > fiftyTwoWeekLow) {
+      positionInRange =
+        (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+    }
+
     if (!isFallingKnife) {
-      if (currentPrice <= 1.05 * fiftyTwoWeekLow) {
+      // Tier 1: Bottom 5% of Range OR < 5% from Low (Deep Value)
+      if (currentPrice <= 1.05 * fiftyTwoWeekLow || positionInRange <= 0.05) {
         score += 10; // At the bottom
-      } else if (currentPrice <= 1.25 * fiftyTwoWeekLow) {
+      }
+      // Tier 2: Bottom 20% of Range OR < 25% from Low (Value Zone)
+      else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) {
         score += 5; // Value zone
       }
     }

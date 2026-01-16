@@ -224,21 +224,22 @@ describe('VerdictUtil', () => {
       expect(resultVeryHigh.score).toBeLessThan(resultHigh.score);
     });
 
-    it('should reward buying the dip (progressive)', () => {
-      // Bottom (<5% from Low) -> +10
-      const resultBottom = calculateAiRating({
+    it('should reward buying the dip (progressive) - Standard % from Low', () => {
+      // Case 1: Within 5% of Low -> +10
+      const result1 = calculateAiRating({
         risk: 5,
         upside: 10,
         peRatio: 20,
         revenueTTM: 100000,
         overallScore: 6,
-        currentPrice: 102,
+        currentPrice: 104,
         fiftyTwoWeekLow: 100,
         fiftyTwoWeekHigh: 200,
-      });
+      }); // 1.04x Low
+      expect(result1.score).toBeGreaterThan(50); // Just check it runs, we know base score logic
 
-      // Value Zone (<25% from Low) -> +5
-      const resultValue = calculateAiRating({
+      // Case 2: Within 25% of Low -> +5
+      const result2 = calculateAiRating({
         risk: 5,
         upside: 10,
         peRatio: 20,
@@ -247,22 +248,80 @@ describe('VerdictUtil', () => {
         currentPrice: 120,
         fiftyTwoWeekLow: 100,
         fiftyTwoWeekHigh: 200,
+      }); // 1.20x Low
+      
+      expect(result1.score).toBe(result2.score + 5); // +10 vs +5 = 5 diff
+    });
+
+    it('should reward buying the dip (Range Position) - ARCT Scenario', () => {
+      // Scenario: Stock rallied > 25% from low, but range is HUGE, so it's still in bottom 20%
+      // Low: 100, High: 1000. Range: 900.
+      // Bottom 20% of range logic: Position = (Price - Low) / (High - Low)
+      
+      const result = calculateAiRating({
+        risk: 5,
+        upside: 10,
+        peRatio: 20,
+        revenueTTM: 100000,
+        overallScore: 6,
+        currentPrice: 130, // +30% from low (fails < 1.25x check)
+        fiftyTwoWeekLow: 100,
+        fiftyTwoWeekHigh: 1000,
       });
 
-      // Mid Range -> +0
+      // Position = (130 - 100) / 900 = 30 / 900 = 0.033 (3.3%)
+      // This is <= 0.05 (Bottom 5%), so should get Tier 1 reward (+10)
+      
+      // Control: High in range
+      const resultHigh = calculateAiRating({
+        risk: 5,
+        upside: 10,
+        peRatio: 20,
+        revenueTTM: 100000,
+        overallScore: 6,
+        currentPrice: 900,
+        fiftyTwoWeekLow: 100,
+        fiftyTwoWeekHigh: 1000,
+      });
+
+      expect(result.score).toBe(resultHigh.score + 20); 
+      // resultHigh gets -10 penalty for being near high (900/1000=0.9 -> Very High -10)
+      // resultLow gets +10 reward
+      // Diff = 10 - (-10) = 20? No wait.
+      // High score calculation: Base - 10 (High penalty).
+      // Low score calculation: Base + 10 (Low reward).
+      // Diff should be 20.
+    });
+
+    it('should reward Tier 2 Range Position', () => {
+      // Low: 100, High: 1000. Range: 900.
+      // Price: 250 (+150% from low, but still low in range).
+      // Position = (250 - 100) / 900 = 150 / 900 = 0.166 (16.6%)
+      // This is <= 0.20 (Bottom 20%), so should get Tier 2 reward (+5)
+      
+      const result = calculateAiRating({
+        risk: 5,
+        upside: 10,
+        peRatio: 20,
+        revenueTTM: 100000,
+        overallScore: 6,
+        currentPrice: 250,
+        fiftyTwoWeekLow: 100,
+        fiftyTwoWeekHigh: 1000,
+      });
+
       const resultMid = calculateAiRating({
         risk: 5,
         upside: 10,
         peRatio: 20,
         revenueTTM: 100000,
         overallScore: 6,
-        currentPrice: 150,
+        currentPrice: 500, // Mid range
         fiftyTwoWeekLow: 100,
-        fiftyTwoWeekHigh: 200,
+        fiftyTwoWeekHigh: 1000,
       });
 
-      expect(resultBottom.score).toBeGreaterThan(resultValue.score); // +10 vs +5
-      expect(resultValue.score).toBeGreaterThan(resultMid.score); // +5 vs +0
+      expect(result.score).toBe(resultMid.score + 5);
     });
 
     it('should NOT reward falling knives (Sell + 100% Downside)', () => {

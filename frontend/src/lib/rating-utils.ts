@@ -287,16 +287,25 @@ export function calculateAiRating(
     // 3.6. 52-Week Low Reward (Buy the Dip)
     // Reward value/dip buying, but avoid "Falling Knives"
     if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekLow && riskOrInput.fiftyTwoWeekLow > 0) {
-        const { currentPrice, fiftyTwoWeekLow, consensus, downside } = riskOrInput;
+        const { currentPrice, fiftyTwoWeekLow, fiftyTwoWeekHigh, consensus, downside } = riskOrInput;
         const actualDownside = downside ?? 0;
         
         const isFallingKnife = consensus?.toLowerCase().includes('sell') && actualDownside <= -99;
         
+        // Calculate Position in Range (0.0 = Low, 1.0 = High)
+        let positionInRange = 1.0;
+        if (fiftyTwoWeekHigh && fiftyTwoWeekHigh > fiftyTwoWeekLow) {
+            positionInRange = (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+        }
+
         if (!isFallingKnife) {
-            if (currentPrice <= 1.05 * fiftyTwoWeekLow) {
-                score += 10; // At the bottom
-            } else if (currentPrice <= 1.25 * fiftyTwoWeekLow) {
-                score += 5;  // Value zone
+            // Tier 1: Bottom 5% of Range OR < 5% from Low (Deep Value)
+            if (currentPrice <= 1.05 * fiftyTwoWeekLow || positionInRange <= 0.05) {
+                score += 10; 
+            } 
+            // Tier 2: Bottom 20% of Range OR < 25% from Low (Value Zone)
+            else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) {
+                score += 5;  
             }
         }
     }
@@ -363,13 +372,19 @@ export function calculateAiRating(
 
     // Low Reward
     if (typeof riskOrInput === 'object' && riskOrInput.currentPrice && riskOrInput.fiftyTwoWeekLow && riskOrInput.fiftyTwoWeekLow > 0) {
-        const { currentPrice, fiftyTwoWeekLow, consensus, downside } = riskOrInput;
+        const { currentPrice, fiftyTwoWeekLow, fiftyTwoWeekHigh, consensus, downside } = riskOrInput;
         const actualDownside = downside ?? 0;
         const isFallingKnife = consensus?.toLowerCase().includes('sell') && actualDownside <= -99;
         
+        // Calculate Position in Range
+        let positionInRange = 1.0;
+        if (fiftyTwoWeekHigh && fiftyTwoWeekHigh > fiftyTwoWeekLow) {
+            positionInRange = (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+        }
+
         if (!isFallingKnife) {
-            if (currentPrice <= 1.05 * fiftyTwoWeekLow) fiftyTwoWeekScore += 10;
-            else if (currentPrice <= 1.25 * fiftyTwoWeekLow) fiftyTwoWeekScore += 5;
+            if (currentPrice <= 1.05 * fiftyTwoWeekLow || positionInRange <= 0.05) fiftyTwoWeekScore += 10;
+            else if (currentPrice <= 1.25 * fiftyTwoWeekLow || positionInRange <= 0.20) fiftyTwoWeekScore += 5;
         }
     }
 
