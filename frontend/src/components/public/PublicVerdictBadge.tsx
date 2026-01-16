@@ -25,6 +25,9 @@ interface PublicVerdictBadgeProps {
     pe?: number | null;
     newsSentiment?: string | null;
     newsImpact?: number | null;
+    currentPrice?: number;
+    fiftyTwoWeekHigh?: number | null;
+    fiftyTwoWeekLow?: number | null;
 }
 
 export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
@@ -36,7 +39,10 @@ export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
     consensus,
     pe,
     newsSentiment,
-    newsImpact
+    newsImpact,
+    currentPrice,
+    fiftyTwoWeekHigh,
+    fiftyTwoWeekLow
 }) => {
     // --- COPY OF LOGIC (Zero Dependencies on original file) ---
     const getConsensusColor = (c?: string) => {
@@ -60,18 +66,22 @@ export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
         return "text-red-500"; // Low score
     };
 
-    const { rating, variant, score } = useMemo(
+    const { rating, variant, score, fiftyTwoWeekScore } = useMemo(
         () => calculateAiRating({
             risk,
             upside,
             overallScore,
             downside,
             consensus,
+            consensus,
             peRatio: pe,
             newsSentiment,
-            newsImpact
+            newsImpact,
+            currentPrice,
+            fiftyTwoWeekHigh,
+            fiftyTwoWeekLow
         }),
-        [risk, upside, overallScore, downside, consensus, pe, newsSentiment, newsImpact]
+        [risk, upside, overallScore, downside, consensus, pe, newsSentiment, newsImpact, currentPrice, fiftyTwoWeekHigh, fiftyTwoWeekLow]
     );
 
     // Filter variant
@@ -95,7 +105,7 @@ export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
                 <div className="h-1.5 w-full bg-secondary mt-1.5 rounded-full overflow-hidden">
                     <div
                         className={cn("h-full rounded-full transition-all",
-                            variant === 'strongBuy' ? "bg-emerald-500" :
+                            (variant === 'strongBuy' || variant === 'legendary') ? "bg-emerald-500" :
                                 variant === 'buy' ? "bg-emerald-400" :
                                     variant === 'sell' ? "bg-red-500" : "bg-yellow-500"
                         )}
@@ -163,6 +173,14 @@ export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
 
             <p className="text-[10px] text-muted-foreground pt-1 border-t border-border opacity-70">
                 Probability-weighted Bull/Base/Bear scenarios. Downside penalized 2x (Loss Aversion).
+                <br />
+                Low P/E (≤10) rewarded. Missing P/E not penalized.
+                <span className={cn("block mt-1 font-medium",
+                    (fiftyTwoWeekScore || 0) > 0 ? "text-emerald-500" :
+                        (fiftyTwoWeekScore || 0) < 0 ? "text-red-500" : "text-muted-foreground"
+                )}>
+                    52w High/Low Impact: {(fiftyTwoWeekScore || 0) > 0 ? '+' : ''}{fiftyTwoWeekScore || 0} pts (Dip buying rewarded, ATH chasing penalized).
+                </span>
             </p>
         </div>
     );

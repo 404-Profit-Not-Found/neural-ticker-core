@@ -163,7 +163,7 @@ export function UserDetailDialog({
                             </Button>
                         )}
 
-                        {user.role === 'admin' && (
+                        {user.role === 'admin' ? (
                             <Button
                                 variant="outline"
                                 className="justify-start gap-2 h-10 hover:bg-amber-400/10 hover:text-amber-400 hover:border-amber-400/30"
@@ -172,6 +172,16 @@ export function UserDetailDialog({
                             >
                                 <Shield size={16} className="text-amber-400" />
                                 Remove Admin Role
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                className="justify-start gap-2 h-10 hover:bg-violet-500/10 hover:text-violet-500 hover:border-violet-500/30"
+                                onClick={() => user.id && onUpdateRole(user.id, 'admin')}
+                                disabled={!user.id}
+                            >
+                                <Shield size={16} className="text-violet-500" />
+                                Promote to Admin
                             </Button>
                         )}
 

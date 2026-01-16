@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, Brain } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -26,6 +26,9 @@ interface VerdictBadgeProps {
     pe?: number | null;
     newsSentiment?: string | null;
     newsImpact?: number | null;
+    currentPrice?: number;
+    fiftyTwoWeekHigh?: number | null;
+    fiftyTwoWeekLow?: number | null;
 }
 
 export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
@@ -37,7 +40,10 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
     consensus,
     pe,
     newsSentiment,
-    newsImpact
+    newsImpact,
+    currentPrice,
+    fiftyTwoWeekHigh,
+    fiftyTwoWeekLow
 }) => {
     const getConsensusColor = (c?: string) => {
         if (!c) return "text-muted-foreground";
@@ -60,7 +66,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
         return "text-red-500"; // Low score
     };
 
-    const { rating, variant, score } = useMemo(
+    const { rating, variant, score, fiftyTwoWeekScore } = useMemo(
         () => calculateAiRating({
             risk,
             upside,
@@ -69,9 +75,12 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
             consensus,
             peRatio: pe, // Legacy name mapping if object was used
             newsSentiment,
-            newsImpact
+            newsImpact,
+            currentPrice,
+            fiftyTwoWeekHigh,
+            fiftyTwoWeekLow
         }),
-        [risk, upside, overallScore, downside, consensus, pe, newsSentiment, newsImpact]
+        [risk, upside, overallScore, downside, consensus, pe, newsSentiment, newsImpact, currentPrice, fiftyTwoWeekHigh, fiftyTwoWeekLow]
     );
 
     // We map our internal rating variant to the Badge's expected variant types
@@ -80,29 +89,29 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
 
     const BadgeContent = (
         <Badge variant={badgeVariant} className={cn("gap-1.5 h-6 px-2 whitespace-nowrap cursor-help", className)}>
-            <Bot size={12} className="opacity-80" />
+            {variant === 'legendary' ? <Brain size={12} className="text-white" /> : <Bot size={12} className="opacity-80" />}
             {rating}
         </Badge>
     );
 
     const TooltipBody = (
-         <div className="space-y-3">
+        <div className="space-y-3">
             <div>
                 <p className="font-bold text-sm flex items-center gap-2">
                     {rating} <span className="font-normal text-muted-foreground ml-auto text-xs">Score: {score?.toFixed(0) ?? '-'}</span>
                 </p>
                 <div className="h-1.5 w-full bg-secondary mt-1.5 rounded-full overflow-hidden">
-                    <div 
-                        className={cn("h-full rounded-full transition-all", 
-                            variant === 'strongBuy' ? "bg-emerald-500" : 
-                            variant === 'buy' ? "bg-emerald-400" :
-                            variant === 'sell' ? "bg-red-500" : "bg-yellow-500"
+                    <div
+                        className={cn("h-full rounded-full transition-all",
+                            (variant === 'strongBuy' || variant === 'legendary') ? "bg-emerald-500" :
+                                variant === 'buy' ? "bg-emerald-400" :
+                                    variant === 'sell' ? "bg-red-500" : "bg-yellow-500"
                         )}
                         style={{ width: `${score ?? 50}%` }}
                     />
                 </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <div className="flex justify-between">
                     <span>Upside:</span>
@@ -122,15 +131,15 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                         {overallScore ? overallScore.toFixed(1) : '-'}/10
                     </span>
                 </div>
-                 <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center">
                     <span>Analyst:</span>
                     <span className={cn("font-medium text-right", getConsensusColor(consensus))}>{consensus ?? '-'}</span>
                 </div>
-                 <div className="flex justify-between items-center align-middle">
+                <div className="flex justify-between items-center align-middle">
                     <span>P/E Ratio:</span>
-                    <span className={cn("font-medium", 
-                        !pe || pe < 0 || pe > 40 ? "text-red-500" : 
-                        pe < 25 ? "text-emerald-500" : "text-yellow-500"
+                    <span className={cn("font-medium",
+                        !pe || pe < 0 || pe > 40 ? "text-red-500" :
+                            pe < 25 ? "text-emerald-500" : "text-yellow-500"
                     )}>
                         {pe === undefined || pe === null ? 'n/a' : pe < 0 ? 'Loss' : pe.toFixed(2)}
                     </span>
@@ -141,9 +150,9 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                     <>
                         <div className="flex justify-between items-center">
                             <span>Smart News:</span>
-                            <span className={cn("font-medium", 
+                            <span className={cn("font-medium",
                                 newsSentiment === 'BULLISH' ? 'text-emerald-500' :
-                                newsSentiment === 'BEARISH' ? 'text-red-500' : 'text-blue-500'
+                                    newsSentiment === 'BEARISH' ? 'text-red-500' : 'text-blue-500'
                             )}>
                                 {newsSentiment ?? 'Mixed'}
                             </span>
@@ -164,14 +173,20 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
                 Probability-weighted Bull/Base/Bear scenarios. Downside penalized 2x (Loss Aversion).
                 <br />
                 Low P/E (≤10) rewarded. Missing P/E not penalized.
+                <span className={cn("block mt-1 font-medium",
+                    (fiftyTwoWeekScore || 0) > 0 ? "text-emerald-500" :
+                        (fiftyTwoWeekScore || 0) < 0 ? "text-red-500" : "text-muted-foreground"
+                )}>
+                    52w High/Low Impact: {(fiftyTwoWeekScore || 0) > 0 ? '+' : ''}{fiftyTwoWeekScore || 0} pts (Dip buying rewarded, ATH chasing penalized).
+                </span>
             </p>
         </div>
     );
 
     return (
         <TooltipProvider delayDuration={0}>
-             {/* Mobile: Popover */}
-             <div className="md:hidden">
+            {/* Mobile: Popover */}
+            <div className="md:hidden">
                 <Popover>
                     <PopoverTrigger asChild>
                         <button type="button" className="focus:outline-none active:scale-95 transition-transform" onClick={(e) => e.stopPropagation()}>
@@ -188,7 +203,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
             <div className="hidden md:block">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                         <button type="button" className="focus:outline-none hover:scale-105 transition-transform" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="focus:outline-none hover:scale-105 transition-transform" onClick={(e) => e.stopPropagation()}>
                             {BadgeContent}
                         </button>
                     </TooltipTrigger>

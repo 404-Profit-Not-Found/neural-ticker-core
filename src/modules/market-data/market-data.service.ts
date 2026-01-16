@@ -1,5 +1,7 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { getErrorMessage } from '../../utils/error.util';
+import { NumberUtil } from '../../utils/number.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
 import { ConfigService } from '@nestjs/config'; // Added
@@ -306,10 +308,12 @@ export class MarketDataService {
                 this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
 
               if (profile) {
-                // Finnhub marketCapitalization is in Millions. Normalize to full Dollars.
-                entity.market_cap = profile.marketCapitalization
-                  ? profile.marketCapitalization * 1000000
-                  : null;
+                // Finnhub marketCapitalization is in Millions. Normalize to full Dollars using robust parser.
+                entity.market_cap = NumberUtil.parseMarketCap(
+                  profile.marketCapitalization
+                    ? profile.marketCapitalization * 1000000
+                    : null,
+                );
                 entity.sector = profile.finnhubIndustry;
               }
 
@@ -1407,6 +1411,9 @@ export class MarketDataService {
       ELSE -(risk.financial_risk * 5)
     END`;
 
+    // -------------------------------------------------------------------------
+    // VERDICT SCORING SQL (Backend Mirror of verdict.util.ts)
+    // -------------------------------------------------------------------------
     const verdictScoreSql = `(
         50
         -- 1. Upside Impact (Max 0+, Capped at 100, * 0.4)
@@ -1423,6 +1430,34 @@ export class MarketDataService {
             ELSE 0 
           END
         
+      -- 3.5 ATH Penalty (Progressive)
+      + CASE
+          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.98) THEN -20
+          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.90) THEN -10
+          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.80) THEN -5
+          ELSE 0
+        END
+
+      -- 3.6 Low Reward (Buy the Dip) - With Falling Knife Check
+      + CASE
+          WHEN fund.fifty_two_week_low > 0 AND price.close <= (fund.fifty_two_week_low * 1.25) THEN
+            CASE
+               -- Falling Knife Exception: Sell Consensus AND Downside ~ -100%
+               WHEN (fund.consensus_rating ILIKE '%Sell%') AND (${downsideExpr} <= -99) THEN 0
+               -- Tiers
+               WHEN price.close <= (fund.fifty_two_week_low * 1.05) THEN 10
+               WHEN price.close <= (fund.fifty_two_week_low * 1.25) THEN 5
+               ELSE 0
+            END
+          ELSE 0
+        END
+
+      -- 3.7 No Revenue Penalty
+      + CASE
+          WHEN fund.revenue_ttm IS NULL OR fund.revenue_ttm <= 0 THEN -5
+          ELSE 0
+        END
+
         -- 4. Neural Score Bonus (Weight Increased)
         + CASE 
             WHEN "risk"."overall_score" >= 8 THEN 20
@@ -1571,6 +1606,19 @@ export class MarketDataService {
       }
     }
 
+    // 2.6 Min Market Cap Filter
+    if (options.minMarketCap) {
+      qb.andWhere('fund.market_cap >= :minMarketCap', {
+        minMarketCap: options.minMarketCap,
+      });
+    }
+
+    // 2.7 Profitable Only Filter (PE TTM > 0 OR Net Income > 0)
+    // Using PE > 0 as a strict profitability check for now as requested
+    if (options.profitableOnly) {
+      qb.andWhere('fund.pe_ttm > 0');
+    }
+
     // 3. AI Rating Filter (Standardized Weighted Verdict)
     // Synchronized with frontend rating-utils.ts
     // Score Tiers: >= 80 Strong Buy, >= 65 Buy, >= 45 Hold, < 45 Sell
@@ -1578,7 +1626,9 @@ export class MarketDataService {
       qb.andWhere(
         new Brackets((sub) => {
           options.aiRating?.forEach((rating) => {
-            if (rating === 'Strong Buy') {
+            if (rating === 'Legendary' || rating === 'No Brainer') {
+              sub.orWhere(`${verdictScoreSql} > 105`);
+            } else if (rating === 'Strong Buy') {
               sub.orWhere(`${verdictScoreSql} >= 80`);
             } else if (rating === 'Buy') {
               sub.orWhere(
@@ -1884,7 +1934,9 @@ export class MarketDataService {
     }
 
     if (quote) {
-      if (quote.marketCap) entity.market_cap = quote.marketCap;
+      if (quote.marketCap) {
+        entity.market_cap = NumberUtil.parseMarketCap(quote.marketCap);
+      }
       // Fallback if not in summary
       if (!entity.fifty_two_week_high && quote.fiftyTwoWeekHigh)
         entity.fifty_two_week_high = quote.fiftyTwoWeekHigh;
@@ -1920,6 +1972,58 @@ export class MarketDataService {
     };
 
     return result;
+  }
+
+  /**
+   * Background CRON Job: Refresh Top Picks every 5 minutes
+   * Ensures the "Dashboard Picks" are not stale.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async refreshTopPicks() {
+    this.logger.log('CRON: Refreshing Top Picks (YOLO & Conservative)...');
+
+    try {
+      // 1. Find potential top picks (High potential upside OR High Score)
+      const candidates = await this.getAnalyzerTickers({
+        limit: 50,
+        sortBy: 'upside_percent',
+        sortDir: 'DESC',
+      });
+
+      // 2. Identify stale ones
+      const staleSymbols: string[] = [];
+      const now = Date.now();
+      const STALE_THRESHOLD = 5 * 60 * 1000; // 5 mins
+
+      candidates.items.forEach((item) => {
+        const lastUpdate = item.latestPrice?.ts
+          ? new Date(item.latestPrice.ts).getTime()
+          : 0;
+        if (now - lastUpdate > STALE_THRESHOLD) {
+          staleSymbols.push(item.ticker.symbol);
+        }
+      });
+
+      if (staleSymbols.length === 0) {
+        this.logger.log('CRON: No stale top picks found.');
+        return;
+      }
+
+      this.logger.log(
+        `CRON: Found ${staleSymbols.length} stale top picks. Refreshing...`,
+      );
+
+      // 3. Refresh in batches
+      // We use getSnapshots which handles batching internally
+      await this.getSnapshots(staleSymbols);
+
+      this.logger.log('CRON: Top Picks refresh complete.');
+    } catch (e) {
+      this.logger.error(
+        `CRON: Top Picks refresh failed: ${e.message}`,
+        e.stack,
+      );
+    }
   }
 }
 

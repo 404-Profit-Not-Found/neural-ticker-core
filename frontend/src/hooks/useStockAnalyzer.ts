@@ -68,6 +68,8 @@ export interface AnalyzerParams {
     upside?: string | null;
     sector?: string[];
     overallScore?: string | null;
+    minMarketCap?: number;
+    profitableOnly?: boolean;
 }
 
 export function useStockAnalyzer(params: AnalyzerParams) {
@@ -87,6 +89,8 @@ export function useStockAnalyzer(params: AnalyzerParams) {
       params.sector?.forEach(s => queryParams.append('sector', s));
       if (params.upside) queryParams.append('upside', params.upside);
       if (params.overallScore) queryParams.append('overallScore', params.overallScore);
+      if (params.minMarketCap) queryParams.append('minMarketCap', String(params.minMarketCap));
+      if (params.profitableOnly) queryParams.append('profitableOnly', String(params.profitableOnly));
 
       const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {
         params: queryParams,

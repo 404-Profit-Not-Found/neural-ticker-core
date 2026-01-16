@@ -3,6 +3,7 @@ import { testTypeOrmConfig } from './database/typeorm.test.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static'; // Added
+import { ScheduleModule } from '@nestjs/schedule'; // Added
 import { join } from 'path'; // Added
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
 
@@ -55,6 +56,7 @@ import configuration from './config/configuration';
         limit: 100,
       },
     ]),
+    ScheduleModule.forRoot(),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

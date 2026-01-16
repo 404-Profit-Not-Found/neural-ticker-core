@@ -95,7 +95,8 @@ describe('Rating Utilities', () => {
         risk: 3,
         upside: 100,
         peRatio: 12,
-      })).toMatchObject({ rating: 'Strong Buy', variant: 'strongBuy' });
+        revenueTTM: 1000000,
+      })).toMatchObject({ rating: 'No Brainer', variant: 'legendary' });
     });
 
     it('should return Buy for moderate risk and moderate upside with fair P/E', () => {
@@ -104,12 +105,13 @@ describe('Rating Utilities', () => {
         risk: 5,
         upside: 30,
         peRatio: 25,
+        revenueTTM: 1000000,
       })).toMatchObject({ rating: 'Buy', variant: 'buy' });
     });
 
     it('should return Hold for low upside (legacy without P/E)', () => {
       // Score: 50 + 2 (5% * 0.4) + 5 (low risk) - 10 (no P/E) = 47 → Hold
-      expect(calculateAiRating(3, 5)).toMatchObject({ rating: 'Hold', variant: 'hold' });
+      expect(calculateAiRating({ risk: 3, upside: 5, revenueTTM: 1000000 })).toMatchObject({ rating: 'Hold', variant: 'hold' });
     });
   });
 
@@ -166,7 +168,7 @@ describe('Rating Utilities', () => {
         overallScore: 8,
       });
       
-      expect(['Strong Buy', 'Buy']).toContain(result.rating);
+      expect(['Strong Buy', 'Buy', 'No Brainer']).toContain(result.rating);
       expect(result.score).toBeGreaterThan(60);
     });
 
@@ -195,7 +197,7 @@ describe('Rating Utilities', () => {
     });
 
     it('should handle moderate news impact (5-7)', () => {
-      const baseOptions = { risk: 5, upside: 20 };
+      const baseOptions = { risk: 5, upside: 20, revenueTTM: 1000000 };
       const bullishResult = calculateAiRating({ ...baseOptions, newsSentiment: 'BULLISH', newsImpact: 6 });
       const bearishResult = calculateAiRating({ ...baseOptions, newsSentiment: 'BEARISH', newsImpact: 6 });
 
