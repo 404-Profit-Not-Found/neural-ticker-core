@@ -209,7 +209,7 @@ describe('Rating Utilities', () => {
     it('should trigger hard veto for extreme risk regardless of other factors', () => {
       const result = calculateAiRating({
         risk: 9.5,
-        upside: 100,
+        upside: 50,
         overallScore: 2, // Low neural
       });
       expect(result.rating).toBe('Sell');

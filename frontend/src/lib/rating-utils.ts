@@ -388,15 +388,16 @@ export function calculateAiRating(
         }
     }
 
+    // Speculative Buy Override
+    // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
+    // Moved BEFORE Hard Veto to allow high-upside plays (YOLO) to exist.
+    if (risk >= 8 && (effectiveUpside >= 100 || (overallScore && overallScore >= 7.5))) {
+        return { rating: 'Speculative Buy', variant: 'speculativeBuy', score, fiftyTwoWeekScore };
+    }
+
     // Hard Veto: If risk is Extreme (9+) and no massive redeeming qualities, kill it.
     if (risk >= 9 && score < 70) {
         return { rating: 'Sell', variant: 'sell', score, fiftyTwoWeekScore };
-    }
-
-    // Speculative Buy Override
-    // High Risk (>=8) but High Reward (Upside >= 100 OR Neural >= 7.5)
-    if (risk >= 8 && (effectiveUpside >= 100 || (overallScore && overallScore >= 7.5))) {
-        return { rating: 'Speculative Buy', variant: 'speculativeBuy', score, fiftyTwoWeekScore };
     }
 
     if (score > 105) return { rating: 'No Brainer', variant: 'legendary', score, fiftyTwoWeekScore };
