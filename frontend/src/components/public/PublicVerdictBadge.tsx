@@ -73,7 +73,6 @@ export const PublicVerdictBadge: React.FC<PublicVerdictBadgeProps> = ({
             overallScore,
             downside,
             consensus,
-            consensus,
             peRatio: pe,
             newsSentiment,
             newsImpact,
