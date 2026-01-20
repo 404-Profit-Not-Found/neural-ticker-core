@@ -11,7 +11,6 @@ import {
   Sse,
   MessageEvent,
   UseGuards, // Added
-  ForbiddenException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -20,7 +19,6 @@ import { CreditService } from '../users/credit.service'; // Added
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Public } from '../auth/public.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -388,9 +386,9 @@ export class ResearchController {
       throw new NotFoundException(`Research note ${id} not found`);
     }
 
-    // Ownership check removed per user requirement: 
+    // Ownership check removed per user requirement:
     // "Allow anyone who has access to the app and is authenticated to access the research"
-    
+
     return note;
   }
 
