@@ -16,6 +16,10 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { CreditGuard } from './guards/credit.guard'; // Added
 import { CreditService } from '../users/credit.service'; // Added
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/public.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -162,6 +166,7 @@ class ContributeDto {
 @ApiTags('Research')
 @ApiBearerAuth()
 @Controller('v1/research')
+@UseGuards(JwtAuthGuard)
 export class ResearchController {
   constructor(
     private readonly researchService: ResearchService,
@@ -375,6 +380,7 @@ export class ResearchController {
     },
   })
   @ApiResponse({ status: 404, description: 'Ticket not found. Invalid ID.' })
+  @Public()
   @Get(':id')
   async getResearch(@Param('id') id: string) {
     const note = await this.researchService.getResearchNote(id);
@@ -444,6 +450,8 @@ export class ResearchController {
     summary: 'Manually trigger financial extraction from latest research',
   })
   @ApiResponse({ status: 200, description: 'Extraction started.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @Post('extract-financials/:ticker')
   async extractFinancials(@Param('ticker') ticker: string) {
     await this.researchService.reprocessFinancials(ticker);
@@ -454,6 +462,8 @@ export class ResearchController {
     summary: 'Reprocess research and dedupe analyst ratings for a ticker',
   })
   @ApiResponse({ status: 200, description: 'Sync completed.' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @Post('sync/:ticker')
   async syncResearch(@Param('ticker') ticker: string) {
     await this.researchService.reprocessFinancials(ticker);

@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -9,6 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { SocialService } from './social.service';
 import { Public } from '../auth/public.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Social')
 @ApiBearerAuth()
@@ -31,6 +40,7 @@ export class SocialController {
     schema: { type: 'object', properties: { content: { type: 'string' } } },
   })
   @ApiResponse({ status: 201, description: 'Comment created' })
+  @UseGuards(JwtAuthGuard)
   @Post('comments/:symbol')
   async postComment(
     @Request() req: any,
