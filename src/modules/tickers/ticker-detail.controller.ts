@@ -5,6 +5,7 @@ import {
   Param,
   Inject,
   forwardRef,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
@@ -12,6 +13,9 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ResearchService } from '../research/research.service';
 import { Fundamentals } from '../market-data/entities/fundamentals.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('tickers')
 @Controller('v1/tickers')
@@ -151,6 +155,8 @@ export class TickerDetailController {
   }
 
   @ApiOperation({ summary: 'Trigger background 5-year history sync' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':symbol/sync')
   syncHistory(@Param('symbol') symbol: string) {
     // Fire and forget (or await if fast enough? Better F&F for UI responsiveness)

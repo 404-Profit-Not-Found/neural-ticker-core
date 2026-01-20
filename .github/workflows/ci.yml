@@ -24,6 +24,8 @@ jobs:
     - name: Install Frontend Dependencies
       run: npm ci
       working-directory: ./frontend
+      env:
+        CYPRESS_INSTALL_BINARY: 0
     - name: Lint Frontend
       run: npm run lint
       working-directory: ./frontend
@@ -107,6 +109,8 @@ jobs:
     - name: Install Frontend Dependencies
       run: npm ci
       working-directory: ./frontend
+      env:
+        CYPRESS_INSTALL_BINARY: 0
     - name: Build Frontend
       run: npm run build
       working-directory: ./frontend

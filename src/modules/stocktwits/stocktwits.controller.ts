@@ -7,6 +7,7 @@ import {
   Headers,
   UnauthorizedException,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
 import {
@@ -22,6 +23,9 @@ import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
 
 import { Public } from '../auth/public.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('StockTwits')
 @ApiExtraModels(StockTwitsPost)
@@ -83,6 +87,8 @@ export class StockTwitsController {
     return this.stockTwitsService.getWatchersHistory(symbol);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':symbol/sync')
   @ApiOperation({
     summary: 'Trigger manual sync for a symbol',

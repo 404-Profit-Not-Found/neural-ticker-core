@@ -26,6 +26,7 @@ import { TickerEntity } from './entities/ticker.entity';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Ticker')
 @ApiBearerAuth()
@@ -117,7 +118,7 @@ export class TickersController {
     status: 200,
     description: 'List of hidden tickers.',
   })
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Get('admin/hidden')
   getHiddenTickers() {
@@ -131,7 +132,7 @@ export class TickersController {
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'missing_logo', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'List of tickers.' })
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Get('admin/search')
   adminSearch(
@@ -203,7 +204,7 @@ export class TickersController {
     },
   })
   @ApiResponse({ status: 200, description: 'Ticker visibility updated.' })
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Patch(':symbol/hidden')
   setHidden(@Param('symbol') symbol: string, @Body('hidden') hidden: boolean) {
@@ -217,7 +218,7 @@ export class TickersController {
   @ApiParam({ name: 'symbol', example: 'AAPL' })
   @ApiBody({ schema: { properties: { logo_url: { type: 'string' } } } })
   @ApiResponse({ status: 200, description: 'Ticker updated.' })
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Patch(':symbol')
   updateTicker(

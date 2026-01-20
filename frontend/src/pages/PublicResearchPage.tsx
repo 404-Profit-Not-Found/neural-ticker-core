@@ -122,10 +122,8 @@ export function PublicResearchPage() {
 
                 {/* --- HERO SECTION --- */}
                 <header className="space-y-6">
-                    <div className="bg-gradient-to-br from-muted/30 to-background border border-border/50 rounded-2xl p-6 md:p-8 shadow-sm relative overflow-hidden">
-                        {/* Background Decor */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-
+                    <div className="relative">
+                        
                         <div className="relative z-10">
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                                 <div className="flex items-start gap-5">
@@ -171,7 +169,7 @@ export function PublicResearchPage() {
 
                                 <div className="text-right hidden md:block">
                                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-2">
-                                        Last Updated
+                                        Last AI Analysis
                                     </div>
                                     <p className="text-sm text-muted-foreground font-mono">
                                         {new Date(note.created_at).toLocaleDateString()}

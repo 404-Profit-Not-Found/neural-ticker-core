@@ -4,6 +4,7 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 # Install frontend deps
+ENV CYPRESS_INSTALL_BINARY=0
 RUN npm ci
 # Copy frontend source
 COPY frontend/ .

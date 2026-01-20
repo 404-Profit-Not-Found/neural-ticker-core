@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request } from '@nestjs/common';
+import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,6 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
 import { Public } from '../auth/public.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 import { ResearchService } from '../research/research.service';
 
@@ -22,6 +23,7 @@ export class NewsController {
 
   @ApiOperation({ summary: 'Get Daily AI News Digest' })
   @ApiResponse({ status: 200, description: 'Personalized news digest' })
+  @UseGuards(JwtAuthGuard)
   @Get('digest')
   async getDailyDigest(@Request() req?: any) {
     // If public user, maybe return a generic system digest?
@@ -78,6 +80,7 @@ export class NewsController {
   // Temporary: Force trigger digest generation
   @ApiOperation({ summary: 'Force trigger digest generation' })
   @ApiResponse({ status: 200, description: 'Digest object' })
+  @UseGuards(JwtAuthGuard)
   @Get('digest/trigger')
   async triggerDigest(@Request() req: any) {
     // Forcing generation for the authenticated user
