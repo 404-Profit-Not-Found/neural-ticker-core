@@ -11,6 +11,7 @@ import {
   Sse,
   MessageEvent,
   UseGuards, // Added
+  ForbiddenException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -380,13 +381,16 @@ export class ResearchController {
     },
   })
   @ApiResponse({ status: 404, description: 'Ticket not found. Invalid ID.' })
-  @Public()
   @Get(':id')
-  async getResearch(@Param('id') id: string) {
+  async getResearch(@Request() req: any, @Param('id') id: string) {
     const note = await this.researchService.getResearchNote(id);
     if (!note) {
       throw new NotFoundException(`Research note ${id} not found`);
     }
+
+    // Ownership check removed per user requirement: 
+    // "Allow anyone who has access to the app and is authenticated to access the research"
+    
     return note;
   }
 

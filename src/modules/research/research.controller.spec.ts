@@ -177,19 +177,42 @@ describe('ResearchController', () => {
   });
 
   describe('getResearch', () => {
-    it('should return research note', async () => {
-      const note = { id: '1', tickers: ['AAPL'], status: 'completed' };
+    it('should return research note for owner', async () => {
+      const note = { id: '1', user_id: 'user1', status: 'completed' };
       mockResearchService.getResearchNote.mockResolvedValue(note);
+      const req = { user: { id: 'user1', role: 'user' } };
 
-      const result = await controller.getResearch('1');
+      const result = await controller.getResearch(req, '1');
+
+      expect(result).toEqual(note);
+    });
+
+    it('should return research note for admin', async () => {
+      const note = { id: '1', user_id: 'user1', status: 'completed' };
+      mockResearchService.getResearchNote.mockResolvedValue(note);
+      const req = { user: { id: 'admin1', role: 'admin' } };
+
+      const result = await controller.getResearch(req, '1');
+
+      expect(result).toEqual(note);
+    });
+
+    it('should return research note for any authenticated user (shared access)', async () => {
+      const note = { id: '1', user_id: 'user1', status: 'completed' };
+      mockResearchService.getResearchNote.mockResolvedValue(note);
+      // User 2 (not owner) requesting
+      const req = { user: { id: 'user2', role: 'user' } };
+
+      const result = await controller.getResearch(req, '1');
 
       expect(result).toEqual(note);
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockResearchService.getResearchNote.mockResolvedValue(null);
+      const req = { user: { id: 'user1' } };
 
-      await expect(controller.getResearch('999')).rejects.toThrow(
+      await expect(controller.getResearch(req, '999')).rejects.toThrow(
         NotFoundException,
       );
     });
