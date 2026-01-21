@@ -115,7 +115,7 @@ export class MarketDataController {
 
     const toStr = toDate.toISOString().split('T')[0];
     const fromStr = fromDate.toISOString().split('T')[0];
-    const interval = 'D';
+    const interval = '1d';
 
     return this.service.getHistory(symbol, interval, fromStr, toStr);
   }

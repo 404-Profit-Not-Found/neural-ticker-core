@@ -65,7 +65,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('lucide-react', () => ({ 
   Plus: () => <span>+</span>, 
   Search: () => <span>S</span>, 
-  ChevronLeft: () => <span><</span>, 
+  ChevronLeft: () => <span>{'<'}</span>, 
   ArrowUpDown: () => <span>⇅</span>, 
   Crown: () => <span>C</span>, 
   Sparkles: () => <span>S</span>, 
@@ -126,7 +126,9 @@ describe('AdminConsole', () => {
     const searchInput = screen.getByPlaceholderText(/search by email/i);
     fireEvent.change(searchInput, { target: { value: 'user2' } });
     
-    expect(screen.queryByText(/user1@example.com/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/user2@example.com/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText(/user1@example.com/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/user2@example.com/i)).toBeInTheDocument();
+    });
   });
 });

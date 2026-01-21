@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Calendar as CalendarIcon, Search, Loader2, Info, AlertCircle, DollarSign, Hash } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { api, cn } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
 import { SimpleCalendar } from '../ui/simple-calendar';
 import { TickerLogo } from '../dashboard/TickerLogo';
@@ -103,6 +103,11 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   // Search tickers
   useEffect(() => {
     const timer = setTimeout(async () => {
+      // If query matches selected symbol, don't search again (avoids re-opening dropdown on selection)
+      if (symbol && searchQuery === symbol) {
+          return;
+      }
+
       if (searchQuery.length < 1) {
         setResults([]);
         return;
@@ -116,8 +121,8 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
             external: 'false' // Only internal tickers
           },
         });
-        // Filter out queued/pending tickers
-        const validResults = data.filter(t => !t.is_queued);
+        // Filter out queued/pending tickers and ensure we only show "vetted" (internal) ones with logos
+        const validResults = data.filter(t => !t.is_queued && t.logo_url);
         setResults(validResults);
         setShowResults(true);
       } catch (err) {
@@ -128,7 +133,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, symbol]);
 
   // Fetch OHLC + Snapshot when symbol changes (only if valid symbol selected)
   useEffect(() => {
@@ -141,20 +146,32 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
       setFetchingOhlc(true);
       try {
         // Fetch history
-        const historyPromise = api.get<any[]>(`/tickers/${symbol}/history`);
+        const historyPromise = api.get<any[]>(`/tickers/${symbol}/history`, { params: { days: 1825 } });
         // Fetch today's snapshot
         const snapshotPromise = api.get<any>(`/tickers/${symbol}/snapshot`).catch(() => ({ data: null }));
 
         const [historyRes, snapshotRes] = await Promise.all([historyPromise, snapshotPromise]);
 
-        let combinedData = historyRes.data.map((item: any) => ({
-          date: item.time, // 'YYYY-MM-DD'
+        let combinedData = historyRes.data.map((item: any) => {
+          const val = item.ts || item.date || item.time;
+          let dateStr = val;
+          if (typeof val === 'number') {
+            dateStr = new Date(val * 1000).toISOString().split('T')[0];
+          } else if (val) {
+             // Try to handle direct date objects or strings
+             try {
+                dateStr = new Date(val).toISOString().split('T')[0];
+             } catch { dateStr = val; }
+          }
+          return {
+            date: dateStr, 
           open: item.open,
           high: item.high,
           low: item.low,
           close: item.close,
           median: (item.high + item.low) / 2
-        }));
+        };
+       });
 
         // Append today if available
         if (snapshotRes.data && snapshotRes.data.latestPrice) {
@@ -264,8 +281,29 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
 
   // Dates with data for calendar disabling
   const validDates = useMemo(() => {
-    return new Set(ohlcData.map(d => d.date));
+    return new Set(ohlcData.map(d => d.date).filter(Boolean));
   }, [ohlcData]);
+
+  // Fallback data for slider when exact date match fails (e.g. weekend/holiday selected)
+  // Find the closest previous trading day
+  const effectiveDateData = useMemo(() => {
+    if (selectedDateData) return selectedDateData;
+    if (ohlcData.length === 0) return null;
+    if (!date) return null;
+    
+    // Find closest date before or equal to selected date
+    // Array is likely sorted by date (or we can just sort to be safe, but usually API returns sorted)
+    // Assuming API returns descending or ascending. Let's filter dates <= selectedDate and take latest.
+    const target = new Date(date).getTime();
+    
+    // Sort desc to find latest before target
+    const sorted = [...ohlcData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    return sorted.find(d => {
+        const dt = new Date(d.date).getTime();
+        return dt <= target;
+    }) || sorted[0]; // fallback to most recent if everything is in future?
+  }, [ohlcData, date, selectedDateData]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -277,9 +315,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
             </div>
             Add Position
           </DialogTitle>
-          <DialogDescription>
-            Manually track an external holding.
-          </DialogDescription>
+            Add a stock supported by NeuralTicker
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
@@ -297,7 +333,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search symbol (e.g. AAPL)..."
-                className="pl-9 font-mono uppercase"
+                className="pl-9 font-mono normal-case"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -362,9 +398,9 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
           <Tabs 
             value={inputMode} 
             onValueChange={(v) => setInputMode(v as 'shares' | 'investment')}
-            className="w-full pt-1"
+            className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 bg-muted/30">
               <TabsTrigger value="investment" className="flex items-center gap-2">
                 <DollarSign size={14} /> By Investment
               </TabsTrigger>
@@ -372,115 +408,157 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                  <Hash size={14} /> By Shares
               </TabsTrigger>
             </TabsList>
+
+            <div className="mt-4 space-y-4">
+                <TabsContent value="investment" className="space-y-4 m-0 border-0 p-0">
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Date Picker (Left) */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-muted-foreground">Buy Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal bg-muted/10 h-10",
+                                            !date && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        {date ? format(parseISO(date), 'PPP') : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                                    <SimpleCalendar
+                                        value={parseISO(date)}
+                                        onChange={(d) => setDate(format(d, 'yyyy-MM-dd'))}
+                                        enabledDates={ohlcData.length > 0 ? validDates : undefined}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        {/* Investment Input (Right) */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="investment-input" className="text-xs font-bold text-muted-foreground">Investment Amount</Label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="investment-input"
+                                    type="number"
+                                    step="any"
+                                    required
+                                    placeholder="0.00"
+                                    value={investment}
+                                    onChange={(e) => handleInvestmentChange(e.target.value)}
+                                    className="pl-9 font-mono bg-muted/20"
+                                    autoFocus={inputMode === 'investment'}
+                                />
+                            </div>
+                            {shares && parseFloat(shares) > 0 && (
+                                <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
+                                    <Hash size={12} />
+                                    Result: <strong>{shares}</strong> shares
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="shares" className="space-y-4 m-0 border-0 p-0">
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Date Picker (Left) - Exact same instance */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-muted-foreground">Buy Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal bg-muted/10 h-10",
+                                            !date && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        {date ? format(parseISO(date), 'PPP') : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                                    <SimpleCalendar
+                                        value={parseISO(date)}
+                                        onChange={(d) => setDate(format(d, 'yyyy-MM-dd'))}
+                                        enabledDates={ohlcData.length > 0 ? validDates : undefined}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        {/* Shares Input (Right) */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="shares-input" className="text-xs font-bold text-muted-foreground">Number of Shares</Label>
+                            <div className="relative">
+                                <Hash className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="shares-input"
+                                    type="number"
+                                    step="any"
+                                    required
+                                    placeholder="0.00"
+                                    value={shares}
+                                    onChange={(e) => handleSharesChange(e.target.value)}
+                                    className="pl-9 font-mono bg-muted/20"
+                                    autoFocus={inputMode === 'shares'}
+                                />
+                            </div>
+                            {investment && parseFloat(investment) > 0 && (
+                                <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
+                                    <DollarSign size={12} />
+                                    Result: <strong>${parseFloat(investment).toLocaleString()}</strong> total
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+
+                {/* Price Slider/Input Area - Full Width Below Tabs */}
+                <div className="space-y-2 pt-2">
+                        <div className="bg-muted/10 px-3 py-1 rounded-lg border border-border/50">
+                            {effectiveDateData && !selectedDateData && (
+                                <div className="text-[10px] text-orange-500 pt-2 flex items-center gap-1">
+                                    <AlertCircle size={10} />
+                                    <span>Using data from {effectiveDateData.date}</span>
+                                </div>
+                            )}
+                            <PriceRangeSlider
+                                low={effectiveDateData?.low ?? 0}
+                                high={effectiveDateData?.high ?? 100}
+                                median={effectiveDateData?.median ?? 50}
+                                value={parseFloat(price) || effectiveDateData?.close || 0}
+                                onChange={(val) => setPrice(val.toFixed(2))}
+                                className={cn("pt-0 pb-2", !effectiveDateData && "opacity-50 grayscale")}
+                            />
+                        </div>
+                </div>
+            </div>
           </Tabs>
 
-          {/* Date & Price Row */}
-          <div className="space-y-1.5 pt-2">
-             <div className="flex flex-col gap-4">
-               {/* Date */}
-               <div className="space-y-1.5">
-                  <Label>Date</Label>
-                  <Popover>
-                      <PopoverTrigger asChild>
-                          <Button
-                              variant="outline"
-                              className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !date && "text-muted-foreground"
-                              )}
-                          >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {date ? format(parseISO(date), 'PPP') : <span>Pick a date</span>}
-                          </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                          <SimpleCalendar
-                              value={parseISO(date)}
-                              onChange={(d) => setDate(format(d, 'yyyy-MM-dd'))}
-                              enabledDates={ohlcData.length > 0 ? validDates : undefined}
-                          />
-                      </PopoverContent>
-                  </Popover>
-               </div>
-               
-               {/* Price Selection (Slider OR Manual Input) */}
-               <div className="space-y-1.5 min-h-[80px]">
-                 {selectedDateData ? (
-                    <div>
-                        <Label className="text-xs text-muted-foreground mb-1.5 block">
-                            Price Selection ({format(parseISO(date), 'MM/dd')})
-                        </Label>
-                        <PriceRangeSlider
-                            low={selectedDateData.low}
-                            high={selectedDateData.high}
-                            median={selectedDateData.median}
-                            value={parseFloat(price) || selectedDateData.close}
-                            onChange={(val) => setPrice(val.toFixed(2))}
-                        />
-                    </div>
-                 ) : (
-                    <div className="space-y-1.5">
-                        <Label>Share Price</Label>
-                        <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                            className="font-mono bg-muted/50"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                           Manual price entry (No OHLC data found)
-                        </p>
-                    </div>
-                 )}
-               </div>
-             </div>
-          </div>
-
-          {/* Quantity Inputs */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                 <DollarSign size={12} />
-                 Investment
-              </Label>
-              <Input
-                type="number"
-                step="any"
-                required
-                placeholder="0.00"
-                value={investment}
-                onChange={(e) => handleInvestmentChange(e.target.value)}
-                disabled={inputMode === 'shares' && !!shares && !!price}
-                className={cn("font-mono", inputMode === 'shares' && "bg-muted/30 focus-visible:ring-0 opacity-80")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                 <Hash size={12} />
-                 Shares
-              </Label>
-              <Input
-                type="number"
-                step="any"
-                required
-                placeholder="0.00"
-                value={shares}
-                onChange={(e) => handleSharesChange(e.target.value)}
-                disabled={inputMode === 'investment' && !!investment && !!price}
-                className={cn("font-mono", inputMode === 'investment' && "bg-muted/30 focus-visible:ring-0 opacity-80")}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="pt-4 border-t border-border/50">
+            <Button variant="ghost" type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !symbol || !shares || !price}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add {symbol} Position
+            <Button 
+                type="submit" 
+                disabled={loading || !symbol || !shares || !price || parseFloat(shares) <= 0}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[140px]"
+            >
+              {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+              )}
+              Add {symbol || 'Position'}
             </Button>
           </DialogFooter>
         </form>
