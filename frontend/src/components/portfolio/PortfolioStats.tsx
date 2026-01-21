@@ -45,6 +45,57 @@ const COLORS = [
 const RANGES = ['1M', '3M', '6M', '1Y'] as const;
 type Range = typeof RANGES[number];
 
+// Standard Tooltip (Theme-Aware)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const formatCurrency = (val: number) =>
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+
+    return (
+      <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs">
+        <p className="font-semibold text-popover-foreground mb-1.5">{label}</p>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {payload.map((entry: any, index: number) => {
+          // Check if this data point has added symbols attached
+          if (entry.payload && entry.payload.addedSymbols && index === 0) {
+            return (
+              <div key={`added-${index}`} className="mt-1 pt-1 border-t border-border/50">
+                {entry.payload.addedSymbols.map((sym: string) => (
+                  <p key={sym} className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    Added: {sym}
+                  </p>
+                ))}
+              </div>
+            );
+          }
+          return null;
+        })}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke }} />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-medium text-popover-foreground">{typeof entry.value === 'number' ? formatCurrency(entry.value) : entry.value}</span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const renderPieLabel = ({ cx, cy, sectorCount }: any) => {
+  return (
+    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+      <tspan x={cx} dy="-0.3em" className="fill-muted-foreground text-[10px] font-medium">Portfolio</tspan>
+      <tspan x={cx} dy="1.3em" className="fill-foreground text-sm font-bold">{sectorCount}</tspan>
+    </text>
+  );
+};
+
 export function PortfolioStats({
   totalValue,
   totalGainLoss,
@@ -179,53 +230,6 @@ export function PortfolioStats({
   const isProfit = totalGainLoss >= 0;
   const chartColor = isProfit ? '#10b981' : '#f43f5e'; // Emerald-500 or Rose-500
 
-  // Standard Tooltip (Theme-Aware)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs">
-          <p className="font-semibold text-popover-foreground mb-1.5">{label}</p>
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {payload.map((entry: any, index: number) => {
-            // Check if this data point has added symbols attached
-            if (entry.payload && entry.payload.addedSymbols && index === 0) {
-              return (
-                <div key={`added-${index}`} className="mt-1 pt-1 border-t border-border/50">
-                  {entry.payload.addedSymbols.map((sym: string) => (
-                    <p key={sym} className="flex items-center gap-1.5 text-blue-400 font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                      Added: {sym}
-                    </p>
-                  ))}
-                </div>
-              );
-            }
-            return null;
-          })}
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke }} />
-              <span className="text-muted-foreground">{entry.name}:</span>
-              <span className="font-medium text-popover-foreground">{typeof entry.value === 'number' ? formatCurrency(entry.value) : entry.value}</span>
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderPieLabel = ({ cx, cy }: any) => {
-    return (
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-        <tspan x={cx} dy="-0.3em" className="fill-muted-foreground text-[10px] font-medium">Portfolio</tspan>
-        <tspan x={cx} dy="1.3em" className="fill-foreground text-sm font-bold">{sectorData.length}</tspan>
-      </text>
-    );
-  };
 
   return (
     <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -370,7 +374,7 @@ export function PortfolioStats({
                     stroke="none"
                     cornerRadius={3}
                     labelLine={false}
-                    label={renderPieLabel}
+                    label={(props: any) => renderPieLabel({ ...props, sectorCount: sectorData.length })}
                   >
                     {sectorData.map((_, index) => (
                       <Cell

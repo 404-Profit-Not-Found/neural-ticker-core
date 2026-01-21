@@ -78,21 +78,46 @@ export class MarketDataController {
     name: 'days',
     required: false,
     example: 30,
-    description: 'Number of days back to fetch. Defaults to 30.',
+    description: 'Number of days back to fetch. Defaults to 30. Ignored if from/to are provided.',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    example: '2019-01-01',
+    description: 'Start date (YYYY-MM-DD). Used with "to" for explicit date range.',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    example: '2024-01-31',
+    description: 'End date (YYYY-MM-DD). Defaults to today if "from" is provided.',
   })
   @ApiResponse({ status: 200, description: 'History retrieved.' })
   @Get('history')
-  getHistory(@Param('symbol') symbol: string, @Query('days') days?: number) {
-    const numDays = days || 30;
-    const toDate = new Date();
-    const fromDate = new Date();
-    fromDate.setDate(toDate.getDate() - numDays);
+  getHistory(
+    @Param('symbol') symbol: string,
+    @Query('days') days?: number,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    let fromDate: Date;
+    let toDate: Date;
 
-    const to = toDate.toISOString().split('T')[0];
-    const from = fromDate.toISOString().split('T')[0];
+    if (from) {
+      fromDate = new Date(from);
+      toDate = to ? new Date(to) : new Date();
+    } else {
+      const numDays = days || 30;
+      toDate = new Date();
+      fromDate = new Date();
+      fromDate.setDate(toDate.getDate() - numDays);
+    }
+
+    const toStr = toDate.toISOString().split('T')[0];
+    const fromStr = fromDate.toISOString().split('T')[0];
     const interval = 'D';
 
-    return this.service.getHistory(symbol, interval, from, to);
+    return this.service.getHistory(symbol, interval, fromStr, toStr);
   }
   @ApiOperation({ summary: 'Get Company News' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
