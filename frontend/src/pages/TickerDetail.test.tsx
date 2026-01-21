@@ -1,5 +1,5 @@
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { TickerDetail } from './TickerDetail';
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { BrowserRouter, useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -20,12 +20,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import '@testing-library/jest-dom';
 
 // Mocks
-vi.mock('react-router-dom', async (importOriginal) => ({
-  ...await importOriginal<any>(),
-  useParams: vi.fn(),
-  useNavigate: vi.fn(),
-  useLocation: vi.fn(),
-}));
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useParams: vi.fn(),
+    useNavigate: vi.fn(),
+    useLocation: vi.fn(),
+  };
+});
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: vi.fn(),

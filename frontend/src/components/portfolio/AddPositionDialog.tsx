@@ -59,7 +59,21 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
 
   // OHLC Data
   const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
-  const [snapshot, setSnapshot] = useState<any>(null);
+  const [snapshot, setSnapshot] = useState<{
+    price?: number;
+    change_percent?: number;
+    latestPrice?: {
+      close: number;
+      open?: number;
+      high?: number;
+      low?: number;
+      c?: number;
+      change_percent?: number;
+    };
+    ticker?: {
+      industry?: string;
+    };
+  } | null>(null);
 
   // Derived calculations
   useEffect(() => {
@@ -151,23 +165,31 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     const fetchHistory = async () => {
       try {
         // Fetch history
-        const historyPromise = api.get<any[]>(`/tickers/${symbol}/history`, { params: { days: 1825 } });
+        const historyPromise = api.get<Array<{
+          ts?: number | string;
+          date?: string;
+          time?: string;
+          open: number;
+          high: number;
+          low: number;
+          close: number;
+        }>>(`/tickers/${symbol}/history`, { params: { days: 1825 } });
         // Fetch today's snapshot
-        const snapshotPromise = api.get<any>(`/tickers/${symbol}/snapshot`).catch(() => ({ data: null }));
+        const snapshotPromise = api.get<typeof snapshot>(`/tickers/${symbol}/snapshot`).catch(() => ({ data: null }));
 
         const [historyRes, snapshotRes] = await Promise.all([historyPromise, snapshotPromise]);
         setSnapshot(snapshotRes.data);
 
-        let combinedData = historyRes.data.map((item: any) => {
+        let combinedData: OhlcDataPoint[] = historyRes.data.map((item) => {
           const val = item.ts || item.date || item.time;
-          let dateStr = val;
+          let dateStr = '';
           if (typeof val === 'number') {
             dateStr = new Date(val * 1000).toISOString().split('T')[0];
           } else if (val) {
              // Try to handle direct date objects or strings
              try {
                 dateStr = new Date(val).toISOString().split('T')[0];
-             } catch { dateStr = val; }
+             } catch { dateStr = String(val); }
           }
           return {
             date: dateStr, 
@@ -186,14 +208,14 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
           
           // Check if today already exists in history (avoid dupe)
           const exists = combinedData.find(d => d.date === today);
-          if (!exists) {
+          if (!exists && snap.close) {
             combinedData.push({
               date: today,
-              open: snap.open || snap.c, // fallback to close if open missing
-              high: snap.high || snap.c,
-              low: snap.low || snap.c,
-              close: snap.close || snap.c,
-              median: ((snap.high || snap.c) + (snap.low || snap.c)) / 2
+              open: snap.open ?? snap.c ?? snap.close,
+              high: snap.high ?? snap.c ?? snap.close,
+              low: snap.low ?? snap.c ?? snap.close,
+              close: snap.close ?? snap.c ?? 0,
+              median: ((snap.high ?? snap.c ?? snap.close) + (snap.low ?? snap.c ?? snap.close)) / 2
             });
           }
         }
@@ -267,7 +289,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
       setInvestment('');
       setDate(new Date().toISOString().split('T')[0]);
     } catch (err: unknown) {
-      const errorMessage = (err as any).response?.data?.message || (err as Error).message || 'Failed to add position';
+      const errorMessage = (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (err as Error).message || 'Failed to add position';
       setError(errorMessage);
     } finally {
       setLoading(false);

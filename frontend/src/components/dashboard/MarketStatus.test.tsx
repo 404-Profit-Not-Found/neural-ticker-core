@@ -13,7 +13,7 @@ vi.mock('../../hooks/useMarketStatus', () => ({
 }));
 
 vi.mock('../ui/badge', () => ({
-  Badge: ({ children, className }: any) => <div data-test-class={className}>{children}</div>,
+  Badge: ({ children, className }: { children: React.ReactNode; className?: string }) => <div data-test-class={className}>{children}</div>,
 }));
 
 describe('MarketStatus', () => {
@@ -26,8 +26,8 @@ describe('MarketStatus', () => {
       data: null,
       isLoading: true,
     });
-    const { container } = render(<MarketStatus />);
-    expect(container.firstChild).toHaveClass('animate-pulse');
+    render(<MarketStatus />);
+    expect(document.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
   it('renders market open state', () => {

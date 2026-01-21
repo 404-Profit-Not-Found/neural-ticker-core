@@ -11,7 +11,7 @@ vi.mock('../../lib/api', () => ({
     get: vi.fn(),
     post: vi.fn(),
   },
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  cn: (...args: Array<string | boolean | undefined>) => args.filter(Boolean).join(' '),
 }));
 
 vi.mock('lucide-react', () => ({
@@ -35,7 +35,7 @@ vi.mock('../dashboard/TickerLogo', () => ({
 }));
 
 vi.mock('./PriceRangeSlider', () => ({
-  PriceRangeSlider: ({ onChange, value }: any) => (
+  PriceRangeSlider: ({ onChange, value }: { onChange: (val: number) => void; value?: number }) => (
     <div data-testid="price-slider" onClick={() => onChange(155)}>
       Slider {value ? `$${value.toFixed(2)}` : ''}
     </div>
@@ -43,42 +43,46 @@ vi.mock('./PriceRangeSlider', () => ({
 }));
 
 vi.mock('../ui/simple-calendar', () => ({
-  SimpleCalendar: ({ onChange }: any) => <div data-testid="calendar" onClick={() => onChange(new Date())}>Calendar</div>,
+  SimpleCalendar: ({ onChange }: { onChange: (date: Date) => void }) => <div data-testid="calendar" onClick={() => onChange(new Date())}>Calendar</div>,
 }));
 
 vi.mock('../ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => open ? <div data-testid="dialog">{children}</div> : null,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('../ui/popover', () => ({
-  Popover: ({ children }: any) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: any) => <div>{children}</div>,
-  PopoverContent: ({ children }: any) => <div data-testid="popover-content">{children}</div>,
+  Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div data-testid="popover-content">{children}</div>,
 }));
 
 vi.mock('../ui/tabs', () => ({
-  Tabs: ({ children }: any) => <div data-testid="tabs">{children}</div>,
-  TabsList: ({ children }: any) => <div>{children}</div>,
-  TabsTrigger: ({ children, value }: any) => <button data-testid={`tabs-trigger-${value}`}>{children}</button>,
-  TabsContent: ({ children, value }: any) => <div data-testid={`tabs-content-${value}`}>{children}</div>,
+  Tabs: ({ children }: { children: React.ReactNode }) => <div data-testid="tabs">{children}</div>,
+  TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TabsTrigger: ({ children, value }: { children: React.ReactNode; value?: string }) => <button data-testid={`tabs-trigger-${value}`}>{children}</button>,
+  TabsContent: ({ children, value }: { children: React.ReactNode; value?: string }) => <div data-testid={`tabs-content-${value}`}>{children}</div>,
 }));
 
 vi.mock('../ui/input', () => ({
-  Input: (props: any) => <input {...props} />,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
 }));
 
 vi.mock('../ui/label', () => ({
-  Label: ({ children, htmlFor }: any) => <label htmlFor={htmlFor}>{children}</label>,
+  Label: ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => <label htmlFor={htmlFor}>{children}</label>,
 }));
 
 vi.mock('../ui/button', () => ({
-  Button: ({ children, onClick, type, disabled }: any) => (
+  Button: ({ children, onClick, type, disabled }: { children: React.ReactNode; onClick?: () => void; type?: 'submit' | 'reset' | 'button'; disabled?: boolean }) => (
     <button onClick={onClick} type={type} disabled={disabled}>{children}</button>
   ),
+}));
+
+vi.mock('../ui/Sparkline', () => ({
+  Sparkline: () => <div data-testid="sparkline">Sparkline</div>,
 }));
 
 describe('AddPositionDialog', () => {

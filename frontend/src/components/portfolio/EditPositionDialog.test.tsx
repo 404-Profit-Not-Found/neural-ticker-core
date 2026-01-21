@@ -87,6 +87,14 @@ vi.mock('../ui/label', () => ({
   Label: ({ children }: any) => <label>{children}</label>,
 }));
 
+vi.mock('../ui/Sparkline', () => ({
+  Sparkline: () => <div data-testid="sparkline">Sparkline</div>,
+}));
+
+vi.mock('../dashboard/TickerLogo', () => ({
+  TickerLogo: () => <div data-testid="ticker-logo">Logo</div>,
+}));
+
 describe('EditPositionDialog', () => {
   const mockOnOpenChange = vi.fn();
   const mockOnSuccess = vi.fn();
