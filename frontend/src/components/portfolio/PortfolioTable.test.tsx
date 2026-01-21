@@ -17,27 +17,33 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 // Mock DataTable to simplify testing
 vi.mock('../ui/data-table', () => ({
-  DataTable: ({ columns, data, onRowClick }: any) => (
-    <table data-testid="data-table">
-      <thead>
-        <tr>
-          {columns.map((col: any, i: number) => (
-            <th key={i}>{typeof col.header === 'function' ? col.header() : col.header}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((row: any) => (
-          <tr key={row.id} onClick={() => onRowClick?.(row)}>
-            {columns.map((col: any, i: number) => (
-              <td key={i}>
-                {col.cell ? col.cell({ row: { original: row }, getValue: () => row[col.accessorKey || col.id] }) : null}
-              </td>
-            ))}
+  DataTable: ({ columns, data, onRowClick }: { columns: unknown[]; data: unknown[]; onRowClick?: (row: unknown) => void }) => (
+    <div data-testid="data-table">
+      <table>
+        <thead>
+          <tr>
+            {columns.map((colItem, i: number) => {
+              const col = colItem as Record<string, unknown>;
+              return <th key={i}>{col.header as string}</th>;
+            })}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.map((rowItem, i: number) => {
+            const row = rowItem as Record<string, unknown>;
+            return (
+              <tr key={i} onClick={() => onRowClick?.(row)}>
+                {columns.map((colItem, j: number) => {
+                  const col = colItem as Record<string, unknown>;
+                  const accessor = col.accessor as keyof typeof row;
+                  return <td key={j}>{row[accessor] as string}</td>;
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   ),
 }));
 

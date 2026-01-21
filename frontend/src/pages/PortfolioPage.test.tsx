@@ -28,13 +28,13 @@ vi.mock('../lib/api', () => ({
     delete: vi.fn(),
     post: vi.fn(),
   },
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 // Mock components with simple return values
 vi.mock('../components/layout/Header', () => ({ Header: () => <div data-testid="header">Header</div> }));
 vi.mock('../components/portfolio/PortfolioStats', () => ({ 
-  PortfolioStats: ({ totalValue, onAnalyze }: any) => (
+  PortfolioStats: ({ totalValue, onAnalyze }: { totalValue: number; onAnalyze: () => void }) => (
     <div data-testid="stats">
       Value: {totalValue}
       <button onClick={onAnalyze}>Analyze</button>
@@ -42,22 +42,25 @@ vi.mock('../components/portfolio/PortfolioStats', () => ({
   ) 
 }));
 vi.mock('../components/portfolio/PortfolioTable', () => ({ 
-  PortfolioTable: ({ positions, onDelete, onEdit }: any) => (
+  PortfolioTable: ({ positions, onDelete, onEdit }: { positions: unknown[]; onDelete: (id: string) => void; onEdit: (position: unknown) => void }) => (
     <div data-testid="table">
-      {(positions || []).map((p: any) => (
-        <div key={p.id}>
-          {p.symbol}
-          <button onClick={() => onDelete(p.id)}>Delete {p.symbol}</button>
-          <button onClick={() => onEdit(p)}>Edit {p.symbol}</button>
-        </div>
-      ))}
+      {(positions || []).map((p) => {
+        const position = p as Record<string, unknown>;
+        return (
+          <div key={position.id as string}>
+            {position.symbol as string}
+            <button onClick={() => onDelete(position.id as string)}>Delete {position.symbol as string}</button>
+            <button onClick={() => onEdit(position)}>Edit {position.symbol as string}</button>
+          </div>
+        );
+      })}
     </div>
   ) 
 }));
 vi.mock('../components/portfolio/PortfolioGridView', () => ({ PortfolioGridView: () => <div data-testid="grid">Grid</div> }));
-vi.mock('../components/portfolio/AddPositionDialog', () => ({ AddPositionDialog: ({ open }: any) => open ? <div>AddDialog</div> : null }));
-vi.mock('../components/portfolio/EditPositionDialog', () => ({ EditPositionDialog: ({ open }: any) => open ? <div>EditDialog</div> : null }));
-vi.mock('../components/portfolio/PortfolioAiAnalyzer', () => ({ PortfolioAiAnalyzer: ({ open }: any) => open ? <div>AiDialog</div> : null }));
+vi.mock('../components/portfolio/AddPositionDialog', () => ({ AddPositionDialog: ({ open }: { open: boolean }) => open ? <div>AddDialog</div> : null }));
+vi.mock('../components/portfolio/EditPositionDialog', () => ({ EditPositionDialog: ({ open }: { open: boolean }) => open ? <div>EditDialog</div> : null }));
+vi.mock('../components/portfolio/PortfolioAiAnalyzer', () => ({ PortfolioAiAnalyzer: ({ open }: { open: boolean }) => open ? <div>AiDialog</div> : null }));
 vi.mock('../components/analyzer/FilterBar', () => ({ FilterBar: () => <div>Filter</div> }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('lucide-react', () => ({ 

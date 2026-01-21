@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Calendar as CalendarIcon, Search, Loader2, Info, AlertCircle, DollarSign, Hash } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Search, Loader2, AlertCircle, DollarSign, Hash } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { api, cn } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -10,14 +10,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
 import { SimpleCalendar } from '../ui/simple-calendar';
 import { TickerLogo } from '../dashboard/TickerLogo';
+import { Sparkline } from '../ui/Sparkline';
 import { PriceRangeSlider } from './PriceRangeSlider';
 
 interface TickerResult {
   symbol: string;
   name: string;
+  industry?: string;
+  sector?: string;
   exchange: string;
   logo_url?: string;
   is_queued?: boolean;
+  sparkline?: number[];
 }
 
 interface OhlcDataPoint {
@@ -48,13 +52,14 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<TickerResult[]>([]);
+  const [selectedTicker, setSelectedTicker] = useState<TickerResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // OHLC Data
   const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
-  const [fetchingOhlc, setFetchingOhlc] = useState(false);
+  const [snapshot, setSnapshot] = useState<any>(null);
 
   // Derived calculations
   useEffect(() => {
@@ -139,11 +144,11 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   useEffect(() => {
     if (!symbol) {
       setOhlcData([]);
+      setSelectedTicker(null);
       return;
     }
 
     const fetchHistory = async () => {
-      setFetchingOhlc(true);
       try {
         // Fetch history
         const historyPromise = api.get<any[]>(`/tickers/${symbol}/history`, { params: { days: 1825 } });
@@ -151,6 +156,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
         const snapshotPromise = api.get<any>(`/tickers/${symbol}/snapshot`).catch(() => ({ data: null }));
 
         const [historyRes, snapshotRes] = await Promise.all([historyPromise, snapshotPromise]);
+        setSnapshot(snapshotRes.data);
 
         let combinedData = historyRes.data.map((item: any) => {
           const val = item.ts || item.date || item.time;
@@ -210,7 +216,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
         console.error('Failed to fetch history', err);
         setOhlcData([]);
       } finally {
-        setFetchingOhlc(false);
+        // No-op
       }
     };
 
@@ -268,11 +274,6 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     }
   };
 
-  const selectTicker = (t: TickerResult) => {
-    setSymbol(t.symbol);
-    setSearchQuery(t.symbol); // Show symbol in input
-    setShowResults(false);
-  };
   
   // Get data for currently selected date
   const selectedDateData = useMemo(() => {
@@ -355,43 +356,93 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
             {/* Results Dropdown */}
             {showResults && results.length > 0 && (
               <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-[200px] overflow-y-auto">
-                {results.map((r) => (
+                {results.map((result) => (
                   <button
-                    key={r.symbol}
+                    key={result.symbol}
                     type="button"
-                    onClick={() => selectTicker(r)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center justify-between"
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors border-b border-border/10 last:border-0"
+                    onClick={() => {
+                      setSymbol(result.symbol);
+                      setSearchQuery(result.symbol);
+                      setSelectedTicker(result);
+                      setShowResults(false);
+                      setError(null);
+                    }}
                   >
                     <div className="flex items-center gap-3">
-                      <TickerLogo symbol={r.symbol} url={r.logo_url} className="w-6 h-6" />
-                      <div>
-                        <div className="font-bold flex items-center gap-2">
-                            {r.symbol}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{r.name}</div>
+                      <TickerLogo url={result.logo_url} symbol={result.symbol} className="w-8 h-8 rounded-full shadow-inner" />
+                      <div className="flex flex-col items-start min-w-0">
+                        <span className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
+                          {result.symbol}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground truncate max-w-[150px]">
+                          {result.name}
+                        </span>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{r.exchange}</span>
+                    {result.sparkline && result.sparkline.length > 0 ? (
+                      <div className="flex flex-col items-end gap-1">
+                        <Sparkline data={result.sparkline} width={70} height={24} className="opacity-70 group-hover:opacity-100" />
+                        <span className="text-[9px] text-muted-foreground/60 tracking-tighter">Last 14 days</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/50 uppercase tracking-widest px-2 py-0.5 rounded border border-border/20">
+                        {result.exchange?.replace('NASDAQ NMS - ', '') || 'Vetted'}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
             )}
             
             {/* Selected Ticker Info */}
-            {symbol && !searching && (
-                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                    {fetchingOhlc ? (
-                        <>
-                            <Loader2 size={10} className="animate-spin" />
-                            Fetching market data...
-                        </>
-                    ) : (
-                         <span className="text-primary flex items-center gap-1">
-                            <Info size={12} />
-                            Market data loaded for range selection
-                         </span>
+            {symbol && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                {/* SELECTED TICKER CARD (Retail UX) */}
+                {selectedTicker && (
+                  <div className="bg-muted/20 rounded-xl border border-border/40 p-4 flex items-center justify-between gap-4">
+                    {/* Left: Company Info */}
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <TickerLogo url={selectedTicker.logo_url} symbol={selectedTicker.symbol} className="w-12 h-12 rounded-full shadow-lg border-2 border-background flex-shrink-0" />
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-bold text-foreground leading-none">{selectedTicker.symbol}</h3>
+                        <p className="text-sm text-muted-foreground font-medium truncate">{selectedTicker.name}</p>
+                        {(selectedTicker.industry || snapshot?.ticker?.industry) && (
+                          <p className="text-[10px] text-muted-foreground/60 mt-0.5 uppercase tracking-wider">
+                            {selectedTicker.industry || snapshot?.ticker?.industry}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Center: Sparkline */}
+                    {selectedTicker.sparkline && selectedTicker.sparkline.length > 0 && (
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <Sparkline data={selectedTicker.sparkline} width={100} height={32} />
+                        <span className="text-[9px] text-muted-foreground/60 tracking-tighter">Last 14 days</span>
+                      </div>
                     )}
-                 </div>
+                    
+                    {/* Right: Price & Change */}
+                    <div className="flex flex-col items-end flex-shrink-0">
+                      <div className="text-xl font-mono font-bold">
+                        ${(snapshot?.price || snapshot?.latestPrice?.close)?.toFixed(2) || '---'}
+                      </div>
+                      {snapshot && (
+                        <div className={cn(
+                          "text-xs font-bold flex items-center gap-0.5", 
+                          (snapshot?.change_percent ?? snapshot?.latestPrice?.change_percent ?? 0) >= 0 
+                            ? "text-emerald-500" 
+                            : "text-red-500"
+                        )}>
+                          {(snapshot?.change_percent ?? snapshot?.latestPrice?.change_percent ?? 0) >= 0 ? '+' : ''}
+                          {(snapshot?.change_percent ?? snapshot?.latestPrice?.change_percent ?? 0).toFixed(2)}%
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

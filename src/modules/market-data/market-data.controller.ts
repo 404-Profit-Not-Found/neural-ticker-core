@@ -78,19 +78,22 @@ export class MarketDataController {
     name: 'days',
     required: false,
     example: 30,
-    description: 'Number of days back to fetch. Defaults to 30. Ignored if from/to are provided.',
+    description:
+      'Number of days back to fetch. Defaults to 30. Ignored if from/to are provided.',
   })
   @ApiQuery({
     name: 'from',
     required: false,
     example: '2019-01-01',
-    description: 'Start date (YYYY-MM-DD). Used with "to" for explicit date range.',
+    description:
+      'Start date (YYYY-MM-DD). Used with "to" for explicit date range.',
   })
   @ApiQuery({
     name: 'to',
     required: false,
     example: '2024-01-31',
-    description: 'End date (YYYY-MM-DD). Defaults to today if "from" is provided.',
+    description:
+      'End date (YYYY-MM-DD). Defaults to today if "from" is provided.',
   })
   @ApiResponse({ status: 200, description: 'History retrieved.' })
   @Get('history')

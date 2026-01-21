@@ -9,7 +9,7 @@ import '@testing-library/jest-dom';
 
 // Mocks
 vi.mock('../lib/utils', () => ({
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 vi.mock('../context/AuthContext', () => ({
@@ -33,33 +33,33 @@ vi.mock('../services/adminService', () => ({
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
-    ...await importOriginal<any>(),
+    ...await importOriginal<typeof import('react-router-dom')>(),
     useNavigate: () => vi.fn(),
 }));
 
 // Components Mocks
 vi.mock('../components/layout/Header', () => ({ Header: () => <div data-testid="header">Header</div> }));
-vi.mock('../components/ui/select-native', () => ({ NativeSelect: ({ children, onChange, value }: any) => <select onChange={onChange} value={value} data-testid="mobile-nav">{children}</select> }));
-vi.mock('../components/ui/button', () => ({ Button: ({ children, onClick, className }: any) => <button onClick={onClick} className={className}>{children}</button> }));
-vi.mock('../components/ui/input', () => ({ Input: ({ value, onChange, placeholder }: any) => <input value={value} onChange={onChange} placeholder={placeholder} /> }));
-vi.mock('../components/ui/badge', () => ({ Badge: ({ children }: any) => <span>{children}</span> }));
+vi.mock('../components/ui/select-native', () => ({ NativeSelect: ({ children, onChange, value }: { children: React.ReactNode; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; value: string }) => <select onChange={onChange} value={value} data-testid="mobile-nav">{children}</select> }));
+vi.mock('../components/ui/button', () => ({ Button: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => <button onClick={onClick} className={className}>{children}</button> }));
+vi.mock('../components/ui/input', () => ({ Input: ({ value, onChange, placeholder }: { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string }) => <input value={value} onChange={onChange} placeholder={placeholder} /> }));
+vi.mock('../components/ui/badge', () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock('../components/ui/table', () => ({ 
-  Table: ({ children }: any) => <table>{children}</table>, 
-  TableHeader: ({ children }: any) => <thead>{children}</thead>, 
-  TableBody: ({ children }: any) => <tbody>{children}</tbody>, 
-  TableRow: ({ children, onClick }: any) => <tr onClick={onClick}>{children}</tr>, 
-  TableHead: ({ children, onClick }: any) => <th onClick={onClick}>{children}</th>, 
-  TableCell: ({ children }: any) => <td>{children}</td> 
+  Table: ({ children }: { children: React.ReactNode }) => <table>{children}</table>, 
+  TableHeader: ({ children }: { children: React.ReactNode }) => <thead>{children}</thead>, 
+  TableBody: ({ children }: { children: React.ReactNode }) => <tbody>{children}</tbody>, 
+  TableRow: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <tr onClick={onClick}>{children}</tr>, 
+  TableHead: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <th onClick={onClick}>{children}</th>, 
+  TableCell: ({ children }: { children: React.ReactNode }) => <td>{children}</td> 
 }));
 vi.mock('../components/ui/dialog', () => ({ 
-  Dialog: ({ children, open }: any) => open ? <div>{children}</div> : null, 
-  DialogContent: ({ children }: any) => <div>{children}</div>, 
-  DialogHeader: ({ children }: any) => <div>{children}</div>, 
-  DialogTitle: ({ children }: any) => <div>{children}</div>, 
-  DialogDescription: ({ children }: any) => <div>{children}</div>, 
-  DialogFooter: ({ children }: any) => <div>{children}</div> 
+  Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) => open ? <div>{children}</div> : null, 
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, 
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, 
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, 
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, 
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div> 
 }));
-vi.mock('../components/ui/popover', () => ({ Popover: ({ children }: any) => <div>{children}</div>, PopoverTrigger: ({ children }: any) => <div>{children}</div>, PopoverContent: ({ children }: any) => <div>{children}</div> }));
+vi.mock('../components/ui/popover', () => ({ Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('../components/ui/user-tier-badge', () => ({ UserTierBadge: () => <div>UTB</div> }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('lucide-react', () => ({ 

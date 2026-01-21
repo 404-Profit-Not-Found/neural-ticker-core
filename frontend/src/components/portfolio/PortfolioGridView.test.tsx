@@ -20,17 +20,17 @@ vi.mock('../dashboard/TickerLogo', () => ({
 }));
 
 vi.mock('../ui/badge', () => ({
-  Badge: ({ children, variant }: any) => <div data-variant={variant}>{children}</div>,
+  Badge: ({ children, variant }: { children: React.ReactNode; variant?: string }) => <div data-variant={variant}>{children}</div>,
 }));
 
 vi.mock('../ui/button', () => ({
-  Button: ({ children, onClick, className }: any) => (
+  Button: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => (
     <button onClick={onClick} className={className}>{children}</button>
   ),
 }));
 
 vi.mock('../ui/skeleton', () => ({
-  Skeleton: ({ className }: any) => <div className={className} data-testid="skeleton" />,
+  Skeleton: ({ className }: { className?: string }) => <div className={className} data-testid="skeleton" />,
 }));
 
 describe('PortfolioGridView', () => {

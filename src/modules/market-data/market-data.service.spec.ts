@@ -664,4 +664,34 @@ describe('MarketDataService', () => {
       expect(mockOhlcvRepo.upsert).toHaveBeenCalled();
     });
   });
+
+  describe('getHistory', () => {
+    it('should normalize interval and use UTC dates', async () => {
+      const mockTicker = { id: 1, symbol: 'AAPL' };
+      mockTickersService.getTicker.mockResolvedValue(mockTicker);
+      mockOhlcvRepo.find.mockResolvedValue([{ close: 150, ts: new Date() }]);
+
+      // Test with 'D' interval and YYYY-MM-DD strings
+      await service.getHistory('AAPL', 'D', '2025-01-01', '2025-01-02');
+
+      expect(mockOhlcvRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            timeframe: '1d',
+          }),
+        }),
+      );
+
+      // Check if dates were converted to UTC
+      const calls = mockOhlcvRepo.find.mock.calls;
+      const between = calls[0][0].where.ts;
+      // Between is an object { _type: 'between', _value: [Date, Date] }
+      expect(between._value[0].toISOString()).toContain(
+        '2025-01-01T00:00:00.000Z',
+      );
+      expect(between._value[1].toISOString()).toContain(
+        '2025-01-02T23:59:59.000Z',
+      );
+    });
+  });
 });

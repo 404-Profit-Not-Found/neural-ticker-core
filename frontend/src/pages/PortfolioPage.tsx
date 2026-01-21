@@ -105,8 +105,7 @@ export function PortfolioPage() {
   // Merge Snapshots with Positions
   const enrichedPositions = useMemo(() => {
     if (!snapshots || snapshots.length === 0) return positions;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const snapMap = new Map(snapshots.map((s: any) => [s.ticker.symbol, s]));
+    const snapMap = new Map(snapshots.map((s: Record<string, unknown> & { ticker: { symbol: string }; fundamentals?: { fifty_two_week_high?: number; fifty_two_week_low?: number }; sparkline?: unknown }) => [s.ticker.symbol, s]));
 
     return positions.map((p: PortfolioPosition) => {
       const snap = snapMap.get(p.symbol);
@@ -122,18 +121,18 @@ export function PortfolioPage() {
 
   // Client-Side Filtering
   const filteredPositions = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return enrichedPositions.filter((item: any) => {
+    return enrichedPositions.filter((item: unknown) => {
+      const typedItem = item as Record<string, unknown> & Partial<PortfolioPosition>;
       // 1. Search (Symbol or Name)
       const matchSearch = !search ||
-        item.symbol.includes(search.toUpperCase()) ||
-        item.ticker?.name?.toLowerCase().includes(search.toLowerCase());
+        typedItem.symbol?.includes(search.toUpperCase()) ||
+        typedItem.ticker?.name?.toLowerCase().includes(search.toLowerCase());
 
       if (!matchSearch) return false;
 
       // 2. Risk
       if (filters.risk.length > 0) {
-        const risk = Number(item.aiAnalysis?.financial_risk || 0);
+        const risk = Number(typedItem.aiAnalysis?.financial_risk || 0);
         const matchesRisk = filters.risk.some(range => {
           if (range.includes('Low')) return risk <= 3.5;
           if (range.includes('Medium')) return risk > 3.5 && risk <= 6.5;
@@ -145,9 +144,9 @@ export function PortfolioPage() {
 
       // 3. AI Rating
       if (filters.aiRating.length > 0) {
-        const risk = Number(item.aiAnalysis?.financial_risk || 0);
-        const upside = Number(item.aiAnalysis?.upside_percent || 0);
-        const overallScore = item.aiAnalysis?.overall_score;
+        const risk = Number(typedItem.aiAnalysis?.financial_risk || 0);
+        const upside = Number(typedItem.aiAnalysis?.upside_percent || 0);
+        const overallScore = typedItem.aiAnalysis?.overall_score;
         const { rating } = calculateAiRating(risk, upside, overallScore); // e.g. "Strong Buy"
 
         // Check direct match ("Strong Buy" === "Strong Buy")
@@ -158,7 +157,7 @@ export function PortfolioPage() {
 
       // 4. Sector
       if (filters.sector.length > 0) {
-        const sec = item.ticker?.sector || item.fundamentals?.sector;
+        const sec = typedItem.ticker?.sector || typedItem.fundamentals?.sector;
         if (!sec || !filters.sector.includes(sec)) return false;
       }
 
@@ -166,15 +165,15 @@ export function PortfolioPage() {
       if (filters.upside) {
         // "> 10%"
         const minUpside = parseInt(filters.upside.replace(/[^0-9]/g, ''));
-        const up = Number(item.aiAnalysis?.upside_percent || 0);
+        const up = Number(typedItem.aiAnalysis?.upside_percent || 0);
 
         // Or calculate base_price upside dynamically? 
         // Let's stick to stored 'upside_percent' for filtering consistency vs display.
         // Display logic uses base_price if available.
         // Let's use the better logic:
         let displayUpside = up;
-        if (typeof item.aiAnalysis?.base_price === 'number' && item.current_price > 0) {
-          displayUpside = ((item.aiAnalysis.base_price - item.current_price) / item.current_price) * 100;
+        if (typeof typedItem.aiAnalysis?.base_price === 'number' && (typedItem.current_price || 0) > 0) {
+          displayUpside = ((typedItem.aiAnalysis.base_price - (typedItem.current_price || 0)) / (typedItem.current_price || 0)) * 100;
         }
 
         if (displayUpside <= minUpside) return false;
@@ -183,7 +182,7 @@ export function PortfolioPage() {
       // 6. Overall Score (Risk/Reward)
       if (filters.overallScore) {
         const minScore = parseFloat(filters.overallScore.replace(/[^0-9.]/g, ''));
-        const score = Number(item.aiAnalysis?.overall_score || 0);
+        const score = Number(typedItem.aiAnalysis?.overall_score || 0);
         if (score <= minScore) return false;
       }
 

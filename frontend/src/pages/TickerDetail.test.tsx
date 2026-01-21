@@ -61,7 +61,7 @@ vi.mock('../lib/api', () => ({
     post: vi.fn(),
     patch: vi.fn(),
   },
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 vi.mock('@tanstack/react-query', () => ({

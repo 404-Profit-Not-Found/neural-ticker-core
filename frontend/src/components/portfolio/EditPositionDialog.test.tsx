@@ -8,12 +8,10 @@ import '@testing-library/jest-dom';
 // Mocks
 vi.mock('../../lib/api', () => ({
   api: {
+    get: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
   },
-}));
-
-vi.mock('../../lib/utils', () => ({
   cn: (...args: any[]) => args.filter(Boolean).join(' '),
 }));
 
@@ -24,12 +22,55 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('lucide-react', () => ({
+  Plus: () => <div data-testid="icon-plus" />,
+  Calendar: () => <div data-testid="icon-calendar" />,
+  Search: () => <div data-testid="icon-search" />,
+  Loader2: () => <div data-testid="icon-loader" />,
+  Info: () => <div data-testid="icon-info" />,
+  AlertCircle: () => <div data-testid="icon-alert" />,
+  DollarSign: () => <div data-testid="icon-dollar" />,
+  Hash: () => <div data-testid="icon-hash" />,
+  Save: () => <div data-testid="icon-save" />,
+  Trash2: () => <div data-testid="icon-trash" />,
+  AlertTriangle: () => <div data-testid="icon-alert-triangle" />,
+}));
+
 vi.mock('../ui/dialog', () => ({
   Dialog: ({ children, open }: any) => open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: any) => <p>{children}</p>,
   DialogFooter: ({ children }: any) => <div>{children}</div>,
+}));
+
+vi.mock('../ui/tabs', () => ({
+  Tabs: ({ children, value, onValueChange }: any) => (
+    <div data-testid="tabs" onClick={() => onValueChange?.('shares')}>{children}</div>
+  ),
+  TabsList: ({ children }: any) => <div>{children}</div>,
+  TabsTrigger: ({ children, value }: any) => <button>{children}</button>,
+  TabsContent: ({ children, value }: any) => <div>{children}</div>,
+}));
+
+vi.mock('../ui/popover', () => ({
+  Popover: ({ children }: any) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: any) => <div>{children}</div>,
+  PopoverContent: ({ children }: any) => <div data-testid="popover-content">{children}</div>,
+}));
+
+vi.mock('../ui/simple-calendar', () => ({
+  SimpleCalendar: () => <div data-testid="calendar" />,
+}));
+
+vi.mock('./PriceRangeSlider', () => ({
+  PriceRangeSlider: ({ value, onChange }: any) => (
+    <div data-testid="price-slider">
+      <span>Value: {value}</span>
+      <button onClick={() => onChange(155)}>Set Price</button>
+    </div>
+  ),
 }));
 
 vi.mock('../ui/button', () => ({
@@ -59,9 +100,14 @@ describe('EditPositionDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (api.get as Mock).mockImplementation((url: string) => {
+      if (url.includes('/snapshot')) return Promise.resolve({ data: { latestPrice: { close: 150 }, ticker: { name: 'Apple Inc' } } });
+      if (url.includes('/history')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: [] });
+    });
   });
 
-  it('renders with position data when open', () => {
+  it('renders with position data when open', async () => {
     render(
       <EditPositionDialog
         open={true}
@@ -71,8 +117,10 @@ describe('EditPositionDialog', () => {
       />
     );
     
-    expect(screen.getByText(/Manage Position: AAPL/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+    expect(await screen.findByText(/Manage Position/i)).toBeInTheDocument();
+    // Use findByText to wait for the snapshot and price info
+    expect(await screen.findByText('AAPL')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('10')).toBeInTheDocument();
   });
 
   it('handles patch submission', async () => {
@@ -86,10 +134,11 @@ describe('EditPositionDialog', () => {
       />
     );
     
-    const sharesInput = screen.getByDisplayValue('10');
+    // Use findBy to wait for initial value from useEffect
+    const sharesInput = await screen.findByDisplayValue('10');
     fireEvent.change(sharesInput, { target: { value: '12' } });
     
-    const saveBtn = screen.getByText(/save/i);
+    const saveBtn = screen.getByText(/Save Changes/i);
     fireEvent.click(saveBtn);
     
     await waitFor(() => {
@@ -111,12 +160,12 @@ describe('EditPositionDialog', () => {
       />
     );
     
-    const deleteBtn = screen.getByText('Delete');
+    const deleteBtn = screen.getByText(/Delete Position/i);
     fireEvent.click(deleteBtn);
     
-    expect(screen.getByText(/Delete Position\?/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Delete Position\?/i)).toBeInTheDocument();
     
-    const confirmDeleteBtn = screen.getByRole('button', { name: 'Delete' });
+    const confirmDeleteBtn = screen.getByRole('button', { name: /^Delete$/i });
     fireEvent.click(confirmDeleteBtn);
     
     await waitFor(() => {

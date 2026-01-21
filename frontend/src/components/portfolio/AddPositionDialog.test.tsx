@@ -118,8 +118,13 @@ describe('AddPositionDialog', () => {
       expect(screen.getByText('Apple')).toBeInTheDocument();
     });
 
+    // In the search results, 'Apple' is inside a button
     fireEvent.click(screen.getByText('Apple'));
-    expect(input).toHaveValue('AAPL');
+    
+    // After selection, the search input searchQuery is set to symbol
+    await waitFor(() => {
+      expect(input).toHaveValue('AAPL');
+    });
   });
 
   it('updates price via slider when data is available', async () => {
@@ -139,21 +144,22 @@ describe('AddPositionDialog', () => {
     fireEvent.click(screen.getByText('Apple Inc'));
 
     await waitFor(() => {
-        expect(screen.getByTestId('price-slider')).toBeInTheDocument();
-    });
+        expect(screen.getByTestId('price-slider')).toHaveTextContent(/150\.00/);
+    }, { timeout: 3000 });
 
     fireEvent.click(screen.getByTestId('price-slider'));
     // Slider mock calls onChange(155)
     await waitFor(() => {
-        expect(screen.getByText(/\$155\.00/)).toBeInTheDocument();
-    });
+        expect(screen.getByTestId('price-slider')).toHaveTextContent(/155\.00/);
+    }, { timeout: 3000 });
   });
 
   it('handles form submission', async () => {
+    const testDate = '2026-01-21';
     (api.post as Mock).mockResolvedValue({});
     (api.get as Mock).mockImplementation((url: string) => {
         if (url.includes('/tickers')) return Promise.resolve({ data: [{ symbol: 'AAPL', name: 'Apple Inc', logo_url: 'logo.png' }] });
-        if (url.includes('/history')) return Promise.resolve({ data: [{ date: today, close: 100, high: 110, low: 90, median: 100 }] });
+        if (url.includes('/history')) return Promise.resolve({ data: [{ date: testDate, close: 100, high: 110, low: 90, median: 100 }] });
         if (url.includes('/snapshot')) return Promise.resolve({ data: { latestPrice: { close: 100 } } });
         return Promise.resolve({ data: [] });
     });
@@ -169,12 +175,16 @@ describe('AddPositionDialog', () => {
     const investmentInput = screen.getByLabelText(/Investment Amount/i);
     fireEvent.change(investmentInput, { target: { value: '1000' } });
     
-    // Price should be auto-set to 100 from history
+    // Price should be auto-set from history
     await waitFor(() => {
-        // We can check if share calc updated or just proceed
-        // With price 100, 1000 investment -> 10 shares
-        expect(screen.getByText('10.0000')).toBeInTheDocument(); 
-    });
+        expect(screen.getByTestId('price-slider')).toHaveTextContent(/100\.00/);
+    }, { timeout: 3000 });
+
+    // With price 100, 1000 investment -> 10 shares
+    await waitFor(() => {
+        const sharesInput = screen.getByLabelText(/Number of Shares/i) as HTMLInputElement;
+        expect(parseFloat(sharesInput.value)).toBeCloseTo(10, 2);
+    }, { timeout: 3000 });
     
     const submitButton = screen.getByText(/Add AAPL/i);
     fireEvent.click(submitButton);

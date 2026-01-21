@@ -686,10 +686,13 @@ export class MarketDataService {
     const tickerEntity = await this.tickersService.getTicker(symbol);
 
     // Normalize interval for DB and providers
-    const normalizedInterval = interval === 'D' || interval === '1d' ? '1d' : interval;
+    const normalizedInterval =
+      interval === 'D' || interval === '1d' ? '1d' : interval;
 
     // Use absolute UTC dates to avoid timezone shifts
-    const from = new Date(fromStr + (fromStr.includes('T') ? '' : 'T00:00:00Z'));
+    const from = new Date(
+      fromStr + (fromStr.includes('T') ? '' : 'T00:00:00Z'),
+    );
     const to = new Date(toStr + (toStr.includes('T') ? '' : 'T23:59:59Z'));
 
     // 1. Try DB first
@@ -705,18 +708,25 @@ export class MarketDataService {
     // Smart Coverage Check (Trading days are ~5/7 of calendar days)
     const msPerDay = 1000 * 60 * 60 * 24;
     const calendarDaysRequested = (to.getTime() - from.getTime()) / msPerDay;
-    const expectedTradingDays = Math.max(1, Math.floor(calendarDaysRequested * (5 / 7)));
+    const expectedTradingDays = Math.max(
+      1,
+      Math.floor(calendarDaysRequested * (5 / 7)),
+    );
     const coverageRatio = dbData.length / expectedTradingDays;
 
     // If we have > 95% of expected trading days, return DB.
     if (coverageRatio > 0.95) {
-      this.logger.debug(`Using DB history (Excellent Coverage: ${(coverageRatio * 100).toFixed(1)}%)`);
+      this.logger.debug(
+        `Using DB history (Excellent Coverage: ${(coverageRatio * 100).toFixed(1)}%)`,
+      );
       return dbData;
     }
 
     // 2. Fetch from Providers (Sync if coverage is low/gaps exist)
-    this.logger.log(`Gap detected in DB history for ${symbol} (Coverage: ${(coverageRatio * 100).toFixed(1)}%). Syncing synchronously...`);
-    
+    this.logger.log(
+      `Gap detected in DB history for ${symbol} (Coverage: ${(coverageRatio * 100).toFixed(1)}%). Syncing synchronously...`,
+    );
+
     // Await sync to ensure user gets full data even if it takes a moment
     await this.syncTickerHistory(symbol, 5);
 
@@ -741,7 +751,11 @@ export class MarketDataService {
 
     try {
       const resolution =
-        normalizedInterval === '1d' ? 'D' : normalizedInterval === '1wk' ? 'W' : 'M';
+        normalizedInterval === '1d'
+          ? 'D'
+          : normalizedInterval === '1wk'
+            ? 'W'
+            : 'M';
 
       this.logger.debug(
         `Finnhub Request: ${symbol} Res: ${resolution} From: ${fromUnix} To: ${toUnix}`,

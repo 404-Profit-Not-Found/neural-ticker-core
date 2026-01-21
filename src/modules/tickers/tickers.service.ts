@@ -303,6 +303,8 @@ export class TickersService {
             'ticker.name',
             'ticker.exchange',
             'ticker.logo_url',
+            'ticker.sector',
+            'ticker.finnhub_industry',
           ])
           .where('ticker.is_hidden = :hidden', { hidden: false })
           .andWhere(
@@ -377,6 +379,7 @@ export class TickersService {
       ...t,
       is_locally_tracked: true,
       sparkline: sparklineMap.get(t.id) || [],
+      industry: t.sector || t.finnhub_industry,
     }));
 
     // Map pending requests to results
