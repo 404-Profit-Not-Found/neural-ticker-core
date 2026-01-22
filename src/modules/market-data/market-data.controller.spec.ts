@@ -67,7 +67,7 @@ describe('MarketDataController', () => {
       // Check if dates are passed correctly (approximate check since Date is dynamic)
       expect(service.getHistory).toHaveBeenCalledWith(
         'AAPL',
-        'D',
+        '1d',
         expect.any(String), // fromDate
         expect.any(String), // toDate
       );
@@ -80,7 +80,7 @@ describe('MarketDataController', () => {
 
       expect(service.getHistory).toHaveBeenCalledWith(
         'AAPL',
-        'D',
+        '1d',
         expect.any(String),
         expect.any(String),
       );

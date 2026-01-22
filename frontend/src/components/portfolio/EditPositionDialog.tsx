@@ -39,6 +39,31 @@ interface EditPositionDialogProps {
     onSuccess: () => void;
 }
 
+interface HistoryItem {
+    ts?: number;
+    date?: string;
+    time?: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+}
+
+interface SnapshotData {
+    ticker?: {
+        logo_url?: string;
+        name?: string;
+        industry?: string;
+    };
+    sparkline?: number[];
+    price?: number;
+    latestPrice?: {
+        close?: number;
+        change_percent?: number;
+    };
+    change_percent?: number;
+}
+
 export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: EditPositionDialogProps) {
     const [shares, setShares] = useState('');
     const [price, setPrice] = useState('');
@@ -51,7 +76,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
 
     // OHLC Data
     const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
-    const [snapshot, setSnapshot] = useState<Record<string, unknown> | null>(null);
+    const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
 
     // Initialize state from position
     useEffect(() => {
@@ -72,21 +97,21 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
         const fetchHistory = async () => {
             try {
                 // Fetch 5 years of history + snapshot
-                const historyPromise = api.get<Array<Record<string, unknown>>>(`/tickers/${position.symbol}/history`, { params: { days: 1825 } });
-                const snapshotPromise = api.get<Record<string, unknown>>(`/tickers/${position.symbol}/snapshot`).catch(() => ({ data: null }));
+                const historyPromise = api.get<HistoryItem[]>(`/tickers/${position.symbol}/history`, { params: { days: 1825 } });
+                const snapshotPromise = api.get<SnapshotData>(`/tickers/${position.symbol}/snapshot`).catch(() => ({ data: {} as SnapshotData }));
 
                 const [historyRes, snapshotRes] = await Promise.all([historyPromise, snapshotPromise]);
                 setSnapshot(snapshotRes.data);
                 
-                const combinedData = historyRes.data.map((item: Record<string, unknown>) => {
+                const combinedData = historyRes.data.map((item) => {
                     const val = item.ts || item.date || item.time;
-                    let dateStr = val;
+                    let dateStr = String(val);
                     if (typeof val === 'number') {
                         dateStr = new Date(val * 1000).toISOString().split('T')[0];
                     } else if (val) {
                         try {
-                            dateStr = new Date(val).toISOString().split('T')[0];
-                        } catch { dateStr = val; }
+                            dateStr = new Date(val as string | number | Date).toISOString().split('T')[0];
+                        } catch { dateStr = String(val); }
                     }
                     return {
                         date: dateStr,

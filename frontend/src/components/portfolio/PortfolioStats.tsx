@@ -338,7 +338,7 @@ export function PortfolioStats({
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorValuePortfolio)"
-                  dot={(props: { cx: number; cy: number; payload?: { date: string; addedSymbols?: string[] } }) => {
+                  dot={(props: any) => {
                     const { cx, cy, payload } = props;
                     if (payload && payload.addedSymbols && payload.addedSymbols.length > 0) {
                       return <circle key={payload.date} cx={cx} cy={cy} r={4} fill="white" stroke={chartColor} strokeWidth={2} />;
