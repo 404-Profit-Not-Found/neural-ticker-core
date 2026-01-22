@@ -610,13 +610,10 @@ export class MarketDataService {
       `History coverage for ${symbol} (${years}y): ${dbCount}/${expectedDays} (${(coverageRatio * 100).toFixed(1)}%)`,
     );
 
-    // If we have > 70% of data, we consider it "synced enough" to not trigger a full re-download.
-    // Ideally we'd check for specific gaps, but this is a good heuristic for MVP.
-    // Exception: If the latest data is stale (checked separately via getSnapshot normally),
-    // but here we focus on bulk history.
-    if (coverageRatio > 0.7) {
+    // If we have > 95% of data, we consider it "synced enough" to not trigger a full re-download.
+    if (coverageRatio > 0.95) {
       this.logger.debug(
-        `Skipping full history sync for ${symbol} (Good coverage)`,
+        `Skipping full history sync for ${symbol} (Excellent coverage: ${(coverageRatio * 100).toFixed(1)}%)`,
       );
       return;
     }
@@ -688,41 +685,64 @@ export class MarketDataService {
   ) {
     const tickerEntity = await this.tickersService.getTicker(symbol);
 
-    const from = new Date(fromStr);
-    const to = new Date(toStr);
+    // Normalize interval for DB and providers
+    const normalizedInterval =
+      interval === 'D' || interval === '1d' ? '1d' : interval;
+
+    // Use absolute UTC dates to avoid timezone shifts
+    const from = new Date(
+      fromStr + (fromStr.includes('T') ? '' : 'T00:00:00Z'),
+    );
+    const to = new Date(toStr + (toStr.includes('T') ? '' : 'T23:59:59Z'));
 
     // 1. Try DB first
     const dbData = await this.ohlcvRepo.find({
       where: {
         symbol_id: tickerEntity.id,
-        timeframe: interval,
+        timeframe: normalizedInterval,
         ts: Between(from, to),
       },
       order: { ts: 'ASC' },
     });
 
-    // Smart Coverage Check
+    // Smart Coverage Check (Trading days are ~5/7 of calendar days)
     const msPerDay = 1000 * 60 * 60 * 24;
-    const daysRequested = (to.getTime() - from.getTime()) / msPerDay;
-    const coverageRatio = daysRequested > 0 ? dbData.length / daysRequested : 0;
+    const calendarDaysRequested = (to.getTime() - from.getTime()) / msPerDay;
+    const expectedTradingDays = Math.max(
+      1,
+      Math.floor(calendarDaysRequested * (5 / 7)),
+    );
+    const coverageRatio = dbData.length / expectedTradingDays;
 
-    // If we have > 50% of the days (considering weekends/holidays, 50% of total calendar days is roughly ~70% of business days),
-    // we return the DB data.
-    if (coverageRatio > 0.4) {
-      // 0.4 * 365 = 146 days per year (Trading days ~252. 146/252 = ~57% of trading days).
-      // Actually, let's just trigger a background sync check if it looks sparse,
-      // but return what we have to be fast.
-      if (coverageRatio < 0.6) {
-        // Fire and forget sync if data feels "thin", but don't block
-        this.syncTickerHistory(symbol, 5).catch((e) =>
-          this.logger.error(`Bg sync failed: ${e.message}`),
-        );
-      }
+    // If we have > 95% of expected trading days, return DB.
+    if (coverageRatio > 0.95) {
+      this.logger.debug(
+        `Using DB history (Excellent Coverage: ${(coverageRatio * 100).toFixed(1)}%)`,
+      );
       return dbData;
     }
 
-    // 2. Fetch from Providers
-    this.logger.log(`Fetching history for ${symbol} from providers...`);
+    // 2. Fetch from Providers (Sync if coverage is low/gaps exist)
+    this.logger.log(
+      `Gap detected in DB history for ${symbol} (Coverage: ${(coverageRatio * 100).toFixed(1)}%). Syncing synchronously...`,
+    );
+
+    // Await sync to ensure user gets full data even if it takes a moment
+    await this.syncTickerHistory(symbol, 5);
+
+    // Re-query DB after sync
+    const syncedData = await this.ohlcvRepo.find({
+      where: {
+        symbol_id: tickerEntity.id,
+        timeframe: normalizedInterval,
+        ts: Between(from, to),
+      },
+      order: { ts: 'ASC' },
+    });
+
+    if (syncedData.length > 0) return syncedData;
+
+    // 3. Fallback Providers (Final attempt if sync failed)
     let history: any[] = [];
     let source = 'finnhub';
 
@@ -731,7 +751,11 @@ export class MarketDataService {
 
     try {
       const resolution =
-        interval === '1d' ? 'D' : interval === '1wk' ? 'W' : 'M';
+        normalizedInterval === '1d'
+          ? 'D'
+          : normalizedInterval === '1wk'
+            ? 'W'
+            : 'M';
 
       this.logger.debug(
         `Finnhub Request: ${symbol} Res: ${resolution} From: ${fromUnix} To: ${toUnix}`,

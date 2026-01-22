@@ -39,6 +39,22 @@ function useUnreadNotifications(isAuthenticated: boolean) {
   return { unreadCount: unreadCount || 0, check: refetch };
 }
 
+// Cached notification list
+function useNotificationsList(isAuthenticated: boolean) {
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications', 'list'],
+    queryFn: async () => {
+      const { data } = await api.get<Notification[]>('/notifications');
+      return data;
+    },
+    enabled: isAuthenticated,
+    staleTime: 60000, // 1 minute stale time
+    refetchOnWindowFocus: true,
+  });
+
+  return { notifications: notifications || [] };
+}
+
 interface ActiveResearchIndicatorProps {
   count: number;
 }
@@ -65,7 +81,6 @@ export function Header() {
   const [notificationsMenuOpen, setNotificationsMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Lifted state to synchronize notifications
@@ -74,15 +89,10 @@ export function Header() {
 
   const { unreadCount, check: refreshNotifications } =
     useUnreadNotifications(!!user);
+  
+  const { notifications } = useNotificationsList(!!user);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const { data } = await api.get<Notification[]>('/notifications');
-      setNotifications(data);
-    } catch (e) {
-      console.error('Failed to fetch notifications list', e);
-    }
-  }, []);
+
 
   const closeMenus = useCallback(() => {
     setProfileMenuOpen(false);
@@ -105,10 +115,8 @@ export function Header() {
         // 1. Immediately refresh the unread count badge
         void refreshNotifications();
 
-        // 2. If it's a research complete event, also refresh research list if menu is open
-        if (notificationsMenuOpen) {
-          void fetchNotifications();
-        }
+        // 2. If it's a research complete event, update list
+        void queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
 
         // 3. Specifically for research updates, invalidate the active research count
         void queryClient.invalidateQueries({
@@ -129,7 +137,7 @@ export function Header() {
     return () => {
       eventSource.close();
     };
-  }, [user, refreshNotifications, notificationsMenuOpen, fetchNotifications]);
+  }, [user, refreshNotifications, notificationsMenuOpen]);
 
   // Sync: When research finishes (count drops to 0), immediately check for new notifications
   useEffect(() => {
@@ -147,14 +155,9 @@ export function Header() {
     setNotificationsMenuOpen(false);
   }, [location.pathname]);
 
-  const toggleNotifications = async () => {
-    if (!notificationsMenuOpen) {
-      await fetchNotifications();
-      setNotificationsMenuOpen(true);
-      setProfileMenuOpen(false);
-    } else {
-      setNotificationsMenuOpen(false);
-    }
+  const toggleNotifications = () => {
+    setNotificationsMenuOpen(!notificationsMenuOpen);
+    if (profileMenuOpen) setProfileMenuOpen(false);
   };
 
   const handleNotificationClick = async (n: Notification) => {
@@ -162,6 +165,7 @@ export function Header() {
       if (!n.read) {
         await api.patch(`/notifications/${n.id}/read`);
         void refreshNotifications();
+        void queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
       }
 
       if (n.type === 'research_complete' && n.data?.ticker) {
@@ -272,7 +276,8 @@ export function Header() {
             <div className="relative">
               <button
                 className={`flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors relative ${notificationsMenuOpen ? 'text-foreground' : ''}`}
-                onClick={() => { void toggleNotifications(); }}
+                onClick={toggleNotifications}
+                aria-label="Notifications"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
@@ -295,7 +300,7 @@ export function Header() {
                     onClick={() => {
                       void (async () => {
                         await api.patch('/notifications/read-all');
-                        await fetchNotifications();
+                        await queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
                         void refreshNotifications();
                       })();
                     }}

@@ -93,7 +93,6 @@ DialogDescription.displayName = "DialogDescription"
 
 // Shim for APIs used by other components
 const DialogContent = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={className} {...props}>{children}</div>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const DialogTrigger = ({ children }: any) => <>{children}</>
+const DialogTrigger = ({ children }: { children: React.ReactNode }) => <>{children}</>
 
 export { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger }

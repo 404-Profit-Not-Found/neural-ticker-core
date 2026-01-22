@@ -167,8 +167,7 @@ export function useRemoveTickerFromWatchlist() {
 // --- Market Data ---
 
 // Constant empty array for snapshots
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const EMPTY_SNAPSHOTS: any[] = [];
+const EMPTY_SNAPSHOTS: unknown[] = [];
 
 export function useMarketSnapshots(symbols: string[]) {
   return useQuery({
@@ -192,8 +191,7 @@ export function useMarketSnapshots(symbols: string[]) {
 }
 
 // Constant empty array for search results
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const EMPTY_SEARCH_RESULTS: any[] = [];
+const EMPTY_SEARCH_RESULTS: unknown[] = [];
 
 export function useTickerSearch(query: string) {
   return useQuery({

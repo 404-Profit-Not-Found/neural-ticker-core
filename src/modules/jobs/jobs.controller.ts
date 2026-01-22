@@ -81,4 +81,24 @@ export class JobsController {
     const result = await this.jobsService.syncResearchAndRatings(symbol);
     return { message: 'Sync completed', ...result };
   }
+
+  @Post('daily-digest')
+  @ApiOperation({ summary: 'Trigger daily news digest generation (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Digest generation triggered' })
+  async runDailyDigest(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    await this.jobsService.runDailyDigest();
+    return { message: 'Daily digest generation triggered' };
+  }
+
+  @Post('process-requests')
+  @ApiOperation({ summary: 'Process pending async requests (Cron)' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Processing triggered' })
+  async processPendingRequests(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    await this.jobsService.processPendingRequests();
+    return { message: 'Pending requests processing triggered' };
+  }
 }

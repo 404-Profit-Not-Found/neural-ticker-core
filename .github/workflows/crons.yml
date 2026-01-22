@@ -1,5 +1,8 @@
 name: Cron Jobs
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # Daily at Midnight UTC (Sync Candles, Watchers)
@@ -8,6 +11,8 @@ on:
     - cron: '0 * * * *'
     # Every 30 mins during market hours (6 AM - 9 PM UTC covers both EU and US)
     - cron: '*/30 6-21 * * 1-5'
+    # Every 5 minutes (Digest, Queue Processing)
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -44,3 +49,15 @@ jobs:
     steps:
       - name: Trigger Snapshot Sync
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-snapshots -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
+  # Frequent jobs (Every 5 mins)
+  frequent-jobs:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Daily Digest Generation
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
+      - name: Trigger Process Request Queue
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/process-requests -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
