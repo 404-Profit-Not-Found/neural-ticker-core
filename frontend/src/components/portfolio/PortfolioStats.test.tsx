@@ -66,11 +66,16 @@ describe('PortfolioStats', () => {
         positions={mockPositions}
         onAnalyze={mockOnAnalyze}
         credits={10}
+        todayGain={50}
+        todayGainPct={1.4}
       />
     );
 
     expect(screen.getByText(/\$3,550\.00/)).toBeInTheDocument();
     expect(screen.getByText(/\$550\.00/)).toBeInTheDocument();
+    expect(screen.getByText('All Time')).toBeInTheDocument();
+    // Default range is 1M, so it should show 1M label in the period gain section
+    expect(screen.getAllByText('1M').length).toBeGreaterThan(0); 
     expect(screen.getAllByText('AI Analyze').length).toBeGreaterThan(0);
   });
 
@@ -122,6 +127,61 @@ describe('PortfolioStats', () => {
     fireEvent.click(rangeButton);
     
     // Check if the range button becomes active
+    expect(rangeButton).toHaveClass('text-foreground');
+  });
+
+  it('handles 1D range with simulated hourly data', () => {
+    render(
+      <PortfolioStats
+        totalValue={3550}
+        totalGainLoss={550}
+        totalGainLossPercent={18.3}
+        positions={mockPositions}
+        onAnalyze={mockOnAnalyze}
+      />
+    );
+
+    const rangeButton = screen.getByText('1D');
+    fireEvent.click(rangeButton);
+    expect(rangeButton).toHaveClass('text-foreground');
+    // We can't easily check internal state, but we know it doesn't crash
+  });
+
+  it('displays period gains correctly for 1D', () => {
+    render(
+      <PortfolioStats
+        totalValue={3550}
+        totalGainLoss={550}
+        totalGainLossPercent={18.3}
+        positions={mockPositions}
+        onAnalyze={mockOnAnalyze}
+        todayGain={123.45}
+        todayGainPct={3.5}
+      />
+    );
+
+    const rangeButton = screen.getByRole('button', { name: '1D' });
+    fireEvent.click(rangeButton);
+
+    expect(rangeButton).toHaveClass('text-foreground');
+    // The period gain should match the prop
+    expect(screen.getByText(/\$123\.45/)).toBeInTheDocument();
+    expect(screen.getByText(/3\.50%/)).toBeInTheDocument();
+  });
+
+  it('handles 1W range', () => {
+    render(
+      <PortfolioStats
+        totalValue={3550}
+        totalGainLoss={550}
+        totalGainLossPercent={18.3}
+        positions={mockPositions}
+        onAnalyze={mockOnAnalyze}
+      />
+    );
+
+    const rangeButton = screen.getByText('1W');
+    fireEvent.click(rangeButton);
     expect(rangeButton).toHaveClass('text-foreground');
   });
 

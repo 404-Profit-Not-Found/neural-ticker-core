@@ -12,6 +12,7 @@ import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
 import { TickerEntity } from '../tickers/entities/ticker.entity';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 import { ConfigService } from '@nestjs/config';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
@@ -132,6 +133,9 @@ describe('MarketDataService', () => {
     getSummary: jest.fn(),
     fetchNewsFromYahoo: jest.fn().mockResolvedValue([]),
   };
+  const mockPortfolioService = {
+    getAllDistinctPortfolioSymbols: jest.fn().mockResolvedValue([]),
+  };
 
   const mockConfigService = {
     get: jest.fn().mockReturnValue(15), // Return default number
@@ -184,6 +188,10 @@ describe('MarketDataService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: PortfolioService,
+          useValue: mockPortfolioService,
         },
         {
           provide: getRepositoryToken(TickerEntity),

@@ -169,7 +169,7 @@ export function useRemoveTickerFromWatchlist() {
 // Constant empty array for snapshots
 const EMPTY_SNAPSHOTS: unknown[] = [];
 
-export function useMarketSnapshots(symbols: string[]) {
+export function useMarketSnapshots(symbols: string[], options?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ['market-data', 'snapshots', symbols],
     queryFn: async () => {
@@ -184,7 +184,8 @@ export function useMarketSnapshots(symbols: string[]) {
     },
     enabled: symbols.length > 0,
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 30, // 30s fresh
+    staleTime: 1000 * 5, // Reduce stale time to 5s if we are polling
+    refetchInterval: options?.refetchInterval,
     retry: 1,
     refetchOnWindowFocus: false,
   });

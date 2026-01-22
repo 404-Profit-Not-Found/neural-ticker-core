@@ -72,6 +72,30 @@ export function PortfolioPage() {
     },
   });
 
+
+
+  // -- Market Data for Sparklines & 52-Week Range --
+  const symbols = useMemo(() => positions.map((p: PortfolioPosition) => p.symbol), [positions]);
+  const { data: snapshots = [] } = useMarketSnapshots(symbols, { refetchInterval: 10000 });
+
+  // Merge Snapshots with Positions
+  const enrichedPositions = useMemo(() => {
+    if (!snapshots || snapshots.length === 0) return positions;
+    const snapMap = new Map(snapshots.map((s: Record<string, unknown> & { ticker: { symbol: string }; quote?: { d?: number; dp?: number }; fundamentals?: { fifty_two_week_high?: number; fifty_two_week_low?: number }; sparkline?: unknown }) => [s.ticker.symbol, s]));
+
+    return positions.map((p: PortfolioPosition) => {
+      const snap = snapMap.get(p.symbol);
+      if (!snap) return p;
+      return {
+        ...p,
+        sparkline: snap.sparkline,
+        fiftyTwoWeekHigh: snap.fundamentals?.fifty_two_week_high,
+        fiftyTwoWeekLow: snap.fundamentals?.fifty_two_week_low,
+        quote: snap.quote,
+      };
+    });
+  }, [positions, snapshots]);
+
   // Calculate Aggregates
   const stats = useMemo(() => {
     let totalValue = 0;
@@ -79,10 +103,15 @@ export function PortfolioPage() {
     let totalCost = 0;
     let totalRisk = 0;
     let riskCount = 0;
+    let todayGain = 0;
 
-    positions.forEach((p: PortfolioPosition) => {
+    enrichedPositions.forEach((p: PortfolioPosition & { quote?: { d?: number } }) => {
       totalValue += p.current_value;
       totalCost += p.cost_basis;
+
+      if (p.quote?.d) {
+        todayGain += (p.shares * p.quote.d);
+      }
 
       const risk = p.aiAnalysis?.financial_risk;
       if (typeof risk === 'number') {
@@ -95,31 +124,12 @@ export function PortfolioPage() {
     const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
     const avgRisk = riskCount > 0 ? totalRisk / riskCount : null;
 
-    return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk };
-  }, [positions]);
+    // Estimate previous close value to calculate today's % change
+    const previousValue = totalValue - todayGain;
+    const todayGainPct = previousValue > 0 ? (todayGain / previousValue) * 100 : 0;
 
-  // -- Market Data for Sparklines & 52-Week Range --
-  const symbols = useMemo(() => positions.map((p: PortfolioPosition) => p.symbol), [positions]);
-  const { data: snapshots = [] } = useMarketSnapshots(symbols);
-
-  // Merge Snapshots with Positions
-  const enrichedPositions = useMemo(() => {
-    if (!snapshots || snapshots.length === 0) return positions;
-    const snapMap = new Map(snapshots.map((s: Record<string, unknown> & { ticker: { symbol: string }; fundamentals?: { fifty_two_week_high?: number; fifty_two_week_low?: number }; sparkline?: unknown }) => [s.ticker.symbol, s]));
-
-    return positions.map((p: PortfolioPosition) => {
-      const snap = snapMap.get(p.symbol);
-      if (!snap) return p;
-      return {
-        ...p,
-        sparkline: snap.sparkline,
-        fiftyTwoWeekHigh: snap.fundamentals?.fifty_two_week_high,
-        fiftyTwoWeekLow: snap.fundamentals?.fifty_two_week_low,
-      };
-    });
-  }, [positions, snapshots]);
-
-  // Client-Side Filtering
+    return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk, todayGain, todayGainPct };
+  }, [enrichedPositions, positions.length]);
   const filteredPositions = useMemo(() => {
     return enrichedPositions.filter((item: unknown) => {
       const typedItem = item as Record<string, unknown> & Partial<PortfolioPosition>;
@@ -216,7 +226,10 @@ export function PortfolioPage() {
           totalValue={stats.totalValue}
           totalGainLoss={stats.totalGain}
           totalGainLossPercent={stats.totalGainPct}
-          positions={positions}
+          todayGain={stats.todayGain}
+          todayGainPct={stats.todayGainPct}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          positions={enrichedPositions as any[]}
           onAnalyze={() => setIsAiOpen(true)}
           credits={user?.credits_balance}
         />

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -145,6 +145,21 @@ export class MarketDataController {
       // Return empty array if news fetch fails (ticker may not have news coverage)
       return [];
     });
+  }
+
+  @ApiOperation({
+    summary: 'Trigger Portfolio Refresh (Cron)',
+    description:
+      'Triggers the active portfolio refresh logic. Used by external schedulers (GitHub Actions).',
+  })
+  @ApiResponse({ status: 200, description: 'Refresh triggered.' })
+  @Get('cron/refresh-portfolios') // Keeping it GET for easy browser testing if needed, or POST if strict. User pattern suggests POST for jobs.
+  // Actually, existing jobs are POST. let's match patterns.
+  @Post('cron/refresh-portfolios')
+  async triggerPortfolioRefresh() {
+    // Fire and forget or await? Await is safer for serverless timeouts.
+    await this.service.updateActivePortfolios();
+    return { status: 'ok', message: 'Portfolio refresh triggered' };
   }
 
   @ApiOperation({
