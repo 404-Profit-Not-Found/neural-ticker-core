@@ -180,13 +180,12 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
         const [historyRes, snapshotRes] = await Promise.all([historyPromise, snapshotPromise]);
         setSnapshot(snapshotRes.data);
 
-        let combinedData: OhlcDataPoint[] = historyRes.data.map((item) => {
+        const combinedData: OhlcDataPoint[] = historyRes.data.map((item) => {
           const val = item.ts || item.date || item.time;
           let dateStr = '';
           if (typeof val === 'number') {
             dateStr = new Date(val * 1000).toISOString().split('T')[0];
           } else if (val) {
-             // Try to handle direct date objects or strings
              try {
                 dateStr = new Date(val).toISOString().split('T')[0];
              } catch { dateStr = String(val); }

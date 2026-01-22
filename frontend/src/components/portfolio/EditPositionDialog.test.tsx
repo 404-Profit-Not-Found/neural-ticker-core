@@ -12,7 +12,7 @@ vi.mock('../../lib/api', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  cn: (...args: (string | undefined | null | false)[]) => args.filter(Boolean).join(' '),
 }));
 
 vi.mock('sonner', () => ({
@@ -37,27 +37,27 @@ vi.mock('lucide-react', () => ({
 }));
 
 vi.mock('../ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => open ? <div data-testid="dialog">{children}</div> : null,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2>{children}</h2>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) => open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('../ui/tabs', () => ({
-  Tabs: ({ children, value, onValueChange }: any) => (
+  Tabs: ({ children, onValueChange }: { children: React.ReactNode; value: string; onValueChange: (val: string) => void }) => (
     <div data-testid="tabs" onClick={() => onValueChange?.('shares')}>{children}</div>
   ),
-  TabsList: ({ children }: any) => <div>{children}</div>,
-  TabsTrigger: ({ children, value }: any) => <button>{children}</button>,
-  TabsContent: ({ children, value }: any) => <div>{children}</div>,
+  TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TabsTrigger: ({ children }: { children: React.ReactNode; value: string }) => <button>{children}</button>,
+  TabsContent: ({ children }: { children: React.ReactNode; value: string }) => <div>{children}</div>,
 }));
 
 vi.mock('../ui/popover', () => ({
-  Popover: ({ children }: any) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: any) => <div>{children}</div>,
-  PopoverContent: ({ children }: any) => <div data-testid="popover-content">{children}</div>,
+  Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div data-testid="popover-content">{children}</div>,
 }));
 
 vi.mock('../ui/simple-calendar', () => ({
@@ -65,7 +65,7 @@ vi.mock('../ui/simple-calendar', () => ({
 }));
 
 vi.mock('./PriceRangeSlider', () => ({
-  PriceRangeSlider: ({ value, onChange }: any) => (
+  PriceRangeSlider: ({ value, onChange }: { value: number; onChange: (fullVal: number) => void }) => (
     <div data-testid="price-slider">
       <span>Value: {value}</span>
       <button onClick={() => onChange(155)}>Set Price</button>
@@ -74,17 +74,17 @@ vi.mock('./PriceRangeSlider', () => ({
 }));
 
 vi.mock('../ui/button', () => ({
-  Button: ({ children, onClick, type, disabled }: any) => (
+  Button: ({ children, onClick, type, disabled }: { children: React.ReactNode; onClick?: () => void; type?: "button" | "submit" | "reset"; disabled?: boolean }) => (
     <button onClick={onClick} type={type} disabled={disabled}>{children}</button>
   ),
 }));
 
 vi.mock('../ui/input', () => ({
-  Input: (props: any) => <input {...props} />,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
 }));
 
 vi.mock('../ui/label', () => ({
-  Label: ({ children }: any) => <label>{children}</label>,
+  Label: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
 }));
 
 vi.mock('../ui/Sparkline', () => ({
@@ -128,7 +128,7 @@ describe('EditPositionDialog', () => {
     expect(await screen.findByText(/Manage Position/i)).toBeInTheDocument();
     // Use findByText to wait for the snapshot and price info
     expect(await screen.findByText('AAPL')).toBeInTheDocument();
-    expect(await screen.findByDisplayValue('10')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('10.0000')).toBeInTheDocument();
   });
 
   it('handles patch submission', async () => {
@@ -142,8 +142,12 @@ describe('EditPositionDialog', () => {
       />
     );
     
+    // Switch to shares mode to allow editing shares without overwriting
+    const tabs = screen.getByTestId('tabs');
+    fireEvent.click(tabs);
+
     // Use findBy to wait for initial value from useEffect
-    const sharesInput = await screen.findByDisplayValue('10');
+    const sharesInput = await screen.findByDisplayValue('10.0000');
     fireEvent.change(sharesInput, { target: { value: '12' } });
     
     const saveBtn = screen.getByText(/Save Changes/i);

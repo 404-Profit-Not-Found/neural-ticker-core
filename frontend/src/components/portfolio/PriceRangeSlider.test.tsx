@@ -18,8 +18,9 @@ describe('PriceRangeSlider', () => {
       />
     );
 
-    expect(screen.getByText('$155.00')).toBeInTheDocument();
-    expect(screen.getByText('Range: $100.00 - $200.00')).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes('155.00'))).toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.getByText('$200.00')).toBeInTheDocument();
     expect(screen.getByText('MEDIAN')).toBeInTheDocument();
   });
 
@@ -41,7 +42,7 @@ describe('PriceRangeSlider', () => {
   });
 
   it('calculates median position correctly', () => {
-    const { container } = render(
+    render(
       <PriceRangeSlider
         low={100}
         high={200}

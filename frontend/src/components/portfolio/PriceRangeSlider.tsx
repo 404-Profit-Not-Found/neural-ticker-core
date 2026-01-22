@@ -26,7 +26,7 @@ export function PriceRangeSlider({
         <div className="space-y-0.5">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Price Selection</span>
           <div className="text-xl font-mono font-bold">
-            ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
       </div>

@@ -20,6 +20,8 @@ vi.mock('recharts', () => ({
   ComposedChart: ({ children }: { children: React.ReactNode }) => <div data-testid="composed-chart">{children}</div>,
   Area: () => <div />,
   CartesianGrid: () => <div />,
+  XAxis: () => <div />,
+  YAxis: () => <div />,
 }));
 
 vi.mock('lucide-react', () => ({
