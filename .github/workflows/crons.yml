@@ -1,5 +1,8 @@
 name: Cron Jobs
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # Daily at Midnight UTC (Sync Candles, Watchers)
