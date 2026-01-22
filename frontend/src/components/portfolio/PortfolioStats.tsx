@@ -338,6 +338,7 @@ export function PortfolioStats({
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorValuePortfolio)"
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   dot={(props: any) => {
                     const { cx, cy, payload } = props;
                     if (payload && payload.addedSymbols && payload.addedSymbols.length > 0) {

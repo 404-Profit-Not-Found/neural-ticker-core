@@ -17,6 +17,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 // Mock DataTable to simplify testing
 vi.mock('../ui/data-table', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   DataTable: ({ columns, data, onRowClick }: { columns: any[]; data: any[]; onRowClick?: (row: any) => void }) => (
     <div data-testid="data-table">
       <table>
