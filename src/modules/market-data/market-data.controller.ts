@@ -149,7 +149,8 @@ export class MarketDataController {
 
   @ApiOperation({
     summary: 'Trigger Portfolio Refresh (Cron)',
-    description: 'Triggers the active portfolio refresh logic. Used by external schedulers (GitHub Actions).',
+    description:
+      'Triggers the active portfolio refresh logic. Used by external schedulers (GitHub Actions).',
   })
   @ApiResponse({ status: 200, description: 'Refresh triggered.' })
   @Get('cron/refresh-portfolios') // Keeping it GET for easy browser testing if needed, or POST if strict. User pattern suggests POST for jobs.

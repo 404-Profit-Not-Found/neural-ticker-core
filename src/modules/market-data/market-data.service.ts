@@ -1,4 +1,27 @@
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
+
+import { TickersService } from '../tickers/tickers.service';
+import { FinnhubService } from '../finnhub/finnhub.service';
+import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
+
+import { PriceOhlcv } from './entities/price-ohlcv.entity';
+import { Fundamentals } from './entities/fundamentals.entity';
+import { AnalystRating } from './entities/analyst-rating.entity';
+import { RiskAnalysis } from '../risk-reward/entities/risk-analysis.entity';
+import { RiskScenario } from '../risk-reward/entities/risk-scenario.entity';
+import { ResearchNote } from '../research/entities/research-note.entity';
+import { Comment } from '../social/entities/comment.entity';
+import { CompanyNews } from './entities/company-news.entity';
+import { TickerEntity as Ticker } from '../tickers/entities/ticker.entity';
+import { getErrorMessage } from '../../utils/error.util';
+import { calculateAiRating, VerdictInput } from '../../lib/verdict.util';
+import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
+import { NumberUtil } from '../../utils/number.util';
 
 @Injectable()
 export class MarketDataService {
@@ -38,21 +61,26 @@ export class MarketDataService {
   async updateActivePortfolios() {
     this.logger.log('Cron: Refreshing active portfolio symbols...');
     try {
-      const symbols = await this.portfolioService.getAllDistinctPortfolioSymbols();
+      const symbols =
+        await this.portfolioService.getAllDistinctPortfolioSymbols();
       if (symbols.length === 0) return;
 
-      this.logger.debug(`Found ${symbols.length} distinct symbols to refresh: ${symbols.join(', ')}`);
+      this.logger.debug(
+        `Found ${symbols.length} distinct symbols to refresh: ${symbols.join(', ')}`,
+      );
 
       // Process sequentially or with limited concurrency to respect rate limits
       for (const symbol of symbols) {
         try {
           // Force refresh if data is older than 30 seconds
-          await this.performGetSnapshot(symbol, { 
+          await this.performGetSnapshot(symbol, {
             updateIfStale: true,
-            staleThresholdSeconds: 30 
+            staleThresholdSeconds: 30,
           });
         } catch (e) {
-          this.logger.error(`Failed to refresh ${symbol} in cron: ${e.message}`);
+          this.logger.error(
+            `Failed to refresh ${symbol} in cron: ${e.message}`,
+          );
         }
       }
     } catch (e) {
@@ -134,15 +162,18 @@ export class MarketDataService {
 
   private async performGetSnapshot(
     symbol: string,
-    options: { updateIfStale?: boolean; staleThresholdSeconds?: number } = { updateIfStale: true },
+    options: { updateIfStale?: boolean; staleThresholdSeconds?: number } = {
+      updateIfStale: true,
+    },
   ) {
     const tickerEntity = await this.tickersService.awaitEnsureTicker(symbol);
 
     // Configurable stale thresholds
     // Priority: options.staleThresholdSeconds -> config -> default
-    const priceStaleSeconds = options.staleThresholdSeconds || 
-      (this.configService.get<number>('marketData.stalePriceMinutes', 15) * 60);
-      
+    const priceStaleSeconds =
+      options.staleThresholdSeconds ||
+      this.configService.get<number>('marketData.stalePriceMinutes', 15) * 60;
+
     const FUNDAMENTALS_STALE_HOURS = this.configService.get<number>(
       'marketData.staleFundamentalsHours',
       24,
@@ -160,13 +191,12 @@ export class MarketDataService {
     });
 
     // Store detailed quote (d, dp) if fetched from API, to pass to frontend
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     let detailedQuote: any = null;
 
     const isPriceStale =
       !latestCandle ||
-      Date.now() - latestCandle.ts.getTime() >
-        priceStaleSeconds * 1000;
+      Date.now() - latestCandle.ts.getTime() > priceStaleSeconds * 1000;
     const isFundamentalsStale =
       !fundamentals ||
       Date.now() - fundamentals.updated_at.getTime() >
@@ -1605,7 +1635,7 @@ export class MarketDataService {
 
     if (options.sector && options.sector.length > 0) {
       qb.andWhere(
-        new Brackets((sub) => {
+        new Brackets((sub: any) => {
           sub
             .where('ticker.sector IN (:...sectors)', {
               sectors: options.sector,
@@ -1625,8 +1655,8 @@ export class MarketDataService {
       // Low: 0-3.5, Medium: 3.5-6.5, High: 6.5+
       // (Using a Brackets to OR them together)
       qb.andWhere(
-        new Brackets((sub) => {
-          options.risk?.forEach((r) => {
+        new Brackets((sub: any) => {
+          options.risk?.forEach((r: any) => {
             if (r.includes('Low')) sub.orWhere('risk.financial_risk < 3.5');
             else if (r.includes('Medium'))
               sub.orWhere('risk.financial_risk BETWEEN 3.5 AND 6.5');
@@ -1681,8 +1711,8 @@ export class MarketDataService {
     // Score Tiers: >= 80 Strong Buy, >= 65 Buy, >= 45 Hold, < 45 Sell
     if (options.aiRating && options.aiRating.length > 0) {
       qb.andWhere(
-        new Brackets((sub) => {
-          options.aiRating?.forEach((rating) => {
+        new Brackets((sub: any) => {
+          options.aiRating?.forEach((rating: any) => {
             if (rating === 'Legendary' || rating === 'No Brainer') {
               sub.orWhere(`${verdictScoreSql} > 105`);
             } else if (rating === 'Strong Buy') {

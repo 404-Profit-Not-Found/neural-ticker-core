@@ -317,9 +317,10 @@ export function PortfolioStats({
       const gain = currentGainTotal - startingGain;
       
       // For ROI calculation: 
-      // If we started from 0, use current total invested as base.
-      // Otherwise use the starting value or invested amount at that point.
-      const roiBase = startInvested > 0 ? startInvested : currentInvested;
+      // Use current total invested as base to avoid "percentage explosions" if the portfolio 
+      // started very small but had large deposits later in the period.
+      // This makes period performance percentage comparable to the "All Time" percentage.
+      const roiBase = currentInvested;
       const pct = roiBase > 0 ? (gain / roiBase) * 100 : 0;
       
       return {
