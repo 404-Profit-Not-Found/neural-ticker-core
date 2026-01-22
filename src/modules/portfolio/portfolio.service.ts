@@ -118,6 +118,15 @@ export class PortfolioService {
     return enriched;
   }
 
+  async getAllDistinctPortfolioSymbols(): Promise<string[]> {
+    const positions = await this.positionRepo
+      .createQueryBuilder('position')
+      .select('DISTINCT position.symbol', 'symbol')
+      .getRawMany();
+
+    return positions.map((p) => p.symbol);
+  }
+
   async findOne(userId: string, id: string): Promise<PortfolioPosition> {
     const position = await this.positionRepo.findOne({
       where: { id, user_id: userId },

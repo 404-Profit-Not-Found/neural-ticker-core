@@ -29,6 +29,8 @@ interface PortfolioStatsProps {
   positions: Position[];
   onAnalyze: () => void;
   credits?: number;
+  todayGain?: number;
+  todayGainPct?: number;
 }
 
 // Professional Palette - Carbon/Minimalist
@@ -42,7 +44,7 @@ const COLORS = [
   '#06b6d4', // cyan-500
 ];
 
-const RANGES = ['1M', '3M', '6M', '1Y'] as const;
+const RANGES = ['1D', '1W', '1M', '3M', '6M', '1Y'] as const;
 type Range = typeof RANGES[number];
 
 // Standard Tooltip (Theme-Aware)
@@ -101,6 +103,8 @@ export function PortfolioStats({
   positions,
   onAnalyze,
   credits = 0,
+  todayGain = 0,
+  todayGainPct = 0,
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
@@ -134,8 +138,62 @@ export function PortfolioStats({
 
   // 2. History Simulation (Date-Aware) - WITH FALLBACKS AND NUMERIC CASTING
   const historyData = useMemo(() => {
+    // 1D SPECIAL CASE: Hourly simulation
+    if (range === '1D') {
+      const data = [];
+      const marketOpen = new Date();
+      marketOpen.setHours(9, 30, 0, 0); // 9:30 AM
+      const now = new Date();
+      
+      // If before 9:30 AM, just show pre-market flat line
+      // const effectiveEnd = now < marketOpen ? marketOpen : now; (unused)
+      const hoursPoints = 8; // approx points
+
+      const startValue = totalValue - todayGain;
+      
+      // Brownian Bridge Simulation
+      // 1. Generate random walk
+      let currentRandom = startValue;
+      const randomWalk = [startValue];
+      const steps = hoursPoints;
+      
+      for (let i = 0; i < steps; i++) {
+         const volatility = totalValue * 0.005; // 0.5% volatility per step
+         // Seeded pseudo-random for purity
+         const seed = i + steps + totalValue;
+         const rand = (Math.sin(seed) * 10000) % 1; 
+         const change = (rand - 0.5) * volatility;
+         currentRandom += change;
+         randomWalk.push(currentRandom);
+      }
+      
+      // 2. Adjust to bridge to exact end value
+      const lastRandom = randomWalk[randomWalk.length - 1];
+      const bridgeAdjustment = totalValue - lastRandom;
+      
+      for (let i = 0; i <= steps; i++) {
+        const time = new Date(marketOpen.getTime() + (i * 3600 * 1000));
+        if (time > now && data.length > 0) break;
+        
+        const originalVal = randomWalk[i];
+        const progress = i / steps;
+        
+        // Apply adjustment scaled by progress (linear drift correction)
+        const bridgedVal = originalVal + (bridgeAdjustment * progress);
+        
+        data.push({
+          date: format(time, 'HH:mm'),
+          value: bridgedVal,
+          invested: totalValue - totalGainLoss, // Invested is roughly constant for 1D for MVP
+        });
+      }
+      return data;
+    }
+
+    // REGULAR DAILY CASES
     let days = 30;
     switch (range) {
+      case '1W': days = 7; break;
       case '1M': days = 30; break;
       case '3M': days = 90; break;
       case '6M': days = 180; break;
@@ -150,6 +208,7 @@ export function PortfolioStats({
     for (let i = 0; i <= days; i++) {
       const currentDate = addDays(startDate, i);
       let dailyValue = 0;
+      let dailyInvested = 0;
 
       positions.forEach(pos => {
         // Safely cast inputs to numbers to handle "decimal" strings from DB
@@ -188,12 +247,30 @@ export function PortfolioStats({
         // If totalDaysOwned is 0 or negative (bought today/future), progress is 1 (show current price)
         const progress = totalDaysOwned <= 0 ? 1 : Math.min(1, Math.max(0, daysSinceBuy / totalDaysOwned));
 
-        const estimatedPrice = safeBuyPrice + (safeCurrentPrice - safeBuyPrice) * progress;
+        // Better Simulation: Random Walk / Brownian Motion
+        // Use a persistent random seed-like behavior or just accumulated walk for visual variance
+        // We want the end result to match 'current_value' roughly, but have a path to get there.
+        // Since we don't have real history for every position in this MVP simulation, 
+        // we'll apply a cumulative random walk to the price estimation.
+        
+        // 1. Base linear interpolation (Trend)
+        const linearPrice = safeBuyPrice + (safeCurrentPrice - safeBuyPrice) * progress;
+        
+        // 2. Add random walk component (Volatility)
+        // Use deterministic math to keep it pure for ESLint
+        const seed = (i * 1337) + (shares * 7);
+        const rand = (Math.sin(seed) * 10000) % 1;
+        const volatility = 0.02; // 2% daily volatility
+        const randomNoise = (rand - 0.5) * volatility * linearPrice;
+        
+        // Ensure price doesn't go negative or look too crazy vs linear
+        // We weigh the linear trend heavier as we get closer to today (convergence)
+        // const timeWeight = 1 - progress; // (removed unused)
+        
+        const estimatedPrice = Math.max(0, linearPrice + (randomNoise * (1 - progress * 0.5)));
 
-        // Use deterministic variation based on index instead of Math.random() for purity
-        const variation = ((i % 7) - 3) * 0.001;
-
-        dailyValue += shares * Math.max(0, estimatedPrice * (1 + variation));
+        dailyValue += shares * estimatedPrice;
+        dailyInvested += shares * safeBuyPrice;
       });
 
       // Check for buys on this specific day
@@ -209,20 +286,51 @@ export function PortfolioStats({
       data.push({
         date: format(currentDate, 'MMM dd'),
         value: dailyValue,
+        invested: dailyInvested,
         addedSymbols: buysToday.length > 0 ? buysToday : undefined
       });
     }
 
-    // Debugging data
-    console.log('[PortfolioStats] historyData constructed:', {
-      points: data.length,
-      first: data[0],
-      last: data[data.length - 1],
-      totalValue
-    });
-
     return data;
-  }, [range, positions, totalValue]);
+  }, [range, positions, totalValue, todayGain]);
+
+  // Calculate Period Gain/Loss (Dynamic based on Range)
+  const { periodGain, periodGainPct, isPeriodProfit } = useMemo(() => {
+    if (range === '1D') {
+      return {
+        periodGain: todayGain,
+        periodGainPct: todayGainPct,
+        isPeriodProfit: todayGain >= 0
+      };
+    }
+
+    if (historyData.length > 0) {
+      const firstData = historyData[0];
+      const startValue = firstData.value as number;
+      const startInvested = (firstData.invested as number) || 0;
+      const currentInvested = totalValue - totalGainLoss;
+
+      // Pure Performance Gain = (Current Portfolio Gain) - (Starting Portfolio Gain)
+      const currentGainTotal = totalGainLoss; // (Value - Invested)
+      const startingGain = startValue - startInvested;
+      
+      const gain = currentGainTotal - startingGain;
+      
+      // For ROI calculation: 
+      // If we started from 0, use current total invested as base.
+      // Otherwise use the starting value or invested amount at that point.
+      const roiBase = startInvested > 0 ? startInvested : currentInvested;
+      const pct = roiBase > 0 ? (gain / roiBase) * 100 : 0;
+      
+      return {
+        periodGain: gain,
+        periodGainPct: pct,
+        isPeriodProfit: gain >= 0
+      };
+    }
+
+    return { periodGain: 0, periodGainPct: 0, isPeriodProfit: true };
+  }, [range, todayGain, todayGainPct, historyData, totalValue, totalGainLoss]);
 
 
   const isProfit = totalGainLoss >= 0;
@@ -275,26 +383,47 @@ export function PortfolioStats({
                   : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
               )}>
                 {isProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                {formatCurrency(Math.abs(totalGainLoss))} ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+                {formatCurrency(Math.abs(totalGainLoss))} ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%) <span className="text-muted-foreground ml-1">All Time</span>
               </div>
             </div>
 
-            {/* Range Selectors */}
-            <div className="flex items-center bg-muted/50 rounded-md p-1 border border-border/50">
-              {RANGES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  className={cn(
-                    "px-3 py-1 text-[11px] font-medium rounded-sm transition-all duration-200",
-                    range === r
-                      ? "bg-background text-foreground shadow-sm border border-border"
-                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
+            {/* Middle: Invested Amount */}
+             <div className="hidden sm:flex flex-col items-center justify-center pt-1">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Invested</span>
+              <span className="text-xl font-bold text-foreground/80">
+                {formatCurrency(totalValue - totalGainLoss)}
+              </span>
+            </div>
+
+            {/* Range Selectors & Period Gain */}
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center bg-muted/50 rounded-md p-1 border border-border/50">
+                {RANGES.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRange(r)}
+                    className={cn(
+                      "px-3 py-1 text-[11px] font-medium rounded-sm transition-all duration-200",
+                      range === r
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                    )}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selected Period Gain */}
+              <div className={cn(
+                "flex items-center gap-1.5 text-xs font-semibold",
+                isPeriodProfit
+                  ? "text-emerald-500"
+                  : "text-rose-500"
+              )}>
+                {isPeriodProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {formatCurrency(Math.abs(periodGain))} ({periodGainPct >= 0 ? '+' : ''}{periodGainPct.toFixed(2)}%) <span className="text-muted-foreground ml-1">{range}</span>
+              </div>
             </div>
           </div>
 
@@ -325,6 +454,8 @@ export function PortfolioStats({
                   tick={{ fontSize: 9, fill: '#9ca3af' }}
                   axisLine={false}
                   tickLine={false}
+                  domain={['auto', 'auto']}
+                  hide={false}
                 />
                 <Tooltip
                   content={<CustomTooltip />}
@@ -346,6 +477,16 @@ export function PortfolioStats({
                     }
                     return <></>;
                   }}
+                />
+                 <Area
+                  type="monotone"
+                  dataKey="invested"
+                  name="Invested"
+                  stroke="#6366f1" // Indigo-500
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  fill="none"
+                  tooltipType="none"
                 />
               </ComposedChart>
             </ResponsiveContainer>
