@@ -163,6 +163,17 @@ export class MarketDataController {
   }
 
   @ApiOperation({
+    summary: 'Trigger Top Picks Refresh (Cron)',
+    description:
+      'Triggers the top picks refresh logic. Used by external schedulers (GitHub Actions).',
+  })
+  @Post('cron/refresh-top-picks')
+  async triggerTopPicksRefresh() {
+    await this.service.refreshTopPicks();
+    return { status: 'ok', message: 'Top Picks refresh triggered' };
+  }
+
+  @ApiOperation({
     summary: 'Get Market Status for a Symbol',
     description:
       'Returns market status (open/closed/pre/post) for a specific ticker. Uses Yahoo Finance for EU stocks and Finnhub for US stocks.',

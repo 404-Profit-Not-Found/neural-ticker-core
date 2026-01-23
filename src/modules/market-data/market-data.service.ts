@@ -56,8 +56,16 @@ export class MarketDataService {
   private snapshotRequests = new Map<string, Promise<any>>();
   private historyRequests = new Map<string, Promise<any>>();
 
+  // In-app crons only run in development - GitHub Actions handles production crons
+  private readonly isDevMode = process.env.NODE_ENV !== 'production';
+
   // Cron Job: Refresh active portfolio symbols every 30 seconds
   @Cron('*/30 * * * * *')
+  async updateActivePortfoliosCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.updateActivePortfolios();
+  }
+
   async updateActivePortfolios() {
     this.logger.log('Cron: Refreshing active portfolio symbols...');
     try {
@@ -338,9 +346,13 @@ export class MarketDataService {
             // Normal Finnhub path
             if (quote) {
               detailedQuote = quote; // Finnhub quote has d and dp directly
+              const normalizedDate = this.normalizeDateToUtcMidnight(
+                new Date(quote.t * 1000),
+              );
+
               const newCandle = this.ohlcvRepo.create({
                 symbol_id: tickerEntity.id,
-                ts: new Date(quote.t * 1000),
+                ts: normalizedDate,
                 timeframe: '1d',
                 open: quote.o,
                 high: quote.h,
@@ -1956,9 +1968,12 @@ export class MarketDataService {
   }
 
   private saveYahooQuoteAsCandle(symbolId: string, quote: any): PriceOhlcv {
+    const rawDate = quote.regularMarketTime || new Date();
+    const normalizedDate = this.normalizeDateToUtcMidnight(new Date(rawDate));
+
     return this.ohlcvRepo.create({
       symbol_id: symbolId,
-      ts: quote.regularMarketTime || new Date(),
+      ts: normalizedDate,
       timeframe: '1d',
       open: quote.regularMarketOpen,
       high: quote.regularMarketDayHigh,
@@ -1968,6 +1983,12 @@ export class MarketDataService {
       volume: quote.regularMarketVolume,
       source: 'yahoo_quote',
     });
+  }
+
+  private normalizeDateToUtcMidnight(date: Date): Date {
+    const d = new Date(date);
+    d.setUTCHours(0, 0, 0, 0);
+    return d;
   }
 
   private async applyYahooEnrichment(
@@ -2066,6 +2087,11 @@ export class MarketDataService {
    * Ensures the "Dashboard Picks" are not stale.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
+  async refreshTopPicksCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.refreshTopPicks();
+  }
+
   async refreshTopPicks() {
     this.logger.log('CRON: Refreshing Top Picks (YOLO & Conservative)...');
 

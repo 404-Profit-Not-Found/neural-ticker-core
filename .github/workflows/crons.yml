@@ -61,3 +61,6 @@ jobs:
 
       - name: Trigger Process Request Queue
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/process-requests -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
+      - name: Trigger Top Picks Refresh
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/tickers/cron/refresh-top-picks -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
