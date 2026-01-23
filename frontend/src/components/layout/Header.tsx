@@ -89,7 +89,7 @@ export function Header() {
 
   const { unreadCount, check: refreshNotifications } =
     useUnreadNotifications(!!user);
-  
+
   const { notifications } = useNotificationsList(!!user);
 
 
@@ -168,8 +168,8 @@ export function Header() {
         void queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
       }
 
-      if (n.type === 'research_complete' && n.data?.ticker) {
-        navigate(`/ticker/${n.data.ticker}`);
+      if (n.type === 'research_complete' && n.data?.ticker && n.data?.researchId) {
+        navigate(`/ticker/${n.data.ticker}/research/${n.data.researchId}`);
       } else if (n.data?.ticker) {
         navigate(`/ticker/${n.data.ticker}`);
       }
@@ -404,6 +404,14 @@ export function Header() {
                       Admin Console
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => goTo('/about')}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                  >
+                    <Brain size={16} />
+                    About NeuralTicker
+                  </button>
                 </div>
 
                 <div className="p-2 border-t border-border">

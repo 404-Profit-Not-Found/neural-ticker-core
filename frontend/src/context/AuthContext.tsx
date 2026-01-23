@@ -13,6 +13,7 @@ interface User {
     tier: 'free' | 'pro' | 'whale' | 'admin';
     credits_balance?: number;
     avatar_url: string;
+    has_onboarded?: boolean;
 }
 
 interface AuthContextType {
@@ -20,7 +21,7 @@ interface AuthContextType {
     loading: boolean;
     loginWithGoogle: () => void;
     logout: () => void;
-    refreshSession: () => Promise<void>;
+    refreshSession: () => Promise<User | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,14 +41,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         checkSession();
     }, []);
 
-    const checkSession = async () => {
+    const checkSession = async (): Promise<User | null> => {
         try {
             // Attempt to fetch profile using cookie - use httpClient (root) not api (v1)
             const { data } = await httpClient.get('/api/auth/profile');
             setUser(data);
+            return data;
         } catch (err) {
             console.warn('Session check failed:', err); // Log error for debug
             setUser(null);
+            return null;
         } finally {
             setLoading(false);
         }

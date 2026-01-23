@@ -17,6 +17,7 @@ import { ResearchListPage } from './pages/ResearchListPage';
 import { NewsPage } from './pages/NewsPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { PublicResearchPage } from './pages/PublicResearchPage';
+import { AboutPage } from './pages/AboutPage';
 
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -97,6 +98,7 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+            <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
 
             {/* Admin Route */}
             <Route path="/admin" element={
@@ -209,8 +211,13 @@ function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      await refreshSession();
-      navigate('/', { replace: true });
+      const user = await refreshSession();
+
+      if (user && !user.has_onboarded) {
+        navigate('/about', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     };
 
     handleCallback();

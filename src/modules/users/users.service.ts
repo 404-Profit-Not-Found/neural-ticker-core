@@ -186,7 +186,12 @@ export class UsersService {
 
   async updateProfile(
     id: string,
-    updates: { nickname?: string; view_mode?: string; theme?: string },
+    updates: {
+      nickname?: string;
+      view_mode?: string;
+      theme?: string;
+      has_onboarded?: boolean;
+    },
   ): Promise<User> {
     const user = await this.findById(id);
     if (!user) {
@@ -196,6 +201,8 @@ export class UsersService {
     if (updates.nickname) user.nickname = updates.nickname;
     if (updates.view_mode) user.view_mode = updates.view_mode;
     if (updates.theme) user.theme = updates.theme;
+    if (updates.has_onboarded !== undefined)
+      user.has_onboarded = updates.has_onboarded;
 
     return this.userRepo.save(user);
   }
