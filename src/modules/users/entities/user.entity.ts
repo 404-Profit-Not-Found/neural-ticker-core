@@ -77,6 +77,10 @@ export class User {
   @Column({ default: 'PRO' })
   view_mode: string;
 
+  @ApiProperty({ default: false })
+  @Column({ default: false })
+  has_onboarded: boolean;
+
   @ApiProperty({ example: 'dark' })
   @Column({ default: 'dark' })
   theme: string;

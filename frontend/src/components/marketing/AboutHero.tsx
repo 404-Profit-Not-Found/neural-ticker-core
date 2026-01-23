@@ -1,15 +1,25 @@
 import { Sparkles } from 'lucide-react';
-import { Button } from '../ui/button';
+import { httpClient } from '../../lib/api';
+
+
+
 
 export function AboutHero() {
     return (
         <div className="relative overflow-hidden border-b border-border bg-muted/20">
             <div className="absolute top-6 left-6 z-20">
                 <button
-                    onClick={() => {
-                        // TODO: Switch to API call in next step
-                        localStorage.setItem('neural_onboarding_completed', 'true');
-                        window.location.href = '/';
+                    onClick={async () => {
+                        try {
+                            await httpClient.patch('/api/v1/users/me', { has_onboarded: true });
+                            // Force refresh to update context
+                            // We don't have access to refreshSession here easily unless we fetch it from useAuth
+                            // But AboutHero is inside AuthProvider, so we can use useAuth.
+                            window.location.href = '/';
+                        } catch (e) {
+                            console.error('Failed to set onboarding status', e);
+                            window.location.href = '/'; // Fallback
+                        }
                     }}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium bg-transparent border-none cursor-pointer"
                 >

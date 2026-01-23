@@ -118,6 +118,7 @@ export class UsersController {
         nickname: 'SuperTrader',
         view_mode: 'KISS',
         theme: 'g10',
+        has_onboarded: true,
       },
     },
   })
@@ -125,7 +126,13 @@ export class UsersController {
   @Patch('me')
   async updateProfile(
     @Request() req: any,
-    @Body() body: { nickname?: string; view_mode?: string; theme?: string },
+    @Body()
+    body: {
+      nickname?: string;
+      view_mode?: string;
+      theme?: string;
+      has_onboarded?: boolean;
+    },
   ) {
     return this.usersService.updateProfile(req.user.id, body);
   }

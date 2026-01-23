@@ -211,12 +211,9 @@ function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      await refreshSession();
+      const user = await refreshSession();
 
-      // Check if user has seen onboarding
-      const hasSeenOnboarding = localStorage.getItem('neural_onboarding_completed');
-
-      if (!hasSeenOnboarding) {
+      if (user && !user.has_onboarded) {
         navigate('/about', { replace: true });
       } else {
         navigate('/', { replace: true });
