@@ -61,8 +61,12 @@ export class MarketDataService {
 
   // Cron Job: Refresh active portfolio symbols every 30 seconds
   @Cron('*/30 * * * * *')
-  async updateActivePortfolios() {
+  async updateActivePortfoliosCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.updateActivePortfolios();
+  }
+
+  async updateActivePortfolios() {
     this.logger.log('Cron: Refreshing active portfolio symbols...');
     try {
       const symbols =
@@ -1963,8 +1967,6 @@ export class MarketDataService {
     }
   }
 
-
-
   private saveYahooQuoteAsCandle(symbolId: string, quote: any): PriceOhlcv {
     const rawDate = quote.regularMarketTime || new Date();
     const normalizedDate = this.normalizeDateToUtcMidnight(new Date(rawDate));
@@ -2085,8 +2087,12 @@ export class MarketDataService {
    * Ensures the "Dashboard Picks" are not stale.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
-  async refreshTopPicks() {
+  async refreshTopPicksCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.refreshTopPicks();
+  }
+
+  async refreshTopPicks() {
     this.logger.log('CRON: Refreshing Top Picks (YOLO & Conservative)...');
 
     try {
