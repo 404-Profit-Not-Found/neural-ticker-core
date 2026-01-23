@@ -16,6 +16,7 @@ import { PortfolioService } from '../portfolio/portfolio.service';
 
 import { ConfigService } from '@nestjs/config';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
+import { MarketStatusService } from './market-status.service';
 
 describe('MarketDataService', () => {
   let service: MarketDataService;
@@ -26,6 +27,7 @@ describe('MarketDataService', () => {
   let researchNoteRepo: Repository<ResearchNote>;
   let tickersService: TickersService;
   let finnhubService: FinnhubService;
+  let marketStatusService: MarketStatusService;
   let configService: ConfigService;
 
   const mockQueryBuilder: any = {
@@ -137,6 +139,14 @@ describe('MarketDataService', () => {
     getAllDistinctPortfolioSymbols: jest.fn().mockResolvedValue([]),
   };
 
+  const mockMarketStatusService = {
+    getAllMarketsStatus: jest.fn().mockResolvedValue({
+      us: { isOpen: true, session: 'regular' },
+      eu: { isOpen: true, session: 'regular' },
+      asia: { isOpen: true, session: 'regular' },
+    }),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue(15), // Return default number
   };
@@ -194,6 +204,10 @@ describe('MarketDataService', () => {
           useValue: mockPortfolioService,
         },
         {
+          provide: MarketStatusService,
+          useValue: mockMarketStatusService,
+        },
+        {
           provide: getRepositoryToken(TickerEntity),
           useValue: {
             createQueryBuilder: jest.fn(() => ({
@@ -238,6 +252,7 @@ describe('MarketDataService', () => {
     tickersService = module.get<TickersService>(TickersService);
     finnhubService = module.get<FinnhubService>(FinnhubService);
     configService = module.get<ConfigService>(ConfigService);
+    marketStatusService = module.get<MarketStatusService>(MarketStatusService);
 
     jest.clearAllMocks();
 
@@ -251,7 +266,13 @@ describe('MarketDataService', () => {
     mockAnalystRatingRepo.count.mockResolvedValue(0);
     mockRiskAnalysisRepo.findOne.mockResolvedValue(null);
     mockResearchNoteRepo.count.mockResolvedValue(0);
+    mockRiskAnalysisRepo.findOne.mockResolvedValue(null);
+    mockResearchNoteRepo.count.mockResolvedValue(0);
     mockFinnhubService.getCompanyNews.mockResolvedValue([]);
+    mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
+      us: { isOpen: true },
+      eu: { isOpen: true },
+    });
   });
 
   it('should be defined', () => {
@@ -700,6 +721,57 @@ describe('MarketDataService', () => {
       expect(between._value[1].toISOString()).toContain(
         '2025-01-02T23:59:59.000Z',
       );
+    });
+  });
+
+  describe('updateActivePortfolios', () => {
+    it('should skip refresh if all markets are closed', async () => {
+      mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
+        us: { isOpen: false, session: 'closed' },
+        eu: { isOpen: false, session: 'closed' },
+        asia: { isOpen: false, session: 'closed' },
+      });
+      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([
+        'AAPL',
+      ]);
+
+      await service.updateActivePortfolios();
+
+      expect(mockMarketStatusService.getAllMarketsStatus).toHaveBeenCalled();
+      // Should NOT call portfolio service or snapshots
+      expect(
+        mockPortfolioService.getAllDistinctPortfolioSymbols,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should proceed if at least one market is open', async () => {
+      mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
+        us: { isOpen: true, session: 'regular' },
+        eu: { isOpen: false, session: 'closed' },
+        asia: { isOpen: false, session: 'closed' },
+      });
+      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([]);
+
+      await service.updateActivePortfolios();
+
+      expect(
+        mockPortfolioService.getAllDistinctPortfolioSymbols,
+      ).toHaveBeenCalled();
+    });
+
+    it('should proceed if only Asia market is open', async () => {
+      mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
+        us: { isOpen: false, session: 'closed' },
+        eu: { isOpen: false, session: 'closed' },
+        asia: { isOpen: true, session: 'regular' },
+      });
+      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([]);
+
+      await service.updateActivePortfolios();
+
+      expect(
+        mockPortfolioService.getAllDistinctPortfolioSymbols,
+      ).toHaveBeenCalled();
     });
   });
 });

@@ -44,15 +44,15 @@ describe('MarketStatusService', () => {
 
   describe('getMarketStatus', () => {
     it('should coalesce concurrent requests for the same symbol/region', async () => {
-      mockFinnhubService.getMarketStatus.mockImplementation(async () => {
+      mockYahooService.getMarketStatus.mockImplementation(async () => {
         await new Promise((resolve) => setTimeout(resolve, 50)); // Delay to allow concurrency
-        return { isOpen: true, session: 'regular' };
+        return { isOpen: true, session: 'regular', exchange: 'US' };
       });
 
       // Launch 5 concurrent requests for US market (AAPL)
       const promises = [
         service.getMarketStatus('AAPL'),
-        service.getMarketStatus('MSFT'), // Should map to same 'US' region logic if optimized
+        service.getMarketStatus('MSFT'),
         service.getMarketStatus('GOOGL'),
         service.getMarketStatus('TSLA'),
         service.getMarketStatus('NVDA'),
@@ -60,59 +60,46 @@ describe('MarketStatusService', () => {
 
       await Promise.all(promises);
 
-      // Verify that Finnhub was called ONLY ONCE for the 'US' region
-      // Note: The service maps symbols to regions. 'AAPL' -> 'US'.
-      // If the service coalesces based on REGION, it should be 1 call.
-      // If it coalesces based on SYMBOL, it would be 5 calls.
-      // My implementation coalesces based on REGION for Finnhub status calls.
-
-      expect(finnhubService.getMarketStatus).toHaveBeenCalledTimes(1);
+      // Verify that Yahoo was called ONLY ONCE for the 'US' region (using proxy ^GSPC)
+      expect(yahooService.getMarketStatus).toHaveBeenCalledTimes(1);
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^GSPC');
+      expect(finnhubService.getMarketStatus).not.toHaveBeenCalled();
     });
 
     it('should return cached value if available', async () => {
       const mockStatus = { isOpen: true, session: 'regular', exchange: 'US' };
       // First call (cache miss)
-      mockFinnhubService.getMarketStatus.mockResolvedValue(mockStatus);
-
-      // We need to spy on the private cache or just verify the service call
-      // effectively, the service uses a local method cache or property.
-      // MarketStatusService uses `this.statusCache` Map, not the injected CacheModule.
+      mockYahooService.getMarketStatus.mockResolvedValue(mockStatus);
 
       // Call 1
       const result1 = await service.getMarketStatus('AAPL');
       expect(result1.session).toBe('regular');
-      expect(finnhubService.getMarketStatus).toHaveBeenCalledTimes(1);
+      expect(yahooService.getMarketStatus).toHaveBeenCalledTimes(1);
 
       // Call 2 (should be cached)
-      mockFinnhubService.getMarketStatus.mockClear();
+      mockYahooService.getMarketStatus.mockClear();
       const result2 = await service.getMarketStatus('AAPL');
       expect(result2.session).toBe('regular');
-      expect(finnhubService.getMarketStatus).not.toHaveBeenCalled();
+      expect(yahooService.getMarketStatus).not.toHaveBeenCalled();
     });
 
     it('should fetch separately for different regions', async () => {
-      mockFinnhubService.getMarketStatus.mockResolvedValue({
-        isOpen: true,
-        session: 'regular',
-        exchange: 'US',
-      });
-      mockYahooService.getMarketStatus.mockResolvedValue({
-        isOpen: false,
-        session: 'closed',
-        exchange: 'EU',
+      mockYahooService.getMarketStatus.mockImplementation(async (symbol) => {
+        if (symbol === '^GSPC') {
+          return { isOpen: true, session: 'regular', exchange: 'US' };
+        }
+        return { isOpen: false, session: 'closed', exchange: 'EU' };
       });
 
       // US Call
       await service.getMarketStatus('AAPL');
 
       // EU Call (e.g. LVMH.PA)
-      // Assume getRegion maps .PA to EU or similar.
-      // Logic: if (symbol.includes('.')) -> return yahoo status (which might map to region key)
       await service.getMarketStatus('MC.PA');
 
-      expect(finnhubService.getMarketStatus).toHaveBeenCalled(); // For US
-      // For EU/Other, it uses Yahoo
-      expect(yahooService.getMarketStatus).toHaveBeenCalled();
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^GSPC'); // For US
+      // For EU/Other, it uses Yahoo with passed symbol
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('MC.PA');
     });
 
     it('should return OPEN for EU market at 16:45 CET via fallback', () => {
@@ -121,15 +108,82 @@ describe('MarketStatusService', () => {
       const mockDate = new Date('2025-01-08T15:45:00Z');
       jest.useFakeTimers().setSystemTime(mockDate);
 
-      // Access private method by casting to any or testing via public API if possible.
-      // Since we want to test fallback logic specifically, we can use the private method reference
-      // if we cast service to any.
       const result = (service as any).getEUFallback();
 
       expect(result.isOpen).toBe(true);
       expect(result.session).toBe('regular');
 
       jest.useRealTimers();
+    });
+
+    it('should default to Yahoo Finance (^GSPC) for US status', async () => {
+      mockYahooService.getMarketStatus.mockResolvedValue({
+        isOpen: true,
+        session: 'regular',
+        exchange: 'US',
+      });
+
+      const result = await service.getMarketStatus('AAPL');
+
+      expect(finnhubService.getMarketStatus).not.toHaveBeenCalled();
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^GSPC');
+      expect(result.isOpen).toBe(true);
+    });
+
+    it('should use Yahoo Finance proxy (^HSI) for ASIA region', async () => {
+      mockYahooService.getMarketStatus.mockResolvedValue({
+        isOpen: true,
+        session: 'regular',
+        exchange: 'ASIA',
+      });
+
+      const result = await service.getMarketStatus(undefined, 'ASIA');
+
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^HSI');
+      expect(result.region).toBe('ASIA');
+      expect(result.isOpen).toBe(true);
+    });
+
+    it('should use Yahoo Finance proxy (^STOXX50E) for EU region when no symbol provided', async () => {
+      mockYahooService.getMarketStatus.mockResolvedValue({
+        isOpen: true,
+        session: 'regular',
+        exchange: 'EU',
+      });
+
+      const result = await service.getMarketStatus(undefined, 'EU');
+
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^STOXX50E');
+      expect(result.region).toBe('EU');
+      expect(result.isOpen).toBe(true);
+    });
+
+    it('should use Yahoo Finance proxy (^HSI) for ASIA region', async () => {
+      mockYahooService.getMarketStatus.mockResolvedValue({
+        isOpen: true,
+        session: 'regular',
+        exchange: 'ASIA',
+      });
+
+      const result = await service.getMarketStatus(undefined, 'ASIA');
+
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^HSI');
+      expect(result.region).toBe('ASIA');
+      expect(result.isOpen).toBe(true);
+    });
+
+    it('should use Yahoo Finance proxy (^STOXX50E) for EU region when no symbol provided', async () => {
+      mockYahooService.getMarketStatus.mockResolvedValue({
+        isOpen: true,
+        session: 'regular',
+        exchange: 'EU',
+      });
+
+      const result = await service.getMarketStatus(undefined, 'EU');
+
+      expect(yahooService.getMarketStatus).toHaveBeenCalledWith('^STOXX50E');
+      expect(result.region).toBe('EU');
+      expect(result.isOpen).toBe(true);
     });
   });
 });
