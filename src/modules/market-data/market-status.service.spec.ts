@@ -84,7 +84,7 @@ describe('MarketStatusService', () => {
     });
 
     it('should fetch separately for different regions', async () => {
-      mockYahooService.getMarketStatus.mockImplementation(async (symbol) => {
+      mockYahooService.getMarketStatus.mockImplementation((symbol) => {
         if (symbol === '^GSPC') {
           return { isOpen: true, session: 'regular', exchange: 'US' };
         }
