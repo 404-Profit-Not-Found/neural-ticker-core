@@ -11,6 +11,7 @@ import { Fundamentals } from './entities/fundamentals.entity';
 import { FinnhubModule } from '../finnhub/finnhub.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { YahooFinanceModule } from '../yahoo-finance/yahoo-finance.module';
+import { PortfolioModule } from '../portfolio/portfolio.module';
 
 import { AnalystRating } from './entities/analyst-rating.entity';
 
@@ -40,6 +41,7 @@ import { ResearchModule } from '../research/research.module';
     FinnhubModule,
     forwardRef(() => TickersModule),
     YahooFinanceModule,
+    forwardRef(() => PortfolioModule),
   ],
   controllers: [
     MarketDataController,
