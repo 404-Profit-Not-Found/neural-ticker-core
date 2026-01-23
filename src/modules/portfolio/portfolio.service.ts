@@ -22,6 +22,7 @@ export class PortfolioService {
     private readonly positionRepo: Repository<PortfolioPosition>,
     @InjectRepository(PortfolioAnalysis)
     private readonly analysisRepo: Repository<PortfolioAnalysis>,
+    @Inject(forwardRef(() => MarketDataService))
     private readonly marketDataService: MarketDataService,
     private readonly llmService: LlmService,
     @Inject(forwardRef(() => TickersService))
