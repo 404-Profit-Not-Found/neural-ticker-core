@@ -158,6 +158,19 @@ export class FinnhubService implements OnModuleInit {
         { exchange: targetExchange },
         (error: any, data: any) => {
           if (error) {
+            const msg = getErrorMessage(error);
+            // Suppress warnings for market status access restrictions (common on free tier)
+            if (
+              msg.toLowerCase().includes('access') ||
+              msg.includes('403') ||
+              msg.toLowerCase().includes('plan')
+            ) {
+              this.logger.debug(
+                `Market status access restricted (${targetExchange}), returning null.`,
+              );
+              return resolve(null);
+            }
+
             this.handleError(error, `marketStatus-${targetExchange}`);
             // Gracefully return null when access is restricted
             return resolve(null);
