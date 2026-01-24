@@ -12,7 +12,7 @@ interface WatchersChartProps {
     data: WatcherData[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         const dateObj = new Date(data.timestamp);
@@ -43,8 +43,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const WatchersChart = ({ data }: WatchersChartProps) => {
-    if (!data || data.length === 0) {
-        return <div className="h-full flex items-center justify-center text-muted-foreground text-xs">No Watcher Data</div>;
+    // Trending usually needs at least 2 points
+    if (!data || data.length < 2) {
+        return null;
     }
 
     // Sort by date ascending for chart

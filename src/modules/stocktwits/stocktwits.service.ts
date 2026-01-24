@@ -390,6 +390,11 @@ export class StockTwitsService {
           : 'Focus on extracting a comprehensive social pulse for the last 30 days.'
         }
 
+        THINKING STEP:
+        1. Identify specific future events, catalysts, or dates mentioned in the comments.
+        2. DEDUPLICATE: If multiple comments mention the same event (e.g., "CEO visit", "Jensen visit to China", "China trip"), combine them into a single, high-confidence entry. Do NOT output multiple entries for the same event.
+        3. Be precise with dates: If a date is provided (e.g. "Jan 28"), use it. If a range is given, use the first date.
+        
         Focus on extracting:
         1. Main "Topics Discussed" (e.g. Earnings Hype, Buyout Rumors, Insider Selling, Technical Breakout).
         2. Sentiment Score (0-1, where 1 is Super Bullish).
@@ -399,7 +404,7 @@ export class StockTwitsService {
         {
           "sentiment_score": 0.XX,
           "sentiment_label": "Bullish" | "Bearish" | "Neutral",
-          "summary": "2-sentence summary of the CURRENT pulse (incorporating new info)...",
+          "summary": "...",
           "highlights": {
             "topics": ["Topic 1", "Topic 2"],
             "bullish_points": ["..."],
@@ -407,14 +412,14 @@ export class StockTwitsService {
           },
           "extracted_events": [
             {
-              "title": "...",
-              "date": "YYYY-MM-DD" (or null),
+              "title": "Clear Canonical Title",
+              "date": "YYYY-MM-DD",
               "type": "earnings" | "product_launch" | "other",
               "confidence": 0.XX
             }
           ]
         }
-
+        
         ${isIncremental ? 'NEW Comments (since last analysis)' : 'Comments (last 30d)'} (TOON format):
         ${postsToon}
         `;
@@ -493,9 +498,16 @@ export class StockTwitsService {
 
       await this.analysisRepository.save(analysis);
 
-      // 4. Save Events
+      // 4. Save Events (Deduplicated)
       if (data.extracted_events && Array.isArray(data.extracted_events)) {
         const eventsToSave = [];
+        
+        // Fetch existing future events for this symbol to prevent cross-analysis duplicates
+        const today = new Date().toISOString().split('T')[0];
+        const existingFutureEvents = await this.calendarRepository.find({
+            where: { symbol, event_date: MoreThan(today) }
+        });
+
         for (const event of data.extracted_events) {
           if (event.title && event.date) {
              const eventDate = new Date(event.date);
@@ -504,17 +516,39 @@ export class StockTwitsService {
                  continue;
              }
 
+             const dateStr = eventDate.toISOString().split('T')[0];
+
+             // Backend Deduplication: Check if we already have a similar event on this day
+             // We use a simple normalization/inclusion check for the title.
+             const isDuplicate = existingFutureEvents.some(existing => {
+                 const sameDay = existing.event_date === dateStr;
+                 const titleLower = event.title.toLowerCase();
+                 const existingLower = existing.title.toLowerCase();
+                 
+                 // If titles are very similar or one contains the other on the same day, skip.
+                 const isSimilar = existingLower.includes(titleLower) || titleLower.includes(existingLower);
+                 return sameDay && isSimilar;
+             });
+
+             if (isDuplicate) {
+                 this.logger.log(`Skipping duplicate event: "${event.title}" on ${dateStr}`);
+                 continue;
+             }
+
              const newEvent = this.calendarRepository.create({
                ticker_id: ticker.id,
                symbol: symbol,
                title: event.title,
-               event_date: eventDate.toISOString().split('T')[0],
+               event_date: dateStr,
                event_type: (event.type as EventCalendarEventType) || EventCalendarEventType.OTHER,
                source: EventCalendarSource.STOCKTWITS,
                confidence: event.confidence || 0.8,
                created_at: new Date(),
              });
              eventsToSave.push(newEvent);
+             
+             // Add to our temporary list to prevent duplicates WITHIN the same batch if LLM failed
+             existingFutureEvents.push(newEvent);
           }
         }
         if (eventsToSave.length > 0) {

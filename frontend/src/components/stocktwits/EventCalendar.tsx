@@ -48,9 +48,9 @@ export const EventCalendar = ({ symbol }: { symbol: string }) => {
         <CalendarIcon className="w-4 h-4 text-primary" /> Upcoming Catalysts ({events.length})
       </h3>
       
-      <div className="overflow-hidden rounded-xl bg-card/40 border border-border/50">
+      <div className="overflow-hidden rounded-xl bg-transparent border border-border/40">
         <table className="w-full text-sm">
-          <thead className="bg-muted/30 text-[10px] uppercase text-muted-foreground font-semibold">
+          <thead className="bg-muted/10 text-[10px] uppercase text-muted-foreground font-semibold">
             <tr>
               <th className="px-4 py-2 text-left">Date</th>
               <th className="px-4 py-2 text-left">Event</th>
@@ -59,7 +59,7 @@ export const EventCalendar = ({ symbol }: { symbol: string }) => {
               <th className="px-4 py-2 text-right">Conf.</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/40">
+          <tbody className="divide-y divide-border/20">
             {events.map((event) => (
               <tr key={event.id} className="hover:bg-muted/10 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-foreground/80">

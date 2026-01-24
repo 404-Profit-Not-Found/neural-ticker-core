@@ -263,7 +263,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* 1. Market Sentiment Gauge */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm relative overflow-hidden group hover:border-border/80 transition-colors">
+                <Card className="bg-transparent border-border/50 shadow-sm relative overflow-hidden group hover:border-border/80 transition-colors">
                     <CardContent className="pt-6 relative z-10">
                         <div className="flex items-center justify-between mb-2">
                              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">StockTwits Sentiment (30D)</h4>
@@ -274,7 +274,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                 </Card>
 
                 {/* 2. Volume Trend */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm relative mb-auto md:mb-0 h-full">
+                <Card className="bg-transparent border-border/50 shadow-sm relative mb-auto md:mb-0 h-full">
                      <CardContent className="pt-6 h-full flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Message Volume Trend</h4>
@@ -291,7 +291,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                 </Card>
 
                 {/* 3. Bullish Drivers */}
-                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm md:col-span-1 h-full">
+                <Card className="bg-transparent border-border/50 shadow-sm md:col-span-1 h-full">
                      <CardContent className="pt-6 h-full">
                         <div className="flex items-center justify-start gap-2 mb-4">
                              <TrendingUp className="w-4 h-4 text-green-500" />
@@ -316,25 +316,26 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
 
             {/* --- Row 2: Watchers & Events --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                {/* Watchers Chart (2/3 width) */}
-                <div className="md:col-span-2">
-                    <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm h-full">
-                         <CardContent className="pt-6 h-full flex flex-col">
-                            <div className="flex items-center justify-between mb-2">
-                                 <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                    <Users className="w-3.5 h-3.5" /> Watcher Trends
-                                 </h4>
-                            </div>
-                            <div className="flex-1 min-h-[200px]">
-                                <WatchersChart data={watchers} />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                {/* Watchers Chart (2/3 width) - Hidden if not enough data */}
+                {watchers.length >= 2 && (
+                    <div className="md:col-span-2">
+                        <Card className="bg-transparent border-border/50 shadow-sm h-full">
+                            <CardContent className="pt-6 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                        <Users className="w-3.5 h-3.5" /> Watcher Trends
+                                    </h4>
+                                </div>
+                                <div className="flex-1 min-h-[200px]">
+                                    <WatchersChart data={watchers} />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
-                {/* Events (1/3 width) */}
-                {/* --- Events Integration --- */}
-                <div className="md:col-span-1 h-full">
+                {/* Events (1/3 width or 3/3 if watchers hidden) */}
+                <div className={`${watchers.length >= 2 ? 'md:col-span-1' : 'md:col-span-3'} h-full`}>
                     <EventCalendar symbol={symbol} />
                 </div>
             </div>
@@ -342,7 +343,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
             {/* --- Row 3: Executive Summary --- */}
             <div className="grid grid-cols-1 gap-6">
                 <div className="flex flex-col gap-6">
-                     <Card className="bg-secondary/5 border-primary/10 shadow-sm">
+                     <Card className="bg-transparent border-primary/20 shadow-sm">
                         <CardContent className="pt-6">
                              <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                                 <Activity className="w-4 h-4" /> Executive Summary
