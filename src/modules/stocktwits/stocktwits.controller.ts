@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   Body,
+  Delete,
 } from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
 import {
@@ -169,6 +170,16 @@ export class StockTwitsController {
   @ApiResponse({ status: 200, description: 'List of past analyses' })
   async getHistory(@Param('symbol') symbol: string) {
     return this.stockTwitsService.getAnalysisHistory(symbol);
+  }
+
+  @Delete('analysis/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Delete a specific analysis (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Analysis deleted' })
+  async deleteAnalysis(@Param('id') id: string) {
+    await this.stockTwitsService.deleteAnalysis(id);
+    return { message: 'Deleted' };
   }
 
   @Get(':symbol/events')

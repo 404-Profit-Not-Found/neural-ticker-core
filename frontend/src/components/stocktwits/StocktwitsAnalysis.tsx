@@ -7,18 +7,22 @@ import {
   Clock,
   Calendar,
   Activity,
-  Bot
+  Bot,
+  Trash2,
+  Users
 } from 'lucide-react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { SentimentGauge } from './SentimentGauge';
 import { VolumeSparkline } from './VolumeSparkline';
+import { WatchersChart } from './WatchersChart';
 import { EventCalendar } from './EventCalendar';
 import { ModelBadge } from '../ui/model-badge';
 import { useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { RunAnalysisDialog } from '../ticker/RunAnalysisDialog';
+import { analysisStore } from '../../store/analysisStore';
 
 interface Analysis {
   id: string;
@@ -56,6 +60,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [history, setHistory] = useState<Analysis[]>([]);
   const [volumeStats, setVolumeStats] = useState<VolumeStat[]>([]);
+  const [watchers, setWatchers] = useState<any[]>([]);
   const [volumeRange, setVolumeRange] = useState<{ start: string; end: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -68,6 +73,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
   const triggerAnalysis = useCallback(async (options: { model: string; quality: 'low' | 'medium' | 'high' | 'deep' }) => {
     if (isLocked) return;
     setSyncing(true);
+    analysisStore.start();
     try {
       const { data } = await axios.post<Analysis>(`/api/v1/stocktwits/${symbol}/analyze`, {
         model: options.model,
@@ -83,18 +89,38 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
       console.error('Analysis failed', e);
     } finally {
       setSyncing(false);
+      analysisStore.stop();
       // Refresh history after new analysis
       axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).then(res => setHistory(res.data));
     }
   }, [symbol, isLocked]);
+  
+  const deleteAnalysis = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this analysis? This cannot be undone.')) return;
+    try {
+        await axios.delete(`/api/v1/stocktwits/analysis/${id}`);
+        // Refresh history
+        const { data } = await axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`);
+        setHistory(data);
+        if (data.length > 0) {
+            setAnalysis(data[0]);
+        } else {
+            setAnalysis(null);
+        }
+    } catch (e) {
+        console.error('Delete failed', e);
+        alert('Failed to delete analysis');
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
       // Parallel fetch for speed
-      const [analysisRes, statsRes, historyRes] = await Promise.all([
+      const [analysisRes, statsRes, historyRes, watchersRes] = await Promise.all([
         axios.get<Analysis>(`/api/v1/stocktwits/${symbol}/analysis`).catch(() => ({ data: null })),
         axios.get<VolumeResponse>(`/api/v1/stocktwits/${symbol}/stats/volume`).catch(() => ({ data: null })),
-        axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).catch(() => ({ data: [] }))
+        axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).catch(() => ({ data: [] })),
+        axios.get<any[]>(`/api/v1/stocktwits/${symbol}/watchers`).catch(() => ({ data: [] }))
       ]);
 
       if (analysisRes.data) {
@@ -108,6 +134,10 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
       if (statsRes.data) {
         setVolumeStats(statsRes.data.stats);
         setVolumeRange({ start: statsRes.data.startDate, end: statsRes.data.endDate });
+      }
+
+      if (watchersRes.data) {
+        setWatchers(watchersRes.data);
       }
 
     } catch (e) {
@@ -146,19 +176,28 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                         >
                             {history.length > 0 ? history.map(h => (
                                 <option key={h.id} value={h.id} className="bg-background text-foreground">
-                                    {new Date(h.created_at).toLocaleString()} {h.id === history[0].id ? '(Latest)' : ''}
+                                    {new Date(h.created_at).toLocaleString('en-GB', { hour12: false })} {h.id === history[0].id ? '(Latest)' : ''}
                                 </option>
                             )) : (
-                                <option value="">{analysis ? new Date(analysis.created_at).toLocaleString() : 'Never'}</option>
+                                <option value="">{analysis ? new Date(analysis.created_at).toLocaleString('en-GB', { hour12: false }) : 'Never'}</option>
                             )}
                         </select>
+                        {isAdmin && analysis && (
+                             <button 
+                                onClick={() => deleteAnalysis(analysis.id)}
+                                className="ml-2 p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                                title="Delete Analysis (Admin)"
+                             >
+                                <Trash2 className="w-3.5 h-3.5" />
+                             </button>
+                        )}
                     </span>
                     {analysis && (
                         <>
                             <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/30 border border-border/50">
                                 <History className="w-3.5 h-3.5 text-orange-400" />
                                 <span className="text-[10px] md:text-xs font-bold uppercase">Data Window:</span>
-                                <span className="text-foreground font-mono text-[10px] md:text-xs">{new Date(analysis.analysis_start).toLocaleDateString()} - {new Date(analysis.analysis_end).toLocaleDateString()}</span>
+                                <span className="text-foreground font-mono text-[10px] md:text-xs">{new Date(analysis.analysis_start).toLocaleDateString('en-GB')} - {new Date(analysis.analysis_end).toLocaleDateString('en-GB')}</span>
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <span className="text-muted-foreground uppercase text-[10px] font-bold">Posts:</span>
@@ -275,10 +314,35 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                 </Card>
             </div>
 
-            {/* --- Executive Summary & Topics --- */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full items-stretch">
-                <div className="md:col-span-2 flex flex-col gap-6">
-                     <Card className="bg-secondary/5 border-primary/10 shadow-sm h-full">
+            {/* --- Row 2: Watchers & Events --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+                {/* Watchers Chart (2/3 width) */}
+                <div className="md:col-span-2">
+                    <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm h-full">
+                         <CardContent className="pt-6 h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-2">
+                                 <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                    <Users className="w-3.5 h-3.5" /> Watcher Trends
+                                 </h4>
+                            </div>
+                            <div className="flex-1 min-h-[200px]">
+                                <WatchersChart data={watchers} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Events (1/3 width) */}
+                {/* --- Events Integration --- */}
+                <div className="md:col-span-1 h-full">
+                    <EventCalendar symbol={symbol} />
+                </div>
+            </div>
+
+            {/* --- Row 3: Executive Summary --- */}
+            <div className="grid grid-cols-1 gap-6">
+                <div className="flex flex-col gap-6">
+                     <Card className="bg-secondary/5 border-primary/10 shadow-sm">
                         <CardContent className="pt-6">
                              <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
                                 <Activity className="w-4 h-4" /> Executive Summary
@@ -298,11 +362,6 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                              )}
                         </CardContent>
                     </Card>
-                </div>
-                
-                {/* --- Events Integration --- */}
-                <div className="md:col-span-1 h-full">
-                    <EventCalendar symbol={symbol} />
                 </div>
             </div>
             

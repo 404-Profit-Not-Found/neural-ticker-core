@@ -32,6 +32,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
         description: 'Next-gen intelligence, ideal for regular updates and news.',
         defaultQuestion: 'Give me a concise but detailed analysis for {ticker}',
     },
+    /*
     {
         key: 'gpt-4.1-mini',
         label: 'GPT-4.1 Mini',
@@ -42,6 +43,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
         description: 'Balanced speed vs. thoroughness for routine updates.',
         defaultQuestion: 'Summarize the latest investment view on {ticker}.',
     },
+    */
     {
         key: 'gemini-3-pro-preview',
         label: 'Gemini 3 Pro',
@@ -52,6 +54,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
         description: 'Optimal for deep research and complex reasoning tasks.',
         defaultQuestion: 'Conduct a comprehensive deep dive into {ticker}, analyzing risks, catalysts, and competitive landscape.',
     },
+    /*
     {
         key: 'gpt-5.1',
         label: 'GPT-5.1',
@@ -62,4 +65,5 @@ export const MODEL_OPTIONS: ModelOption[] = [
         description: 'OpenAI flagship for detailed thesis generation.',
         defaultQuestion: 'Generate a high-precision research brief for {ticker}.',
     },
+    */
 ];

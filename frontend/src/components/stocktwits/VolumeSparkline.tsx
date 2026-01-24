@@ -1,10 +1,52 @@
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 interface VolumeSparklineProps {
-    data: { date: string; count: number }[];
+    data: { date: string; count: number; topics?: string[] }[];
     startDate?: string;
     endDate?: string;
 }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        const dateObj = new Date(data.date);
+        
+        // Format: "Monday, Jan 8"
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        return (
+            <div className="bg-zinc-950/95 border border-zinc-800 p-3 rounded-lg shadow-xl backdrop-blur-sm min-w-[140px]">
+                <div className="text-[10px] uppercase tracking-wide text-zinc-500 font-bold mb-0.5">{dayName}</div>
+                <div className="text-xs font-medium text-zinc-300 mb-2">{dateStr}</div>
+                
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <span className="text-xl font-bold text-white tabular-nums">{data.count}</span>
+                    <span className="text-[10px] text-zinc-400 font-medium">POSTS</span>
+                </div>
+
+                {data.topics && data.topics.length > 0 ? (
+                    <div className="border-t border-zinc-800 pt-2 mt-1">
+                        <div className="text-[9px] uppercase tracking-wider text-green-500 font-bold mb-1.5 px-0.5">Top Drivers</div>
+                        <div className="flex flex-wrap gap-1.5">
+                           {data.topics.map((t: string, i: number) => (
+                               <span key={i} className="text-[10px] bg-zinc-900 text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-800/50">
+                                   {t}
+                               </span>
+                           ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="border-t border-zinc-800 pt-2 mt-1">
+                        <div className="text-[10px] italic text-zinc-600">No analysis for this day</div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+    return null;
+};
 
 export const VolumeSparkline = ({ data, startDate, endDate }: VolumeSparklineProps) => {
     if (!data || data.length === 0) {
@@ -21,19 +63,8 @@ export const VolumeSparkline = ({ data, startDate, endDate }: VolumeSparklinePro
                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <Tooltip
-                        contentStyle={{ 
-                            backgroundColor: '#09090b', 
-                            borderColor: '#27272a',
-                            fontSize: '11px',
-                            color: '#e4e4e7',
-                            borderRadius: '6px'
-                        }}
-                        itemStyle={{ color: '#60a5fa' }}
-                        cursor={{ stroke: '#3f3f46', strokeDasharray: '3 3' }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString()}
-                    />
-                     <XAxis 
+                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeDasharray: '3 3' }} />
+                    <XAxis 
                         dataKey="date" 
                         hide 
                     />

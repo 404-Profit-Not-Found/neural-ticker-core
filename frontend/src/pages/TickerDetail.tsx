@@ -141,11 +141,7 @@ export function TickerDetail() {
 
 
     // Trigger background sync for 5-year history
-    useEffect(() => {
-        if (symbol) {
-            api.post(`/tickers/${symbol}/sync`).catch(err => console.error('Background sync trigger failed', err));
-        }
-    }, [symbol]);
+
 
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };

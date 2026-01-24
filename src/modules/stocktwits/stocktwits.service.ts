@@ -43,8 +43,12 @@ export class StockTwitsService {
    * Fetch posts for a symbol and store them.
    * Skips existing posts to prevent overwrite.
    */
-  async fetchAndStorePosts(symbol: string) {
-    // If a sync is already running for this symbol, await it and return
+  /**
+   * Syncs posts from StockTwits API.
+   * Uses `curl` to bypass Cloudflare and handles pagination.
+   */
+  async fetchAndStorePosts(symbol: string, maxPages: number = 10) {
+    // Prevent overlapping syncs for same symbol
     if (this.syncLocks.has(symbol)) {
       this.logger.log(`Sync already in progress for ${symbol}, awaiting...`);
       return this.syncLocks.get(symbol);
@@ -52,37 +56,58 @@ export class StockTwitsService {
 
     const syncPromise = (async () => {
       try {
-        this.logger.log(`Fetching StockTwits posts for ${symbol}...`);
+        this.logger.log(`Fetching StockTwits posts for ${symbol} (Limit: ${maxPages} pages)...`);
       
       let maxId: number | null = null;
       let pages = 0;
-      const MAX_PAGES = 500; // Increased to ensure we get all posts for 30 days even for high-volume tickers
-      const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const MAX_PAGES = maxPages;
+      const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
       let oldestDateFetched = new Date();
 
       while (pages < MAX_PAGES && oldestDateFetched > THIRTY_DAYS_AGO) {
-        const url: string = `${this.BASE_URL}/${symbol}.json${maxId ? `?max=${maxId}` : ''}`;
+        // Attempting max limit (API usually caps at 30, but we request 300 just in case)
+        const url: string = `${this.BASE_URL}/${symbol}.json?limit=300${maxId ? `&max=${maxId}` : ''}`;
         
-        // Use curl for resilience against 403 blocks in specialized node environments
         let data: any;
-        const curlCmd = `curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" -H "Accept: application/json" "${url}"`;
         try {
-          const output = execSync(curlCmd, { encoding: 'utf8' });
-          
-          // Check for 403 in headers
-          if (output.includes('HTTP/1.1 403') || output.includes('HTTP/2 403')) {
-            this.logger.error(`StockTwits returned 403 Forbidden for ${symbol} using curl. Command: ${curlCmd}`);
-            this.logger.debug(`Response Header Snippet: ${output.substring(0, 200)}`);
-            break;
-          }
-
-          // Strip headers to get JSON body
-          const bodyStart = output.indexOf('\r\n\r\n');
-          const body = bodyStart !== -1 ? output.substring(bodyStart + 4) : output;
-          data = JSON.parse(body);
-        } catch (e) {
-          this.logger.error(`Curl fetch failed for ${symbol} page ${pages}: ${e.message}. Command: ${curlCmd}`);
-          break;
+            // Attempt 1: Fast path with Axios
+            const response = await firstValueFrom(
+                this.httpService.get(url, {
+                    headers: {
+                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                       'Accept': 'application/json'
+                    },
+                    timeout: 10000
+                })
+            );
+            data = response.data;
+        } catch (axiosError) {
+             // Fallback: If Cloudflare blocks Axios, use curl (slower but bypasses WAF)
+             if (axiosError.response?.status === 403 || axiosError.code === 'ECONNABORTED') {
+                 this.logger.warn(`[${symbol}] Axios blocked with ${axiosError.response?.status || axiosError.code}. Falling back to curl...`);
+                 
+                 const curlCmd = `curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" -H "Accept: application/json" "${url}"`;
+                 try {
+                     const output = execSync(curlCmd, { encoding: 'utf8' });
+                     
+                     // Check for 403 in headers
+                     if (output.includes('HTTP/1.1 403') || output.includes('HTTP/2 403')) {
+                         this.logger.error(`[${symbol}] curl also returned 403. Rate limit or permanent block.`);
+                         break;
+                     }
+                     
+                     // Strip headers to get JSON body
+                     const bodyStart = output.indexOf('\r\n\r\n');
+                     const body = bodyStart !== -1 ? output.substring(bodyStart + 4) : output;
+                     data = JSON.parse(body);
+                 } catch (curlError) {
+                     this.logger.error(`[${symbol}] curl fallback failed: ${curlError.message}`);
+                     break;
+                 }
+             } else {
+                 this.logger.error(`[${symbol}] Fetch failed: ${axiosError.message}`);
+                 break;
+             }
         }
 
         if (!data || !data.messages || data.messages.length === 0) {
@@ -104,7 +129,7 @@ export class StockTwitsService {
                     symbol: symbol,
                     username: msg.user?.username || 'unknown',
                     user_followers_count: msg.user?.followers || 0,
-                    body: msg.body, // Logic: we save raw, cleaning happens in DTO for TOON
+                    body: (msg.body || '').replace(/\u0000/g, ''), // Sanitize null bytes to prevent Postgres error
                     likes_count: msg.likes?.total || 0,
                     created_at: new Date(msg.created_at),
                 });
@@ -128,11 +153,14 @@ export class StockTwitsService {
         oldestDateFetched = new Date(lastMsg.created_at);
         pages++;
         
-        this.logger.log(`Page ${pages}: Stored ${newPostsCount} posts. Oldest: ${oldestDateFetched.toISOString()}`);
+        this.logger.log(`[${symbol}] Page ${pages}: Stored ${newPostsCount} posts. Oldest: ${oldestDateFetched.toISOString()}`);
         
-        // If we found many existing posts, we might be overlapping history.
-        // We continue to ensures we fill gaps back to the target date (14 days ago).
-        this.logger.log(`Page ${pages} processed.`);
+        // Optimization: Stop if we've reached known history (all duplicate posts)
+        if (newPostsCount === 0) {
+            this.logger.log(`[${symbol}] Reached existing history at page ${pages}. Stopping sync.`);
+            break;
+        }
+        this.logger.log(`[${symbol}] Page ${pages} processed.`);
       }
       
     } catch (error) {
@@ -195,7 +223,7 @@ export class StockTwitsService {
     const tickers = await this.tickersService.getAllTickers();
     for (const ticker of tickers) {
       if (ticker.symbol) {
-        await this.fetchAndStorePosts(ticker.symbol);
+        await this.fetchAndStorePosts(ticker.symbol, 20); // Limit 20 pages for cron
       }
     }
     this.logger.log('Hourly Post Sync Complete.');
@@ -248,8 +276,8 @@ export class StockTwitsService {
   async analyzeComments(symbol: string, userId?: string, options: { model?: string, quality?: 'low' | 'medium' | 'high' | 'deep' } = {}) {
     this.logger.log(`Starting AI analysis for ${symbol}... (User: ${userId || 'System'}, Model: ${options.model || 'default'})`);
 
-    // 0. Sync latest posts first
-    await this.fetchAndStorePosts(symbol);
+    // 0. Sync latest posts first (Deep pulse: 50 pages max - approx 1500 posts to cover ~14 days)
+    await this.fetchAndStorePosts(symbol, 50);
     
     // 1. Determine Window (Bridging the gap)
     const latestAnalysis = await this.getLatestAnalysis(symbol);
@@ -260,10 +288,20 @@ export class StockTwitsService {
     let previousContext = '';
 
     if (latestAnalysis && latestAnalysis.created_at > thirtyDaysAgo) {
-      since = latestAnalysis.created_at;
-      isIncremental = true;
-      previousContext = latestAnalysis.summary;
-      this.logger.log(`Performing incremental analysis for ${symbol} since ${since.toISOString()}`);
+      // Heuristic: If last analysis was very shallow (e.g. < 5 posts), it might be a partial/incremental fragment.
+      // Force a full re-read to ensure we get the big picture and correct the cumulative stats.
+      this.logger.debug(`Checking shallow analysis: Count=${latestAnalysis.posts_analyzed} Type=${typeof latestAnalysis.posts_analyzed}`);
+      
+      if ((latestAnalysis.posts_analyzed || 0) < 20) {
+         this.logger.log(`Previous analysis for ${symbol} was shallow (${latestAnalysis.posts_analyzed} posts). Forcing full 30-day re-analysis.`);
+         // Leave 'since' as thirtyDaysAgo
+         // Leave 'isIncremental' as false
+      } else {
+         since = latestAnalysis.created_at;
+         isIncremental = true;
+         previousContext = latestAnalysis.summary;
+         this.logger.log(`Performing incremental analysis for ${symbol} since ${since.toISOString()}`);
+      }
     } else {
       this.logger.log(`Performing full 30-day analysis for ${symbol}`);
     }
@@ -271,7 +309,7 @@ export class StockTwitsService {
     const posts = await this.postsRepository.find({
       where: { symbol, created_at: MoreThan(since) },
       order: { likes_count: 'DESC', created_at: 'DESC' },
-      take: 1000,
+      take: 150, // USER_RULE: LLM needs only 150 posts. Chart uses full DB history.
     });
 
     if (posts.length < 1 && isIncremental) {
@@ -291,74 +329,116 @@ export class StockTwitsService {
     }
 
 
-    const postsData = posts.map((p) => new StockTwitsToonDto(p).toPlain());
+    let data: any = null;
+    let modelName = 'gemini';
+    let totalTokens = 0;
 
-    const postsToon = jsonToToon(postsData);
-    this.logger.log(`TOON conversion (30d): ${postsToon.length} chars. Context depth: ${posts.length} posts.`);
-
-    // 2. Prompt LLM
-    const prompt = `
-    Analyze the following StockTwits comments for ticker $${symbol}.
-    ${isIncremental ? `CONVERSATION CONTEXT (from last analysis): "${previousContext}"` : ''}
-    
-    ${isIncremental 
-      ? `INSTRUCTION: Incorporate the NEW comments below into the existing pulse. Update the sentiment, topics, and summary to reflect the current state (last 30 days total), but focus on what has changed or evolved since the previous summary.` 
-      : 'Focus on extracting a comprehensive social pulse for the last 30 days.'
-    }
-
-    Focus on extracting:
-    1. Main "Topics Discussed" (e.g. Earnings Hype, Buyout Rumors, Insider Selling, Technical Breakout).
-    2. Sentiment Score (0-1, where 1 is Super Bullish).
-    3. Events/Catalysts mentioned (with dates if available).
-    
-    Return JSON format:
-    {
-      "sentiment_score": 0.XX,
-      "sentiment_label": "Bullish" | "Bearish" | "Neutral",
-      "summary": "2-sentence summary of the CURRENT pulse (incorporating new info)...",
-      "highlights": {
-        "topics": ["Topic 1", "Topic 2"],
-        "bullish_points": ["..."],
-        "bearish_points": ["..."]
-      },
-      "extracted_events": [
-        {
-          "title": "...",
-          "date": "YYYY-MM-DD" (or null),
-          "type": "earnings" | "product_launch" | "other",
-          "confidence": 0.XX
+    // Retry Strategy: If context is too large or model fails to output JSON, retry with reduced context
+    const attempts = 2;
+    for (let i = 0; i < attempts; i++) {
+        // Attempt 0: Full batch (500). Attempt 1: Critical subset (50 highly engaging posts)
+        const currentPosts = i === 0 ? posts : posts.slice(0, 50);
+        
+        if (i > 0) {
+            this.logger.warn(`Retrying analysis with reduced context (${currentPosts.length} posts)...`);
         }
-      ]
+
+        const postsData = currentPosts.map((p) => new StockTwitsToonDto(p).toPlain());
+        const postsToon = jsonToToon(postsData);
+        this.logger.log(`TOON conversion (Attempt ${i+1}): ${postsToon.length} chars.`);
+
+        // 2. Prompt LLM
+        const prompt = `
+        Analyze the following StockTwits comments for ticker $${symbol}.
+        ${isIncremental ? `CONVERSATION CONTEXT (from last analysis): "${previousContext}"` : ''}
+        
+        ${isIncremental 
+          ? `INSTRUCTION: Incorporate the NEW comments below into the existing pulse. Update the sentiment, topics, and summary to reflect the current state (last 30 days total), but focus on what has changed or evolved since the previous summary.` 
+          : 'Focus on extracting a comprehensive social pulse for the last 30 days.'
+        }
+
+        Focus on extracting:
+        1. Main "Topics Discussed" (e.g. Earnings Hype, Buyout Rumors, Insider Selling, Technical Breakout).
+        2. Sentiment Score (0-1, where 1 is Super Bullish).
+        3. Events/Catalysts mentioned (with dates if available).
+        
+        Return JSON format:
+        {
+          "sentiment_score": 0.XX,
+          "sentiment_label": "Bullish" | "Bearish" | "Neutral",
+          "summary": "2-sentence summary of the CURRENT pulse (incorporating new info)...",
+          "highlights": {
+            "topics": ["Topic 1", "Topic 2"],
+            "bullish_points": ["..."],
+            "bearish_points": ["..."]
+          },
+          "extracted_events": [
+            {
+              "title": "...",
+              "date": "YYYY-MM-DD" (or null),
+              "type": "earnings" | "product_launch" | "other",
+              "confidence": 0.XX
+            }
+          ]
+        }
+
+        ${isIncremental ? 'NEW Comments (since last analysis)' : 'Comments (last 30d)'} (TOON format):
+        ${postsToon}
+        `;
+
+        // Resolve Quality
+        let quality: 'low' | 'medium' | 'high' | 'deep' = options.quality || 'medium';
+        if (options.model) {
+            if (options.model.includes('lite')) quality = 'low';
+            else if (options.model.includes('pro')) quality = 'deep';
+            else if (options.model.includes('flash')) quality = 'medium';
+        }
+
+        try {
+          const result = await this.llmService.generateResearch({
+            question: prompt,
+            tickers: [symbol],
+            numericContext: {},
+            style: 'concise',
+            provider: (options.model?.includes('gpt') ? 'openai' : 'gemini') as 'gemini' | 'openai' | 'ensemble',
+            quality: quality,
+          });
+          
+          const response = result.answerMarkdown;
+          totalTokens = (result.tokensIn || 0) + (result.tokensOut || 0);
+          modelName = result.models ? result.models.join(', ') : 'gemini';
+          
+          const jsonMatch = response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+             data = JSON.parse(jsonMatch[0]);
+             break; // Success
+          } else {
+             if (i === attempts - 1) {
+                 this.logger.error(`Failed to parse JSON on last attempt. Raw: ${response.substring(0, 500)}...`);
+                 throw new Error('No JSON found in LLM response');
+             }
+          }
+        } catch (e) {
+             if (i === attempts - 1) throw e;
+             this.logger.warn(`Analysis failed (Attempt ${i+1}): ${e.message}. Retrying...`);
+        }
     }
-
-    ${isIncremental ? 'NEW Comments (since last analysis)' : 'Comments (last 30d)'} (TOON format):
-    ${postsToon}
-    `;
-
-    try {
-      const result = await this.llmService.generateResearch({
-        question: prompt,
-        tickers: [symbol],
-        numericContext: {},
-        style: 'concise',
-        provider: (options.model?.includes('gpt') ? 'openai' : 'gemini') as 'gemini' | 'openai' | 'ensemble',
-        quality: options.quality || 'medium',
-      });
-      
-      const response = result.answerMarkdown;
-      const totalTokens = (result.tokensIn || 0) + (result.tokensOut || 0);
-      const modelName = result.models ? result.models.join(', ') : 'gemini';
-      
-      // Parse JSON (resiliently)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found in LLM response');
-      const data = JSON.parse(jsonMatch[0]);
 
       // 3. Save Analysis
       const ticker = await this.tickersService.findOneBySymbol(symbol);
       if (!ticker) throw new Error(`Ticker ${symbol} not found`);
 
-      const analysis_start = posts.length > 0 ? posts[posts.length - 1].created_at : new Date();
+      // Determine metadata for the record
+      let finalAnalysisStart = posts.length > 0 ? posts[posts.length - 1].created_at : new Date();
+      let finalPostsCount = posts.length;
+
+      if (isIncremental && latestAnalysis) {
+          // Carry over the start date from the previous analysis to show full window
+          finalAnalysisStart = latestAnalysis.analysis_start;
+          // Accumulate post count
+          finalPostsCount = (latestAnalysis.posts_analyzed || 0) + posts.length;
+      }
+
       const analysis_end = posts.length > 0 ? posts[0].created_at : new Date();
 
       const analysis = this.analysisRepository.create({
@@ -366,12 +446,12 @@ export class StockTwitsService {
         symbol: symbol,
         sentiment_score: data.sentiment_score,
         sentiment_label: data.sentiment_label,
-        posts_analyzed: posts.length,
+        posts_analyzed: finalPostsCount,
         weighted_sentiment_score: data.sentiment_score,
         summary: data.summary,
         model_used: modelName,
-        tokens_used: totalTokens,
-        analysis_start,
+        tokens_used: totalTokens, // This is just for this run, which is correct cost accounting
+        analysis_start: finalAnalysisStart,
         analysis_end,
         highlights: data.highlights,
         extracted_events: data.extracted_events || [],
@@ -385,11 +465,17 @@ export class StockTwitsService {
         const eventsToSave = [];
         for (const event of data.extracted_events) {
           if (event.title && event.date) {
+             const eventDate = new Date(event.date);
+             if (isNaN(eventDate.getTime())) {
+                 this.logger.warn(`Invalid event date from LLM: ${event.date} for event "${event.title}". Skipping.`);
+                 continue;
+             }
+
              const newEvent = this.calendarRepository.create({
                ticker_id: ticker.id,
                symbol: symbol,
                title: event.title,
-               event_date: event.date,
+               event_date: eventDate.toISOString().split('T')[0],
                event_type: (event.type as EventCalendarEventType) || EventCalendarEventType.OTHER,
                source: EventCalendarSource.STOCKTWITS,
                confidence: event.confidence || 0.8,
@@ -406,10 +492,7 @@ export class StockTwitsService {
       this.logger.log(`AI analysis completed for ${symbol}`);
       return analysis;
 
-    } catch (e) {
-      this.logger.error(`AI Analysis process failed for ${symbol}: ${e.message}`);
-      throw e;
-    }
+
   }
 
   async getLatestAnalysis(symbol: string) {
@@ -427,6 +510,10 @@ export class StockTwitsService {
     });
   }
 
+  async deleteAnalysis(id: string) {
+    return this.analysisRepository.delete(id);
+  }
+
   async getVolumeStats(symbol: string) {
     // Aggregate posts by day for the last 30 days
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -442,6 +529,15 @@ export class StockTwitsService {
       .orderBy('date', 'ASC')
       .getRawMany();
 
+    this.logger.debug(`Volume Stats Raw: ${JSON.stringify(stats)}`);
+
+    // Fetch recent analyses to cross-reference topics
+    const analyses = await this.analysisRepository.find({
+        where: { symbol },
+        order: { created_at: 'DESC' },
+        take: 10
+    });
+
     // Calculate actual range from data found
     const startDateRaw = stats.length > 0 ? stats[0].date : since.toISOString().split('T')[0];
     const endDateRaw = stats.length > 0 ? stats[stats.length - 1].date : new Date().toISOString().split('T')[0];
@@ -456,10 +552,28 @@ export class StockTwitsService {
         symbol,
         startDate: formatDate(startDateRaw),
         endDate: formatDate(endDateRaw),
-        stats: stats.map(s => ({
-            date: s.date,
-            count: Number(s.count)
-        }))
+        stats: stats.map(s => {
+            const dateStr = s.date; // YYYY-MM-DD
+            const dateObj = new Date(dateStr);
+            
+            // Find relevant analysis
+            // Logic: Analysis covers a range [start, end]. If this daily bar is inside that range, show its topics.
+            // Simplified: Just check if date is within window.
+            const relevantAnalysis = analyses.find(a => {
+                const start = new Date(a.analysis_start);
+                const end = new Date(a.analysis_end);
+                // Expand window slightly to catch same-day
+                start.setHours(0,0,0,0);
+                end.setHours(23,59,59,999);
+                return dateObj >= start && dateObj <= end;
+            });
+
+            return {
+                date: s.date,
+                count: Number(s.count),
+                topics: relevantAnalysis?.highlights?.topics?.slice(0, 3) || [] // Top 3 topics
+            };
+        })
     };
   }
 

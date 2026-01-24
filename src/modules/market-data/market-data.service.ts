@@ -670,13 +670,26 @@ export class MarketDataService {
     }
 
     const to = new Date();
-    const from = new Date();
+    let from = new Date();
     from.setFullYear(from.getFullYear() - years);
+
+    // Adjust for IPO date if available
+    let adjustedYears = years;
+    if (ticker.ipo_date) {
+        const ipoDate = new Date(ticker.ipo_date);
+        if (ipoDate > from) {
+            from = ipoDate;
+            const diffTime = Math.abs(to.getTime() - from.getTime());
+            const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+            adjustedYears = diffYears;
+            this.logger.debug(`Adjusting sync start for ${symbol} to IPO date: ${ticker.ipo_date}`);
+        }
+    }
 
     // 1. Check DB Coverage
     // Count expected trading days (rough approx: 252 days per year * 5/7 adjustment is overkill, just ~250/yr)
     // 5 years = ~1250 trading days.
-    const expectedDays = years * 250;
+    const expectedDays = Math.max(10, Math.ceil(adjustedYears * 252)); // Minimum 10 days to avoid division by zero or tiny ranges
 
     const dbCount = await this.ohlcvRepo.count({
       where: {

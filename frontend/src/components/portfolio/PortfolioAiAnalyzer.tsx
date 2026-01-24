@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
+import { analysisStore } from '../../store/analysisStore';
 
 interface PortfolioAiAnalyzerProps {
   open: boolean;
@@ -64,6 +65,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
 
   const startAnalysis = async () => {
     setStep('analyzing');
+    analysisStore.start();
     try {
       const { data } = await api.post('/portfolio/analyze', {
         riskAppetite,
@@ -78,6 +80,8 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
       const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to generate AI analysis';
       toast.error(message);
       setStep('survey');
+    } finally {
+      analysisStore.stop();
     }
   };
 
@@ -282,7 +286,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                     </div>
                   </Label>
 
-                  {/* GPT-4.1 Mini */}
+                  {/* GPT-4.1 Mini
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
                     model === 'gpt-4.1-mini' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
@@ -304,6 +308,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                       </Badge>
                     </div>
                   </Label>
+                  */}
 
                   {/* Gemini 3 Pro */}
                   <Label className={cn(
@@ -333,7 +338,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                     </div>
                   </Label>
 
-                  {/* GPT-5.1 PRO */}
+                  {/* GPT-5.1 PRO
                   <Label className={cn(
                     "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
                     model === 'gpt-5.1' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
@@ -360,6 +365,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                       </Badge>
                     </div>
                   </Label>
+                  */}
                 </RadioGroup>
               </div>
             </div>
