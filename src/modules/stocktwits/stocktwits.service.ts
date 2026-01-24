@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { jsonToToon } from 'toon-parser';
 import { execSync } from 'child_process';
@@ -355,6 +355,11 @@ export class StockTwitsService {
       return null;
     }
 
+    // Move ticker fetch to top to provide better context to the LLM
+    const ticker = await this.tickersService.findOneBySymbol(symbol);
+    if (!ticker) throw new Error(`Ticker ${symbol} not found`);
+    const companyName = ticker.name || symbol;
+
     // --- Credit Deduction ---
     if (userId) {
         const cost = this.creditService.getModelCost(options.model || 'gemini-3-flash-preview');
@@ -382,7 +387,7 @@ export class StockTwitsService {
 
         // 2. Prompt LLM
         const prompt = `
-        Analyze the following StockTwits comments for ticker $${symbol}.
+        Analyze the following StockTwits comments for ${companyName} ($${symbol}).
         ${isIncremental ? `CONVERSATION CONTEXT (from last analysis): "${previousContext}"` : ''}
         
         ${isIncremental 
@@ -392,7 +397,7 @@ export class StockTwitsService {
 
         THINKING STEP:
         1. Identify specific future events, catalysts, or dates mentioned in the comments.
-        2. DEDUPLICATE: If multiple comments mention the same event (e.g., "CEO visit", "Jensen visit to China", "China trip"), combine them into a single, high-confidence entry. Do NOT output multiple entries for the same event.
+        2. DEDUPLICATE: If multiple comments mention the same event (e.g., "CEO visit", "Earnings", or specific trips), combine them into a single, high-confidence entry. Do NOT output multiple entries for the same event. Use canonical names for events and individuals specific to ${companyName}.
         3. Be precise with dates: If a date is provided (e.g. "Jan 28"), use it. If a range is given, use the first date.
         
         Focus on extracting:
@@ -415,6 +420,8 @@ export class StockTwitsService {
               "title": "Clear Canonical Title",
               "date": "YYYY-MM-DD",
               "type": "earnings" | "product_launch" | "other",
+              "impact_score": 1,
+              "expected_impact": "Short summary of market effect",
               "confidence": 0.XX
             }
           ]
@@ -463,9 +470,6 @@ export class StockTwitsService {
     }
 
       // 3. Save Analysis
-      const ticker = await this.tickersService.findOneBySymbol(symbol);
-      if (!ticker) throw new Error(`Ticker ${symbol} not found`);
-
       // Determine metadata for the record
       let finalAnalysisStart = posts.length > 0 ? posts[posts.length - 1].created_at : new Date();
       let finalPostsCount = posts.length;
@@ -502,11 +506,23 @@ export class StockTwitsService {
       if (data.extracted_events && Array.isArray(data.extracted_events)) {
         const eventsToSave = [];
         
-        // Fetch existing future events for this symbol to prevent cross-analysis duplicates
-        const today = new Date().toISOString().split('T')[0];
-        const existingFutureEvents = await this.calendarRepository.find({
-            where: { symbol, event_date: MoreThan(today) }
+        // Fetch existing future and recent events to prevent cross-analysis duplicates
+        // We look 2 days back from today just in case an event was logged for today/yesterday
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        const searchStartDate = twoDaysAgo.toISOString().split('T')[0];
+
+        const existingEvents = await this.calendarRepository.find({
+            where: { symbol, event_date: MoreThanOrEqual(searchStartDate) }
         });
+
+        // Helper to normalize and tokenize a title for similarity checking
+        const getKeywords = (title: string) => {
+            return title.toLowerCase()
+                .replace(/[^\w\s]/g, '') // remove punctuation
+                .split(/\s+/)
+                .filter(w => w.length >= 3 && !['the', 'and', 'for', 'with', 'visit', 'tour', 'meeting', 'trip'].includes(w));
+        };
 
         for (const event of data.extracted_events) {
           if (event.title && event.date) {
@@ -520,17 +536,24 @@ export class StockTwitsService {
 
              // Backend Deduplication: Check if we already have a similar event within +/- 2 days
              // Social media noise often blurs dates for the same event.
-             const isDuplicate = existingFutureEvents.some(existing => {
+             const eventKeywords = getKeywords(event.title);
+
+             const isDuplicate = existingEvents.some(existing => {
                  const existingDate = new Date(existing.event_date);
                  const diffDays = Math.abs((eventDate.getTime() - existingDate.getTime()) / (1000 * 3600 * 24));
                  const isCloseDate = diffDays <= 2;
                  
-                 const titleLower = event.title.toLowerCase();
-                 const existingLower = existing.title.toLowerCase();
+                 if (!isCloseDate) return false;
+
+                 const existingKeywords = getKeywords(existing.title);
                  
-                 // Similarity check: One title contains the other or they share significant keywords
-                 const isSimilar = existingLower.includes(titleLower) || titleLower.includes(existingLower);
-                 return isCloseDate && isSimilar;
+                 // Calculate keyword intersection
+                 const intersection = eventKeywords.filter(k => existingKeywords.includes(k));
+                 
+                 // If major keywords match (e.g. Jensen, Huang, China), it's a duplicate
+                 // Threshold: 60% of keywords match OR at least 3 keywords match
+                 const matchRatio = intersection.length / Math.max(eventKeywords.length, 1);
+                 return matchRatio >= 0.6 || intersection.length >= 3;
              });
 
              if (isDuplicate) {
@@ -546,12 +569,14 @@ export class StockTwitsService {
                event_type: (event.type as EventCalendarEventType) || EventCalendarEventType.OTHER,
                source: EventCalendarSource.STOCKTWITS,
                confidence: event.confidence || 0.8,
+               impact_score: event.impact_score || 5,
+               expected_impact: event.expected_impact || 'Moderate volatility expected',
                created_at: new Date(),
              });
              eventsToSave.push(newEvent);
              
              // Add to our temporary list to prevent duplicates WITHIN the same batch if LLM failed
-             existingFutureEvents.push(newEvent);
+             existingEvents.push(newEvent as any);
           }
         }
         if (eventsToSave.length > 0) {

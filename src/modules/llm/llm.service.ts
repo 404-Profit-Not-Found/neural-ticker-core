@@ -91,7 +91,7 @@ export class LlmService {
 
     if (k === 'gemini-2.5-flash-lite')
       return { provider: 'gemini', quality: 'low' };
-    if (k === 'gemini-3-flash' || k === 'gemini')
+    if (k === 'gemini-3-flash-preview' || k === 'gemini')
       return { provider: 'gemini', quality: 'medium' };
     if (k === 'gemini-3-pro')
       return { provider: 'gemini', quality: 'deep' };

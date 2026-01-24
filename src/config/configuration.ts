@@ -40,8 +40,8 @@ export default () => {
       secondaryApiKey: process.env.GEMINI_API_KEY_SECONDARY,
       models: {
         low: process.env.GEMINI_MODEL_LOW || 'gemini-2.5-flash-lite',
-        medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash',
-        deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro',
+        medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
+        deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
         extraction:
           process.env.GEMINI_MODEL_EXTRACTION || 'gemini-2.5-flash-lite',
       },

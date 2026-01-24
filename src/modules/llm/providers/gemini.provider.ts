@@ -17,7 +17,7 @@ export class GeminiProvider implements ILlmProvider {
   // Cost-effective models with Google Search grounding
   private readonly defaultModels = {
     deep: 'gemini-3-pro',
-    medium: 'gemini-3-flash',
+    medium: 'gemini-3-flash-preview',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-2.5-flash-lite',
   };
@@ -126,8 +126,8 @@ export class GeminiProvider implements ILlmProvider {
     // Fallback chain for 429 errors
     const fallbackChain: Record<string, string> = {
       'gemini-2.5-flash-lite': 'gemini-2.5-flash',
-      'gemini-2.5-flash': 'gemini-3-flash',
-      'gemini-3-flash': 'gemini-3-pro', // Only available on Secondary (Billed)
+      'gemini-2.5-flash': 'gemini-3-flash-preview',
+      'gemini-3-flash-preview': 'gemini-3-pro-preview', // Only available on Secondary (Billed)
     };
 
     let activeApiKey = apiKey;
@@ -137,8 +137,8 @@ export class GeminiProvider implements ILlmProvider {
 
     // CRITICAL: gemini-3-pro is only available on the Secondary (Billed) Key
     // If it's the requested model, we failover immediately to avoid the unavoidable 429 on Free Key.
-    if (currentModel === 'gemini-3-pro' && !hasSwitchedToSecondary && secondaryApiKey) {
-        this.logger.warn(`gemini-3-pro requested. Switching to SECONDARY API KEY (Billed) immediately.`);
+    if (currentModel === 'gemini-3-pro-preview' && !hasSwitchedToSecondary && secondaryApiKey) {
+        this.logger.warn(`gemini-3-pro-preview is not available on Free Key. Initiating Key Failoverrequested. Switching to SECONDARY API KEY (Billed) immediately.`);
         activeApiKey = secondaryApiKey;
         activeClient = new GoogleGenAI({ apiKey: activeApiKey });
         hasSwitchedToSecondary = true;
@@ -184,10 +184,10 @@ export class GeminiProvider implements ILlmProvider {
 
         if (isQuotaError && attempts < maxAttempts * 4) {
           let nextModel: string | undefined = fallbackChain[currentModel];
-          
-          // CRITICAL: gemini-3-pro is only available on the Secondary (Billed) Key
-          if (nextModel === 'gemini-3-pro' && !hasSwitchedToSecondary) {
-              this.logger.warn(`gemini-3-pro is not available on Free Key. Initiating Key Failover.`);
+
+          // CRITICAL: gemini-3-pro-preview is only available on the Secondary (Billed) Key
+          if (nextModel === 'gemini-3-pro-preview' && !hasSwitchedToSecondary) {
+              this.logger.warn(`gemini-3-pro-preview is not available on Free Key. Initiating Key Failover.`);
               nextModel = undefined; // Force key failover to re-start chain on Secondary
           }
 

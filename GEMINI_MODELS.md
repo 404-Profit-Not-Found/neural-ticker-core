@@ -9,7 +9,8 @@ This document summarizes the available models and their respective rate limits f
 | `gemini-2.5-flash-lite` | Text-out models | 10 | 250K | 20 |
 | `gemini-2.5-flash-tts` | Multi-modal generative models | 3 | 10K | 10 |
 | `gemini-2.5-flash` | Text-out models | 5 | 250K | 20 |
-| `gemini-3-flash` | Text-out models | 5 | 250K | 20 |
+| `gemini-3-flash-preview` | Text-out models | 5 | 250K | 20 |
+| `gemini-3-pro` | Text-out models | 5 | 250K | 20 |
 | `gemini-robotics-er-1.5-preview` | Other models | 10 | 250K | 20 |
 | `gemma-3-12b` | Other models | 30 | 15K | 14.4K |
 | `gemma-3-1b` | Other models | 30 | 15K | 14.4K |
@@ -25,4 +26,4 @@ This document summarizes the available models and their respective rate limits f
 ![Gemini Rate Limits](file:///C:/Users/brani/.gemini/antigravity/brain/82ae232a-4472-4022-bf6a-62a1a5ed632b/uploaded_media_1769296143361.png)
 
 > [!TIP]
-> **Gemini 2.5 Flash Lite** remains the most generous for experimental usage with 10 RPM, while **Gemini 3 Flash** and **Gemini 2.5 Flash** are balanced for higher complexity.
+> **Gemini 2.5 Flash Lite** remains the most generous for experimental usage with 10 RPM, while **Gemini 3 Flash (Preview)** and **Gemini 3 Pro** are balanced for higher complexity.
