@@ -212,13 +212,13 @@ function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const user = await refreshSession();
+      await refreshSession();
 
-      if (user && !user.has_onboarded) {
-        navigate('/about', { replace: true });
-      } else {
+      // if (user && !user.has_onboarded) {
+      //   navigate('/about', { replace: true });
+      // } else {
         navigate('/', { replace: true });
-      }
+      // }
     };
 
     handleCallback();

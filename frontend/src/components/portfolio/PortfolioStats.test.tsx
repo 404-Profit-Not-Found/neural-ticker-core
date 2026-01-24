@@ -123,51 +123,16 @@ describe('PortfolioStats', () => {
       />
     );
 
-    const rangeButton = screen.getByText('3M');
+    const rangeButton = screen.getByText('6M');
     fireEvent.click(rangeButton);
     
     // Check if the range button becomes active
     expect(rangeButton).toHaveClass('text-foreground');
   });
 
-  it('handles 1D range with simulated hourly data', () => {
-    render(
-      <PortfolioStats
-        totalValue={3550}
-        totalGainLoss={550}
-        totalGainLossPercent={18.3}
-        positions={mockPositions}
-        onAnalyze={mockOnAnalyze}
-      />
-    );
+  // 1D test removed
 
-    const rangeButton = screen.getByText('1D');
-    fireEvent.click(rangeButton);
-    expect(rangeButton).toHaveClass('text-foreground');
-    // We can't easily check internal state, but we know it doesn't crash
-  });
-
-  it('displays period gains correctly for 1D', () => {
-    render(
-      <PortfolioStats
-        totalValue={3550}
-        totalGainLoss={550}
-        totalGainLossPercent={18.3}
-        positions={mockPositions}
-        onAnalyze={mockOnAnalyze}
-        todayGain={123.45}
-        todayGainPct={3.5}
-      />
-    );
-
-    const rangeButton = screen.getByRole('button', { name: '1D' });
-    fireEvent.click(rangeButton);
-
-    expect(rangeButton).toHaveClass('text-foreground');
-    // The period gain should match the prop
-    expect(screen.getByText(/\$123\.45/)).toBeInTheDocument();
-    expect(screen.getByText(/3\.50%/)).toBeInTheDocument();
-  });
+  // 1D gain test removed
 
   it('handles 1W range', () => {
     render(

@@ -341,15 +341,19 @@ export class TickersService {
     if (symbolIds.length > 0) {
       try {
         // Single query to get last 14 days of prices for ALL tickers at once
-        const fourteenDaysAgo = new Date();
-        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-
         const allPrices = await this.ohlcvRepo
           .createQueryBuilder('ohlcv')
           .select(['ohlcv.symbol_id', 'ohlcv.close', 'ohlcv.ts'])
           .where('ohlcv.symbol_id IN (:...symbolIds)', { symbolIds })
           .andWhere('ohlcv.timeframe = :timeframe', { timeframe: '1d' })
-          .andWhere('ohlcv.ts >= :fromDate', { fromDate: fourteenDaysAgo })
+          // Remove arbitrary date filter to rely on explicit subquery limits if possible,
+          // but for bulk mapped queries, 'take' per group is hard in standard SQL/TypeORM without lateral joins.
+          // Fallback: Fetch slightly more history (e.g. 30 days) and slice in memory to ensure coverage
+          // or use a WINDOW function approach if TypeORM supports it well.
+          // SIMPLIFIED APPROACH: Fetch last 30 days calendar, then slice to 14 points per symbol.
+          .andWhere('ohlcv.ts >= :fromDate', {
+            fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          })
           .orderBy('ohlcv.symbol_id', 'ASC')
           .addOrderBy('ohlcv.ts', 'DESC')
           .getMany();
@@ -364,9 +368,11 @@ export class TickersService {
 
         // Convert to sparkline arrays (reversed for chronological order)
         for (const [symbolId, prices] of groupedPrices) {
+          // Take only last 14 points
+          const limitedPrices = prices.slice(0, 14);
           sparklineMap.set(
             symbolId,
-            prices.reverse().map((p) => p.close),
+            limitedPrices.reverse().map((p) => p.close),
           );
         }
       } catch {
@@ -549,7 +555,8 @@ export class TickersService {
       }
 
       for (const [sym, prices] of grouped) {
-        results[sym] = prices.reverse();
+        // Take last 14 effectively
+        results[sym] = prices.slice(0, 14).reverse();
       }
     }
 

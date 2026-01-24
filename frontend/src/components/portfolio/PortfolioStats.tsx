@@ -44,7 +44,7 @@ const COLORS = [
   '#06b6d4', // cyan-500
 ];
 
-const RANGES = ['1D', '1W', '1M', '3M', '6M', '1Y'] as const;
+const RANGES = ['1W', '1M', '6M', '1Y'] as const;
 type Range = typeof RANGES[number];
 
 // Standard Tooltip (Theme-Aware)
@@ -138,64 +138,15 @@ export function PortfolioStats({
 
   // 2. History Simulation (Date-Aware) - WITH FALLBACKS AND NUMERIC CASTING
   const historyData = useMemo(() => {
-    // 1D SPECIAL CASE: Hourly simulation
-    if (range === '1D') {
-      const data = [];
-      const marketOpen = new Date();
-      marketOpen.setHours(9, 30, 0, 0); // 9:30 AM
-      const now = new Date();
-      
-      // If before 9:30 AM, just show pre-market flat line
-      // const effectiveEnd = now < marketOpen ? marketOpen : now; (unused)
-      const hoursPoints = 8; // approx points
+    // 1D logic removed
 
-      const startValue = totalValue - todayGain;
-      
-      // Brownian Bridge Simulation
-      // 1. Generate random walk
-      let currentRandom = startValue;
-      const randomWalk = [startValue];
-      const steps = hoursPoints;
-      
-      for (let i = 0; i < steps; i++) {
-         const volatility = totalValue * 0.005; // 0.5% volatility per step
-         // Seeded pseudo-random for purity
-         const seed = i + steps + totalValue;
-         const rand = (Math.sin(seed) * 10000) % 1; 
-         const change = (rand - 0.5) * volatility;
-         currentRandom += change;
-         randomWalk.push(currentRandom);
-      }
-      
-      // 2. Adjust to bridge to exact end value
-      const lastRandom = randomWalk[randomWalk.length - 1];
-      const bridgeAdjustment = totalValue - lastRandom;
-      
-      for (let i = 0; i <= steps; i++) {
-        const time = new Date(marketOpen.getTime() + (i * 3600 * 1000));
-        if (time > now && data.length > 0) break;
-        
-        const originalVal = randomWalk[i];
-        const progress = i / steps;
-        
-        // Apply adjustment scaled by progress (linear drift correction)
-        const bridgedVal = originalVal + (bridgeAdjustment * progress);
-        
-        data.push({
-          date: format(time, 'HH:mm'),
-          value: bridgedVal,
-          invested: totalValue - totalGainLoss, // Invested is roughly constant for 1D for MVP
-        });
-      }
-      return data;
-    }
 
     // REGULAR DAILY CASES
     let days = 30;
     switch (range) {
       case '1W': days = 7; break;
       case '1M': days = 30; break;
-      case '3M': days = 90; break;
+      // 3M removed
       case '6M': days = 180; break;
       case '1Y': days = 365; break;
     }
@@ -296,13 +247,7 @@ export function PortfolioStats({
 
   // Calculate Period Gain/Loss (Dynamic based on Range)
   const { periodGain, periodGainPct, isPeriodProfit } = useMemo(() => {
-    if (range === '1D') {
-      return {
-        periodGain: todayGain,
-        periodGainPct: todayGainPct,
-        isPeriodProfit: todayGain >= 0
-      };
-    }
+    // 1D logic removed
 
     if (historyData.length > 0) {
       const firstData = historyData[0];

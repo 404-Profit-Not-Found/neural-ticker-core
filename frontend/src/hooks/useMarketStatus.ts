@@ -7,13 +7,14 @@ export interface MarketStatusData {
     exchange: string;
     session: 'pre' | 'regular' | 'post' | 'closed';
     timezone?: string;
-    region?: 'US' | 'EU' | 'OTHER';
+    region?: 'US' | 'EU' | 'ASIA' | 'OTHER';
     fallback?: boolean;
 }
 
 export interface AllMarketsStatusData {
     us: MarketStatusData;
     eu: MarketStatusData;
+    asia: MarketStatusData;
 }
 
 /**
@@ -42,7 +43,7 @@ export function useTickerMarketStatus(symbol: string, enabled: boolean = true) {
  */
 export function useAllMarketsStatus() {
     return useQuery({
-        queryKey: ['market-status', 'all'],
+        queryKey: ['market-status', 'all', 'v2'],
         queryFn: async (): Promise<AllMarketsStatusData> => {
             try {
                 const { data } = await api.get<AllMarketsStatusData>('/market/status/all');
@@ -51,6 +52,7 @@ export function useAllMarketsStatus() {
                 return {
                     us: getMarketStatusFromTime('US'),
                     eu: getMarketStatusFromTime('EU'),
+                    asia: getMarketStatusFromTime('ASIA'),
                 };
             }
         },
@@ -82,10 +84,12 @@ export function useMarketStatus() {
 /**
  * Time-based fallback for market status.
  */
-function getMarketStatusFromTime(region: 'US' | 'EU'): MarketStatusData {
+function getMarketStatusFromTime(region: 'US' | 'EU' | 'ASIA'): MarketStatusData {
     const now = new Date();
     
-    const timeZone = region === 'EU' ? 'Europe/Berlin' : 'America/New_York';
+    let timeZone = 'America/New_York';
+    if (region === 'EU') timeZone = 'Europe/Berlin';
+    if (region === 'ASIA') timeZone = 'Asia/Hong_Kong';
     
     // Robust time extraction
     const formatter = new Intl.DateTimeFormat('en-US', {
@@ -112,6 +116,22 @@ function getMarketStatusFromTime(region: 'US' | 'EU'): MarketStatusData {
     const isWeekend = weekdayPart === 'Sat' || weekdayPart === 'Sun';
     const isWeekday = !isWeekend;
     
+    if (region === 'ASIA') {
+        const marketOpen = 9 * 60 + 30; // 9:30 AM HKT
+        const marketClose = 16 * 60; // 4:00 PM HKT
+
+        const isOpen = isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+
+        return {
+            isOpen,
+            exchange: 'ASIA',
+            session: isOpen ? 'regular' : 'closed',
+            timezone: 'Asia/Hong_Kong',
+            region: 'ASIA',
+            fallback: true,
+        };
+    }
+
     if (region === 'EU') {
         const marketOpen = 8 * 60; // 8:00 AM CET
         const marketClose = 17 * 60 + 30; // 5:30 PM CET

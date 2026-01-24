@@ -53,6 +53,7 @@ export class MarketDataService {
     private readonly marketStatusService: MarketStatusService,
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
+    private readonly marketStatusService: MarketStatusService,
   ) {}
 
   private snapshotRequests = new Map<string, Promise<any>>();
@@ -76,7 +77,20 @@ export class MarketDataService {
   }
 
   async updateActivePortfolios() {
+    // Create a set of open regions to avoid checking status for every symbol individually if global markets are closed
+    const { us, eu, asia } =
+      await this.marketStatusService.getAllMarketsStatus();
+    const isUsOpen = us.isOpen; // Strict open check (ignore post-market to reduce API usage/logs)
+    const isEuOpen = eu.isOpen;
+    const isAsiaOpen = asia.isOpen;
+
+    if (!isUsOpen && !isEuOpen && !isAsiaOpen) {
+      // Silent return - no debug log to avoid spamming "closed" every 30s
+      return;
+    }
+
     this.logger.log('Cron: Refreshing active portfolio symbols...');
+
     try {
       const symbols =
         await this.portfolioService.getAllDistinctPortfolioSymbols();
@@ -574,6 +588,28 @@ export class MarketDataService {
       select: ['close', 'ts'],
     });
 
+    // Sort chronologically (oldest first)
+    const reversedSparkline = (sparklinePrices || []).reverse();
+    const cleanSparkline = reversedSparkline.map((p) => p.close);
+
+    // [NEW] Append latest real-time price if strictly newer than last historical candle
+    // useful for active market days so line doesn't lag a full day
+    if (latestCandle && latestCandle.ts && reversedSparkline.length > 0) {
+      const lastHistDate = new Date(
+        reversedSparkline[reversedSparkline.length - 1].ts,
+      ).getTime();
+      const latestDate = new Date(latestCandle.ts).getTime();
+
+      // If latest price is > last history (e.g. today vs yesterday), append it
+      // Also ensure we don't duplicate if history IS today (e.g. after close synced)
+      if (latestDate > lastHistDate) {
+        cleanSparkline.push(latestCandle.close);
+      }
+    } else if (latestCandle && cleanSparkline.length === 0) {
+      // If we have no history but have a latest price, show that point
+      cleanSparkline.push(latestCandle.close);
+    }
+
     return {
       ticker: tickerEntity,
       latestPrice: latestCandle,
@@ -595,7 +631,7 @@ export class MarketDataService {
         analysts: analystCount,
         social: socialCount,
       },
-      sparkline: (sparklinePrices || []).reverse().map((p) => p.close),
+      sparkline: cleanSparkline,
     };
   }
 
@@ -1834,10 +1870,32 @@ export class MarketDataService {
             select: ['close', 'ts'],
           });
 
+          // Sort chronologically
+          const reversedSparkline = (prices || []).reverse();
+          const cleanSparkline = reversedSparkline.map((p) => p.close);
+
           // Inject change into latestPrice
           const latestPriceWithChange = t.latestPrice
             ? { ...t.latestPrice, change: isNaN(changePct) ? 0 : changePct }
             : null;
+
+          // [NEW] Append latest real-time price logic for Analyzer too
+          if (
+            latestPriceWithChange &&
+            latestPriceWithChange.ts &&
+            reversedSparkline.length > 0
+          ) {
+            const lastHistDate = new Date(
+              reversedSparkline[reversedSparkline.length - 1].ts,
+            ).getTime();
+            const latestDate = new Date(latestPriceWithChange.ts).getTime();
+
+            if (latestDate > lastHistDate) {
+              cleanSparkline.push(latestPriceWithChange.close);
+            }
+          } else if (latestPriceWithChange && cleanSparkline.length === 0) {
+            cleanSparkline.push(latestPriceWithChange.close);
+          }
 
           return {
             ticker: {
@@ -1872,7 +1930,7 @@ export class MarketDataService {
               social: socialCount,
               news: newsCount,
             },
-            sparkline: (prices || []).reverse().map((p) => p.close),
+            sparkline: cleanSparkline,
           };
         }),
       ),
