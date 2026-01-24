@@ -8,15 +8,14 @@ import {
   Calendar,
   Activity,
   Bot,
-  Trash2,
-  Users
+  Trash2
 } from 'lucide-react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { SentimentGauge } from './SentimentGauge';
 import { VolumeSparkline } from './VolumeSparkline';
-import { WatchersChart } from './WatchersChart';
+
 import { EventCalendar } from './EventCalendar';
 import { ModelBadge } from '../ui/model-badge';
 import { useCallback } from 'react';
@@ -60,7 +59,6 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [history, setHistory] = useState<Analysis[]>([]);
   const [volumeStats, setVolumeStats] = useState<VolumeStat[]>([]);
-  const [watchers, setWatchers] = useState<any[]>([]);
   const [volumeRange, setVolumeRange] = useState<{ start: string; end: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -92,7 +90,6 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
       analysisStore.stop();
       // Refresh history & watchers after new analysis
       axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).then(res => setHistory(res.data));
-      axios.get<any[]>(`/api/v1/stocktwits/${symbol}/watchers`).then(res => setWatchers(res.data));
     }
   }, [symbol, isLocked]);
   
@@ -117,11 +114,10 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
   const fetchData = useCallback(async () => {
     try {
       // Parallel fetch for speed
-      const [analysisRes, statsRes, historyRes, watchersRes] = await Promise.all([
+      const [analysisRes, statsRes, historyRes] = await Promise.all([
         axios.get<Analysis>(`/api/v1/stocktwits/${symbol}/analysis`).catch(() => ({ data: null })),
         axios.get<VolumeResponse>(`/api/v1/stocktwits/${symbol}/stats/volume`).catch(() => ({ data: null })),
-        axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).catch(() => ({ data: [] })),
-        axios.get<any[]>(`/api/v1/stocktwits/${symbol}/watchers`).catch(() => ({ data: [] }))
+        axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).catch(() => ({ data: [] }))
       ]);
 
       if (analysisRes.data) {
@@ -137,9 +133,7 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
         setVolumeRange({ start: statsRes.data.startDate, end: statsRes.data.endDate });
       }
 
-      if (watchersRes.data) {
-        setWatchers(watchersRes.data);
-      }
+
     } catch (e) {
       console.warn('Error fetching StockTwits data', e);
     } finally {
@@ -314,28 +308,10 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                 </Card>
             </div>
 
-            {/* --- Row 2: Watchers & Events --- */}
+            {/* --- Row 2: Catalysts --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                {/* Watchers Chart (2/3 width) - Hidden if not enough data */}
-                {watchers.length >= 2 && (
-                    <div className="md:col-span-2">
-                        <Card className="bg-transparent border-border/50 shadow-sm h-full">
-                            <CardContent className="pt-6 h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                        <Users className="w-3.5 h-3.5" /> Watcher Trends
-                                    </h4>
-                                </div>
-                                <div className="flex-1 min-h-[200px]">
-                                    <WatchersChart data={watchers} />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Events (1/3 width or 3/3 if watchers hidden) */}
-                <div className={`${watchers.length >= 2 ? 'md:col-span-1' : 'md:col-span-3'} h-full`}>
+                {/* Events (Full width now that watchers are removed) */}
+                <div className="md:col-span-3 h-full">
                     <EventCalendar symbol={symbol} />
                 </div>
             </div>

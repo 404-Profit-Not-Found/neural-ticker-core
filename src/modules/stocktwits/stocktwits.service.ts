@@ -518,20 +518,23 @@ export class StockTwitsService {
 
              const dateStr = eventDate.toISOString().split('T')[0];
 
-             // Backend Deduplication: Check if we already have a similar event on this day
-             // We use a simple normalization/inclusion check for the title.
+             // Backend Deduplication: Check if we already have a similar event within +/- 2 days
+             // Social media noise often blurs dates for the same event.
              const isDuplicate = existingFutureEvents.some(existing => {
-                 const sameDay = existing.event_date === dateStr;
+                 const existingDate = new Date(existing.event_date);
+                 const diffDays = Math.abs((eventDate.getTime() - existingDate.getTime()) / (1000 * 3600 * 24));
+                 const isCloseDate = diffDays <= 2;
+                 
                  const titleLower = event.title.toLowerCase();
                  const existingLower = existing.title.toLowerCase();
                  
-                 // If titles are very similar or one contains the other on the same day, skip.
+                 // Similarity check: One title contains the other or they share significant keywords
                  const isSimilar = existingLower.includes(titleLower) || titleLower.includes(existingLower);
-                 return sameDay && isSimilar;
+                 return isCloseDate && isSimilar;
              });
 
              if (isDuplicate) {
-                 this.logger.log(`Skipping duplicate event: "${event.title}" on ${dateStr}`);
+                 this.logger.log(`Skipping duplicate event: "${event.title}" on ${dateStr} (Already exists nearby)`);
                  continue;
              }
 

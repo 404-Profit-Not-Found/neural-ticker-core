@@ -14,9 +14,10 @@ export class GeminiProvider implements ILlmProvider {
   private client: GoogleGenAI;
 
   // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
+  // Cost-effective models with Google Search grounding
   private readonly defaultModels = {
-    deep: 'gemini-3-pro-preview',
-    medium: 'gemini-3-flash-preview',
+    deep: 'gemini-3-pro',
+    medium: 'gemini-3-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-2.5-flash-lite',
   };
@@ -65,7 +66,7 @@ export class GeminiProvider implements ILlmProvider {
     // Retry & Fallback Logic
     let attempts = 0;
     const maxAttempts = 3;
-    const currentModel = modelName;
+    let currentModel = modelName;
 
     // Branch for Deep Research Agent (Interactions API)
     if (currentModel === 'deep-research-pro-preview-12-2025') {
@@ -122,16 +123,36 @@ export class GeminiProvider implements ILlmProvider {
       }
     }
 
+    // Fallback chain for 429 errors
+    const fallbackChain: Record<string, string> = {
+      'gemini-2.5-flash-lite': 'gemini-2.5-flash',
+      'gemini-2.5-flash': 'gemini-3-flash',
+      'gemini-3-flash': 'gemini-3-pro', // Only available on Secondary (Billed)
+    };
+
+    let activeApiKey = apiKey;
+    const secondaryApiKey = this.configService.get<string>('gemini.secondaryApiKey');
+    let hasSwitchedToSecondary = false;
+    let activeClient = client;
+
+    // CRITICAL: gemini-3-pro is only available on the Secondary (Billed) Key
+    // If it's the requested model, we failover immediately to avoid the unavoidable 429 on Free Key.
+    if (currentModel === 'gemini-3-pro' && !hasSwitchedToSecondary && secondaryApiKey) {
+        this.logger.warn(`gemini-3-pro requested. Switching to SECONDARY API KEY (Billed) immediately.`);
+        activeApiKey = secondaryApiKey;
+        activeClient = new GoogleGenAI({ apiKey: activeApiKey });
+        hasSwitchedToSecondary = true;
+    }
+
     // Standard GenerateContent Flow
-    while (attempts < maxAttempts * 2) {
-      // Allow attempts for primary + fallback
+    while (attempts < maxAttempts * 4) { // Increased buffer for multiple tiers and keys
       try {
         attempts++;
         this.logger.log(
-          `Gemini Request [Attempt ${attempts}] using ${currentModel}`,
+          `Gemini Request [Attempt ${attempts}] using ${currentModel} (Key: ${hasSwitchedToSecondary ? 'Secondary' : 'Primary'})`,
         );
 
-        const result = await client.models.generateContent({
+        const result = await activeClient.models.generateContent({
           model: currentModel,
           contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
           config: config,
@@ -161,16 +182,42 @@ export class GeminiProvider implements ILlmProvider {
           err.message?.includes('429') ||
           err.message?.includes('quota');
 
-        if (isQuotaError && attempts < maxAttempts) {
-          // Retry same model
+        if (isQuotaError && attempts < maxAttempts * 4) {
+          let nextModel: string | undefined = fallbackChain[currentModel];
+          
+          // CRITICAL: gemini-3-pro is only available on the Secondary (Billed) Key
+          if (nextModel === 'gemini-3-pro' && !hasSwitchedToSecondary) {
+              this.logger.warn(`gemini-3-pro is not available on Free Key. Initiating Key Failover.`);
+              nextModel = undefined; // Force key failover to re-start chain on Secondary
+          }
+
+          if (nextModel) {
+             this.logger.warn(
+               `Gemini 429 Quota Exceeded for ${currentModel}. Stepping up to ${nextModel}...`,
+             );
+             currentModel = nextModel;
+             continue; // Try next model on current key
+          } 
+          
+          // No next model in chain for this key, try switching to secondary key
+          if (secondaryApiKey && !hasSwitchedToSecondary) {
+             this.logger.warn(
+               `Gemini Quota fully exhausted on Primary Key. Switching to SECONDARY API KEY and restarting model cycle...`,
+             );
+             activeApiKey = secondaryApiKey;
+             activeClient = new GoogleGenAI({ apiKey: activeApiKey });
+             currentModel = modelName; // Reset to original requested model (e.g. Lite)
+             hasSwitchedToSecondary = true;
+             continue; // Try original model on secondary key
+          }
+
+          // If no fallback and no secondary key remains, wait and retry current model
           this.logger.warn(
-            `Gemini 429 Quota Exceeded for ${currentModel}. Retrying in 5s...`,
+            `Gemini 429 Quota Exceeded for ${currentModel}. No further keys or models available. Retrying in 5s...`,
           );
           await new Promise((r) => setTimeout(r, 5000));
           continue;
         }
-
-        // Removed fallback to legacy models as per user instruction.
 
         this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
         throw err;
