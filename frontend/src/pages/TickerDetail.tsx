@@ -33,6 +33,8 @@ import { TickerFinancials } from '../components/ticker/TickerFinancials';
 import { TickerNews } from '../components/ticker/TickerNews';
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
 import { PriceChart } from '../components/ticker/PriceChart';
+import { StocktwitsAnalysis } from '../components/stocktwits/StocktwitsAnalysis';
+import { EventCalendar } from '../components/stocktwits/EventCalendar';
 import {
     useTickerDetails,
     useTickerNews,
@@ -124,7 +126,7 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news'] as const;
+    const validTabs = ['overview', 'financials', 'research', 'news', 'social'] as const;
     // Extract tab from pathname: /ticker/NVDA/research -> research
     // Handle potential trailing slashes and case sensitivity
     const pathSegments = location.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
@@ -650,6 +652,7 @@ export function TickerDetail() {
                                 <TabsTrigger value="research">AI Research</TabsTrigger>
                                 <TabsTrigger value="financials">Financials</TabsTrigger>
                                 <TabsTrigger value="news">News</TabsTrigger>
+                                <TabsTrigger value="social">Social & Events</TabsTrigger>
                             </TabsList>
 
                             {/* OVERVIEW TAB */}
@@ -683,6 +686,12 @@ export function TickerDetail() {
                             {/* NEWS TAB */}
                             <TabsContent value="news">
                                 <TickerNews news={news} />
+                            </TabsContent>
+
+                            {/* SOCIAL TAB */}
+                            <TabsContent value="social" className="space-y-8">
+                                <StocktwitsAnalysis symbol={symbol || ''} />
+                                <EventCalendar symbol={symbol || ''} />
                             </TabsContent>
                         </Tabs>
 

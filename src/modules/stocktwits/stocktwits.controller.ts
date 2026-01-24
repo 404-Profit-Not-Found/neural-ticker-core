@@ -87,9 +87,9 @@ export class StockTwitsController {
     return this.stockTwitsService.getWatchersHistory(symbol);
   }
 
+  @Post(':symbol/sync')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @Post(':symbol/sync')
   @ApiOperation({
     summary: 'Trigger manual sync for a symbol',
     description:
@@ -129,5 +129,43 @@ export class StockTwitsController {
     this.validateSecret(secret);
     await this.stockTwitsService.handleDailyWatchersSync();
     return { message: 'Daily watchers sync completed' };
+  }
+
+  // --- AI Analysis Endpoints ---
+
+  @Post(':symbol/analyze')
+  @Public() // Disabled for testing/demo per user request
+  @ApiOperation({ summary: 'Trigger AI Analysis for comments' })
+  @ApiResponse({ status: 201, description: 'Analysis started/completed' })
+  async analyzeComments(@Param('symbol') symbol: string) {
+    const analysis = await this.stockTwitsService.analyzeComments(symbol);
+    if (!analysis) {
+       return { message: 'Not enough data to analyze' };
+    }
+    return analysis;
+  }
+
+  @Get(':symbol/analysis')
+  @Public()
+  @ApiOperation({ summary: 'Get latest AI analysis' })
+  @ApiResponse({ status: 200, description: 'Latest analysis object' })
+  async getAnalysis(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getLatestAnalysis(symbol);
+  }
+
+  @Get(':symbol/events')
+  @Public()
+  @ApiOperation({ summary: 'Get future events' })
+  @ApiResponse({ status: 200, description: 'List of future events' })
+  async getEvents(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getFutureEvents(symbol);
+  }
+
+  @Get(':symbol/stats/volume')
+  @Public()
+  @ApiOperation({ summary: 'Get daily message volume stats' })
+  @ApiResponse({ status: 200, description: 'Daily volume stats' })
+  async getVolumeStats(@Param('symbol') symbol: string) {
+     return this.stockTwitsService.getVolumeStats(symbol);
   }
 }
