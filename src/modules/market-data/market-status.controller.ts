@@ -11,7 +11,6 @@ import { Public } from '../auth/public.decorator';
 @ApiTags('Market Status')
 @ApiBearerAuth()
 @Controller('v1/market')
-@Public()
 export class MarketStatusController {
   constructor(private readonly marketStatusService: MarketStatusService) {}
 
@@ -45,6 +44,7 @@ export class MarketStatusController {
     },
   })
   @Get('status/all')
+  @Public()
   getAllMarketsStatus() {
     return this.marketStatusService.getAllMarketsStatus();
   }

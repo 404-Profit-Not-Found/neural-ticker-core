@@ -181,34 +181,47 @@ export class StockTwitsService {
    * Stores a timestamped record of the current watcher count.
    */
   async trackWatchers(symbol: string) {
-    const curlCmd = `curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" -H "Accept: application/json" "${this.BASE_URL}/${symbol}.json"`;
+    const url = `${this.BASE_URL}/${symbol}.json`;
+    let data: any;
+
     try {
-      this.logger.log(`Tracking watchers for ${symbol}...`);
-      const output = execSync(curlCmd, { encoding: 'utf8' });
-      
-      if (output.includes('403 Forbidden')) {
-          this.logger.error(`Watcher track hit 403 for ${symbol}. Cmd: ${curlCmd}`);
-          return;
-      }
-
-      const bodyStart = output.indexOf('\r\n\r\n');
-      const body = bodyStart !== -1 ? output.substring(bodyStart + 4) : output;
-      const data = JSON.parse(body);
-
-      if (data && data.symbol && data.symbol.watchlist_count !== undefined) {
-        await this.watchersRepository.save({
-          symbol: symbol,
-          count: data.symbol.watchlist_count,
-          timestamp: new Date(),
-        });
-        this.logger.log(
-          `Recorded ${data.symbol.watchlist_count} watchers for ${symbol}`,
+        this.logger.log(`[${symbol}] Tracking watchers via Axios...`);
+        const response = await firstValueFrom(
+            this.httpService.get(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    'Accept': 'application/json'
+                },
+                timeout: 5000
+            })
         );
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to track watchers for ${symbol}: ${error.message}. Cmd: ${curlCmd}`,
-      );
+        data = response.data;
+    } catch (e) {
+        if (e.response?.status === 403 || e.code === 'ECONNABORTED') {
+            this.logger.warn(`[${symbol}] Watcher Axios blocked (403). Falling back to curl...`);
+            const curlCmd = `curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" -H "Accept: application/json" "${url}"`;
+            try {
+                const output = execSync(curlCmd, { encoding: 'utf8' });
+                const bodyStart = output.indexOf('\r\n\r\n');
+                const body = bodyStart !== -1 ? output.substring(bodyStart + 4) : output;
+                data = JSON.parse(body);
+            } catch (curlError) {
+                this.logger.error(`[${symbol}] Watcher curl fallback failed: ${curlError.message}`);
+                return;
+            }
+        } else {
+            this.logger.error(`[${symbol}] Failed to track watchers: ${e.message}`);
+            return;
+        }
+    }
+
+    if (data && data.symbol && data.symbol.watchlist_count !== undefined) {
+      await this.watchersRepository.save({
+        symbol: symbol,
+        count: data.symbol.watchlist_count,
+        timestamp: new Date(),
+      });
+      this.logger.log(`[${symbol}] Recorded ${data.symbol.watchlist_count} watchers.`);
     }
   }
 
@@ -265,10 +278,30 @@ export class StockTwitsService {
   }
 
   async getWatchersHistory(symbol: string) {
-    return this.watchersRepository.find({
+    const history = await this.watchersRepository.find({
       where: { symbol },
       order: { timestamp: 'ASC' },
     });
+
+    // JIT Sync: If no history or oldest data is from yesterday, trigger a refresh
+    const lastRecord = history[history.length - 1];
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
+    if (!lastRecord || lastRecord.timestamp < sixHoursAgo) {
+        this.logger.log(`[${symbol}] Watcher history stale or missing. Triggering JIT track...`);
+        // If empty, await so the first view has data. Otherwise background sync.
+        if (history.length === 0) {
+            await this.trackWatchers(symbol);
+            return this.watchersRepository.find({
+                where: { symbol },
+                order: { timestamp: 'ASC' },
+            });
+        } else {
+            this.trackWatchers(symbol); // Background
+        }
+    }
+
+    return history;
   }
 
   // --- AI Analysis ---

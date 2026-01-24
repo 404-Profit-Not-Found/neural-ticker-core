@@ -90,8 +90,9 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
     } finally {
       setSyncing(false);
       analysisStore.stop();
-      // Refresh history after new analysis
+      // Refresh history & watchers after new analysis
       axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).then(res => setHistory(res.data));
+      axios.get<any[]>(`/api/v1/stocktwits/${symbol}/watchers`).then(res => setWatchers(res.data));
     }
   }, [symbol, isLocked]);
   
@@ -139,7 +140,6 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
       if (watchersRes.data) {
         setWatchers(watchersRes.data);
       }
-
     } catch (e) {
       console.warn('Error fetching StockTwits data', e);
     } finally {

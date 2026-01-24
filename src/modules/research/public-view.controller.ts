@@ -5,7 +5,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ResearchService } from './research.service';
 import { PublicThrottlerGuard } from './guards/public-throttler.guard';
 import { Public } from '../auth/public.decorator';
@@ -37,7 +37,6 @@ export class PublicViewController {
     status: 403,
     description: 'Invalid or missing signature.',
   })
-  @Public() // Bypasses JWT Auth
   @UseGuards(PublicThrottlerGuard) // Applies strict rate limits
   @Get('report/:researchId/:signature')
   async getPublicReport(

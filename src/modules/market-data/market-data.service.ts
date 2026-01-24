@@ -53,7 +53,6 @@ export class MarketDataService {
     private readonly marketStatusService: MarketStatusService,
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
-    private readonly marketStatusService: MarketStatusService,
   ) {}
 
   private snapshotRequests = new Map<string, Promise<any>>();
@@ -78,13 +77,12 @@ export class MarketDataService {
 
   async updateActivePortfolios() {
     // Create a set of open regions to avoid checking status for every symbol individually if global markets are closed
-    const { us, eu, asia } =
+    const { us, eu } =
       await this.marketStatusService.getAllMarketsStatus();
     const isUsOpen = us.isOpen; // Strict open check (ignore post-market to reduce API usage/logs)
     const isEuOpen = eu.isOpen;
-    const isAsiaOpen = asia.isOpen;
 
-    if (!isUsOpen && !isEuOpen && !isAsiaOpen) {
+    if (!isUsOpen && !isEuOpen) {
       // Silent return - no debug log to avoid spamming "closed" every 30s
       return;
     }

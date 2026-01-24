@@ -21,6 +21,7 @@ import {
   getSchemaPath,
   ApiExtraModels,
   ApiHeader,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
@@ -32,6 +33,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CreditGuard } from '../research/guards/credit.guard';
 
 @ApiTags('StockTwits')
+@ApiBearerAuth()
 @ApiExtraModels(StockTwitsPost)
 @Controller('v1/stocktwits')
 export class StockTwitsController {
@@ -116,6 +118,7 @@ export class StockTwitsController {
   }
 
   @Post('jobs/sync-posts')
+  @Public()
   @ApiOperation({ summary: 'Trigger hourly posts sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
@@ -126,6 +129,7 @@ export class StockTwitsController {
   }
 
   @Post('jobs/sync-watchers')
+  @Public()
   @ApiOperation({ summary: 'Trigger daily watchers sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
