@@ -33,7 +33,7 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
 import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
 import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.module';
 import configuration from './config/configuration';
-
+import { AgentModule } from '../agent/service/agent.module';
 // ...
 
 @Module({
@@ -59,7 +59,7 @@ import configuration from './config/configuration';
     ScheduleModule.forRoot(),
 
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule,AgentModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         if (process.env.NODE_ENV === 'test') {

@@ -8,6 +8,7 @@ import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { MarketStatusService } from './market-status.service';
 
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
 import { Fundamentals } from './entities/fundamentals.entity';
@@ -49,6 +50,7 @@ export class MarketDataService {
     private readonly finnhubService: FinnhubService,
     private readonly yahooFinanceService: YahooFinanceService,
     private readonly configService: ConfigService,
+    private readonly marketStatusService: MarketStatusService,
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
   ) {}
@@ -63,6 +65,13 @@ export class MarketDataService {
   @Cron('*/30 * * * * *')
   async updateActivePortfoliosCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
+    
+    // Safety: Don't refresh if markets are closed
+    const status = await this.marketStatusService.getAllMarketsStatus();
+    if (!status.us.isOpen && !status.eu.isOpen) {
+        return;
+    }
+
     await this.updateActivePortfolios();
   }
 

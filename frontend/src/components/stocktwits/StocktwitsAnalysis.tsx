@@ -3,14 +3,22 @@ import {
   MessageSquare, 
   RefreshCw,
   TrendingUp,
-  TrendingDown,
+  History,
+  Clock,
+  Calendar,
   Activity,
-  Database
+  Bot
 } from 'lucide-react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { SentimentGauge } from './SentimentGauge';
+import { VolumeSparkline } from './VolumeSparkline';
+import { EventCalendar } from './EventCalendar';
+import { ModelBadge } from '../ui/model-badge';
+import { useCallback } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { RunAnalysisDialog } from '../ticker/RunAnalysisDialog';
 
 interface Analysis {
   id: string;
@@ -36,28 +44,70 @@ interface VolumeStat {
   count: number;
 }
 
+interface VolumeResponse {
+  symbol: string;
+  startDate: string;
+  endDate: string;
+  stats: VolumeStat[];
+}
+
 export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
+  const { user } = useAuth();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [history, setHistory] = useState<Analysis[]>([]);
   const [volumeStats, setVolumeStats] = useState<VolumeStat[]>([]);
+  const [volumeRange, setVolumeRange] = useState<{ start: string; end: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  const fetchData = async () => {
+  const REFRESH_COST = 2;
+  const hasCredits = (user?.credits_balance ?? 0) >= REFRESH_COST;
+  const isAdmin = user?.role === 'admin';
+  const isLocked = !hasCredits && !isAdmin;
+
+  const triggerAnalysis = useCallback(async (options: { model: string; quality: 'low' | 'medium' | 'high' | 'deep' }) => {
+    if (isLocked) return;
+    setSyncing(true);
+    try {
+      const { data } = await axios.post<Analysis>(`/api/v1/stocktwits/${symbol}/analyze`, {
+        model: options.model,
+        quality: options.quality
+      });
+      setAnalysis(data);
+      // Refresh volume stats too just in case
+      const { data: vData } = await axios.get<VolumeResponse>(`/api/v1/stocktwits/${symbol}/stats/volume`);
+      setVolumeStats(vData.stats);
+      setVolumeRange({ start: vData.startDate, end: vData.endDate });
+
+    } catch (e) {
+      console.error('Analysis failed', e);
+    } finally {
+      setSyncing(false);
+      // Refresh history after new analysis
+      axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).then(res => setHistory(res.data));
+    }
+  }, [symbol, isLocked]);
+
+  const fetchData = useCallback(async () => {
     try {
       // Parallel fetch for speed
-      const [analysisRes, statsRes] = await Promise.all([
-        axios.get(`/api/v1/stocktwits/${symbol}/analysis`).catch(() => ({ data: null })),
-        axios.get(`/api/v1/stocktwits/${symbol}/stats/volume`).catch(() => ({ data: [] }))
+      const [analysisRes, statsRes, historyRes] = await Promise.all([
+        axios.get<Analysis>(`/api/v1/stocktwits/${symbol}/analysis`).catch(() => ({ data: null })),
+        axios.get<VolumeResponse>(`/api/v1/stocktwits/${symbol}/stats/volume`).catch(() => ({ data: null })),
+        axios.get<Analysis[]>(`/api/v1/stocktwits/${symbol}/history`).catch(() => ({ data: [] }))
       ]);
 
       if (analysisRes.data) {
         setAnalysis(analysisRes.data);
-      } else {
-        triggerAnalysis(); // Auto-trigger if missing
+      }
+
+      if (historyRes.data) {
+        setHistory(historyRes.data);
       }
 
       if (statsRes.data) {
-        setVolumeStats(statsRes.data);
+        setVolumeStats(statsRes.data.stats);
+        setVolumeRange({ start: statsRes.data.startDate, end: statsRes.data.endDate });
       }
 
     } catch (e) {
@@ -65,211 +115,200 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const triggerAnalysis = async () => {
-    setSyncing(true);
-    try {
-      const { data } = await axios.post(`/api/v1/stocktwits/${symbol}/analyze`);
-      setAnalysis(data);
-    } catch (e) {
-      console.error('Analysis failed', e);
-    } finally {
-      setSyncing(false);
-    }
-  };
+  }, [symbol, triggerAnalysis]);
 
   useEffect(() => {
     fetchData();
-  }, [symbol]);
+  }, [symbol, fetchData]);
 
-  if (loading) return <div className="h-64 w-full bg-muted/20 animate-pulse rounded-xl" />;
-
-  // Helper for Sentiment Gauge Color
-  const getSentimentColor = (score: number) => {
-      if (score >= 0.7) return 'text-green-500';
-      if (score >= 0.4) return 'text-yellow-500';
-      return 'text-red-500';
-  };
-
-  // Helper for Sentiment Gradient Bar
-  const SentimentBar = ({ score }: { score: number }) => (
-    <div className="w-full h-3 bg-secondary rounded-full overflow-hidden relative">
-      <div 
-        className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 opacity-30 w-full" 
-      />
-      <div 
-        className="absolute top-0 bottom-0 w-2 bg-white ring-2 ring-black transform -translate-x-1/2 transition-all duration-1000"
-        style={{ left: `${score * 100}%` }}
-      />
-    </div>
-  );
+  if (loading) return <div className="h-64 w-full bg-muted/10 animate-pulse rounded-xl" />;
 
   return (
-    <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex justify-between items-end border-b pb-4">
+    <div className="flex flex-col gap-8 animate-in fade-in duration-500">
+        
+        {/* --- Header --- */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-6">
             <div>
-                <h3 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-                <MessageSquare className="w-6 h-6 text-primary" /> StockTwits AI Pulse
+                <h3 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
+                    <MessageSquare className="w-8 h-8 text-blue-500" /> 
+                    <span>StockTwits AI Pulse</span>
                 </h3>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-4">
-                    <span className="flex items-center gap-1">
-                        <Activity className="w-3 h-3" /> 
-                        Last Sync: {analysis ? new Date(analysis.created_at).toLocaleString() : 'Never'}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 text-xs font-medium text-muted-foreground/80">
+                    <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" /> 
+                        <select 
+                            className="bg-transparent border-none text-[10px] md:text-xs font-bold uppercase text-muted-foreground focus:ring-0 cursor-pointer hover:text-foreground transition-colors"
+                            value={analysis?.id || ''}
+                            onChange={(e) => {
+                                const selected = history.find(h => h.id === e.target.value);
+                                if (selected) setAnalysis(selected);
+                            }}
+                        >
+                            {history.length > 0 ? history.map(h => (
+                                <option key={h.id} value={h.id} className="bg-background text-foreground">
+                                    {new Date(h.created_at).toLocaleString()} {h.id === history[0].id ? '(Latest)' : ''}
+                                </option>
+                            )) : (
+                                <option value="">{analysis ? new Date(analysis.created_at).toLocaleString() : 'Never'}</option>
+                            )}
+                        </select>
                     </span>
                     {analysis && (
-                        <span className="flex items-center gap-1">
-                            <Database className="w-3 h-3" />
-                            Data Window: {new Date(analysis.analysis_start).toLocaleDateString()} - {new Date(analysis.analysis_end).toLocaleDateString()}
-                        </span>
-                    )}
-                </div>
-            </div>
-            <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={triggerAnalysis} 
-            disabled={syncing}
-            className="h-9 gap-2"
-            >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Analyzing...' : 'Refresh Intelligence'}
-            </Button>
-        </div>
-
-      {!analysis ? (
-        <div className="h-48 flex items-center justify-center p-6 bg-muted/10 rounded-xl border border-dashed border-muted-foreground/30 text-center text-muted-foreground">
-          No intelligence data available. Click refresh to trigger analysis.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column: Sentiment & Metrics */}
-            <Card className="col-span-1 border-border/60 shadow-sm bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 flex flex-col items-center justify-center h-full gap-6">
-                    <div className="text-center w-full">
-                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Market Sentiment</span>
-                        <div className={`text-5xl font-black mt-2 tracking-tighter ${getSentimentColor(analysis.sentiment_score)}`}>
-                            {(analysis.sentiment_score * 100).toFixed(0)}%
-                        </div>
-                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold mt-2 border ${
-                            analysis.sentiment_score >= 0.6 ? 'bg-green-500/10 border-green-500/20 text-green-500' : 
-                            analysis.sentiment_score >= 0.4 ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 
-                            'bg-red-500/10 border-red-500/20 text-red-500'
-                        }`}>
-                            {analysis.sentiment_label.toUpperCase()}
-                        </div>
-                    </div>
-                    
-                    <SentimentBar score={analysis.sentiment_score} />
-
-                    <div className="w-full grid grid-cols-2 gap-4 text-center mt-2">
-                        <div className="p-3 rounded-lg bg-muted/30">
-                            <span className="block text-[10px] text-muted-foreground uppercase">Posts Analyzed</span>
-                            <span className="block text-lg font-bold">{analysis.posts_analyzed}</span>
-                        </div>
-                        <div className="p-3 rounded-lg bg-muted/30">
-                            <span className="block text-[10px] text-muted-foreground uppercase">AI Tokens</span>
-                            <span className="block text-lg font-bold">{analysis.tokens_used?.toLocaleString() || '-'}</span>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Middle: Volume Chart */}
-            <Card className="col-span-1 lg:col-span-2 border-border/60 shadow-sm bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 h-full">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Message Volume Trend (30 Days)</span>
-                        <span className="text-[10px] bg-secondary px-2 py-1 rounded text-secondary-foreground">Messages per Day</span>
-                    </div>
-                    <div className="h-[200px] w-full">
-                        {volumeStats.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={volumeStats}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
-                                    <XAxis 
-                                        dataKey="date" 
-                                        tick={{fontSize: 10, fill: '#666'}} 
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {month: 'numeric', day: 'numeric'})}
-                                    />
-                                    <YAxis hide />
-                                    <Tooltip 
-                                        contentStyle={{backgroundColor: '#111', border: '1px solid #333', borderRadius: '8px', fontSize: '12px'}}
-                                        cursor={{fill: '#ffffff10'}}
-                                    />
-                                    <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                                Not enough data for volume chart yet.
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Bottom Row: Insights */}
-            <div className="col-span-1 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Summary */}
-                <Card className="border-border/60 p-6 bg-card/30">
-                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-blue-500" /> Executive Summary
-                     </h4>
-                     <p className="text-sm leading-relaxed text-muted-foreground">
-                        {analysis.summary}
-                     </p>
-                     <div className="mt-4 flex flex-wrap gap-2">
-                        {analysis.highlights?.topics?.map(topic => (
-                             <span key={topic} className="px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs rounded-md font-medium">
-                                #{topic}
+                        <>
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/30 border border-border/50">
+                                <History className="w-3.5 h-3.5 text-orange-400" />
+                                <span className="text-[10px] md:text-xs font-bold uppercase">Data Window:</span>
+                                <span className="text-foreground font-mono text-[10px] md:text-xs">{new Date(analysis.analysis_start).toLocaleDateString()} - {new Date(analysis.analysis_end).toLocaleDateString()}</span>
                             </span>
-                        ))}
-                     </div>
-                </Card>
-
-                {/* Bull/Bear Points */}
-                <div className="space-y-4">
-                    {analysis.highlights?.bullish_points?.length > 0 && (
-                        <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10">
-                            <h5 className="text-xs font-bold text-green-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <TrendingUp className="w-3.5 h-3.5" /> Bullish Drivers
-                            </h5>
-                            <ul className="space-y-2">
-                                {analysis.highlights.bullish_points.map((pt, i) => (
-                                    <li key={i} className="text-sm text-foreground/80 flex items-start gap-2">
-                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-green-500 shrink-0" />
-                                        {pt}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                    {analysis.highlights?.bearish_points?.length > 0 && (
-                        <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10">
-                             <h5 className="text-xs font-bold text-red-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <TrendingDown className="w-3.5 h-3.5" /> Bearish Risks
-                            </h5>
-                            <ul className="space-y-2">
-                                {analysis.highlights.bearish_points.map((pt, i) => (
-                                    <li key={i} className="text-sm text-foreground/80 flex items-start gap-2">
-                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-red-500 shrink-0" />
-                                        {pt}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                            <span className="flex items-center gap-1.5">
+                                <span className="text-muted-foreground uppercase text-[10px] font-bold">Posts:</span>
+                                <span className="text-foreground font-mono text-[10px] md:text-xs">{analysis.posts_analyzed}</span>
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground uppercase text-[10px] font-bold">{analysis.tokens_used.toLocaleString()} tokens</span>
+                            </span>
+                            <ModelBadge model={analysis.model_used} rarity="Common" />
+                        </>
                     )}
                 </div>
             </div>
             
-            <div className="col-span-full text-[10px] text-center text-muted-foreground/40 uppercase tracking-widest mt-4">
-                Powered by {analysis.model_used} • {analysis.id}
+            <div className="flex flex-col items-end gap-1">
+                <RunAnalysisDialog 
+                    onTrigger={(options) => triggerAnalysis({ model: options.modelKey, quality: options.quality })}
+                    isAnalyzing={syncing}
+                    defaultTicker={symbol}
+                    trigger={
+                        <Button 
+                            disabled={syncing || isLocked}
+                            className={`gap-2 px-6 text-sm h-9 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-purple-500/25 border-0 transition-all duration-300 hover:scale-[1.02] ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                        >
+                            {syncing ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Bot className="w-4 h-4" />
+                            )}
+                            <span className="font-semibold">{syncing ? 'Analyzing...' : 'AI Analyze'}</span>
+                        </Button>
+                    }
+                />
+                {!isAdmin && (
+                    <span className={`text-[10px] font-bold flex items-center gap-1 ${isLocked ? 'text-red-400' : 'text-primary/70'}`}>
+                        Premium Models Cost Credits
+                    </span>
+                )}
             </div>
         </div>
+
+      {!analysis ? (
+        <div className="h-64 flex flex-col items-center justify-center p-8 bg-muted/5 rounded-2xl border border-dashed border-border text-center">
+            <h4 className="text-lg font-semibold mb-2">No Intelligence Data Found</h4>
+            <p className="text-muted-foreground text-sm max-w-md mb-6">
+                We haven't analyzed the social sentiment for {symbol} yet. Click the button above to start the AI research engine.
+            </p>
+            <RunAnalysisDialog 
+                onTrigger={(options) => triggerAnalysis({ model: options.modelKey, quality: options.quality })}
+                isAnalyzing={syncing}
+                defaultTicker={symbol}
+                trigger={
+                    <Button disabled={syncing}>
+                        {syncing ? 'Analyzing...' : 'Start Analysis'}
+                    </Button>
+                }
+            />
+        </div>
+      ) : (
+        <>
+            {/* --- Data Grid --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* 1. Market Sentiment Gauge */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm relative overflow-hidden group hover:border-border/80 transition-colors">
+                    <CardContent className="pt-6 relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                             <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">StockTwits Sentiment (30D)</h4>
+                        </div>
+                        <SentimentGauge score={analysis.sentiment_score} label={analysis.sentiment_label} />
+
+                    </CardContent>
+                </Card>
+
+                {/* 2. Volume Trend */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm relative mb-auto md:mb-0 h-full">
+                     <CardContent className="pt-6 h-full flex flex-col">
+                        <div className="flex items-center justify-between mb-6">
+                             <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Message Volume Trend</h4>
+                        </div>
+                        
+                        <div className="flex-1 flex flex-col justify-center relative">
+                             <VolumeSparkline 
+                                data={volumeStats} 
+                                startDate={volumeRange?.start}
+                                endDate={volumeRange?.end}
+                             />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 3. Bullish Drivers */}
+                <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm md:col-span-1 h-full">
+                     <CardContent className="pt-6 h-full">
+                        <div className="flex items-center justify-start gap-2 mb-4">
+                             <TrendingUp className="w-4 h-4 text-green-500" />
+                             <h4 className="text-xs font-bold uppercase tracking-widest text-green-500">Bullish Drivers</h4>
+                        </div>
+                        
+                        {analysis.highlights?.bullish_points?.length > 0 ? (
+                            <ul className="space-y-3">
+                                {analysis.highlights.bullish_points.slice(0, 4).map((pt, i) => (
+                                    <li key={i} className="text-sm text-foreground/90 flex items-start gap-3 group">
+                                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500/50 group-hover:bg-green-400 shrink-0 transition-colors" />
+                                        <span className="leading-snug">{pt}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="text-sm text-muted-foreground italic">No strong bullish signals detected.</div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* --- Executive Summary & Topics --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full items-stretch">
+                <div className="md:col-span-2 flex flex-col gap-6">
+                     <Card className="bg-secondary/5 border-primary/10 shadow-sm h-full">
+                        <CardContent className="pt-6">
+                             <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-primary">
+                                <Activity className="w-4 h-4" /> Executive Summary
+                             </h4>
+                             <p className="text-base text-card-foreground/90 leading-relaxed">
+                                 {analysis.summary}
+                             </p>
+
+                             {analysis.highlights?.topics?.length > 0 && (
+                                 <div className="mt-6 flex flex-wrap gap-2">
+                                     {analysis.highlights.topics.map(topic => (
+                                         <span key={topic} className="px-3 py-1 bg-background border border-border rounded-md text-xs font-medium hover:border-primary/50 transition-colors cursor-default text-muted-foreground">
+                                             #{topic}
+                                         </span>
+                                     ))}
+                                 </div>
+                             )}
+                        </CardContent>
+                    </Card>
+                </div>
+                
+                {/* --- Events Integration --- */}
+                <div className="md:col-span-1 h-full">
+                    <EventCalendar symbol={symbol} />
+                </div>
+            </div>
+            
+             <div className="h-4" />
+
+        </>
       )}
     </div>
   );

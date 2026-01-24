@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
-import { FinnhubService } from '../finnhub/finnhub.service';
 
 export interface MarketStatusResult {
   isOpen: boolean;
@@ -55,7 +54,6 @@ export class MarketStatusService {
 
   constructor(
     private readonly yahooFinanceService: YahooFinanceService,
-    private readonly finnhubService: FinnhubService,
   ) {}
 
   /**
@@ -119,22 +117,25 @@ export class MarketStatusService {
       try {
         let result: MarketStatusResult;
 
-        if (region === 'EU' || region === 'OTHER') {
-          // Use Yahoo Finance for EU stocks
-          if (symbol) {
-            result = await this.getStatusFromYahoo(symbol, region);
-          } else {
-            result = this.getEUFallback();
-          }
-        } else {
-          // US: Try Finnhub first, fallback to time-based
-          result = await this.getStatusFromFinnhub(symbol, exchange || 'US');
+        // User requested ONLY Yahoo for status.
+        // If no symbol provided, use major indices as proxies.
+        const statusSymbol = symbol || (region === 'EU' ? '^GDAXI' : '^GSPC');
+
+        try {
+          result = await this.getStatusFromYahoo(statusSymbol, region);
+        } catch (e) {
+          this.logger.warn(`Yahoo status check failed for ${statusSymbol}, using fallback: ${e.message}`);
+          result = region === 'EU' ? this.getEUFallback() : this.getUSFallback();
         }
 
-        // 4. Update Cache
+        // 4. Update Cache (Dynamic TTL)
+        // If market is CLOSED, cache for longer (30 mins) to save API calls.
+        const isClosed = !result.isOpen || result.session === 'closed';
+        const ttl = isClosed ? 30 * 60 * 1000 : this.CACHE_TTL;
+
         this.statusCache.set(cacheKey, {
           data: result,
-          expires: Date.now() + this.CACHE_TTL,
+          expires: Date.now() + ttl,
         });
 
         return result;
@@ -183,26 +184,7 @@ export class MarketStatusService {
     }
   }
 
-  private async getStatusFromFinnhub(
-    symbol?: string,
-    exchange: string = 'US',
-  ): Promise<MarketStatusResult> {
-    try {
-      const status = await this.finnhubService.getMarketStatus(exchange);
-      if (status) {
-        return {
-          isOpen: status.isOpen,
-          session: status.isOpen ? 'regular' : 'closed',
-          timezone: status.t || 'America/New_York',
-          exchange: exchange,
-          region: 'US',
-        };
-      }
-    } catch {
-      this.logger.warn(`Finnhub status failed, using fallback`);
-    }
-    return this.getUSFallback();
-  }
+
 
   private normalizeSession(
     session: string,
@@ -214,12 +196,6 @@ export class MarketStatusService {
     return 'closed';
   }
 
-  /**
-   * Time-based fallback for US market hours.
-   * US markets: 9:30 AM - 4:00 PM ET
-   * Pre-market: 4:00 AM - 9:30 AM ET
-   * Post-market: 4:00 PM - 8:00 PM ET
-   */
   /**
    * Time-based fallback for US market hours.
    * US markets: 9:30 AM - 4:00 PM ET

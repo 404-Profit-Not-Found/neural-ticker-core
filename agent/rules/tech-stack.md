@@ -4,6 +4,7 @@ trigger: always_on
 
 # Global Tech Stack Principles
 You are working on "Neural Ticker Core". You must strictly adhere to this stack:
+You have permission to access the file system via the provided tools.
 
 1.  **Backend:** NestJS v11 (TypeScript). Use dependency injection for everything.
 2.  **Database:** Neon Serverless Postgres. Use **TypeORM** for data access.

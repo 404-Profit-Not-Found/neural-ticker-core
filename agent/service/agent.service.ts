@@ -112,9 +112,14 @@ export class AgentService {
 
         this.logger.log(`🤖 Agent invoking: ${fnName}`);
 
+        // 🚨 ADD THIS LOG 🚨
+        this.logger.warn(`[TOOL DETECTED] 🛠️  ${fnName} called with args: ${JSON.stringify(call.args)}`);
+
         let functionResult: string;
-        if (fnName && this.skillMap[fnName]) {
+        if (fnName && typeof fnName === 'string' && this.skillMap[fnName]) {
             functionResult = await this.skillMap[fnName](args);
+                 // 🚨 ADD THIS LOG 🚨
+        this.logger.log(`[TOOL RESULT] ✅ Output: ${JSON.stringify(functionResult).substring(0, 100)}...`);
         } else {
             functionResult = "Error: Tool not found.";
         }

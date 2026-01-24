@@ -8,6 +8,7 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('stocktwits_posts')
+@Index(['symbol', 'created_at'])
 export class StockTwitsPost {
   @ApiProperty({ example: 123456789, description: 'StockTwits Message ID' })
   @PrimaryColumn({ type: 'bigint' })
@@ -46,6 +47,9 @@ export class StockTwitsPost {
     description: 'Post creation timestamp',
   })
   @Index()
-  @CreateDateColumn({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   created_at: Date;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  inserted_at: Date;
 }

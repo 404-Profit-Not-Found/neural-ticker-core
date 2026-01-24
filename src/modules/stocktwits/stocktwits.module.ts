@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockTwitsService } from './stocktwits.service';
@@ -9,6 +9,7 @@ import { StocktwitsAnalysis } from './entities/stocktwits-analysis.entity';
 import { EventCalendar } from './entities/event-calendar.entity';
 import { TickersModule } from '../tickers/tickers.module';
 import { LlmModule } from '../llm/llm.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -19,8 +20,9 @@ import { LlmModule } from '../llm/llm.module';
       StocktwitsAnalysis,
       EventCalendar,
     ]),
-    TickersModule,
+    forwardRef(() => TickersModule),
     LlmModule,
+    UsersModule,
   ],
   controllers: [StockTwitsController],
   providers: [StockTwitsService],

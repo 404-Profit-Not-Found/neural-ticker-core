@@ -30,6 +30,7 @@ export class CreditTransaction {
     enum: [
       'research_spend',
       'portfolio_analysis_spend',
+      'social_analysis_spend',
       'manual_contribution',
       'monthly_reset',
       'admin_gift',
@@ -39,6 +40,7 @@ export class CreditTransaction {
   reason:
     | 'research_spend'
     | 'portfolio_analysis_spend'
+    | 'social_analysis_spend'
     | 'manual_contribution'
     | 'monthly_reset'
     | 'admin_gift';

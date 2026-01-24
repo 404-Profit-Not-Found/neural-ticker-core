@@ -8,6 +8,8 @@ import {
   UnauthorizedException,
   Logger,
   UseGuards,
+  Req,
+  Body,
 } from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
 import {
@@ -26,6 +28,7 @@ import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreditGuard } from '../research/guards/credit.guard';
 
 @ApiTags('StockTwits')
 @ApiExtraModels(StockTwitsPost)
@@ -134,11 +137,18 @@ export class StockTwitsController {
   // --- AI Analysis Endpoints ---
 
   @Post(':symbol/analyze')
-  @Public() // Disabled for testing/demo per user request
-  @ApiOperation({ summary: 'Trigger AI Analysis for comments' })
+  @UseGuards(JwtAuthGuard, CreditGuard)
+  @ApiOperation({ summary: 'Trigger AI Analysis for comments (Costs Credits)' })
   @ApiResponse({ status: 201, description: 'Analysis started/completed' })
-  async analyzeComments(@Param('symbol') symbol: string) {
-    const analysis = await this.stockTwitsService.analyzeComments(symbol);
+  async analyzeComments(
+    @Param('symbol') symbol: string, 
+    @Req() req: any,
+    @Body() body: { model?: string; quality?: 'low' | 'medium' | 'high' | 'deep' }
+  ) {
+    const analysis = await this.stockTwitsService.analyzeComments(symbol, req.user.id, {
+        model: body.model,
+        quality: body.quality
+    });
     if (!analysis) {
        return { message: 'Not enough data to analyze' };
     }
@@ -151,6 +161,14 @@ export class StockTwitsController {
   @ApiResponse({ status: 200, description: 'Latest analysis object' })
   async getAnalysis(@Param('symbol') symbol: string) {
     return this.stockTwitsService.getLatestAnalysis(symbol);
+  }
+
+  @Get(':symbol/history')
+  @Public()
+  @ApiOperation({ summary: 'Get analysis history' })
+  @ApiResponse({ status: 200, description: 'List of past analyses' })
+  async getHistory(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getAnalysisHistory(symbol);
   }
 
   @Get(':symbol/events')

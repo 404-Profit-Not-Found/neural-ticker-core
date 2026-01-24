@@ -34,7 +34,6 @@ import { TickerNews } from '../components/ticker/TickerNews';
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
 import { PriceChart } from '../components/ticker/PriceChart';
 import { StocktwitsAnalysis } from '../components/stocktwits/StocktwitsAnalysis';
-import { EventCalendar } from '../components/stocktwits/EventCalendar';
 import {
     useTickerDetails,
     useTickerNews,
@@ -691,7 +690,6 @@ export function TickerDetail() {
                             {/* SOCIAL TAB */}
                             <TabsContent value="social" className="space-y-8">
                                 <StocktwitsAnalysis symbol={symbol || ''} />
-                                <EventCalendar symbol={symbol || ''} />
                             </TabsContent>
                         </Tabs>
 
