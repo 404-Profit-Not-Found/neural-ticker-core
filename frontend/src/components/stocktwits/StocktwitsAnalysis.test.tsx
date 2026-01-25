@@ -59,7 +59,7 @@ describe('StocktwitsAnalysis', () => {
     mockedAxios.get.mockImplementation(() => Promise.reject(new Error('Not found')));
     render(<StocktwitsAnalysis symbol="AAPL" />);
     await waitFor(() => {
-      expect(screen.getByText(/No Intelligence Data Found/i)).toBeInTheDocument();
+      expect(screen.getByText(/No Intelligence Data/i)).toBeInTheDocument();
     });
   });
 
