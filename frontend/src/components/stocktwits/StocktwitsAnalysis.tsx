@@ -206,8 +206,8 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                  <h3 className="text-sm font-bold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
                     <Activity size={14} /> Executive Summary
                 </h3>
-                <div className="bg-muted/10 border border-border/40 rounded-xl p-3.5">
-                    <p className="text-sm text-foreground/80 leading-normal">
+                <div className="bg-muted/10 border border-border/40 rounded-xl p-4">
+                    <p className="text-[15px] text-foreground/80 leading-relaxed">
                          {analysis.summary}
                     </p>
                     {analysis.highlights?.topics?.length > 0 && (
@@ -261,25 +261,25 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                          </CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0 flex-1 flex flex-col justify-center min-h-[140px]">
-                        <div className="space-y-2 py-1">
+                        <div className="space-y-3 py-1">
                              {/* Bullish Signals */}
                              {analysis.highlights?.bullish_points?.slice(0, 2).map((pt, i) => (
-                                 <div key={`bull-${i}`} className="text-[11px] text-foreground/80 flex items-start gap-2 leading-tight">
-                                     <div className="w-1 h-1 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+                                 <div key={`bull-${i}`} className="text-[13px] text-foreground/80 flex items-start gap-2.5 leading-relaxed">
+                                     <div className="w-1 h-1 rounded-full bg-emerald-500 shrink-0 mt-2" />
                                      <span className="line-clamp-2">{pt}</span>
                                  </div>
                              ))}
                              
                              {/* Bearish Signals */}
                              {analysis.highlights?.bearish_points?.slice(0, 1).map((pt, i) => (
-                                 <div key={`bear-${i}`} className="text-[11px] text-foreground/80 flex items-start gap-2 leading-tight">
-                                     <div className="w-1 h-1 rounded-full bg-red-500 shrink-0 mt-1.5" />
+                                 <div key={`bear-${i}`} className="text-[13px] text-foreground/80 flex items-start gap-2.5 leading-relaxed">
+                                     <div className="w-1 h-1 rounded-full bg-red-500 shrink-0 mt-2" />
                                      <span className="line-clamp-2 italic">{pt}</span>
                                  </div>
                              ))}
 
                              {!analysis.highlights?.bullish_points?.length && !analysis.highlights?.bearish_points?.length && (
-                                 <div className="text-xs text-muted-foreground italic text-center">No key signals identified.</div>
+                                 <div className="text-sm text-muted-foreground italic text-center">No key signals identified.</div>
                              )}
                         </div>
                     </CardContent>
