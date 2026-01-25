@@ -132,10 +132,18 @@ File to edit: UserService.ts
 | ✅ **Goal met?** | Did I do exactly what user asked? |
 | ✅ **Files edited?** | Did I modify all necessary files? |
 | ✅ **Code works?** | Did I test/verify the change? |
-| ✅ **No errors?** | Lint and TypeScript pass? |
+| ✅ **No errors?** | Lint, Types, and **Active Terminals** checked? |
 | ✅ **Nothing forgotten?** | Any edge cases missed? |
 
 > 🔴 **Rule:** If ANY check fails, fix it before completing.
+
+---
+
+## 🔴 Terminal Hygiene (CRITICAL)
+
+**Always check running terminals for background errors (e.g., webpack/vite build failures, proxy errors).**
+- Read outputs of `dev`, `start`, or `watch` tasks.
+- Ignore them at your own peril.
 
 ---
 

@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { jsonToToon } from 'toon-parser';
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';

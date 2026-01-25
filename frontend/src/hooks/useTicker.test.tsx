@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
     useTickerDetails,
@@ -13,7 +13,7 @@ import {
     useDeleteResearch,
     useUpdateResearchTitle
 } from './useTicker';
-import { api, httpClient } from '../lib/api';
+import { api } from '../lib/api';
 
 // Mock API
 vi.mock('../lib/api', () => ({
@@ -22,9 +22,7 @@ vi.mock('../lib/api', () => ({
         post: vi.fn(),
         delete: vi.fn()
     },
-    httpClient: {
-        get: vi.fn()
-    }
+
 }));
 
 const queryClient = new QueryClient({

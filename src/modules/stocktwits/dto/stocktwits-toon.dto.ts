@@ -25,7 +25,7 @@ export class StockTwitsToonDto {
     if (!text) return '';
     const withoutHtml = sanitizeHtml(text, {
       allowedTags: [],
-      allowedAttributes: {}
+      allowedAttributes: {},
     });
     return withoutHtml
       .replace(/\s+/g, ' ') // Collapse whitespace
