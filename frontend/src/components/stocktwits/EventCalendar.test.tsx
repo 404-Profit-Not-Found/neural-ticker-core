@@ -18,7 +18,7 @@ describe('EventCalendar', () => {
     mockedAxios.get.mockResolvedValue({ data: [] });
     const { container } = render(<EventCalendar symbol="AAPL" />);
     await waitFor(() => {
-        expect(container).toBeEmptyDOMElement(); 
+        expect(screen.getByText(/No upcoming catalysts detected/i)).toBeInTheDocument(); 
     });
   });
 
@@ -40,7 +40,7 @@ describe('EventCalendar', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Earnings Call')).toBeInTheDocument();
-      expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
+      expect(screen.getByText('Jan 1')).toBeInTheDocument();
       expect(screen.getByText('earnings')).toBeInTheDocument();
       expect(screen.getByText(/8/)).toBeInTheDocument(); 
       expect(screen.getByText('90%')).toBeInTheDocument();
