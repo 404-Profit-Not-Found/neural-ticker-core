@@ -19,6 +19,7 @@ export enum EventCalendarEventType {
   LEGAL = 'legal',
   REGULATORY = 'regulatory',
   ANALYST = 'analyst',
+  INSIDER_TRADING = 'insider_trading',
   OTHER = 'other',
 }
 
@@ -77,18 +78,12 @@ export class EventCalendar {
   expected_impact: string;
 
   @ApiProperty({ enum: EventCalendarEventType })
-  @Column({
-    type: 'enum',
-    enum: EventCalendarEventType,
-  })
-  event_type: EventCalendarEventType;
+  @Column({ type: 'text' })
+  event_type: string;
 
   @ApiProperty({ enum: EventCalendarSource })
-  @Column({
-    type: 'enum',
-    enum: EventCalendarSource,
-  })
-  source: EventCalendarSource;
+  @Column({ type: 'text' })
+  source: string;
 
   @ApiProperty({ type: 'object', nullable: true, additionalProperties: true })
   @Column({ type: 'jsonb', nullable: true })
