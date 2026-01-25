@@ -7,12 +7,21 @@ import {
   Param,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
+import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Jobs')
+@ApiBearerAuth()
 @Controller('v1/jobs')
+@Roles('admin')
 @Public()
 export class JobsController {
   private readonly logger = new Logger(JobsController.name);

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, httpClient } from '../lib/api';
+import { api } from '../lib/api';
 
 // Keys
 export const tickerKeys = {
@@ -12,55 +12,34 @@ export const tickerKeys = {
     logo: (symbol: string) => [...tickerKeys.all, 'logo', symbol] as const,
 };
 
-export function useTickerLogo(symbol: string, url?: string) {
-    return useQuery({
-        queryKey: tickerKeys.logo(symbol),
-        queryFn: async () => {
-            if (!url) return null;
-            let isProxy = false;
-            try {
-                const urlObj = new URL(url);
-                isProxy = urlObj.hostname === 'finnhub.io' || urlObj.hostname.endsWith('.finnhub.io');
-            } catch {
-                // Invalid URL, treat as not proxy
-                isProxy = false;
-            }
-            
-            let blob: Blob;
-            try {
-                if (isProxy) {
-                     const res = await httpClient.get(`api/proxy/image?url=${encodeURIComponent(url)}`, { responseType: 'blob' });
-                     blob = res.data;
-                } else {
-                     const res = await api.get(`tickers/${symbol}/logo`, { responseType: 'blob' });
-                     blob = res.data;
-                }
-            } catch (e) {
-                // Fallback
-                if (url && !isProxy) {
-                     const res = await httpClient.get(`api/proxy/image?url=${encodeURIComponent(url)}`, { responseType: 'blob' });
-                     blob = res.data;
-                } else {
-                    throw e;
-                }
-            }
+// Simplified hook that just returns the DB endpoint URL
+export function useTickerLogo(symbol: string) {
+    // If no symbol, return null immediately
+    if (!symbol) return { data: null, isLoading: false, isError: true };
 
-            // Convert to Base64 for reliable JSON/IDB persistence
-            return new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        },
-        // Cache for 7 days
-        staleTime: 1000 * 60 * 60 * 24 * 7, 
-        gcTime: 1000 * 60 * 60 * 24 * 7, 
-        enabled: !!symbol && !!url,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-    });
+    // We don't even need to fetch. The URL is deterministic.
+    // The TickersController serves cached logos from DB at this endpoint.
+    // We append a timestamp/version if we want to bust cache, but cache-control handles it.
+    // We just return the URL string. TickerLogo can use it directly in <img src="..." />
+    // However, to keep API compatible with existing consuming code that expects { data: string },
+    // we'll return a mock query object or just use a simple state.
+
+    // Actually, TickerLogo expects { data, isLoading, isError }.
+    // Let's just return a static object since we trust the endpoint exists (or 404s handled by img onError).
+    
+    // BUT checking for "isValid" might be useful.
+    // Let's make a HEAD request to check if it exists? 
+    // No, that's extra latency. Just assume it works and handling onError in UI is better.
+    
+    // Wait, TickerLogo logic is: if (!data) showPlaceholder.
+    // If we just return the string, it will always show the image tag.
+    // That's fine, the image tag onError can hide itself.
+    
+    return {
+        data: `/api/v1/tickers/${symbol}/logo`,
+        isLoading: false,
+        isError: false
+    };
 }
 
 export function useTickerDetails(symbol?: string) {

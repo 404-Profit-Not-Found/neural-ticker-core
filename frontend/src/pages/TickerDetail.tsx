@@ -30,9 +30,10 @@ import { TickerLogo } from '../components/dashboard/TickerLogo';
 import { FiftyTwoWeekRange } from '../components/dashboard/FiftyTwoWeekRange';
 import { TickerOverview } from '../components/ticker/TickerOverview';
 import { TickerFinancials } from '../components/ticker/TickerFinancials';
-import { TickerNews } from '../components/ticker/TickerNews';
+
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
 import { PriceChart } from '../components/ticker/PriceChart';
+import { StocktwitsAnalysis } from '../components/stocktwits/StocktwitsAnalysis';
 import {
     useTickerDetails,
     useTickerNews,
@@ -124,7 +125,7 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news'] as const;
+    const validTabs = ['overview', 'financials', 'research', 'social'] as const;
     // Extract tab from pathname: /ticker/NVDA/research -> research
     // Handle potential trailing slashes and case sensitivity
     const pathSegments = location.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
@@ -140,11 +141,7 @@ export function TickerDetail() {
 
 
     // Trigger background sync for 5-year history
-    useEffect(() => {
-        if (symbol) {
-            api.post(`/tickers/${symbol}/sync`).catch(err => console.error('Background sync trigger failed', err));
-        }
-    }, [symbol]);
+
 
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
     const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
@@ -649,7 +646,8 @@ export function TickerDetail() {
                                 <TabsTrigger value="overview">Overview</TabsTrigger>
                                 <TabsTrigger value="research">AI Research</TabsTrigger>
                                 <TabsTrigger value="financials">Financials</TabsTrigger>
-                                <TabsTrigger value="news">News</TabsTrigger>
+
+                                <TabsTrigger value="social">Social & Events</TabsTrigger>
                             </TabsList>
 
                             {/* OVERVIEW TAB */}
@@ -660,6 +658,7 @@ export function TickerDetail() {
                                     ratings={tickerData.ratings}
                                     profile={profile}
                                     news={tickerData.news}
+                                    newsList={news}
                                     fundamentals={fundamentals || undefined}
                                 />
                             </TabsContent>
@@ -680,9 +679,11 @@ export function TickerDetail() {
                                 <TickerFinancials fundamentals={fundamentals} />
                             </TabsContent>
 
-                            {/* NEWS TAB */}
-                            <TabsContent value="news">
-                                <TickerNews news={news} />
+
+
+                            {/* SOCIAL TAB */}
+                            <TabsContent value="social" className="space-y-8">
+                                <StocktwitsAnalysis symbol={symbol || ''} />
                             </TabsContent>
                         </Tabs>
 

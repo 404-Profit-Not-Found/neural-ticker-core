@@ -4,7 +4,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
+import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import {
   RequestQueue,
   RequestStatus,
@@ -24,7 +26,9 @@ export class JobsService {
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly marketDataService: MarketDataService,
+    private readonly marketStatusService: MarketStatusService,
     private readonly researchService: ResearchService,
+    private readonly stocktwitsService: StockTwitsService,
     @InjectRepository(RequestQueue)
     private readonly requestQueueRepo: Repository<RequestQueue>,
   ) {}
@@ -39,6 +43,18 @@ export class JobsService {
       this.logger.error('Zombie Ticket Cleanup failed', e);
       throw e;
     }
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  private async syncStockTwitsPostsCron() {
+    if (!this.isDevMode) return;
+    await this.stocktwitsService.handleHourlyPostsSync();
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  private async syncStockTwitsWatchersCron() {
+    if (!this.isDevMode) return;
+    await this.stocktwitsService.handleDailyWatchersSync();
   }
 
   /**
@@ -121,85 +137,25 @@ export class JobsService {
   }
 
   /**
-   * Check if a market is open based on exchange/region
-   * @param exchange - Exchange code (e.g., 'US', 'LSE', 'XETRA', 'PA')
-   */
-  private isMarketOpenForExchange(exchange?: string): boolean {
-    const now = new Date();
-    const day = now.getUTCDay();
-
-    // Weekend check (0 = Sunday, 6 = Saturday)
-    if (day === 0 || day === 6) return false;
-
-    // Determine region from exchange
-    const euExchanges = [
-      'LSE',
-      'XETRA',
-      'PA',
-      'AS',
-      'MC',
-      'MI',
-      'SW',
-      'VI',
-      'BR',
-      'HE',
-      'CO',
-      'ST',
-      'OL',
-    ];
-    const isEU =
-      exchange && euExchanges.some((e) => exchange.toUpperCase().includes(e));
-
-    if (isEU) {
-      // EU markets: 8:00 AM - 4:30 PM CET (7:00 - 15:30 UTC in winter, 6:00 - 14:30 UTC in summer)
-      // Using approximate UTC times to avoid DST complexity
-      const cetTime = new Date(
-        now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }),
-      );
-      const hours = cetTime.getHours();
-      const minutes = cetTime.getMinutes();
-      const timeInMinutes = hours * 60 + minutes;
-      const marketOpen = 8 * 60; // 8:00 AM CET
-      const marketClose = 16 * 60 + 30; // 4:30 PM CET
-      return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
-    } else {
-      // US markets: 9:30 AM - 4:00 PM ET
-      const etTime = new Date(
-        now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
-      );
-      const hours = etTime.getHours();
-      const minutes = etTime.getMinutes();
-      const timeInMinutes = hours * 60 + minutes;
-      const marketOpen = 9 * 60 + 30; // 9:30 AM ET
-      const marketClose = 16 * 60; // 4:00 PM ET
-      return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
-    }
-  }
-
-  /**
-   * Check if any major market is currently open (US or EU)
-   */
-  private isAnyMarketOpen(): boolean {
-    return (
-      this.isMarketOpenForExchange('US') || this.isMarketOpenForExchange('LSE')
-    );
-  }
-
-  /**
    * Light sync - only fetches current price snapshots for all tickers.
    * Much faster than syncDailyCandles since it skips history.
    * Syncs tickers only when their respective market is open.
    */
   async syncSnapshots(force = false) {
     // Check if any market is open (unless forced via HTTP call)
-    if (!force && !this.isAnyMarketOpen()) {
-      this.logger.log('All markets are closed. Skipping snapshot sync.');
-      return {
-        success: 0,
-        failed: 0,
-        skipped: true,
-        reason: 'All markets closed',
-      };
+    if (!force) {
+      const status = await this.marketStatusService.getAllMarketsStatus();
+      const isAnyOpen = status.us.isOpen || status.eu.isOpen;
+
+      if (!isAnyOpen) {
+        this.logger.log('All markets are closed. Skipping snapshot sync.');
+        return {
+          success: 0,
+          failed: 0,
+          skipped: true,
+          reason: 'All markets closed',
+        };
+      }
     }
 
     this.logger.log('Starting light snapshot sync (prices only)...');
@@ -215,8 +171,13 @@ export class JobsService {
         if (!ticker.symbol) continue;
 
         // Check if this ticker's market is open
-        const exchange = (ticker as any).exchange || 'US'; // Default to US if unknown
-        if (!force && !this.isMarketOpenForExchange(exchange)) {
+        const exchange = (ticker as any).exchange || 'US';
+        const status = await this.marketStatusService.getMarketStatus(
+          ticker.symbol,
+          exchange,
+        );
+
+        if (!force && !status.isOpen) {
           skippedMarketClosed++;
           continue;
         }
@@ -381,6 +342,12 @@ export class JobsService {
     // The current requirement was "personalized per user".
     // If this cron is meant to pre-warm cache, it can't pre-warm for everyone easily.
     // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
+    const status = await this.marketStatusService.getAllMarketsStatus();
+    if (!status.us.isOpen && !status.eu.isOpen) {
+      this.logger.log('Markets closed. Skipping Daily Digest generation.');
+      return;
+    }
+
     // Using NIL UUID to prevent database "invalid input syntax for type uuid" error
     const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
     await this.researchService.getOrGenerateDailyDigest(SYSTEM_UUID);

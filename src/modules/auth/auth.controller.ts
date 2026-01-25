@@ -31,7 +31,6 @@ import {
 
 @Public()
 @ApiTags('Auth')
-@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -92,6 +91,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Get current user profile' })
+  @ApiBearerAuth()
   @ApiResponse({ status: 200, description: 'User profile object' })
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
@@ -150,6 +150,7 @@ export class AuthController {
     summary: 'Logout',
     description: 'Clears authentication cookie.',
   })
+  @ApiBearerAuth()
   @ApiResponse({ status: 200, description: 'Cookie cleared' })
   @Post('logout')
   logout(@Res() res: Response) {

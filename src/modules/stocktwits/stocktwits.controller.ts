@@ -8,6 +8,9 @@ import {
   UnauthorizedException,
   Logger,
   UseGuards,
+  Req,
+  Body,
+  Delete,
 } from '@nestjs/common';
 import { StockTwitsService } from './stocktwits.service';
 import {
@@ -18,6 +21,7 @@ import {
   getSchemaPath,
   ApiExtraModels,
   ApiHeader,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
@@ -26,8 +30,10 @@ import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreditGuard } from '../research/guards/credit.guard';
 
 @ApiTags('StockTwits')
+@ApiBearerAuth()
 @ApiExtraModels(StockTwitsPost)
 @Controller('v1/stocktwits')
 export class StockTwitsController {
@@ -87,9 +93,9 @@ export class StockTwitsController {
     return this.stockTwitsService.getWatchersHistory(symbol);
   }
 
+  @Post(':symbol/sync')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @Post(':symbol/sync')
   @ApiOperation({
     summary: 'Trigger manual sync for a symbol',
     description:
@@ -112,6 +118,7 @@ export class StockTwitsController {
   }
 
   @Post('jobs/sync-posts')
+  @Public()
   @ApiOperation({ summary: 'Trigger hourly posts sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
@@ -122,6 +129,7 @@ export class StockTwitsController {
   }
 
   @Post('jobs/sync-watchers')
+  @Public()
   @ApiOperation({ summary: 'Trigger daily watchers sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
@@ -129,5 +137,73 @@ export class StockTwitsController {
     this.validateSecret(secret);
     await this.stockTwitsService.handleDailyWatchersSync();
     return { message: 'Daily watchers sync completed' };
+  }
+
+  // --- AI Analysis Endpoints ---
+
+  @Post(':symbol/analyze')
+  @UseGuards(JwtAuthGuard, CreditGuard)
+  @ApiOperation({ summary: 'Trigger AI Analysis for comments (Costs Credits)' })
+  @ApiResponse({ status: 201, description: 'Analysis started/completed' })
+  async analyzeComments(
+    @Param('symbol') symbol: string,
+    @Req() req: any,
+    @Body()
+    body: { model?: string; quality?: 'low' | 'medium' | 'high' | 'deep' },
+  ) {
+    const analysis = await this.stockTwitsService.analyzeComments(
+      symbol,
+      req.user.id,
+      {
+        model: body.model,
+        quality: body.quality,
+      },
+    );
+    if (!analysis) {
+      return { message: 'Not enough data to analyze' };
+    }
+    return analysis;
+  }
+
+  @Get(':symbol/analysis')
+  @Public()
+  @ApiOperation({ summary: 'Get latest AI analysis' })
+  @ApiResponse({ status: 200, description: 'Latest analysis object' })
+  async getAnalysis(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getLatestAnalysis(symbol);
+  }
+
+  @Get(':symbol/history')
+  @Public()
+  @ApiOperation({ summary: 'Get analysis history' })
+  @ApiResponse({ status: 200, description: 'List of past analyses' })
+  async getHistory(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getAnalysisHistory(symbol);
+  }
+
+  @Delete('analysis/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Delete a specific analysis (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Analysis deleted' })
+  async deleteAnalysis(@Param('id') id: string) {
+    await this.stockTwitsService.deleteAnalysis(id);
+    return { message: 'Deleted' };
+  }
+
+  @Get(':symbol/events')
+  @Public()
+  @ApiOperation({ summary: 'Get future events' })
+  @ApiResponse({ status: 200, description: 'List of future events' })
+  async getEvents(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getFutureEvents(symbol);
+  }
+
+  @Get(':symbol/stats/volume')
+  @Public()
+  @ApiOperation({ summary: 'Get daily message volume stats' })
+  @ApiResponse({ status: 200, description: 'Daily volume stats' })
+  async getVolumeStats(@Param('symbol') symbol: string) {
+    return this.stockTwitsService.getVolumeStats(symbol);
   }
 }

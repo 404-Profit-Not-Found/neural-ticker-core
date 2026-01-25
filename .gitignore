@@ -31,6 +31,7 @@ profile.cov
 # .vscode/
 node_modules/
 dist/
+client/
 .gemini/
 
 

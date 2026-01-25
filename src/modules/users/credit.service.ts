@@ -68,7 +68,10 @@ export class CreditService {
   async deductCredits(
     userId: string,
     amount: number,
-    reason: 'research_spend' | 'portfolio_analysis_spend',
+    reason:
+      | 'research_spend'
+      | 'portfolio_analysis_spend'
+      | 'social_analysis_spend',
     metadata?: Record<string, any>,
   ): Promise<User> {
     const queryRunner = this.dataSource.createQueryRunner();

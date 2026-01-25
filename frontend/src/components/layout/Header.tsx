@@ -9,6 +9,7 @@ import { UserTierBadge } from '../ui/user-tier-badge';
 import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
 import { SuperLoading } from '../ui/SuperLoading';
+import { useLocalAnalysisCount } from '../../store/analysisStore';
 
 interface Notification {
   id: string;
@@ -60,14 +61,17 @@ interface ActiveResearchIndicatorProps {
 }
 
 function ActiveResearchIndicator({ count }: ActiveResearchIndicatorProps) {
-  if (count <= 0) return null;
+  const localCount = useLocalAnalysisCount();
+  const total = count + localCount;
+  
+  if (total <= 0) return null;
 
   return (
     <div className="relative flex items-center justify-center w-8 h-8">
       <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
       <Brain className="w-5 h-5 text-purple-500 animate-pulse" />
       <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background z-10">
-        {count}
+        {total}
       </span>
     </div>
   );

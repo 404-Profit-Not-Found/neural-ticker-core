@@ -37,7 +37,6 @@ export class PublicViewController {
     status: 403,
     description: 'Invalid or missing signature.',
   })
-  @Public() // Bypasses JWT Auth
   @UseGuards(PublicThrottlerGuard) // Applies strict rate limits
   @Get('report/:researchId/:signature')
   async getPublicReport(

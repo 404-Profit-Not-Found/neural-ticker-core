@@ -14,7 +14,6 @@ import { Public } from '../auth/public.decorator';
 @ApiTags('Risk/Reward')
 @ApiBearerAuth()
 @Controller('v1/tickers/:symbol/risk-reward')
-@Public()
 export class RiskRewardController {
   constructor(private readonly service: RiskRewardService) {}
 
@@ -65,6 +64,7 @@ export class RiskRewardController {
     },
   })
   @Get()
+  @Public()
   getScore(@Param('symbol') symbol: string, @Query('history') history: string) {
     if (history === 'true') {
       return this.service.getScoreHistory(symbol);

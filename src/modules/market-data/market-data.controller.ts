@@ -1,26 +1,43 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Body,
+  Query,
+  UnauthorizedException,
+  Headers,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
-  ApiQuery,
   ApiBearerAuth,
+  ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
 import { MarketStatusService } from './market-status.service';
 
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
 @Controller('v1/tickers/:symbol')
-@Public()
 export class MarketDataController {
   constructor(
     private readonly service: MarketDataService,
     private readonly marketStatusService: MarketStatusService,
   ) {}
+
+  private validateSecret(secret: string) {
+    if (secret !== process.env.CRON_SECRET) {
+      throw new UnauthorizedException('Invalid Cron Secret');
+    }
+  }
 
   @ApiOperation({
     summary: 'Get latest snapshot (price + fundamentals)',
@@ -64,6 +81,7 @@ export class MarketDataController {
     },
   })
   @Get('snapshot')
+  @Public()
   getSnapshot(@Param('symbol') symbol: string) {
     return this.service.getSnapshot(symbol);
   }
@@ -97,6 +115,7 @@ export class MarketDataController {
   })
   @ApiResponse({ status: 200, description: 'History retrieved.' })
   @Get('history')
+  @Public()
   getHistory(
     @Param('symbol') symbol: string,
     @Query('days') days?: number,
@@ -126,6 +145,7 @@ export class MarketDataController {
   @ApiParam({ name: 'symbol', example: 'AAPL' })
   @ApiResponse({ status: 200, description: 'List of company news.' })
   @Get('news')
+  @Public()
   @ApiQuery({
     name: 'from',
     required: false,
@@ -153,10 +173,12 @@ export class MarketDataController {
       'Triggers the active portfolio refresh logic. Used by external schedulers (GitHub Actions).',
   })
   @ApiResponse({ status: 200, description: 'Refresh triggered.' })
-  @Get('cron/refresh-portfolios') // Keeping it GET for easy browser testing if needed, or POST if strict. User pattern suggests POST for jobs.
-  // Actually, existing jobs are POST. let's match patterns.
   @Post('cron/refresh-portfolios')
-  async triggerPortfolioRefresh() {
+  @Public()
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @Roles('admin')
+  async triggerPortfolioRefresh(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
     // Fire and forget or await? Await is safer for serverless timeouts.
     await this.service.updateActivePortfolios();
     return { status: 'ok', message: 'Portfolio refresh triggered' };
@@ -168,7 +190,11 @@ export class MarketDataController {
       'Triggers the top picks refresh logic. Used by external schedulers (GitHub Actions).',
   })
   @Post('cron/refresh-top-picks')
-  async triggerTopPicksRefresh() {
+  @Public()
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @Roles('admin')
+  async triggerTopPicksRefresh(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
     await this.service.refreshTopPicks();
     return { status: 'ok', message: 'Top Picks refresh triggered' };
   }
@@ -193,6 +219,7 @@ export class MarketDataController {
     },
   })
   @Get('status')
+  @Public()
   async getMarketStatus(@Param('symbol') symbol: string) {
     return this.marketStatusService.getMarketStatus(symbol);
   }

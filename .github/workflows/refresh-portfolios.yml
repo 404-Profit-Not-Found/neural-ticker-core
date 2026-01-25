@@ -16,7 +16,4 @@ jobs:
         run: |
           curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/tickers/cron/refresh-portfolios \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-          # Note: If auth is required, added header. If public/internal, curl suffices.
-          # Based on controller, it is public or uses default guards. 
-          # Assuming public based on neighboring endpoints or network security.
+          -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

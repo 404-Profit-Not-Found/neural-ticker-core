@@ -90,6 +90,7 @@ function App() {
             <Route path="/ticker/:symbol/research" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/financials" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/news" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
+            <Route path="/ticker/:symbol/social" element={<ProtectedRoute><TickerDetail /></ProtectedRoute>} />
             <Route path="/research" element={<ProtectedRoute><ResearchListPage /></ProtectedRoute>} />
             <Route path="/ticker/:symbol/research/:id" element={<ProtectedRoute><ResearchPage /></ProtectedRoute>} />
 

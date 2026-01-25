@@ -7,7 +7,13 @@ import {
   forwardRef,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
@@ -16,8 +22,10 @@ import { Fundamentals } from '../market-data/entities/fundamentals.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('tickers')
+@ApiBearerAuth()
 @Controller('v1/tickers')
 export class TickerDetailController {
   constructor(
@@ -37,6 +45,7 @@ export class TickerDetailController {
   @ApiResponse({ status: 200, description: 'Composite data object' })
   @ApiResponse({ status: 404, description: 'Ticker not found' })
   @Get(':symbol/composite')
+  @Public()
   async getCompositeData(@Param('symbol') symbol: string) {
     // 1. Get Market Data Snapshot (Handles Ticker existence and Fundamentals)
     // If ticker doesn't exist, getSnapshot attempts to fetch from Finnhub or throws.

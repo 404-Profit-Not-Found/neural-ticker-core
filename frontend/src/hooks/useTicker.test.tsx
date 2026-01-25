@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
     useTickerDetails,
@@ -13,7 +13,7 @@ import {
     useDeleteResearch,
     useUpdateResearchTitle
 } from './useTicker';
-import { api, httpClient } from '../lib/api';
+import { api } from '../lib/api';
 
 // Mock API
 vi.mock('../lib/api', () => ({
@@ -22,9 +22,7 @@ vi.mock('../lib/api', () => ({
         post: vi.fn(),
         delete: vi.fn()
     },
-    httpClient: {
-        get: vi.fn()
-    }
+
 }));
 
 const queryClient = new QueryClient({
@@ -85,27 +83,17 @@ describe('useTicker Hooks', () => {
     });
 
     describe('useTickerLogo', () => {
-        it('fetches logo via proxy if finnhub', async () => {
-            const mockBlob = new Blob(['fake-image'], { type: 'image/png' });
-            (httpClient.get as Mock).mockResolvedValueOnce({ data: mockBlob });
-
-            const { result } = renderHook(() => useTickerLogo('AAPL', 'https://finnhub.io/logo.png'), { wrapper });
-
-            await waitFor(() => expect(result.current.isSuccess).toBe(true));
-            // The hook returns a data URL string from FileReader
-            expect(result.current.data).toContain('data:image/png;base64');
-            expect(httpClient.get).toHaveBeenCalledWith(expect.stringContaining('proxy/image'), expect.anything());
+        it('returns correct logo url path', () => {
+            const { result } = renderHook(() => useTickerLogo('AAPL'));
+            expect(result.current.data).toBe('/api/v1/tickers/AAPL/logo');
+            expect(result.current.isLoading).toBe(false);
+            expect(result.current.isError).toBe(false);
         });
 
-        it('fetches logo via api if not finnhub', async () => {
-            const mockBlob = new Blob(['fake-image'], { type: 'image/png' });
-            (api.get as Mock).mockResolvedValueOnce({ data: mockBlob });
-
-            const { result } = renderHook(() => useTickerLogo('AAPL', 'https://other.com/logo.png'), { wrapper });
-
-            await waitFor(() => expect(result.current.isSuccess).toBe(true));
-            expect(result.current.data).toContain('data:image/png;base64');
-            expect(api.get).toHaveBeenCalledWith('tickers/AAPL/logo', expect.anything());
+        it('returns null if no symbol', () => {
+            const { result } = renderHook(() => useTickerLogo(''));
+            expect(result.current.data).toBeNull();
+            expect(result.current.isError).toBe(true);
         });
     });
 

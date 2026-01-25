@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
-import { FinnhubService } from '../finnhub/finnhub.service';
 
 export interface MarketStatusResult {
   isOpen: boolean;
   session: 'pre' | 'regular' | 'post' | 'closed';
   timezone: string;
   exchange: string;
-  region: 'US' | 'EU' | 'ASIA' | 'OTHER';
+  region: 'US' | 'EU' | 'OTHER';
   fallback?: boolean;
 }
 
@@ -53,10 +52,7 @@ export class MarketStatusService {
     '.OL',
   ];
 
-  constructor(
-    private readonly yahooFinanceService: YahooFinanceService,
-    private readonly finnhubService: FinnhubService,
-  ) {}
+  constructor(private readonly yahooFinanceService: YahooFinanceService) {}
 
   /**
    * Determines the region (US/EU) based on symbol or exchange.
@@ -93,11 +89,9 @@ export class MarketStatusService {
   ): Promise<MarketStatusResult> {
     const region = symbol
       ? this.getRegion(symbol, exchange)
-      : exchange === 'ASIA'
-        ? 'ASIA'
-        : exchange === 'US'
-          ? 'US'
-          : 'EU';
+      : exchange === 'US'
+        ? 'US'
+        : 'EU';
 
     // Grouping Key: Status is generally region-wide, not per-ticker.
     // US status is the same for AAPL and MSFT.
@@ -121,38 +115,28 @@ export class MarketStatusService {
       try {
         let result: MarketStatusResult;
 
-        if (region === 'EU' || region === 'OTHER') {
-          // EU: Try Yahoo Finance ^STOXX50E as proxy first
-          if (!symbol && region === 'EU') {
-            try {
-              result = await this.getStatusFromYahoo('^STOXX50E', 'EU');
-            } catch {
-              result = this.getEUFallback();
-            }
-          } else {
-            // Specific symbol or OTHER
-            if (symbol) {
-              result = await this.getStatusFromYahoo(symbol, region);
-            } else {
-              result = this.getEUFallback();
-            }
-          }
-        } else if (region === 'ASIA') {
-          // ASIA: Try Yahoo Finance ^HSI (Hang Seng) as proxy
-          try {
-            result = await this.getStatusFromYahoo('^HSI', 'ASIA');
-          } catch {
-            result = this.getAsiaFallback();
-          }
-        } else {
-          // US: Skip Finnhub (restricted on free tier). Use Yahoo Finance ^GSPC as proxy.
-          result = await this.getStatusFromYahoo('^GSPC', 'US');
+        // User requested ONLY Yahoo for status.
+        // If no symbol provided, use major indices as proxies.
+        const statusSymbol = symbol || (region === 'EU' ? '^GDAXI' : '^GSPC');
+
+        try {
+          result = await this.getStatusFromYahoo(statusSymbol, region);
+        } catch (e) {
+          this.logger.warn(
+            `Yahoo status check failed for ${statusSymbol}, using fallback: ${e.message}`,
+          );
+          result =
+            region === 'EU' ? this.getEUFallback() : this.getUSFallback();
         }
 
-        // 4. Update Cache
+        // 4. Update Cache (Dynamic TTL)
+        // If market is CLOSED, cache for longer (30 mins) to save API calls.
+        const isClosed = !result.isOpen || result.session === 'closed';
+        const ttl = isClosed ? 30 * 60 * 1000 : this.CACHE_TTL;
+
         this.statusCache.set(cacheKey, {
           data: result,
-          expires: Date.now() + this.CACHE_TTL,
+          expires: Date.now() + ttl,
         });
 
         return result;
@@ -172,20 +156,39 @@ export class MarketStatusService {
   async getAllMarketsStatus(): Promise<{
     us: MarketStatusResult;
     eu: MarketStatusResult;
-    asia: MarketStatusResult;
   }> {
-    const [us, eu, asia] = await Promise.all([
+    const [us, eu] = await Promise.all([
       this.getMarketStatus(undefined, 'US'),
       this.getMarketStatus(undefined, 'EU'),
-      this.getMarketStatus(undefined, 'ASIA'),
     ]);
-    return { us, eu, asia };
+    return { us, eu };
   }
 
   private async getStatusFromYahoo(
     symbol: string,
-    region: 'US' | 'EU' | 'ASIA' | 'OTHER',
+    region: 'US' | 'EU' | 'OTHER',
   ): Promise<MarketStatusResult> {
+    // Optimization: Skip Yahoo on weekends to save API calls
+    // Use the region's fallback logic to determine if it's strictly a weekend
+    const fallback =
+      region === 'EU' ? this.getEUFallback() : this.getUSFallback();
+
+    // Check local system time as a fast proxy (0=Sun, 6=Sat)
+    // Ideally we trust fallback's timezone aware logic, but access to it is indirect.
+    // However, fallback logic calculates "isWeekend". Rethinking:
+    // If I just call fallback and check dates, but getUSFallback constructs new dates.
+    // Let's copy the timezone-aware weekend check here.
+
+    const tz = region === 'EU' ? 'Europe/Berlin' : 'America/New_York';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+    });
+    const day = formatter.format(new Date()); // 'Sat', 'Sun', etc.
+    if (day === 'Sat' || day === 'Sun') {
+      return fallback;
+    }
+
     try {
       const status = await this.yahooFinanceService.getMarketStatus(symbol);
       return {
@@ -199,43 +202,8 @@ export class MarketStatusService {
       this.logger.warn(
         `Yahoo Finance status failed for ${symbol}, using fallback`,
       );
-      return region === 'EU'
-        ? this.getEUFallback()
-        : region === 'ASIA'
-          ? this.getAsiaFallback()
-          : this.getUSFallback();
+      return fallback;
     }
-  }
-
-  private async getStatusFromFinnhub(
-    symbol?: string,
-    exchange: string = 'US',
-  ): Promise<MarketStatusResult> {
-    try {
-      const status = await this.finnhubService.getMarketStatus(exchange);
-      if (status) {
-        return {
-          isOpen: status.isOpen,
-          session: status.isOpen ? 'regular' : 'closed',
-          timezone: status.t || 'America/New_York',
-          exchange: exchange,
-          region: 'US',
-        };
-      }
-    } catch {
-      this.logger.warn(`Finnhub status failed, using fallback`);
-    }
-
-    // Fallback: Try Yahoo Finance for US market status (using S&P 500 as proxy)
-    // Finnhub free tier often blocks 'marketStatus', but Yahoo quote for ^GSPC is usually available
-    if (exchange === 'US') {
-      this.logger.debug(
-        'Finnhub US status unavailable, checking Yahoo Finance (^GSPC)...',
-      );
-      return this.getStatusFromYahoo('^GSPC', 'US');
-    }
-
-    return this.getUSFallback();
   }
 
   private normalizeSession(
@@ -248,12 +216,6 @@ export class MarketStatusService {
     return 'closed';
   }
 
-  /**
-   * Time-based fallback for US market hours.
-   * US markets: 9:30 AM - 4:00 PM ET
-   * Pre-market: 4:00 AM - 9:30 AM ET
-   * Post-market: 4:00 PM - 8:00 PM ET
-   */
   /**
    * Time-based fallback for US market hours.
    * US markets: 9:30 AM - 4:00 PM ET
@@ -386,62 +348,6 @@ export class MarketStatusService {
       timezone: 'Europe/Berlin',
       exchange: 'EU',
       region: 'EU',
-      fallback: true,
-    };
-  }
-
-  /**
-   * Time-based fallback for ASIAN market hours (using Hong Kong as approx proxy).
-   * HKT is UTC+8.
-   * Trading: 9:30 - 16:00 HKT (with lunch break 12:00-13:00, but we'll simplify to open).
-   */
-  private getAsiaFallback(): MarketStatusResult {
-    const now = new Date();
-
-    // Robust time extraction using Intl
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Hong_Kong',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: false,
-      weekday: 'short',
-    });
-
-    const parts = formatter.formatToParts(now);
-    const hourPart = parts.find((p) => p.type === 'hour')?.value;
-    const minutePart = parts.find((p) => p.type === 'minute')?.value;
-    const weekdayPart = parts.find((p) => p.type === 'weekday')?.value;
-
-    if (!hourPart || !minutePart || !weekdayPart) {
-      return {
-        isOpen: false,
-        session: 'closed',
-        timezone: 'Asia/Hong_Kong',
-        exchange: 'ASIA',
-        region: 'ASIA',
-        fallback: true,
-      };
-    }
-
-    const hours = parseInt(hourPart === '24' ? '0' : hourPart, 10);
-    const minutes = parseInt(minutePart, 10);
-    const timeInMinutes = hours * 60 + minutes;
-
-    const isWeekend = weekdayPart === 'Sat' || weekdayPart === 'Sun';
-    const isWeekday = !isWeekend;
-
-    const marketOpen = 9 * 60 + 30; // 9:30 AM HKT
-    const marketClose = 16 * 60; // 4:00 PM HKT
-
-    const isOpen =
-      isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
-
-    return {
-      isOpen,
-      session: isOpen ? 'regular' : 'closed',
-      timezone: 'Asia/Hong_Kong',
-      exchange: 'ASIA',
-      region: 'ASIA',
       fallback: true,
     };
   }

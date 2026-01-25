@@ -14,9 +14,10 @@ export class GeminiProvider implements ILlmProvider {
   private client: GoogleGenAI;
 
   // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
+  // Cost-effective models with Google Search grounding
   private readonly defaultModels = {
     deep: 'gemini-3-pro-preview',
-    medium: 'gemini-3-flash-preview',
+    medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-2.5-flash-lite',
   };
@@ -65,7 +66,7 @@ export class GeminiProvider implements ILlmProvider {
     // Retry & Fallback Logic
     let attempts = 0;
     const maxAttempts = 3;
-    const currentModel = modelName;
+    let currentModel = modelName;
 
     // Branch for Deep Research Agent (Interactions API)
     if (currentModel === 'deep-research-pro-preview-12-2025') {
@@ -122,16 +123,43 @@ export class GeminiProvider implements ILlmProvider {
       }
     }
 
+    const secondaryApiKey = this.configService.get<string>(
+      'gemini.secondaryApiKey',
+    );
+    let hasSwitchedToSecondary = false;
+    let activeApiKey = apiKey;
+    let activeClient = client;
+    currentModel = modelName;
+
+    // Models available on the Primary (Free) Key
+    const freeModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+
+    const triedOnCurrentKey = new Set<string>();
+
+    // CRITICAL: gemini-3 preview models are gated behind the Secondary (Billed) Key for stability/quota
+    const isGatedPreviewModel =
+      currentModel.startsWith('gemini-3') && currentModel.endsWith('-preview');
+    if (isGatedPreviewModel && !hasSwitchedToSecondary && secondaryApiKey) {
+      this.logger.warn(
+        `${currentModel} is restricted on Free Key. Switching to SECONDARY API KEY immediately.`,
+      );
+      activeApiKey = secondaryApiKey;
+      activeClient = new GoogleGenAI({ apiKey: activeApiKey });
+      hasSwitchedToSecondary = true;
+    }
+
     // Standard GenerateContent Flow
-    while (attempts < maxAttempts * 2) {
-      // Allow attempts for primary + fallback
+    while (attempts < maxAttempts * 6) {
+      // Increased buffer for multiple tiers and keys
       try {
         attempts++;
+        triedOnCurrentKey.add(currentModel);
+
         this.logger.log(
-          `Gemini Request [Attempt ${attempts}] using ${currentModel}`,
+          `Gemini Request [Attempt ${attempts}] using ${currentModel} (Key: ${hasSwitchedToSecondary ? 'Secondary' : 'Primary'})`,
         );
 
-        const result = await client.models.generateContent({
+        const result = await activeClient.models.generateContent({
           model: currentModel,
           contents: [{ role: 'user', parts: [{ text: prompt.question }] }],
           config: config,
@@ -161,16 +189,59 @@ export class GeminiProvider implements ILlmProvider {
           err.message?.includes('429') ||
           err.message?.includes('quota');
 
-        if (isQuotaError && attempts < maxAttempts) {
-          // Retry same model
+        if (isQuotaError && attempts < maxAttempts * 6) {
+          // 1. Try to find another FREE model on the CURRENT key
+          const nextFreeModel = freeModels.find(
+            (m) => !triedOnCurrentKey.has(m),
+          );
+          // Gating check for next model in chain
+          const isNextGated =
+            nextFreeModel &&
+            nextFreeModel.startsWith('gemini-3') &&
+            nextFreeModel.endsWith('-preview');
+
+          if (nextFreeModel && !hasSwitchedToSecondary && !isNextGated) {
+            this.logger.warn(
+              `Gemini 429 for ${currentModel}. Trying alternative free model ${nextFreeModel} on Primary Key...`,
+            );
+            currentModel = nextFreeModel;
+            continue;
+          }
+
+          // 2. If no more free models or already on secondary, check if we can switch from Primary -> Secondary
+          if (secondaryApiKey && !hasSwitchedToSecondary) {
+            this.logger.warn(
+              `Primary Key exhausted (tried: ${Array.from(triedOnCurrentKey).join(', ')}). Switching to SECONDARY API KEY...`,
+            );
+            activeApiKey = secondaryApiKey;
+            activeClient = new GoogleGenAI({ apiKey: activeApiKey });
+            hasSwitchedToSecondary = true;
+            triedOnCurrentKey.clear(); // Important: we have fresh quotas on the new key
+            currentModel = modelName; // Reset to original requested quality
+            continue;
+          }
+
+          // 3. If we are on Secondary and it hits 429, try other models on Secondary too
+          if (hasSwitchedToSecondary) {
+            const nextSecondaryModel = freeModels.find(
+              (m) => !triedOnCurrentKey.has(m),
+            );
+            if (nextSecondaryModel) {
+              this.logger.warn(
+                `Secondary Key 429 for ${currentModel}. Falling back to ${nextSecondaryModel} on Secondary...`,
+              );
+              currentModel = nextSecondaryModel;
+              continue;
+            }
+          }
+
+          // If no fallback and no secondary key remains, wait and retry current model
           this.logger.warn(
-            `Gemini 429 Quota Exceeded for ${currentModel}. Retrying in 5s...`,
+            `Gemini 429 for ${currentModel}. No further keys or models available. Retrying in 5s...`,
           );
           await new Promise((r) => setTimeout(r, 5000));
           continue;
         }
-
-        // Removed fallback to legacy models as per user instruction.
 
         this.logger.error(`Gemini call failed: ${err.message}`, err.stack);
         throw err;

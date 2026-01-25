@@ -11,8 +11,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { TickersModule } from './modules/tickers/tickers.module';
 import { FinnhubModule } from './modules/finnhub/finnhub.module';
 import { MarketDataModule } from './modules/market-data/market-data.module';
@@ -33,7 +31,6 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
 import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
 import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.module';
 import configuration from './config/configuration';
-
 // ...
 
 @Module({
@@ -104,16 +101,14 @@ import configuration from './config/configuration';
     StockTwitsModule,
     WatchlistModule,
     SocialModule,
-
     ProxyModule,
     NotificationsModule,
     PortfolioModule,
     YahooFinanceModule,
     TickerRequestsModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard, // Rate Limiting First

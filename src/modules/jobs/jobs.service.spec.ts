@@ -4,7 +4,9 @@ import { JobsService } from './jobs.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
+import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import { RequestQueue } from './entities/request-queue.entity';
 
 describe('JobsService', () => {
@@ -42,6 +44,14 @@ describe('JobsService', () => {
     update: jest.fn(),
   };
 
+  const mockMarketStatusService = {
+    getAllMarketsStatus: jest.fn().mockResolvedValue({
+      us: { isOpen: true },
+      eu: { isOpen: true },
+    }),
+    getMarketStatus: jest.fn().mockResolvedValue({ isOpen: true }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,7 +59,9 @@ describe('JobsService', () => {
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: TickersService, useValue: mockTickersService },
         { provide: MarketDataService, useValue: mockMarketDataService },
+        { provide: MarketStatusService, useValue: mockMarketStatusService },
         { provide: ResearchService, useValue: mockResearchService },
+        { provide: StockTwitsService, useValue: {} },
 
         {
           provide: getRepositoryToken(RequestQueue),

@@ -11,7 +11,6 @@ import { Public } from '../auth/public.decorator';
 @ApiTags('Statistics')
 @ApiBearerAuth()
 @Controller('v1/stats')
-@Public()
 export class StatsController {
   constructor(private readonly marketDataService: MarketDataService) {}
 
@@ -26,6 +25,7 @@ export class StatsController {
     schema: { example: { count: 5, symbols: ['AAPL', 'MSFT', 'GOOGL'] } },
   })
   @Get('strong-buy')
+  @Public()
   getStrongBuy() {
     return this.marketDataService.getStrongBuyCount();
   }
@@ -41,6 +41,7 @@ export class StatsController {
     schema: { example: { count: 2, symbols: ['COIN', 'RIVN'] } },
   })
   @Get('sell')
+  @Public()
   getSell() {
     return this.marketDataService.getSellCount();
   }
