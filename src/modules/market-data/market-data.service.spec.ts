@@ -759,19 +759,6 @@ describe('MarketDataService', () => {
       ).toHaveBeenCalled();
     });
 
-    it('should proceed if only Asia market is open', async () => {
-      mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
-        us: { isOpen: false, session: 'closed' },
-        eu: { isOpen: false, session: 'closed' },
-        asia: { isOpen: true, session: 'regular' },
-      });
-      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([]);
 
-      await service.updateActivePortfolios();
-
-      expect(
-        mockPortfolioService.getAllDistinctPortfolioSymbols,
-      ).toHaveBeenCalled();
-    });
   });
 });

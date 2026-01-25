@@ -151,6 +151,7 @@ export class StockTwitsService {
                   symbol: symbol,
                   username: msg.user?.username || 'unknown',
                   user_followers_count: msg.user?.followers || 0,
+                  // eslint-disable-next-line no-control-regex
                   body: (msg.body || '').replace(/\u0000/g, ''), // Sanitize null bytes to prevent Postgres error
                   likes_count: msg.likes?.total || 0,
                   created_at: new Date(msg.created_at),
@@ -337,7 +338,7 @@ export class StockTwitsService {
           order: { timestamp: 'ASC' },
         });
       } else {
-        this.trackWatchers(symbol); // Background
+        void this.trackWatchers(symbol); // Background
       }
     }
 

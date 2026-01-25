@@ -168,6 +168,26 @@ export class MarketStatusService {
     symbol: string,
     region: 'US' | 'EU' | 'OTHER',
   ): Promise<MarketStatusResult> {
+    // Optimization: Skip Yahoo on weekends to save API calls
+    // Use the region's fallback logic to determine if it's strictly a weekend
+    const fallback = region === 'EU' ? this.getEUFallback() : this.getUSFallback();
+    
+    // Check local system time as a fast proxy (0=Sun, 6=Sat)
+    // Ideally we trust fallback's timezone aware logic, but access to it is indirect.
+    // However, fallback logic calculates "isWeekend". Rethinking:
+    // If I just call fallback and check dates, but getUSFallback constructs new dates.
+    // Let's copy the timezone-aware weekend check here.
+    
+    const tz = region === 'EU' ? 'Europe/Berlin' : 'America/New_York';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+    });
+    const day = formatter.format(new Date()); // 'Sat', 'Sun', etc.
+    if (day === 'Sat' || day === 'Sun') {
+      return fallback;
+    }
+
     try {
       const status = await this.yahooFinanceService.getMarketStatus(symbol);
       return {
@@ -181,7 +201,7 @@ export class MarketStatusService {
       this.logger.warn(
         `Yahoo Finance status failed for ${symbol}, using fallback`,
       );
-      return region === 'EU' ? this.getEUFallback() : this.getUSFallback();
+      return fallback;
     }
   }
 

@@ -3,12 +3,8 @@ import {
   Get,
   Param,
   Post,
-  Patch,
   Body,
   Query,
-  Res,
-  UseGuards,
-  Req,
   UnauthorizedException,
   Headers,
 } from '@nestjs/common';
@@ -20,7 +16,6 @@ import {
   ApiParam,
   ApiBearerAuth,
   ApiQuery,
-  ApiBody,
   ApiHeader,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
