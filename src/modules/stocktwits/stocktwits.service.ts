@@ -468,7 +468,11 @@ export class StockTwitsService {
         THINKING STEP:
         1. Identify specific future events, catalysts, or dates mentioned in the comments.
         2. DEDUPLICATE: If multiple comments mention the same event (e.g., "CEO visit", "Earnings", or specific trips), combine them into a single, high-confidence entry. Do NOT output multiple entries for the same event. Use canonical names for events and individuals specific to ${companyName}.
-        3. Be precise with dates: If a date is provided (e.g. "Jan 28"), use it. If a range is given, use the first date.
+        3. Be precise with dates: Return YYYY-MM-DD format ONLY. 
+           - INVALID: "2026-01-XX", "Late Jan", "Next week".
+           - VALID: "2026-01-31".
+           - If a specific day is unknown but the month is known, use the 1st of that month (e.g. "2026-02-01" for "February").
+           - If no date is mentioned, do NOT include it in "extracted_events".
         
         Focus on extracting:
         1. Main "Topics Discussed" (e.g. Earnings Hype, Buyout Rumors, Insider Selling, Technical Breakout).

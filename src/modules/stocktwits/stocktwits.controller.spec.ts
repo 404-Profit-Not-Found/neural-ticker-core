@@ -39,14 +39,14 @@ describe('StockTwitsController', () => {
       const mockAnalysis = { id: '1', symbol: 'AAPL' };
       mockService.analyzeComments.mockResolvedValue(mockAnalysis);
 
-      const result = await controller.analyzeComments('AAPL');
+      const result = await controller.analyzeComments('AAPL', {} as any, {});
       expect(result).toEqual(mockAnalysis);
     });
 
     it('should return message if not enough data', async () => {
       mockService.analyzeComments.mockResolvedValue(null);
 
-      const result = await controller.analyzeComments('AAPL');
+      const result = await controller.analyzeComments('AAPL', {} as any, {});
       expect(result).toEqual({ message: 'Not enough data to analyze' });
     });
   });
