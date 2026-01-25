@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { jsonToToon } from 'toon-parser';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 import { StockTwitsPost } from './entities/stocktwits-post.entity';
 import { StockTwitsWatcher } from './entities/stocktwits-watcher.entity';
@@ -98,9 +98,19 @@ export class StockTwitsService {
                 `[${symbol}] Axios blocked with ${axiosError.response?.status || axiosError.code}. Falling back to curl...`,
               );
 
-              const curlCmd = `curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" -H "Accept: application/json" "${url}"`;
+              const curlArgs = [
+                '-s',
+                '-i',
+                '-A',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                '-H',
+                'Accept: application/json',
+                url,
+              ];
               try {
-                const output = execSync(curlCmd, { encoding: 'utf8' });
+                const output = execFileSync('curl', curlArgs, {
+                  encoding: 'utf8',
+                });
 
                 // Check for 403 in headers
                 if (
