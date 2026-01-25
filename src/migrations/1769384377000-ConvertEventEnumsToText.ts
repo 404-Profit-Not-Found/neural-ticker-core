@@ -21,6 +21,7 @@ export class ConvertEventEnumsToText1769384377000 implements MigrationInterface 
     await queryRunner.query(`DROP TYPE IF EXISTS "event_calendar_source_enum"`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Recreating enums on down is possible but usually text is fine forever.
     // For safety, we just leave them as text.
