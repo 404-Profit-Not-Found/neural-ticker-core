@@ -52,6 +52,11 @@ export class StockTwitsService {
    * Uses `curl` to bypass Cloudflare and handles pagination.
    */
   async fetchAndStorePosts(symbol: string, maxPages: number = 10) {
+    // SECURITY: Validate symbol to prevent SSRF and Command Injection
+    if (!/^[A-Z0-9.]+$/.test(symbol)) {
+      throw new Error('Invalid symbol format');
+    }
+
     // Prevent overlapping syncs for same symbol
     if (this.syncLocks.has(symbol)) {
       this.logger.log(`Sync already in progress for ${symbol}, awaiting...`);
