@@ -776,7 +776,7 @@ export class StockTwitsService {
       .orderBy('date', 'ASC')
       .getRawMany();
 
-    this.logger.debug(`Volume Stats Raw: ${JSON.stringify(stats)}`);
+
 
     // Fetch recent analyses to cross-reference topics
     const analyses = await this.analysisRepository.find({
