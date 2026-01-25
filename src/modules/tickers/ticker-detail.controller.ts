@@ -7,7 +7,13 @@ import {
   forwardRef,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';

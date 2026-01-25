@@ -5,7 +5,13 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { ResearchService } from './research.service';
 import { PublicThrottlerGuard } from './guards/public-throttler.guard';
 import { Public } from '../auth/public.decorator';

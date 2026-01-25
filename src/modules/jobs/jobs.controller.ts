@@ -7,7 +7,13 @@ import {
   Param,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/public.decorator';

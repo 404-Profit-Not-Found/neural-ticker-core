@@ -1,4 +1,3 @@
-
 import { StockTwitsPost } from '../entities/stocktwits-post.entity';
 
 /**
@@ -15,8 +14,9 @@ export class StockTwitsToonDto {
     this.l = post.likes_count;
     this.b = this.clean(post.body);
     // Format date efficiently
-    this.d = post.created_at instanceof Date 
-        ? post.created_at.toISOString().slice(0, 10) 
+    this.d =
+      post.created_at instanceof Date
+        ? post.created_at.toISOString().slice(0, 10)
         : new Date(post.created_at).toISOString().slice(0, 10);
   }
 

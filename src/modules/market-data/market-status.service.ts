@@ -52,9 +52,7 @@ export class MarketStatusService {
     '.OL',
   ];
 
-  constructor(
-    private readonly yahooFinanceService: YahooFinanceService,
-  ) {}
+  constructor(private readonly yahooFinanceService: YahooFinanceService) {}
 
   /**
    * Determines the region (US/EU) based on symbol or exchange.
@@ -124,8 +122,11 @@ export class MarketStatusService {
         try {
           result = await this.getStatusFromYahoo(statusSymbol, region);
         } catch (e) {
-          this.logger.warn(`Yahoo status check failed for ${statusSymbol}, using fallback: ${e.message}`);
-          result = region === 'EU' ? this.getEUFallback() : this.getUSFallback();
+          this.logger.warn(
+            `Yahoo status check failed for ${statusSymbol}, using fallback: ${e.message}`,
+          );
+          result =
+            region === 'EU' ? this.getEUFallback() : this.getUSFallback();
         }
 
         // 4. Update Cache (Dynamic TTL)
@@ -183,8 +184,6 @@ export class MarketStatusService {
       return region === 'EU' ? this.getEUFallback() : this.getUSFallback();
     }
   }
-
-
 
   private normalizeSession(
     session: string,

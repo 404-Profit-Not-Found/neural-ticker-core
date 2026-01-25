@@ -52,7 +52,7 @@ describe('MarketStatusService', () => {
 
       await service.getMarketStatus('AAPL');
       mockYahooService.getMarketStatus.mockClear();
-      
+
       const result = await service.getMarketStatus('AAPL');
       expect(result.session).toBe('regular');
       expect(mockYahooService.getMarketStatus).not.toHaveBeenCalled();

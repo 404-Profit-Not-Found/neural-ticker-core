@@ -9,7 +9,13 @@ import {
 import { HttpService } from '@nestjs/axios';
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
-import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Proxy')

@@ -136,8 +136,6 @@ export class JobsService {
     await this.syncSnapshots();
   }
 
-
-
   /**
    * Light sync - only fetches current price snapshots for all tickers.
    * Much faster than syncDailyCandles since it skips history.
@@ -148,7 +146,7 @@ export class JobsService {
     if (!force) {
       const status = await this.marketStatusService.getAllMarketsStatus();
       const isAnyOpen = status.us.isOpen || status.eu.isOpen;
-      
+
       if (!isAnyOpen) {
         this.logger.log('All markets are closed. Skipping snapshot sync.');
         return {
@@ -173,9 +171,12 @@ export class JobsService {
         if (!ticker.symbol) continue;
 
         // Check if this ticker's market is open
-        const exchange = (ticker as any).exchange || 'US'; 
-        const status = await this.marketStatusService.getMarketStatus(ticker.symbol, exchange);
-        
+        const exchange = (ticker as any).exchange || 'US';
+        const status = await this.marketStatusService.getMarketStatus(
+          ticker.symbol,
+          exchange,
+        );
+
         if (!force && !status.isOpen) {
           skippedMarketClosed++;
           continue;
@@ -343,8 +344,8 @@ export class JobsService {
     // Maybe it pre-warms the "Market Opportunities" fallback (userId=system)?
     const status = await this.marketStatusService.getAllMarketsStatus();
     if (!status.us.isOpen && !status.eu.isOpen) {
-       this.logger.log('Markets closed. Skipping Daily Digest generation.');
-       return;
+      this.logger.log('Markets closed. Skipping Daily Digest generation.');
+      return;
     }
 
     // Using NIL UUID to prevent database "invalid input syntax for type uuid" error

@@ -146,16 +146,21 @@ export class StockTwitsController {
   @ApiOperation({ summary: 'Trigger AI Analysis for comments (Costs Credits)' })
   @ApiResponse({ status: 201, description: 'Analysis started/completed' })
   async analyzeComments(
-    @Param('symbol') symbol: string, 
+    @Param('symbol') symbol: string,
     @Req() req: any,
-    @Body() body: { model?: string; quality?: 'low' | 'medium' | 'high' | 'deep' }
+    @Body()
+    body: { model?: string; quality?: 'low' | 'medium' | 'high' | 'deep' },
   ) {
-    const analysis = await this.stockTwitsService.analyzeComments(symbol, req.user.id, {
+    const analysis = await this.stockTwitsService.analyzeComments(
+      symbol,
+      req.user.id,
+      {
         model: body.model,
-        quality: body.quality
-    });
+        quality: body.quality,
+      },
+    );
     if (!analysis) {
-       return { message: 'Not enough data to analyze' };
+      return { message: 'Not enough data to analyze' };
     }
     return analysis;
   }
@@ -199,6 +204,6 @@ export class StockTwitsController {
   @ApiOperation({ summary: 'Get daily message volume stats' })
   @ApiResponse({ status: 200, description: 'Daily volume stats' })
   async getVolumeStats(@Param('symbol') symbol: string) {
-     return this.stockTwitsService.getVolumeStats(symbol);
+    return this.stockTwitsService.getVolumeStats(symbol);
   }
 }

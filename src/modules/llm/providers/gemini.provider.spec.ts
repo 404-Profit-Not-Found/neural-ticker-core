@@ -159,7 +159,7 @@ describe('GeminiProvider', () => {
       const result = await provider.generate(validPrompt);
 
       expect(result.answerMarkdown).toBe('Final Answer');
-      expect(result.models).toContain('gemini-3-flash-preview');
+      expect(result.models).toContain('gemini-2.5-flash');
       expect(result.groundingMetadata).toBeDefined();
     });
   });

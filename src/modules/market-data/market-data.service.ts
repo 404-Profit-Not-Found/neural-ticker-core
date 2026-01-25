@@ -65,11 +65,11 @@ export class MarketDataService {
   @Cron('*/30 * * * * *')
   async updateActivePortfoliosCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
-    
+
     // Safety: Don't refresh if markets are closed
     const status = await this.marketStatusService.getAllMarketsStatus();
     if (!status.us.isOpen && !status.eu.isOpen) {
-        return;
+      return;
     }
 
     await this.updateActivePortfolios();
@@ -77,8 +77,7 @@ export class MarketDataService {
 
   async updateActivePortfolios() {
     // Create a set of open regions to avoid checking status for every symbol individually if global markets are closed
-    const { us, eu } =
-      await this.marketStatusService.getAllMarketsStatus();
+    const { us, eu } = await this.marketStatusService.getAllMarketsStatus();
     const isUsOpen = us.isOpen; // Strict open check (ignore post-market to reduce API usage/logs)
     const isEuOpen = eu.isOpen;
 
@@ -710,14 +709,16 @@ export class MarketDataService {
     // Adjust for IPO date if available
     let adjustedYears = years;
     if (ticker.ipo_date) {
-        const ipoDate = new Date(ticker.ipo_date);
-        if (ipoDate > from) {
-            from = ipoDate;
-            const diffTime = Math.abs(to.getTime() - from.getTime());
-            const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
-            adjustedYears = diffYears;
-            this.logger.debug(`Adjusting sync start for ${symbol} to IPO date: ${ticker.ipo_date}`);
-        }
+      const ipoDate = new Date(ticker.ipo_date);
+      if (ipoDate > from) {
+        from = ipoDate;
+        const diffTime = Math.abs(to.getTime() - from.getTime());
+        const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+        adjustedYears = diffYears;
+        this.logger.debug(
+          `Adjusting sync start for ${symbol} to IPO date: ${ticker.ipo_date}`,
+        );
+      }
     }
 
     // 1. Check DB Coverage
