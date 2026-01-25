@@ -59,7 +59,7 @@ export const VolumeSparkline = ({ data, startDate, endDate }: VolumeSparklinePro
     }
 
     return (
-        <div className="w-full h-[120px]">
+        <div className="w-full h-[100px]">
             <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data}>
                     <defs>
@@ -90,13 +90,7 @@ export const VolumeSparkline = ({ data, startDate, endDate }: VolumeSparklinePro
                  <span className="text-[10px] text-muted-foreground/50">{endDate || 'Today'}</span>
             </div>
             
-             {/* Latest Value Highligher */}
-            <div className="absolute top-2 right-4 text-right">
-                <div className="text-2xl font-bold tabular-nums text-blue-400">
-                    {data[data.length - 1]?.count || 0}
-                </div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Posts Today</div>
-            </div>
+
         </div>
     );
 };
