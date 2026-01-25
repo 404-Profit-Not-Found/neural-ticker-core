@@ -758,7 +758,5 @@ describe('MarketDataService', () => {
         mockPortfolioService.getAllDistinctPortfolioSymbols,
       ).toHaveBeenCalled();
     });
-
-
   });
 });
