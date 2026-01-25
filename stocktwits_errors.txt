@@ -1,0 +1,71 @@
+
+> neural-ticker-core@alpha-0.3.7 test
+> jest modules/stocktwits
+
+[Nest] 2956  - 25. 01. 2026 1:26:05   ERROR [StockTwitsService] [AAPL] Fetch failed: Cannot read properties of undefined (reading 'subscribe')
+FAIL src/modules/stocktwits/stocktwits.service.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+  ΓùÅ StockTwitsService ΓÇ║ analyzeComments ΓÇ║ should analyze posts and save analysis + events
+
+    TypeError: this.calendarRepository.delete is not a function
+
+      600 |       // CLEANUP: Delete previous StockTwits-sourced future events for this symbol.
+      601 |       // This prevents old "no-impact" duplicates from blocking the new high-intelligence run.
+    > 602 |       await this.calendarRepository.delete({
+          |                                           ^
+      603 |         symbol,
+      604 |         source: EventCalendarSource.STOCKTWITS,
+      605 |         event_date: MoreThanOrEqual(todayStr),
+
+      at StockTwitsService.analyzeComments (modules/stocktwits/stocktwits.service.ts:602:43)
+      at Object.<anonymous> (modules/stocktwits/stocktwits.service.spec.ts:136:22)
+
+FAIL src/modules/stocktwits/stocktwits.controller.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ≡ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+  ΓùÅ StockTwitsController ΓÇ║ analyzeComments ΓÇ║ should return analysis if successful
+
+    TypeError: Cannot read properties of undefined (reading 'id')
+
+      154 |     const analysis = await this.stockTwitsService.analyzeComments(
+      155 |       symbol,
+    > 156 |       req.user.id,
+          |                ^
+      157 |       {
+      158 |         model: body.model,
+      159 |         quality: body.quality,
+
+      at StockTwitsController.analyzeComments (modules/stocktwits/stocktwits.controller.ts:156:16)
+      at Object.<anonymous> (modules/stocktwits/stocktwits.controller.spec.ts:42:39)
+
+  ΓùÅ StockTwitsController ΓÇ║ analyzeComments ΓÇ║ should return message if not enough data
+
+    TypeError: Cannot read properties of undefined (reading 'id')
+
+      154 |     const analysis = await this.stockTwitsService.analyzeComments(
+      155 |       symbol,
+    > 156 |       req.user.id,
+          |                ^
+      157 |       {
+      158 |         model: body.model,
+      159 |         quality: body.quality,
+
+      at StockTwitsController.analyzeComments (modules/stocktwits/stocktwits.controller.ts:156:16)
+      at Object.<anonymous> (modules/stocktwits/stocktwits.controller.spec.ts:49:39)
+
+Test Suites: 2 failed, 2 total
+Tests:       3 failed, 3 passed, 6 total
+Snapshots:   0 total
+Time:        2.284 s
+Ran all test suites matching modules/stocktwits.

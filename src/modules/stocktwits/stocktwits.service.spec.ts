@@ -29,6 +29,7 @@ describe('StockTwitsService', () => {
       .fn()
       .mockImplementation((dto) => Promise.resolve({ id: '1', ...dto })),
     findAndCount: jest.fn(),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 
   const mockTickersService = {

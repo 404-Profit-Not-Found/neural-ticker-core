@@ -1,0 +1,101 @@
+
+> neural-ticker-core@alpha-0.3.7 test
+> jest modules/market-data
+
+FAIL src/modules/market-data/market-status.service.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ≡ƒöä add secrets lifecycle management: https://dotenvx.com/ops
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+  ΓùÅ MarketStatusService ΓÇ║ getMarketStatus ΓÇ║ should coalesce concurrent requests for the same symbol/region
+
+    expect(jest.fn()).toHaveBeenCalled()
+
+    Expected number of calls: >= 1
+    Received number of calls:    0
+
+      44 |
+      45 |       await Promise.all(promises);
+    > 46 |       expect(mockYahooService.getMarketStatus).toHaveBeenCalled();
+         |                                                ^
+      47 |     });
+      48 |
+      49 |     it('should return cached value if available', async () => {
+
+      at Object.<anonymous> (modules/market-data/market-status.service.spec.ts:46:48)
+
+  ΓùÅ MarketStatusService ΓÇ║ getMarketStatus ΓÇ║ should return cached value if available
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "regular"
+    Received: "closed"
+
+      55 |
+      56 |       const result = await service.getMarketStatus('AAPL');
+    > 57 |       expect(result.session).toBe('regular');
+         |                              ^
+      58 |       expect(mockYahooService.getMarketStatus).not.toHaveBeenCalled();
+      59 |     });
+      60 |
+
+      at Object.<anonymous> (modules/market-data/market-status.service.spec.ts:57:30)
+
+  ΓùÅ MarketStatusService ΓÇ║ getMarketStatus ΓÇ║ should fetch separately for different symbols/regions
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 2
+    Received number of calls: 0
+
+      69 |       await service.getMarketStatus('MC.PA');
+      70 |
+    > 71 |       expect(mockYahooService.getMarketStatus).toHaveBeenCalledTimes(2);
+         |                                                ^
+      72 |     });
+      73 |
+      74 |     it('should return OPEN for EU market at 16:45 CET via fallback', () => {
+
+      at Object.<anonymous> (modules/market-data/market-status.service.spec.ts:71:48)
+
+PASS src/modules/market-data/market-data.controller.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ≡ƒæÑ sync secrets across teammates & machines: https://dotenvx.com/ops
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+PASS src/modules/market-data/market-data-bulk.controller.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ΓÜÖ∩╕Å  override existing env vars with { override: true }
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+PASS src/modules/market-data/news.controller.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+PASS src/modules/market-data/market-data.service.spec.ts
+  ΓùÅ Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (18) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+
+Test Suites: 1 failed, 4 passed, 5 total
+Tests:       3 failed, 33 passed, 36 total
+Snapshots:   0 total
+Time:        3.173 s
+Ran all test suites matching modules/market-data.
