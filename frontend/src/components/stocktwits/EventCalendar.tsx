@@ -21,7 +21,7 @@ export const EventCalendar = ({ symbol }: { symbol: string }) => {
     try {
       const { data } = await axios.get<Event[]>(`/api/v1/stocktwits/${symbol}/events`);
       setEvents(data);
-    } catch (e) {
+    } catch {
       console.warn('No events found');
     } finally {
       setLoading(false);

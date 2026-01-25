@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
@@ -20,7 +20,7 @@ vi.mock('axios', () => {
     },
   };
 });
-const mockedAxios = axios as any;
+const mockedAxios = axios as unknown as { get: ReturnType<typeof vi.fn>, post: ReturnType<typeof vi.fn> };
 
 describe('StocktwitsAnalysis', () => {
   beforeEach(() => {

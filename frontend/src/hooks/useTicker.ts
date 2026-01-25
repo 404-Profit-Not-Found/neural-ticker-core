@@ -13,7 +13,7 @@ export const tickerKeys = {
 };
 
 // Simplified hook that just returns the DB endpoint URL
-export function useTickerLogo(symbol: string, _url?: string) {
+export function useTickerLogo(symbol: string) {
     // If no symbol, return null immediately
     if (!symbol) return { data: null, isLoading: false, isError: true };
 

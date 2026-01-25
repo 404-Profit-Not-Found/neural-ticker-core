@@ -4,7 +4,7 @@ import { useTickerLogo } from '../../hooks/useTicker';
 
 // Memoize because base64 image rendering is heavy
 export const TickerLogo = memo(({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
-    const { data: logoSrc, isLoading, isError: hookError } = useTickerLogo(symbol, url);
+    const { data: logoSrc, isLoading, isError: hookError } = useTickerLogo(symbol);
     const [imgError, setImgError] = useState(false);
 
     // Fallback logic

@@ -6,7 +6,12 @@ interface VolumeSparklineProps {
     endDate?: string;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipProps {
+    active?: boolean;
+    payload?: { payload: { date: string; count: number; topics?: string[] } }[];
+}
+
+const CustomTooltip = ({ active, payload }: TooltipProps) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         const dateObj = new Date(data.date);

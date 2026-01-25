@@ -12,7 +12,12 @@ interface WatchersChartProps {
     data: WatcherData[];
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface TooltipProps {
+    active?: boolean;
+    payload?: { payload: WatcherData }[];
+}
+
+const CustomTooltip = ({ active, payload }: TooltipProps) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         const dateObj = new Date(data.timestamp);
