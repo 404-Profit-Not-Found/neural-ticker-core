@@ -16,7 +16,7 @@ describe('EventCalendar', () => {
 
   it('renders nothing if no events', async () => {
     mockedAxios.get.mockResolvedValue({ data: [] });
-    const { container } = render(<EventCalendar symbol="AAPL" />);
+    render(<EventCalendar symbol="AAPL" />);
     await waitFor(() => {
         expect(screen.getByText(/No upcoming catalysts detected/i)).toBeInTheDocument(); 
     });

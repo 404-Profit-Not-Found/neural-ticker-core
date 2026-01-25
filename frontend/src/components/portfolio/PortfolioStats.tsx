@@ -103,8 +103,6 @@ export function PortfolioStats({
   positions,
   onAnalyze,
   credits = 0,
-  todayGain = 0,
-  todayGainPct = 0,
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
@@ -243,7 +241,7 @@ export function PortfolioStats({
     }
 
     return data;
-  }, [range, positions, totalValue, todayGain]);
+  }, [range, positions]);
 
   // Calculate Period Gain/Loss (Dynamic based on Range)
   const { periodGain, periodGainPct, isPeriodProfit } = useMemo(() => {
@@ -276,7 +274,7 @@ export function PortfolioStats({
     }
 
     return { periodGain: 0, periodGainPct: 0, isPeriodProfit: true };
-  }, [range, todayGain, todayGainPct, historyData, totalValue, totalGainLoss]);
+  }, [historyData, totalValue, totalGainLoss]);
 
 
   const isProfit = totalGainLoss >= 0;
