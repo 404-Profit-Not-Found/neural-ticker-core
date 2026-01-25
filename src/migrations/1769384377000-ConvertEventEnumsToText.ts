@@ -5,13 +5,19 @@ export class ConvertEventEnumsToText1769384377000 implements MigrationInterface 
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Convert event_type to text
-    await queryRunner.query(`ALTER TABLE "event_calendar" ALTER COLUMN "event_type" TYPE text`);
-    
+    await queryRunner.query(
+      `ALTER TABLE "event_calendar" ALTER COLUMN "event_type" TYPE text`,
+    );
+
     // 2. Convert source to text
-    await queryRunner.query(`ALTER TABLE "event_calendar" ALTER COLUMN "source" TYPE text`);
+    await queryRunner.query(
+      `ALTER TABLE "event_calendar" ALTER COLUMN "source" TYPE text`,
+    );
 
     // 3. Cleanup old types (optional but cleaner)
-    await queryRunner.query(`DROP TYPE IF EXISTS "event_calendar_event_type_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "event_calendar_event_type_enum"`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS "event_calendar_source_enum"`);
   }
 
