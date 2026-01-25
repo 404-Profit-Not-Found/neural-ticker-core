@@ -153,8 +153,8 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
         {/* --- Header --- */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-6">
             <div>
-                <h3 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-                    <MessageSquare className="w-8 h-8 text-blue-500" /> 
+                <h3 className="flex items-center gap-3 text-xl font-bold tracking-tight">
+                    <MessageSquare className="w-6 h-6 text-blue-500" /> 
                     <span>StockTwits AI Pulse</span>
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 text-xs font-medium text-muted-foreground/80">

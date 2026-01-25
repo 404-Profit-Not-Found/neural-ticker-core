@@ -3,11 +3,18 @@ import { TrendingUp, TrendingDown, ArrowUpCircle, Zap } from 'lucide-react';
 
 
 import { ScenarioCards } from './ScenarioCards';
-import type { TickerData } from '../../types/ticker';
+import type { TickerData, NewsItem } from '../../types/ticker';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 
 import { AnalystRatingsTable } from './AnalystRatingsTable';
+import { TickerNews } from './TickerNews';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "../ui/accordion";
 
 interface TickerOverviewProps {
     risk_analysis: TickerData['risk_analysis'];
@@ -15,10 +22,11 @@ interface TickerOverviewProps {
     ratings?: TickerData['ratings'];
     profile: TickerData['profile'];
     news?: TickerData['news'];
+    newsList?: NewsItem[];
     fundamentals?: TickerData['fundamentals'];
 }
 
-export function TickerOverview({ risk_analysis, market_data, ratings, profile, news }: TickerOverviewProps) {
+export function TickerOverview({ risk_analysis, market_data, ratings, profile, news, newsList }: TickerOverviewProps) {
     // Helper to check freshness and format time
     const getNewsStatus = (dateStr?: string) => {
         if (!dateStr) return { isFresh: false, timeAgo: '' };
@@ -150,6 +158,24 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Latest News (Collapsible) */}
+            {news && (
+                <section>
+                    <Accordion type="single" collapsible className="w-full bg-muted/10 border border-border/40 rounded-xl px-4">
+                        <AccordionItem value="news" className="border-b-0">
+                            <AccordionTrigger className="hover:no-underline py-4">
+                                <span className="text-sm font-bold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                                    <Zap size={14} /> Latest News
+                                </span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pb-4 pt-2">
+                                <TickerNews news={newsList || []} /> 
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </section>
+            )}
 
             {/* Analyst Ratings */}
             <AnalystRatingsTable ratings={ratings} />

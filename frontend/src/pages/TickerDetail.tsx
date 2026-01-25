@@ -30,7 +30,7 @@ import { TickerLogo } from '../components/dashboard/TickerLogo';
 import { FiftyTwoWeekRange } from '../components/dashboard/FiftyTwoWeekRange';
 import { TickerOverview } from '../components/ticker/TickerOverview';
 import { TickerFinancials } from '../components/ticker/TickerFinancials';
-import { TickerNews } from '../components/ticker/TickerNews';
+
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
 import { PriceChart } from '../components/ticker/PriceChart';
 import { StocktwitsAnalysis } from '../components/stocktwits/StocktwitsAnalysis';
@@ -125,7 +125,7 @@ export function TickerDetail() {
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
-    const validTabs = ['overview', 'financials', 'research', 'news', 'social'] as const;
+    const validTabs = ['overview', 'financials', 'research', 'social'] as const;
     // Extract tab from pathname: /ticker/NVDA/research -> research
     // Handle potential trailing slashes and case sensitivity
     const pathSegments = location.pathname.replace(/\/+$/, '').toLowerCase().split('/').filter(Boolean);
@@ -646,7 +646,7 @@ export function TickerDetail() {
                                 <TabsTrigger value="overview">Overview</TabsTrigger>
                                 <TabsTrigger value="research">AI Research</TabsTrigger>
                                 <TabsTrigger value="financials">Financials</TabsTrigger>
-                                <TabsTrigger value="news">News</TabsTrigger>
+
                                 <TabsTrigger value="social">Social & Events</TabsTrigger>
                             </TabsList>
 
@@ -658,6 +658,7 @@ export function TickerDetail() {
                                     ratings={tickerData.ratings}
                                     profile={profile}
                                     news={tickerData.news}
+                                    newsList={news}
                                     fundamentals={fundamentals || undefined}
                                 />
                             </TabsContent>
@@ -678,10 +679,7 @@ export function TickerDetail() {
                                 <TickerFinancials fundamentals={fundamentals} />
                             </TabsContent>
 
-                            {/* NEWS TAB */}
-                            <TabsContent value="news">
-                                <TickerNews news={news} />
-                            </TabsContent>
+
 
                             {/* SOCIAL TAB */}
                             <TabsContent value="social" className="space-y-8">

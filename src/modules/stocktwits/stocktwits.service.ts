@@ -222,6 +222,10 @@ export class StockTwitsService {
    * Stores a timestamped record of the current watcher count.
    */
   async trackWatchers(symbol: string) {
+    // SECURITY: Validate symbol to prevent SSRF and Command Injection
+    if (!/^[A-Z0-9.]+$/.test(symbol)) {
+      throw new Error('Invalid symbol format');
+    }
     const url = `${this.BASE_URL}/${symbol}.json`;
     let data: any;
 
@@ -783,8 +787,6 @@ export class StockTwitsService {
       .groupBy('date')
       .orderBy('date', 'ASC')
       .getRawMany();
-
-
 
     // Fetch recent analyses to cross-reference topics
     const analyses = await this.analysisRepository.find({
