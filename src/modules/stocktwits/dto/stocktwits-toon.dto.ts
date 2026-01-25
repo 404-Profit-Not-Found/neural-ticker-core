@@ -1,4 +1,5 @@
 import { StockTwitsPost } from '../entities/stocktwits-post.entity';
+import sanitizeHtml from 'sanitize-html';
 
 /**
  * TOON-optimized DTO for StockTwits posts.
@@ -22,8 +23,11 @@ export class StockTwitsToonDto {
 
   private clean(text: string): string {
     if (!text) return '';
-    return text
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
+    const withoutHtml = sanitizeHtml(text, {
+      allowedTags: [],
+      allowedAttributes: {}
+    });
+    return withoutHtml
       .replace(/\s+/g, ' ') // Collapse whitespace
       .replace(/http\S+/g, '') // Remove URLs
       .trim();
