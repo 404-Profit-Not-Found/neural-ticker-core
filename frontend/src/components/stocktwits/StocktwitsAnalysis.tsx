@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { RunAnalysisDialog } from '../ticker/RunAnalysisDialog';
 import { analysisStore } from '../../store/analysisStore';
 import { HistorySelector } from './HistorySelector';
+import { cn } from '../../lib/utils';
 
 interface Analysis {
   id: string;
@@ -144,7 +145,10 @@ export const StocktwitsAnalysis = ({ symbol }: { symbol: string }) => {
                         <Button 
                             disabled={syncing || isLocked}
                             size="sm"
-                            className={`gap-2 h-9 px-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-md shadow-purple-500/20 border-0 transition-all duration-300 ${isLocked ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            className={cn(
+                                "gap-2 h-9 px-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-md shadow-purple-500/20 border-0 transition-all duration-300",
+                                isLocked && "opacity-50 cursor-not-allowed grayscale"
+                            )}
                         >
                             {syncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
                             <span className="font-bold uppercase text-[10px] tracking-wider">{syncing ? 'Analyzing...' : 'Research'}</span>
