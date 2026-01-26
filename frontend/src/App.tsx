@@ -83,7 +83,10 @@ function App() {
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/report/:researchId/:signature" element={<PublicResearchPage />} />
 
             {/* Protected Routes */}
@@ -103,7 +106,6 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
-            <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
 
             {/* Admin Route */}
             <Route path="/admin" element={

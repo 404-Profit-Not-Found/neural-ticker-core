@@ -126,9 +126,28 @@ export function Login() {
                 </div>
             </div>
 
-            {/* Version Number (Bottom Left) */}
-            <div className="absolute bottom-8 left-8 text-left z-20">
-                <span className="text-xs font-mono opacity-20" style={{ color: 'var(--boot-text)' }}>v{__APP_VERSION__}</span>
+            {/* Footer Links (Bottom) */}
+            <div className="absolute bottom-8 left-0 right-0 px-8 flex justify-between items-end z-20 pointer-events-none">
+                <div className="text-left pointer-events-auto">
+                    <span className="text-xs font-mono opacity-20" style={{ color: 'var(--boot-text)' }}>v{__APP_VERSION__}</span>
+                </div>
+                
+                <div className="flex gap-6 pointer-events-auto">
+                    <a 
+                        href="/privacy" 
+                        className="text-xs font-mono opacity-20 hover:opacity-100 transition-opacity cursor-pointer"
+                        style={{ color: 'var(--boot-text)' }}
+                    >
+                        Privacy Policy
+                    </a>
+                    <a 
+                        href="/terms" 
+                        className="text-xs font-mono opacity-20 hover:opacity-100 transition-opacity cursor-pointer"
+                        style={{ color: 'var(--boot-text)' }}
+                    >
+                        Terms of Service
+                    </a>
+                </div>
             </div>
         </div>
     );

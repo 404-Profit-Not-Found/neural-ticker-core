@@ -1,0 +1,55 @@
+  console.log
+    [dotenv@17.2.3] injecting env (19) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+FAIL src/config/validation.spec.ts
+  Configuration Validation
+    ├ù should validate a valid configuration (2 ms)
+    ΓêÜ should throw an error if a required field is missing (2 ms)
+    ├ù should handle optional fields and implicit conversion (1 ms)
+    ΓêÜ should throw error for invalid enum value (1 ms)
+    ΓêÜ should throw error for out of range numbers (1 ms)
+    ΓêÜ should throw error for invalid URL (1 ms)
+
+  ΓùÅ Configuration Validation ΓÇ║ should validate a valid configuration
+
+    TypeError: Reflect.getMetadata is not a function
+
+      82 |
+      83 | export function validate(config: Record<string, unknown>) {
+    > 84 |   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+         |                                          ^
+      85 |     enableImplicitConversion: true,
+      86 |   });
+      87 |   const errors = validateSync(validatedConfig, {
+
+      at TransformOperationExecutor.transform (../node_modules/src/TransformOperationExecutor.ts:271:52)
+      at ClassTransformer.plainToInstance (../node_modules/src/ClassTransformer.ts:77:21)
+      at plainToInstance (../node_modules/src/index.ts:84:27)
+      at validate (config/validation.ts:84:42)
+      at Object.<anonymous> (config/validation.spec.ts:13:28)
+
+  ΓùÅ Configuration Validation ΓÇ║ should handle optional fields and implicit conversion
+
+    TypeError: Reflect.getMetadata is not a function
+
+      82 |
+      83 | export function validate(config: Record<string, unknown>) {
+    > 84 |   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+         |                                          ^
+      85 |     enableImplicitConversion: true,
+      86 |   });
+      87 |   const errors = validateSync(validatedConfig, {
+
+      at TransformOperationExecutor.transform (../node_modules/src/TransformOperationExecutor.ts:271:52)
+      at ClassTransformer.plainToInstance (../node_modules/src/ClassTransformer.ts:77:21)
+      at plainToInstance (../node_modules/src/index.ts:84:27)
+      at validate (config/validation.ts:84:42)
+      at Object.<anonymous> (config/validation.spec.ts:33:28)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 4 passed, 6 total
+Snapshots:   0 total
+Time:        0.649 s, estimated 1 s
+Ran all test suites matching src/config/validation.spec.ts.

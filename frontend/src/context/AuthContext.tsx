@@ -34,7 +34,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Skip check if handling callback or viewing a public report
         if (window.location.pathname.startsWith('/oauth-callback') ||
-            window.location.pathname.startsWith('/report/')) {
+            window.location.pathname.startsWith('/report/') ||
+            window.location.pathname.startsWith('/privacy') ||
+            window.location.pathname.startsWith('/terms') ||
+            window.location.pathname.startsWith('/about')) {
             setLoading(false); // Important: set loading to false so components can render
             return;
         }
