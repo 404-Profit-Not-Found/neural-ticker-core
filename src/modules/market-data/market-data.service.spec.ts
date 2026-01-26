@@ -436,7 +436,7 @@ describe('MarketDataService', () => {
               latestRisk: { overall_score: 5 },
             },
           ],
-          raw: [],
+          raw: [{ ticker_id: 1, total_count: '1' }],
         }),
         getCount: jest.fn().mockResolvedValue(1),
         getManyAndCount: jest.fn().mockResolvedValue([[], 0]), // Fallback

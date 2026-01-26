@@ -11,7 +11,20 @@ on:
     branches: [ "main" ]
 
 jobs:
+  secrets-scan:
+    name: 🔐 Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
   lint:
+    needs: secrets-scan
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -35,6 +48,7 @@ jobs:
       working-directory: ./frontend
 
   test:
+    needs: secrets-scan
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -97,6 +111,7 @@ jobs:
     #     FINNHUB_API_KEY: "stub"
 
   build:
+    needs: secrets-scan
     runs-on: ubuntu-latest
     strategy:
       matrix:
