@@ -140,9 +140,16 @@ export class StockTwitsService {
                 break;
               }
             } else {
-              this.logger.error(
-                `[${symbol}] Fetch failed: ${axiosError.message}`,
-              );
+              // 404 is expected for invalid/delisted tickers - reduce noise
+              if (axiosError.response?.status === 404) {
+                this.logger.warn(
+                  `[${symbol}] Not found on StockTwits (404). Skipping.`,
+                );
+              } else {
+                this.logger.error(
+                  `[${symbol}] Fetch failed: ${axiosError.message}`,
+                );
+              }
               break;
             }
           }
