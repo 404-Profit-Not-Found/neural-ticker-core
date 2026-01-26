@@ -50,4 +50,4 @@ USER node
 EXPOSE 8080
 
 # Start command
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/main"]
