@@ -55,7 +55,7 @@ describe('Configuration Validation', () => {
   });
 
   it('should throw error for invalid URL', () => {
-     const invalidUrlConfig = {
+    const invalidUrlConfig = {
       ...validConfig,
       FINNHUB_BASE_URL: 'not-a-url',
     };
