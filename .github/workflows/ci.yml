@@ -37,6 +37,9 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
+    - name: Security Audit (Dependencies)
+      run: npm audit --audit-level=high
+      continue-on-error: true # Warning only for now
     - run: npm run lint
     - name: Install Frontend Dependencies
       run: npm ci
@@ -76,8 +79,8 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
-    - name: Run Unit Tests
-      run: npm run test
+    - name: Run Unit Tests with Coverage
+      run: npm run test -- --coverage --coverageThreshold='{"global":{"branches":50,"functions":45,"lines":50,"statements":50}}'
       env:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}

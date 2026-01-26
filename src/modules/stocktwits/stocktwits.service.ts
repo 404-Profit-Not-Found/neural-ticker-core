@@ -638,7 +638,9 @@ export class StockTwitsService {
         .delete()
         .from(EventCalendar)
         .where('symbol = :symbol', { symbol })
-        .andWhere('source = :source', { source: EventCalendarSource.STOCKTWITS })
+        .andWhere('source = :source', {
+          source: EventCalendarSource.STOCKTWITS,
+        })
         .andWhere('event_date >= :todayStr', { todayStr })
         .execute();
 
