@@ -18,6 +18,8 @@ import { NewsPage } from './pages/NewsPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { PublicResearchPage } from './pages/PublicResearchPage';
 import { AboutPage } from './pages/AboutPage';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
 
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -80,6 +82,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             <Route path="/report/:researchId/:signature" element={<PublicResearchPage />} />
 
             {/* Protected Routes */}
