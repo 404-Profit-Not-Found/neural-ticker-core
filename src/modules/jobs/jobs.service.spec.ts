@@ -113,8 +113,7 @@ describe('JobsService', () => {
       mockTickersService.getAllTickers.mockRejectedValue(
         new Error('Global fail'),
       );
-      await service.syncDailyCandles();
-      // Should catch and log
+      await expect(service.syncDailyCandles()).rejects.toThrow('Global fail');
     });
 
     it('should skip tickers without symbol', async () => {

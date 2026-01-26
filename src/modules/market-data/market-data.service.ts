@@ -1837,14 +1837,20 @@ export class MarketDataService {
     // Add secondary sort for stability
     qb.addOrderBy('ticker.symbol', 'ASC');
 
+    // Performance Optimization: Use window function instead of separate getCount() query
+    // This calculates total count in the same query, avoiding a second expensive full table scan
+    qb.addSelect('COUNT(*) OVER()', 'total_count');
+
     // Use limit/offset instead of take/skip to avoid TypeORM generating a broken
     // "SELECT DISTINCT" query when sorting by computed columns (like price_change_pct).
     // Since our joins are effectively 1:1 (mapOne with subqueries), this is safe.
     qb.offset(skip).limit(limit);
 
-    // Get Raw Entities ( mapped)
+    // Get Raw Entities (mapped)
     const { entities, raw } = await qb.getRawAndEntities();
-    const total = await qb.getCount();
+    
+    // Extract total from the first row (window function returns same value for all rows)
+    const total = raw.length > 0 ? parseInt(raw[0].total_count, 10) : 0;
 
     return {
       items: await Promise.all(
