@@ -24,16 +24,16 @@ export class StockTwitsSourceFix1769430000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "stocktwits_watchers" ADD COLUMN IF NOT EXISTS "symbol" character varying`,
     );
-     // Set NOT NULL only if we are sure, or leave nullable initially if data exists? 
-     // For now, let's just make sure columns exist.
-    
+    // Set NOT NULL only if we are sure, or leave nullable initially if data exists?
+    // For now, let's just make sure columns exist.
+
     await queryRunner.query(
       `ALTER TABLE "stocktwits_watchers" ADD COLUMN IF NOT EXISTS "count" integer`,
     );
     await queryRunner.query(
       `ALTER TABLE "stocktwits_watchers" ADD COLUMN IF NOT EXISTS "timestamp" timestamp with time zone DEFAULT now()`,
     );
-    
+
     // Add indices for watchers
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS "IDX_stocktwits_watchers_symbol" ON "stocktwits_watchers" ("symbol")`,

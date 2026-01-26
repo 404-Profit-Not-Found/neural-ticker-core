@@ -1,0 +1,15 @@
+# regex for trufflehog exclusion
+^.git/
+^node_modules/
+^dist/
+^coverage/
+^.vscode/
+^.idea/
+^.DS_Store$
+^.env$
+^.gemini/
+\.lock$
+# ignore images/assets
+\.(png|jpg|jpeg|gif|svg|ico)$
+# ignore binary
+\.(exe|dll|so|dylib)$

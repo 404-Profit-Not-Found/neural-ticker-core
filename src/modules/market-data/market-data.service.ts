@@ -1848,7 +1848,7 @@ export class MarketDataService {
 
     // Get Raw Entities (mapped)
     const { entities, raw } = await qb.getRawAndEntities();
-    
+
     // Extract total from the first row (window function returns same value for all rows)
     const total = raw.length > 0 ? parseInt(raw[0].total_count, 10) : 0;
 

@@ -153,7 +153,11 @@ export class JobsService {
       this.logger.log(
         `All batches complete. Total Processed: ${totalProcessed}, Total Failed: ${totalFailed}`,
       );
-      return { processed: totalProcessed, failed: totalFailed, batches: totalBatches };
+      return {
+        processed: totalProcessed,
+        failed: totalFailed,
+        batches: totalBatches,
+      };
     } catch (e) {
       this.logger.error('Daily candle sync failed globally', e);
       throw e;
@@ -283,7 +287,8 @@ export class JobsService {
 
             const isStale =
               !existingAnalysis ||
-              Date.now() - existingAnalysis.created_at.getTime() > interval14Days;
+              Date.now() - existingAnalysis.created_at.getTime() >
+                interval14Days;
 
             if (!isStale) {
               batchSkipped++;
@@ -332,7 +337,11 @@ export class JobsService {
       this.logger.log(
         `All batches complete. Total Processed: ${totalProcessed}, Total Skipped: ${totalSkipped}`,
       );
-      return { processed: totalProcessed, skipped: totalSkipped, batches: totalBatches };
+      return {
+        processed: totalProcessed,
+        skipped: totalSkipped,
+        batches: totalBatches,
+      };
     } catch (e) {
       this.logger.error('Risk/Reward Scanner failed globally', e);
       throw e;
