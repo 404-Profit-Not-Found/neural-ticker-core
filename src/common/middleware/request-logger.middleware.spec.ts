@@ -9,7 +9,7 @@ describe('RequestLoggerMiddleware', () => {
   beforeEach(() => {
     middleware = new RequestLoggerMiddleware();
     // Spy on the Logger instance prototype since the middleware creates a new Logger('HTTP')
-    // Alternatively, we could spy on the private logger property if we cast to any, 
+    // Alternatively, we could spy on the private logger property if we cast to any,
     // but spying on Logger.prototype.log is safer for this pattern.
     // However, since the middleware instantiates a logger as a property: `private readonly logger = new Logger('HTTP');`
     // We should mock Logger.prototype.log to capture the call.

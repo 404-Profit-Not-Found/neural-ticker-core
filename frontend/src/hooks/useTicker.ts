@@ -62,6 +62,30 @@ export function useTickerDetails(symbol?: string) {
     });
 }
 
+export function useTickerHistory(symbol: string, interval: string = '1d', days?: number) {
+    return useQuery({
+        queryKey: [...tickerKeys.all, 'history', symbol, interval, days],
+        queryFn: async () => {
+             if (!symbol) return [];
+             const res = await api.get(`/tickers/${symbol}/history`, {
+                 params: { interval, days }
+             });
+             return res.data || [];
+        },
+        enabled: !!symbol,
+        refetchInterval: () => {
+             // Don't auto-refresh if there's no data yet (or handle loading) or if error
+             
+             // Intraday Refresh Rates
+             if (['1m', '2m', '5m'].includes(interval)) return 5000; // 5s for high freq
+             if (['15m', '30m', '1h', '60m', '90m'].includes(interval)) return 30000; // 30s for mid freq
+             
+             return false; // Daily+ standard specific refresh or no auto refresh
+        },
+        staleTime: 0, // Always fetch fresh for intraday
+    });
+}
+
 export function useTickerNews(symbol?: string) {
     return useQuery({
         queryKey: tickerKeys.news(symbol || ''),

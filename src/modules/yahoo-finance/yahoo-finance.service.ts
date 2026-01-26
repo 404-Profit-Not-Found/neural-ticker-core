@@ -68,6 +68,38 @@ export class YahooFinanceService implements OnModuleInit {
   }
 
   /**
+   * Fetches chart data (supports intraday).
+   */
+  async getChart(
+    symbol: string,
+    interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '1h' | '1d' = '1d',
+    from?: Date,
+    to?: Date,
+  ): Promise<any> {
+    try {
+      this.logger.debug(
+        `Fetching chart data for ${symbol} with interval ${interval}`,
+      );
+
+      const queryOptions: any = { interval };
+      if (from) queryOptions.period1 = from;
+      if (to) queryOptions.period2 = to;
+
+      // If no dates, yahoo chart defaults to appropriate range, but we usually pass them.
+
+      const result = await this.yahoo.chart(symbol, queryOptions);
+
+      return result;
+    } catch (error) {
+      this.handleError(error, `Chart fetch failed for ${symbol}`);
+      // return null or throw?
+      // Service expects us to throw if completely failed?
+      // Let's force return null on error to handle gracefully in caller
+      return null;
+    }
+  }
+
+  /**
    * Fetches historical OHLCV data.
    */
   async getHistorical(

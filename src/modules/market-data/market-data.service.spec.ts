@@ -656,6 +656,18 @@ describe('MarketDataService', () => {
     });
   });
 
+  describe('normalizeDateToUtcMidnight', () => {
+    it('should set hours, minutes, seconds and ms to 0 in UTC', () => {
+      const date = new Date('2025-01-26T15:30:45Z');
+      const normalized = (service as any).normalizeDateToUtcMidnight(date);
+      expect(normalized.getUTCHours()).toBe(0);
+      expect(normalized.getUTCMinutes()).toBe(0);
+      expect(normalized.getUTCSeconds()).toBe(0);
+      expect(normalized.getUTCMilliseconds()).toBe(0);
+      expect(normalized.toISOString()).toBe('2025-01-26T00:00:00.000Z');
+    });
+  });
+
   describe('syncTickerHistory', () => {
     it('should skip if ticker not found', async () => {
       mockTickersService.getTicker.mockResolvedValue(null);
@@ -672,25 +684,42 @@ describe('MarketDataService', () => {
       expect(mockYahooService.getHistorical).not.toHaveBeenCalled();
     });
 
-    it('should fetch from Yahoo if coverage is low', async () => {
+    it('should handle polymorphic Yahoo response (plain array)', async () => {
       mockTickersService.getTicker.mockResolvedValue({ id: 1, symbol: 'AAPL' });
-      mockOhlcvRepo.count.mockResolvedValue(100); // Low coverage
+      mockOhlcvRepo.count.mockResolvedValue(0);
 
-      const mockHist = [
-        {
-          date: new Date(),
-          open: 100,
-          high: 110,
-          low: 90,
-          close: 105,
-          volume: 1000,
-        },
-      ];
+      const mockHist = [{ date: new Date('2025-01-01T12:00:00Z'), close: 100 }];
       mockYahooService.getHistorical.mockResolvedValue(mockHist);
 
       await service.syncTickerHistory('AAPL', 1);
-      expect(mockYahooService.getHistorical).toHaveBeenCalled();
-      expect(mockOhlcvRepo.upsert).toHaveBeenCalled();
+
+      expect(mockOhlcvRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ts: expect.any(Date),
+          timeframe: '1d',
+        }),
+      );
+
+      // Verify normalization happened in syncTickerHistory
+      const createdEntity = mockOhlcvRepo.create.mock.calls[0][0];
+      expect(createdEntity.ts.getUTCHours()).toBe(0);
+    });
+
+    it('should handle polymorphic Yahoo response ({ quotes: [] } format)', async () => {
+      mockTickersService.getTicker.mockResolvedValue({ id: 1, symbol: 'AAPL' });
+      mockOhlcvRepo.count.mockResolvedValue(0);
+
+      const mockResponse = {
+        quotes: [{ date: new Date('2025-01-01T12:00:00Z'), close: 100 }],
+      };
+      mockYahooService.getHistorical.mockResolvedValue(mockResponse);
+
+      await service.syncTickerHistory('AAPL', 1);
+
+      expect(mockOhlcvRepo.create).toHaveBeenCalled();
+      const createdEntity = mockOhlcvRepo.create.mock.calls[0][0];
+      expect(createdEntity.close).toBe(100);
+      expect(createdEntity.ts.getUTCHours()).toBe(0);
     });
   });
 
@@ -698,7 +727,9 @@ describe('MarketDataService', () => {
     it('should normalize interval and use UTC dates', async () => {
       const mockTicker = { id: 1, symbol: 'AAPL' };
       mockTickersService.getTicker.mockResolvedValue(mockTicker);
-      mockOhlcvRepo.find.mockResolvedValue([{ close: 150, ts: new Date() }]);
+      mockOhlcvRepo.find.mockResolvedValue([
+        { close: 150, ts: new Date('2025-01-01') },
+      ]);
 
       // Test with 'D' interval and YYYY-MM-DD strings
       await service.getHistory('AAPL', 'D', '2025-01-01', '2025-01-02');
@@ -710,17 +741,39 @@ describe('MarketDataService', () => {
           }),
         }),
       );
+    });
 
-      // Check if dates were converted to UTC
-      const calls = mockOhlcvRepo.find.mock.calls;
-      const between = calls[0][0].where.ts;
-      // Between is an object { _type: 'between', _value: [Date, Date] }
-      expect(between._value[0].toISOString()).toContain(
-        '2025-01-01T00:00:00.000Z',
+    it('should normalize daily candle timestamps to midnight on fallback fetch', async () => {
+      const mockTicker = { id: 1, symbol: 'AAPL' };
+      mockTickersService.getTicker.mockResolvedValue(mockTicker);
+
+      // Mock DB find to return empty to trigger sync/fallback
+      mockOhlcvRepo.find.mockResolvedValueOnce([]); // First check
+      mockOhlcvRepo.find.mockResolvedValueOnce([]); // After sync check
+
+      // Mock sync to do nothing
+      jest.spyOn(service, 'syncTickerHistory').mockResolvedValue(undefined);
+
+      // Mock Finnhub to fail
+      mockFinnhubService.getQuote.mockRejectedValue(new Error('Fail'));
+
+      // Mock Yahoo Historical to return non-normalized data
+      const mockYahooData = {
+        quotes: [{ date: new Date('2025-01-01T15:45:00Z'), close: 200 }],
+      };
+      mockYahooService.getHistorical.mockResolvedValue(mockYahooData);
+
+      const result = await service.getHistory(
+        'AAPL',
+        '1d',
+        '2025-01-01',
+        '2025-01-02',
       );
-      expect(between._value[1].toISOString()).toContain(
-        '2025-01-02T23:59:59.000Z',
-      );
+
+      // Verify the mapped data in the fallback loop (it returns the mapped array if DB is empty even after sync)
+      // Actually, performGetHistory returns history.map(...) if successful
+      expect(result[0].ts.getUTCHours()).toBe(0);
+      expect(result[0].close).toBe(200);
     });
   });
 

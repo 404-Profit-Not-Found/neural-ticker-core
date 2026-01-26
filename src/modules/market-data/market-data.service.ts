@@ -754,24 +754,40 @@ export class MarketDataService {
     // 2. Fetch from Yahoo
     try {
       // Fetch specifically using Yahoo Service directly or via helper
-      const candles = await this.yahooFinanceService.getHistorical(
+      let candles: any[] = [];
+      const result: any = await this.yahooFinanceService.getHistorical(
         symbol,
         from,
         to,
         '1d',
       );
+
+      // Handle polymorphic return (Array vs { quotes: [] })
+      if (Array.isArray(result)) {
+        candles = result;
+      } else if (result && result.quotes && Array.isArray(result.quotes)) {
+        candles = result.quotes;
+      }
+
       if (!candles || candles.length === 0) {
-        this.logger.warn(`No history returned from Yahoo for ${symbol}`);
+        this.logger.warn(
+          `No history returned from Yahoo for ${symbol} (Result Type: ${typeof result})`,
+        );
         return;
       }
 
       // 3. Transform and Upsert
       const entities = candles.map((c: any) => {
-        // Yahoo format: { date, open, high, low, close, adjClose, volume }
+        // Yahoo candle date might have time. Normalize to midnight for '1d'
+        const ts = new Date(c.date);
+        if (ts && !isNaN(ts.getTime())) {
+          ts.setUTCHours(0, 0, 0, 0);
+        }
+
         return this.ohlcvRepo.create({
           symbol_id: ticker.id,
           timeframe: '1d',
-          ts: c.date,
+          ts: ts,
           open: c.open,
           high: c.high,
           low: c.low,
@@ -823,6 +839,107 @@ export class MarketDataService {
       fromStr + (fromStr.includes('T') ? '' : 'T00:00:00Z'),
     );
     const to = new Date(toStr + (toStr.includes('T') ? '' : 'T23:59:59Z'));
+
+    // [NEW] Intraday Bypass: fetch directly from Yahoo, do not check/save DB (DB is daily only for now)
+    const isIntraday = [
+      '1m',
+      '2m',
+      '5m',
+      '15m',
+      '30m',
+      '1h',
+      '60m',
+      '90m',
+    ].includes(normalizedInterval);
+
+    if (isIntraday) {
+      this.logger.debug(
+        `Intraday request (${normalizedInterval}) for ${symbol}, bypassing DB check (fetch-first strategy)...`,
+      );
+      try {
+        // Use getChart for intraday (1m, 5m, etc.)
+        const result = await this.yahooFinanceService.getChart(
+          symbol,
+          normalizedInterval as any,
+          from,
+          to,
+        );
+
+        if (result) {
+          // Check for yahoo-finance2 parsed format first
+          if (result.quotes && Array.isArray(result.quotes)) {
+            const mappedData = result.quotes
+              .map((q: any) => ({
+                ts: new Date(q.date),
+                open: q.open,
+                high: q.high,
+                low: q.low,
+                close: q.close,
+                volume: q.volume,
+                symbol_id: tickerEntity.id,
+                timeframe: normalizedInterval,
+                source: 'yahoo_intraday',
+              }))
+              .filter((c: any) => c.close !== null && c.close !== undefined);
+
+            if (mappedData.length > 0) {
+              this.logger.debug(
+                `Persisting ${mappedData.length} intraday candles (Yahoo Parsed) to DB...`,
+              );
+              await this.ohlcvRepo.upsert(mappedData, [
+                'symbol_id',
+                'timeframe',
+                'ts',
+              ]);
+              return mappedData;
+            }
+          }
+
+          // Fallback to raw format check (legacy)
+          const timestamp = result.timestamp;
+          const quote = result.indicators?.quote?.[0]; // Access first quote object
+
+          if (timestamp && quote && timestamp.length > 0) {
+            const mappedData = timestamp
+              .map((t: number, i: number) => ({
+                ts: new Date(t * 1000),
+                open: quote.open[i],
+                high: quote.high[i],
+                low: quote.low[i],
+                close: quote.close[i],
+                volume: quote.volume[i],
+                symbol_id: tickerEntity.id,
+                timeframe: normalizedInterval,
+                source: 'yahoo_intraday',
+              }))
+              .filter((c: any) => c.close !== null && c.close !== undefined);
+
+            if (mappedData.length > 0) {
+              this.logger.debug(
+                `Persisting ${mappedData.length} intraday candles (Yahoo Raw) to DB...`,
+              );
+              await this.ohlcvRepo.upsert(mappedData, [
+                'symbol_id',
+                'timeframe',
+                'ts',
+              ]);
+              return mappedData;
+            }
+          }
+        }
+        this.logger.warn(
+          `Yahoo returned no Intraday data for ${symbol}. Falling back to DB...`,
+        );
+      } catch (e) {
+        this.logger.error(
+          `Yahoo intraday fetch failed: ${getErrorMessage(e)}. Falling back to DB...`,
+        );
+      }
+
+      // FALLBACK TO DB
+      // If Yahoo failed or returned empty, we try proper DB fetch
+      // This ensures that if we have historical data saved, we show it.
+    }
 
     // 1. Try DB first
     const dbData = await this.ohlcvRepo.find({
@@ -916,18 +1033,36 @@ export class MarketDataService {
       try {
         // Map common intervals
         const yahooInterval: '1d' | '1wk' | '1mo' =
-          interval === '1d' ? '1d' : interval === '1wk' ? '1wk' : '1mo';
-        const yahooHistory = await this.yahooFinanceService.getHistorical(
+          normalizedInterval === '1d'
+            ? '1d'
+            : normalizedInterval === '1wk'
+              ? '1wk'
+              : '1mo';
+        const yahooResult: any = await this.yahooFinanceService.getHistorical(
           symbol,
           from,
           to,
           yahooInterval,
         );
 
+        let yahooHistory: any[] = [];
+        if (Array.isArray(yahooResult)) {
+          yahooHistory = yahooResult;
+        } else if (
+          yahooResult &&
+          yahooResult.quotes &&
+          Array.isArray(yahooResult.quotes)
+        ) {
+          yahooHistory = yahooResult.quotes;
+        }
+
         if (yahooHistory && yahooHistory.length > 0) {
           source = 'yahoo';
           history = yahooHistory.map((h: any) => ({
-            ts: h.date,
+            ts:
+              normalizedInterval === '1d'
+                ? this.normalizeDateToUtcMidnight(new Date(h.date))
+                : h.date,
             open: h.open,
             high: h.high,
             low: h.low,
