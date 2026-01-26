@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 // This file runs before every test file.
 // Validates environment variables and sets defaults for testing.
 

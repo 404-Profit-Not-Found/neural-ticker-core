@@ -83,7 +83,10 @@ function App() {
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/report/:researchId/:signature" element={<PublicResearchPage />} />
 
             {/* Protected Routes */}
@@ -103,7 +106,6 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
-            <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
 
             {/* Admin Route */}
             <Route path="/admin" element={
@@ -211,22 +213,24 @@ function ThemeController() {
 
 // Simple Callback Handler to refresh user state
 function OAuthCallback() {
-  const { refreshSession } = useAuth();
+  const { refreshSession, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      await refreshSession();
-
-      // if (user && !user.has_onboarded) {
-      //   navigate('/about', { replace: true });
-      // } else {
-        navigate('/', { replace: true });
-      // }
-    };
-
-    handleCallback();
-  }, [refreshSession, navigate]);
+    // Only attempt refresh if we don't have a user yet
+    if (!user) {
+        refreshSession().then((sessionUser) => {
+            if (!sessionUser) {
+                // If refresh failed, go to login
+                console.error("OAuth Callback: Failed to refresh session");
+                navigate('/login', { replace: true });
+            }
+        });
+    } else {
+        // If we have a user (either from refresh or already there), go to home
+         navigate('/', { replace: true });
+    }
+  }, [refreshSession, navigate, user]);
 
   return <SuperLoading text="Authenticating..." fullScreen />;
 }

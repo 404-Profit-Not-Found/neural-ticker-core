@@ -50,7 +50,7 @@ import configuration from './config/configuration';
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 100,
+        limit: 1000,
       },
     ]),
     ScheduleModule.forRoot(),
