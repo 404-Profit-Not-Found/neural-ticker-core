@@ -9,6 +9,16 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}"
       }
+    },
+    "cloudrun": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-labs/mcp-server-cloud-run"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/gcp-sa-key.json"
+      }
     }
   }
 }

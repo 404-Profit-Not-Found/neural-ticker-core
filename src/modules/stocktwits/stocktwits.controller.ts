@@ -153,7 +153,7 @@ export class StockTwitsController {
   ) {
     const analysis = await this.stockTwitsService.analyzeComments(
       symbol,
-      req.user.id,
+      req.user?.id,
       {
         model: body.model,
         quality: body.quality,

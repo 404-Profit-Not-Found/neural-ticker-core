@@ -18,7 +18,7 @@ describe('StockTwitsService', () => {
   let calendarRepo: any;
 
   const mockHttpService = {
-    get: jest.fn(),
+    get: jest.fn().mockReturnValue(of({ data: { messages: [] } })),
   };
 
   const mockRepo = {
@@ -30,6 +30,13 @@ describe('StockTwitsService', () => {
       .mockImplementation((dto) => Promise.resolve({ id: '1', ...dto })),
     findAndCount: jest.fn(),
     delete: jest.fn().mockResolvedValue({ affected: 1 }),
+    createQueryBuilder: jest.fn().mockReturnValue({
+      delete: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
+    }),
   };
 
   const mockTickersService = {
