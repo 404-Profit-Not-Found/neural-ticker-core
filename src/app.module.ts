@@ -43,7 +43,7 @@ import configuration from './config/configuration';
     }),
 
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', '..', 'client'),
+      rootPath: join(__dirname, '..', 'client'),
     }),
 
     // Global Rate Limiting: 100 requests per minute per IP

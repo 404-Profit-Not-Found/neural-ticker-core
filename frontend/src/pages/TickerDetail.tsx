@@ -475,7 +475,7 @@ export function TickerDetail() {
                                     <div className="flex-1 space-y-4">
                                         <div className="min-h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden group">
                                             {market_data?.history && market_data.history.length > 0 ? (
-                                                <PriceChart data={market_data.history} className="h-full" />
+                                                <PriceChart symbol={symbol} data={market_data.history} className="h-full" />
                                             ) : (
                                                 <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
                                                     No historical data available for chart
@@ -617,7 +617,7 @@ export function TickerDetail() {
                                 <div className="md:hidden mt-6 space-y-4">
                                     <div className="h-[200px] bg-muted/10 rounded-xl border border-border/40 p-1 relative overflow-hidden">
                                         {market_data?.history && market_data.history.length > 0 ? (
-                                            <PriceChart data={market_data.history} className="h-full" />
+                                            <PriceChart symbol={symbol} data={market_data.history} className="h-full" />
                                         ) : (
                                             <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs italic">
                                                 No historical data available for chart

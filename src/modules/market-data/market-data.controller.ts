@@ -113,6 +113,12 @@ export class MarketDataController {
     description:
       'End date (YYYY-MM-DD). Defaults to today if "from" is provided.',
   })
+  @ApiQuery({
+    name: 'interval',
+    required: false,
+    example: '1d',
+    description: 'Time interval (1m, 5m, 15m, 1h, 1d). Defaults to 1d.',
+  })
   @ApiResponse({ status: 200, description: 'History retrieved.' })
   @Get('history')
   @Public()
@@ -121,6 +127,7 @@ export class MarketDataController {
     @Query('days') days?: number,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('interval') interval: string = '1d',
   ) {
     let fromDate: Date;
     let toDate: Date;
@@ -129,17 +136,37 @@ export class MarketDataController {
       fromDate = new Date(from);
       toDate = to ? new Date(to) : new Date();
     } else {
-      const numDays = days || 30;
+      // Default ranges if not specified
       toDate = new Date();
       fromDate = new Date();
-      fromDate.setDate(toDate.getDate() - numDays);
+
+      if (['1m', '2m', '5m'].includes(interval)) {
+        // High frequency: last 2 days (Yahoo limit ~7 days for 1m, but 2 is safer for 5m chart)
+        fromDate.setDate(toDate.getDate() - 2);
+      } else if (['15m', '30m', '1h', '60m', '90m'].includes(interval)) {
+        // Mid frequency: last 7-14 days
+        fromDate.setDate(toDate.getDate() - 14);
+      } else {
+        // Daily: Default 30 days or requested days
+        const numDays = days || 30;
+        fromDate.setDate(toDate.getDate() - numDays);
+      }
     }
 
-    const toStr = toDate.toISOString().split('T')[0];
-    const fromStr = fromDate.toISOString().split('T')[0];
-    const interval = '1d';
+    // For intraday, we need precise ISO strings or timestamps, but service expects YYYY-MM-DD/ISO.
+    // Yahoo service handles Date objects or strings, let's pass standardized strings or Date objects.
+    // The service signature is (symbol, interval, fromStr, toStr).
+    // Let's pass ISO strings for intraday to capture time.
 
-    return this.service.getHistory(symbol, interval, fromStr, toStr);
+    // NOTE: existing service method assumes YYYY-MM-DD for cache keys on daily.
+    // We will update service to handle ISO strings.
+
+    return this.service.getHistory(
+      symbol,
+      interval,
+      fromDate.toISOString(),
+      toDate.toISOString(),
+    );
   }
   @ApiOperation({ summary: 'Get Company News' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })

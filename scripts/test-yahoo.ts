@@ -1,35 +1,33 @@
-import YahooFinance from 'yahoo-finance2';
 
-const yahoo = new YahooFinance();
-
-// Read symbols from CLI arguments or use defaults
-const args = process.argv.slice(2);
-const symbols = args.length > 0 ? args : ['SOI.PA', 'JEN.DE', 'AAPL', 'TSLA', 'ASML.AS'];
+import yahooFinance from 'yahoo-finance2';
 
 async function testYahoo() {
-  console.log('--- Yahoo Finance Exploration ---\n');
-  if (args.length === 0) {
-    console.log('Tip: You can pass symbols as arguments, e.g.: npx ts-node scripts/test-yahoo.ts MSFT AAPL AMZN\n');
-  }
+  const symbol = 'ALT';
+  console.log(`Testing Yahoo Finance for ${symbol}...`);
 
-  for (const symbol of symbols) {
-    try {
-      console.log(`Fetching data for ${symbol}...`);
-      const result = await yahoo.quote(symbol);
-      
-      if (result) {
-        console.log(`✅ Success for ${symbol}:`);
-        console.log(`   Price: ${result.regularMarketPrice} ${result.currency}`);
-        console.log(`   Name:  ${result.longName || result.shortName}`);
-        console.log(`   Exchange: ${result.fullExchangeName}`);
-      } else {
-        console.log(`⚠️ No data returned for ${symbol}.`);
-      }
-    } catch (error: any) {
-      console.error(`❌ Error for ${symbol}:`, error.message || error);
+  try {
+    // 1. Test Quote
+    console.log('Fetching Quote...');
+    const quote = await yahooFinance.quote(symbol);
+    console.log('Quote Result:', quote ? 'Success' : 'Failed');
+    
+    // 2. Test Chart (Intraday 5m)
+    console.log('Fetching Chart (5m)...');
+    const chart = await yahooFinance.chart(symbol, { interval: '5m' });
+    if (chart && chart.quotes && chart.quotes.length > 0) {
+      console.log(`Chart Success: Received ${chart.quotes.length} candles.`);
+      console.log('Sample:', chart.quotes[0]);
+    } else {
+      console.log('Chart Failed: No quotes returned.');
+      console.log('Full Result:', JSON.stringify(chart, null, 2));
     }
-    console.log('-----------------------------------\n');
+
+  } catch (error: any) {
+    console.error('Yahoo Finance Error:', error.message);
+    if (error.errors) {
+      console.error('Validation Errors:', JSON.stringify(error.errors, null, 2));
+    }
   }
 }
 
-testYahoo().catch(console.error);
+testYahoo();
