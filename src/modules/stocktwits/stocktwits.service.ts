@@ -633,11 +633,14 @@ export class StockTwitsService {
 
       // CLEANUP: Delete previous StockTwits-sourced future events for this symbol.
       // This prevents old "no-impact" duplicates from blocking the new high-intelligence run.
-      await this.calendarRepository.delete({
-        symbol,
-        source: EventCalendarSource.STOCKTWITS,
-        event_date: MoreThanOrEqual(todayStr),
-      });
+      await this.calendarRepository
+        .createQueryBuilder()
+        .delete()
+        .from(EventCalendar)
+        .where('symbol = :symbol', { symbol })
+        .andWhere('source = :source', { source: EventCalendarSource.STOCKTWITS })
+        .andWhere('event_date >= :todayStr', { todayStr })
+        .execute();
 
       const existingEvents = await this.calendarRepository.find({
         where: { symbol, event_date: MoreThanOrEqual(searchStartDate) },

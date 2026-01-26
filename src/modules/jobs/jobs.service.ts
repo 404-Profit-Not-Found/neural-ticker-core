@@ -101,31 +101,62 @@ export class JobsService {
   }
 
   async syncDailyCandles() {
-    this.logger.log('Starting daily candle sync...');
+    this.logger.log('Starting sequential batch candle sync...');
     try {
       const tickers = await this.tickersService.getAllTickers();
-      this.logger.log(`Found ${tickers.length} tickers to sync.`);
+      const BATCH_SIZE = 25;
+      const MAX_BATCHES = 5; // Process 5 batches per run (125 tickers max)
 
-      for (const ticker of tickers) {
-        if (!ticker.symbol) continue;
-        try {
-          // 1. Sync Snapshot (Latest Price + News)
-          await this.marketDataService.getSnapshot(ticker.symbol);
+      const totalBatches = Math.min(
+        Math.ceil(tickers.length / BATCH_SIZE),
+        MAX_BATCHES,
+      );
 
-          // 2. Sync History (180 days for charts)
-          // 2. Sync History (5 years)
-          await this.marketDataService.syncTickerHistory(ticker.symbol, 5);
+      this.logger.log(
+        `Processing ${totalBatches} batches of ${BATCH_SIZE} tickers (${totalBatches * BATCH_SIZE} total)`,
+      );
 
-          this.logger.debug(`Synced snapshot and history for ${ticker.symbol}`);
-        } catch (err: any) {
-          this.logger.error(`Failed to sync ${ticker.symbol}: ${err.message}`);
+      let totalProcessed = 0;
+      let totalFailed = 0;
+
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const startIdx = batchNum * BATCH_SIZE;
+        const batch = tickers.slice(startIdx, startIdx + BATCH_SIZE);
+
+        this.logger.log(
+          `Processing batch ${batchNum + 1}/${totalBatches} (tickers ${startIdx}-${startIdx + batch.length - 1})`,
+        );
+
+        let batchProcessed = 0;
+        let batchFailed = 0;
+
+        for (const ticker of batch) {
+          if (!ticker.symbol) continue;
+          try {
+            await this.marketDataService.getSnapshot(ticker.symbol);
+            await this.marketDataService.syncTickerHistory(ticker.symbol, 5);
+            batchProcessed++;
+          } catch (err: any) {
+            batchFailed++;
+            this.logger.error(`Failed ${ticker.symbol}: ${err.message}`);
+          }
         }
-        // Small delay to be respectful to API rate limits (1.5s per ticker)
-        await new Promise((r) => setTimeout(r, 1500));
+
+        totalProcessed += batchProcessed;
+        totalFailed += batchFailed;
+
+        this.logger.log(
+          `Batch ${batchNum + 1} complete. Processed: ${batchProcessed}, Failed: ${batchFailed}`,
+        );
       }
-      this.logger.log('Daily candle sync completed.');
+
+      this.logger.log(
+        `All batches complete. Total Processed: ${totalProcessed}, Total Failed: ${totalFailed}`,
+      );
+      return { processed: totalProcessed, failed: totalFailed, batches: totalBatches };
     } catch (e) {
       this.logger.error('Daily candle sync failed globally', e);
+      throw e;
     }
   }
 
@@ -212,55 +243,59 @@ export class JobsService {
   }
 
   async runRiskRewardScanner() {
-    this.logger.log('Starting Periodic Risk/Reward Scanner (Low Tier)...');
+    this.logger.log('Starting sequential batch risk/reward scanner...');
     try {
       const tickers = await this.tickersService.getAllTickers();
-      this.logger.log(`Found ${tickers.length} tickers to scan.`);
+      const BATCH_SIZE = 15;
+      const MAX_BATCHES = 3; // Process 3 batches per run (45 tickers max)
 
-      let processed = 0;
-      let skipped = 0;
+      const totalBatches = Math.min(
+        Math.ceil(tickers.length / BATCH_SIZE),
+        MAX_BATCHES,
+      );
+
+      this.logger.log(
+        `Processing ${totalBatches} batches of ${BATCH_SIZE} tickers (${totalBatches * BATCH_SIZE} max)`,
+      );
+
+      let totalProcessed = 0;
+      let totalSkipped = 0;
       const interval14Days = 14 * 24 * 60 * 60 * 1000;
 
-      for (const ticker of tickers) {
-        if (!ticker.symbol) continue;
-        const symbol = ticker.symbol;
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const startIdx = batchNum * BATCH_SIZE;
+        const batch = tickers.slice(startIdx, startIdx + BATCH_SIZE);
 
-        try {
-          // Check if we have recent analysis
-          // We need Ticker ID for this. getAllTickers returns existing entities with IDs.
-          // TickersService.getAllTickers returns Partial<TickerEntity> but typically includes ID if selected or full object.
-          // Let's verify getAllTickers implementation. It selects specific fields. We might need ID.
-          // Adjusting logic to fetch ticker detail if id is missing or assume getAllTickers returns enough.
-          // If getAllTickers selects are restrictive, we might need to fetch full ticker or use symbol to find ID.
-          // RiskRewardService.getLatestAnalysis takes tickerId.
-          // Let's assume we can fetch the ticker by symbol to get ID efficiently if needed, or update getAllTickers.
-          // Better: TickersService.getTicker(symbol) is cached/fast-ish? No.
-          // Let's rely on TickersService.getAllTickers() returning what we need or fetch fresh.
+        this.logger.log(
+          `Processing batch ${batchNum + 1}/${totalBatches} (tickers ${startIdx}-${startIdx + batch.length - 1})`,
+        );
 
-          // Optimization: Check existing analysis via RiskRewardService which might need to look up ticker ID internally or we provide it.
-          // RiskRewardService.getLatestScore(symbol) encapsulates this!
-          // It calls marketDataService.getSnapshot(symbol) which gets Ticker ID.
-          // Then calls getLatestAnalysis(tickerId).
+        let batchProcessed = 0;
+        let batchSkipped = 0;
 
-          const existingAnalysis =
-            await this.riskRewardService.getLatestScore(symbol);
+        for (const ticker of batch) {
+          if (!ticker.symbol) continue;
+          const symbol = ticker.symbol;
 
-          const isStale =
-            !existingAnalysis ||
-            Date.now() - existingAnalysis.created_at.getTime() > interval14Days;
+          try {
+            const existingAnalysis =
+              await this.riskRewardService.getLatestScore(symbol);
 
-          if (!isStale) {
-            skipped++;
-            continue;
-          }
+            const isStale =
+              !existingAnalysis ||
+              Date.now() - existingAnalysis.created_at.getTime() > interval14Days;
 
-          this.logger.log(`Queueing Low-Tier Scan for ${symbol}...`);
+            if (!isStale) {
+              batchSkipped++;
+              continue;
+            }
 
-          // Create System Research Ticket (User ID = null)
-          const note = await this.researchService.createResearchTicket(
-            null, // System
-            [symbol],
-            `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
+            this.logger.log(`Queueing Low-Tier Scan for ${symbol}...`);
+
+            const note = await this.researchService.createResearchTicket(
+              null,
+              [symbol],
+              `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
       
       CRITICAL INSTRUCTION:
       You MUST act as a data gatherer. 
@@ -275,27 +310,32 @@ export class JobsService {
 
       Then provide a Risk/Reward Score (0-10) and a succinct summary.
       `,
-            'gemini',
-            'low', // Low tier = gemini-1.5-flash-002 (Cheap)
-          );
+              'gemini',
+              'low',
+            );
 
-          // Process immediately (or could just leave it if there was a separate worker, but here we process)
-          await this.researchService.processTicket(note.id);
-
-          processed++;
-
-          // Slight delay to be nice to API rate limits
-          await new Promise((r) => setTimeout(r, 2000));
-        } catch (err) {
-          this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
+            await this.researchService.processTicket(note.id);
+            batchProcessed++;
+          } catch (err) {
+            this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
+          }
         }
+
+        totalProcessed += batchProcessed;
+        totalSkipped += batchSkipped;
+
+        this.logger.log(
+          `Batch ${batchNum + 1} complete. Processed: ${batchProcessed}, Skipped: ${batchSkipped}`,
+        );
       }
 
       this.logger.log(
-        `Scanner Complete. Processed: ${processed}, Skipped: ${skipped}`,
+        `All batches complete. Total Processed: ${totalProcessed}, Total Skipped: ${totalSkipped}`,
       );
+      return { processed: totalProcessed, skipped: totalSkipped, batches: totalBatches };
     } catch (e) {
       this.logger.error('Risk/Reward Scanner failed globally', e);
+      throw e;
     }
   }
 
