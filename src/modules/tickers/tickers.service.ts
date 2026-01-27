@@ -724,14 +724,20 @@ export class TickersService {
       .orderBy('currency', 'ASC')
       .getRawMany();
 
-    return results.map((r) => r.currency).filter((c) => c && c.trim().length > 0);
+    return results
+      .map((r) => r.currency)
+      .filter((c) => c && c.trim().length > 0);
   }
 
   /**
    * Backfill currency on existing tickers from Yahoo Finance.
    * Updates tickers where currency is NULL, empty, or 'USD' (potential default).
    */
-  async backfillTickerCurrencies(): Promise<{ updated: number; skipped: number; failed: number }> {
+  async backfillTickerCurrencies(): Promise<{
+    updated: number;
+    skipped: number;
+    failed: number;
+  }> {
     this.logger.log('Starting ticker currency backfill...');
 
     // Get tickers that might need currency updates
@@ -749,9 +755,13 @@ export class TickersService {
       .getMany();
 
     const allTickers = [...tickers, ...nullCurrencyTickers];
-    const uniqueTickers = [...new Map(allTickers.map((t) => [t.symbol, t])).values()];
+    const uniqueTickers = [
+      ...new Map(allTickers.map((t) => [t.symbol, t])).values(),
+    ];
 
-    this.logger.log(`Found ${uniqueTickers.length} tickers to check for currency backfill`);
+    this.logger.log(
+      `Found ${uniqueTickers.length} tickers to check for currency backfill`,
+    );
 
     let updated = 0;
     let skipped = 0;
@@ -764,7 +774,9 @@ export class TickersService {
 
         if (currency && currency !== ticker.currency) {
           await this.tickerRepo.update(ticker.id, { currency });
-          this.logger.log(`Updated ${ticker.symbol} currency: ${ticker.currency} -> ${currency}`);
+          this.logger.log(
+            `Updated ${ticker.symbol} currency: ${ticker.currency} -> ${currency}`,
+          );
           updated++;
         } else {
           skipped++;
@@ -773,12 +785,16 @@ export class TickersService {
         // Small delay to avoid rate limiting
         await new Promise((r) => setTimeout(r, 200));
       } catch (error) {
-        this.logger.warn(`Failed to update currency for ${ticker.symbol}: ${error}`);
+        this.logger.warn(
+          `Failed to update currency for ${ticker.symbol}: ${error}`,
+        );
         failed++;
       }
     }
 
-    this.logger.log(`Currency backfill complete. Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}`);
+    this.logger.log(
+      `Currency backfill complete. Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}`,
+    );
     return { updated, skipped, failed };
   }
 

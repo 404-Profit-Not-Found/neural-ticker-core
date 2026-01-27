@@ -8,7 +8,7 @@ import { ExchangeRateEntity } from './entities/exchange-rate.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ExchangeRateEntity]),
-    forwardRef(() => TickersModule)
+    forwardRef(() => TickersModule),
   ],
   controllers: [CurrencyController],
   providers: [CurrencyService],

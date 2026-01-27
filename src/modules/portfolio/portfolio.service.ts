@@ -41,7 +41,9 @@ export class PortfolioService implements OnModuleInit {
     this.logger.log('Initializing PortfolioService...');
     // Auto-heal currency data on startup
     const result = await this.backfillPositionCurrencies();
-    this.logger.log(`Currency Backfill Result: Updated ${result.updated}, Skipped ${result.skipped}`);
+    this.logger.log(
+      `Currency Backfill Result: Updated ${result.updated}, Skipped ${result.skipped}`,
+    );
   }
 
   async create(
@@ -148,8 +150,11 @@ export class PortfolioService implements OnModuleInit {
           if (nativeCurrency === displayCurrency) {
             return { ...pos, display_currency: displayCurrency };
           }
-          const rate = await this.currencyService.getRate(nativeCurrency, displayCurrency);
-          
+          const rate = await this.currencyService.getRate(
+            nativeCurrency,
+            displayCurrency,
+          );
+
           return {
             ...pos,
             // Preserve original native values
@@ -167,7 +172,7 @@ export class PortfolioService implements OnModuleInit {
             cost_basis: pos.cost_basis * rate,
             gain_loss: pos.gain_loss * rate,
             buy_price: pos.buy_price * rate,
-            
+
             conversion_rate: rate,
           };
         }),
@@ -191,7 +196,10 @@ export class PortfolioService implements OnModuleInit {
    * Backfill currency on positions that have 'USD' default by looking up their ticker's native currency.
    * Call this from a cron job to auto-heal existing positions.
    */
-  async backfillPositionCurrencies(): Promise<{ updated: number; skipped: number }> {
+  async backfillPositionCurrencies(): Promise<{
+    updated: number;
+    skipped: number;
+  }> {
     const positions = await this.positionRepo.find({
       where: { currency: 'USD' }, // Only positions with default USD
     });

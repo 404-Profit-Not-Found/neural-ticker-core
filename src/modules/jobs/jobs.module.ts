@@ -27,4 +27,3 @@ import { PortfolioModule } from '../portfolio/portfolio.module';
   exports: [JobsService],
 })
 export class JobsModule {}
-

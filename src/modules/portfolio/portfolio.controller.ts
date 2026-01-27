@@ -17,7 +17,13 @@ import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreditGuard } from '../research/guards/credit.guard';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Portfolio')
 @ApiBearerAuth()

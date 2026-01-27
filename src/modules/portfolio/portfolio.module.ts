@@ -24,4 +24,3 @@ import { CurrencyModule } from '../currency/currency.module';
   exports: [PortfolioService],
 })
 export class PortfolioModule {}
-

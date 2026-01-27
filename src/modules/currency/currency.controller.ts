@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Query, Inject, forwardRef } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CurrencyService } from './currency.service';
 import { TickersService } from '../tickers/tickers.service';
@@ -46,10 +53,10 @@ export class CurrencyController {
   @ApiOperation({ summary: 'Get currencies available in tracked tickers' })
   async getAvailableCurrencies() {
     const currencies = await this.tickersService.getUniqueCurrencies();
-    
+
     // Always include USD as base, even if no USD stocks
     const uniqueCurrencies = [...new Set(['USD', ...currencies])].sort();
-    
+
     return {
       currencies: uniqueCurrencies.map((code) => ({
         code,
@@ -60,7 +67,9 @@ export class CurrencyController {
 
   @Post('backfill-tickers')
   @Public()
-  @ApiOperation({ summary: 'Backfill currency on existing tickers from Yahoo Finance' })
+  @ApiOperation({
+    summary: 'Backfill currency on existing tickers from Yahoo Finance',
+  })
   async backfillTickerCurrencies() {
     const result = await this.tickersService.backfillTickerCurrencies();
     return result;

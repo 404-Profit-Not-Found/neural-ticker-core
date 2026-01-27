@@ -34,7 +34,9 @@ export class CurrencyService implements OnModuleInit {
     // Ensure we have rates
     const rates = await this.getRates();
     if (!rates) {
-      this.logger.error(`CRITICAL: No exchange rates available. Returning 1.0 for ${from}/${to} - VALUES WILL BE INCORRECT.`);
+      this.logger.error(
+        `CRITICAL: No exchange rates available. Returning 1.0 for ${from}/${to} - VALUES WILL BE INCORRECT.`,
+      );
       return 1;
     }
 
@@ -43,7 +45,9 @@ export class CurrencyService implements OnModuleInit {
     const toRate = to === 'USD' ? 1 : rates.rates[to];
 
     if (!fromRate || !toRate) {
-      this.logger.warn(`Missing rate for ${from} or ${to} (Base: ${rates.base}). Defaulting to 1.`);
+      this.logger.warn(
+        `Missing rate for ${from} or ${to} (Base: ${rates.base}). Defaulting to 1.`,
+      );
       return 1;
     }
 
@@ -99,7 +103,9 @@ export class CurrencyService implements OnModuleInit {
             ratesMap['USD'] = 1;
 
             // Save ALL rates provided by the API
-            for (const [currency, rate] of Object.entries(data.conversion_rates)) {
+            for (const [currency, rate] of Object.entries(
+              data.conversion_rates,
+            )) {
               if (typeof rate === 'number') {
                 ratesMap[currency] = rate;
                 entities.push(
@@ -120,14 +126,17 @@ export class CurrencyService implements OnModuleInit {
           }
         }
       } else {
-        this.logger.warn('EXCHANGERATE API key is missing. Skipping API fetch.');
+        this.logger.warn(
+          'EXCHANGERATE API key is missing. Skipping API fetch.',
+        );
       }
     } catch (e) {
       this.logger.warn(`ExchangeRate API failed: ${e}`);
     }
 
     // 2. If API failed (or yielded no results), try DB Fallback
-    if (Object.keys(ratesMap).length <= 1) { // <= 1 because USD is always added
+    if (Object.keys(ratesMap).length <= 1) {
+      // <= 1 because USD is always added
       try {
         const dbRates = await this.rateRepo.find();
         if (dbRates.length > 0) {
@@ -135,7 +144,9 @@ export class CurrencyService implements OnModuleInit {
             ratesMap[r.currency_code] = r.rate_to_usd;
           });
           source = 'DATABASE';
-          this.logger.log(`Loaded ${dbRates.length} rates from Database (Fallback)`);
+          this.logger.log(
+            `Loaded ${dbRates.length} rates from Database (Fallback)`,
+          );
         }
       } catch (e) {
         this.logger.error(`Database rate fetch failed: ${e}`);
@@ -150,15 +161,19 @@ export class CurrencyService implements OnModuleInit {
         lastUpdated: new Date(),
       };
       if (source === 'API') {
-        this.logger.log(`Exchange rates updated from API: ${Object.keys(ratesMap).length} currencies`);
+        this.logger.log(
+          `Exchange rates updated from API: ${Object.keys(ratesMap).length} currencies`,
+        );
       }
     } else {
-        // If we represent a failure state
-        if (this.cachedRates) {
-             this.logger.warn('Refresh failed. Using stale cache.');
-        } else {
-             this.logger.error('Could not load exchange rates from API or DB. System running without FX data.');
-        }
+      // If we represent a failure state
+      if (this.cachedRates) {
+        this.logger.warn('Refresh failed. Using stale cache.');
+      } else {
+        this.logger.error(
+          'Could not load exchange rates from API or DB. System running without FX data.',
+        );
+      }
     }
 
     return this.cachedRates;

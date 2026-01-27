@@ -42,4 +42,3 @@ export class CreatePortfolioPositionDto {
   @IsIn(['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'])
   currency?: string;
 }
-
