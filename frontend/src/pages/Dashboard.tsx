@@ -96,6 +96,7 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     overallScore: item.aiAnalysis?.overall_score ?? null,
     itemId: item.ticker.id,
     sparkline: item.sparkline,
+    currency: item.ticker.currency || 'USD',
   };
 }
 
@@ -158,7 +159,7 @@ export function Dashboard() {
                 label="My Portfolio"
                 value={stats?.portfolio && stats.portfolio.value > 0
                   ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.portfolio.value)
-                  : '$0.00'}
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(0)}
                 subValue={stats?.portfolio && stats.portfolio.value > 0 ? (
                   <span className={cn(
                     "text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",

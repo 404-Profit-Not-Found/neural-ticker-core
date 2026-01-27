@@ -157,7 +157,10 @@ export function ResearchPage() {
                             <div className="hidden md:block">
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-2xl font-mono font-semibold tracking-tight">
-                                        ${marketData.price?.toFixed(2)}
+                                        {new Intl.NumberFormat('en-US', {
+                                            style: 'currency',
+                                            currency: profile?.currency || 'USD'
+                                        }).format(marketData.price || 0)}
                                     </span>
                                     <span className={`flex items-center text-sm font-medium ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
                                         {isPriceUp ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}

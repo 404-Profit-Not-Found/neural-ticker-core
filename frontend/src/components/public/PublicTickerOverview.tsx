@@ -94,7 +94,7 @@ export function PublicTickerOverview({ risk_analysis, market_data, ratings, prof
                         <TrendingUp size={14} /> Price Scenarios & Thesis
                     </h3>
                     {/* Reuse ScenarioCards as it is purely presentational and safe */}
-                    <ScenarioCards scenarios={risk_analysis.scenarios} currentPrice={market_data?.price || 0} />
+                    <ScenarioCards scenarios={risk_analysis.scenarios} currentPrice={market_data?.price || 0} currency={profile?.currency} />
                 </section>
             )}
 
@@ -140,7 +140,7 @@ export function PublicTickerOverview({ risk_analysis, market_data, ratings, prof
             </div>
 
             {/* Analyst Ratings */}
-            <PublicRatingsTable ratings={ratings} />
+            <PublicRatingsTable ratings={ratings} currency={profile?.currency} />
         </div>
     );
 }

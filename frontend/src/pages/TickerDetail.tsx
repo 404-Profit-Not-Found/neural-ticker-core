@@ -291,6 +291,13 @@ export function TickerDetail() {
                 const { profile, market_data, risk_analysis, fundamentals, watchers } = tickerData as TickerData;
                 const isPriceUp = market_data?.change_percent >= 0;
 
+                const formatCurrency = (val: number, currencyCode?: string) => {
+                    return new Intl.NumberFormat('en-US', { 
+                        style: 'currency', 
+                        currency: currencyCode || profile?.currency || 'USD' 
+                    }).format(val);
+                };
+
                 return (
 
                     <main key={symbol} className="container mx-auto px-4 pt-2 pb-6 md:py-6 max-w-[80rem] space-y-6 animate-in fade-in duration-500">
@@ -427,7 +434,7 @@ export function TickerDetail() {
                                     <div className="shrink-0 min-w-[200px]">
                                         <div className="flex items-baseline gap-3 mb-4">
                                             <span className="text-4xl font-mono font-semibold tracking-tighter">
-                                                ${market_data?.price?.toFixed(2)}
+                                                {formatCurrency(market_data?.price)}
                                             </span>
                                             <div className={`flex items-center text-lg font-medium px-2 py-0.5 rounded ${isPriceUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                                                 {isPriceUp ? <TrendingUp size={18} className="mr-1.5" /> : <TrendingDown size={18} className="mr-1.5" />}
@@ -572,7 +579,7 @@ export function TickerDetail() {
                                             <TickerMarketStatusIcon symbol={symbol} />
 
                                             <span className="text-3xl font-mono font-bold tracking-tight">
-                                                ${market_data?.price?.toFixed(2)}
+                                                {formatCurrency(market_data?.price)}
                                             </span>
                                             <span className={`flex items-center text-sm font-bold ml-1 ${isPriceUp ? 'text-green-500' : 'text-red-500'}`}>
                                                 {isPriceUp ? <TrendingUp size={14} className="mr-0.5" /> : <TrendingDown size={14} className="mr-0.5" />}
@@ -676,7 +683,7 @@ export function TickerDetail() {
 
                             {/* FINANCIALS TAB */}
                             <TabsContent value="financials">
-                                <TickerFinancials fundamentals={fundamentals} />
+                                <TickerFinancials fundamentals={fundamentals} currency={profile?.currency} />
                             </TabsContent>
 
 

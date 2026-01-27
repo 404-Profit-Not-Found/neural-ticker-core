@@ -4,9 +4,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 
 interface TickerFinancialsProps {
     fundamentals: TickerData['fundamentals'];
+    currency?: string;
 }
 
-export function TickerFinancials({ fundamentals }: TickerFinancialsProps) {
+export function TickerFinancials({ fundamentals, currency }: TickerFinancialsProps) {
 
 
     return (
@@ -16,7 +17,7 @@ export function TickerFinancials({ fundamentals }: TickerFinancialsProps) {
                     <CardTitle>Financial Health</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <FinancialHealth fundamentals={fundamentals} />
+                    <FinancialHealth fundamentals={fundamentals} currency={currency} />
                 </CardContent>
             </Card>
 
