@@ -86,7 +86,11 @@ export function PortfolioPage() {
   // Merge Snapshots with Positions
   const enrichedPositions = useMemo(() => {
     if (!snapshots || snapshots.length === 0) return positions;
-    const snapMap = new Map(snapshots.map((s: Record<string, unknown> & { ticker: { symbol: string }; quote?: { d?: number; dp?: number }; fundamentals?: { fifty_two_week_high?: number; fifty_two_week_low?: number }; sparkline?: unknown }) => [s.ticker.symbol, s]));
+    const snapMap = new Map(
+      snapshots
+        .filter((s: any) => s && s.ticker && s.ticker.symbol)
+        .map((s: any) => [s.ticker.symbol, s])
+    );
 
     return positions.map((p: PortfolioPosition) => {
       const snap = snapMap.get(p.symbol);
