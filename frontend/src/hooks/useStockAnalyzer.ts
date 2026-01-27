@@ -12,6 +12,7 @@ export interface StockSnapshot {
         logo_url?: string;
         news_sentiment?: string | null;
         news_impact_score?: number | null;
+        currency?: string;
     };
     latestPrice: {
         close: number;

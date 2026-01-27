@@ -3,6 +3,7 @@ import type { TickerData } from '../../types/ticker';
 
 interface FinancialHealthProps {
     fundamentals: TickerData['fundamentals'];
+    currency?: string;
 }
 
 const Metric = ({ label, value, subtext }: { label: string; value: React.ReactNode; subtext?: string }) => (
@@ -21,15 +22,12 @@ const SectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode }
     </div>
 );
 
-export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
+export function FinancialHealth({ fundamentals, currency = 'USD' }: FinancialHealthProps) {
     if (!fundamentals) return <div className="text-muted-foreground">No financial data available</div>;
 
     const formatCurrency = (val: number | undefined | null) => {
         if (val === undefined || val === null) return 'N/A';
-        if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
-        if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
-        if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-        return `$${Number(val).toLocaleString()}`;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact", maximumFractionDigits: 2 }).format(val);
     };
 
     const formatNumber = (val: number | undefined | null, decimals = 2) => {
@@ -53,7 +51,7 @@ export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
                     <Metric label="Market Cap" value={formatCurrency(fundamentals.market_cap)} />
                     <Metric label="P/E Ratio" value={formatNumber(fundamentals.pe_ratio)} />
                     <Metric label="Price/Book" value={formatNumber(fundamentals.price_to_book)} />
-                    <Metric label="Shares Out" value={formatCurrency(fundamentals.shares_outstanding)?.replace('$', '')} subtext="Outstanding" />
+                    <Metric label="Shares Out" value={fundamentals.shares_outstanding ? new Intl.NumberFormat('en-US', { notation: "compact" }).format(fundamentals.shares_outstanding) : '-'} subtext="Outstanding" />
                 </div>
             </div>
 
@@ -91,7 +89,7 @@ export function FinancialHealth({ fundamentals }: FinancialHealthProps) {
                             {formatNumber(fundamentals.interest_coverage)}
                         </span>
                     } />
-                    <Metric label="Book Value/Share" value={`$${formatNumber(fundamentals.book_value_per_share)}`} />
+                    <Metric label="Book Value/Share" value={formatCurrency(fundamentals.book_value_per_share)} />
                     <Metric label="Debt/Assets" value={formatNumber(fundamentals.debt_to_assets)} />
                 </div>
             </div>

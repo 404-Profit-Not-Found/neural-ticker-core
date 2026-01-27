@@ -4,6 +4,8 @@ import {
   IsDateString,
   IsNotEmpty,
   Min,
+  IsOptional,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -29,4 +31,14 @@ export class CreatePortfolioPositionDto {
   })
   @IsDateString()
   buy_date: string;
+
+  @ApiProperty({
+    example: 'USD',
+    description: 'Currency of the purchase (USD, EUR, GBP, etc.)',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'])
+  currency?: string;
 }

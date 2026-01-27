@@ -10,6 +10,7 @@ import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
 import { SuperLoading } from '../ui/SuperLoading';
 import { useLocalAnalysisCount } from '../../store/analysisStore';
+import { CurrencySelector } from '../ui/CurrencySelector';
 
 interface Notification {
   id: string;
@@ -416,6 +417,10 @@ export function Header() {
                     <Brain size={16} />
                     About NeuralTicker
                   </button>
+                </div>
+
+                <div className="border-t border-border">
+                  <CurrencySelector />
                 </div>
 
                 <div className="p-2 border-t border-border">

@@ -22,6 +22,7 @@ interface TickerResult {
   logo_url?: string;
   is_queued?: boolean;
   sparkline?: number[];
+  currency?: string;
 }
 
 interface OhlcDataPoint {
@@ -32,6 +33,15 @@ interface OhlcDataPoint {
   close: number;
   median: number;
 }
+
+const getCurrencySymbol = (currencyCode?: string) => {
+  if (!currencyCode) return '$';
+  try {
+    return (0).toLocaleString('en-US', { style: 'currency', currency: currencyCode, minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\d/g, '').trim();
+  } catch {
+    return currencyCode;
+  }
+};
 
 interface AddPositionDialogProps {
   open: boolean;
@@ -75,6 +85,11 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     };
   } | null>(null);
 
+  // Helper for dynamic currency
+  const currencySymbol = useMemo(() => {
+    return getCurrencySymbol(selectedTicker?.currency);
+  }, [selectedTicker]);
+
   // Derived calculations
   useEffect(() => {
     if (!price) return;
@@ -93,6 +108,8 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
       }
     }
   }, [price, shares, investment, inputMode]);
+
+  // ... (keep intervening code same) ...
 
   const handleInvestmentChange = (val: string) => {
     setInvestment(val);
@@ -219,8 +236,6 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
           }
         }
         
-        // Sort by date desc for easier lookup? No, usually charts want asc.
-        // But for our "find by date" logic, array find is fine.
         setOhlcData(combinedData);
         
         // Auto-set price if not set or date matches today
@@ -249,15 +264,8 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     if (!date || ohlcData.length === 0) return;
     const dayData = ohlcData.find(d => d.date === date);
     if (dayData) {
-      // If user selected a specific date, default price to close, or median?
-      // Let's default to close, but slider allows adjustment.
-      // Only overwrite if user hasn't typed a custom price? 
-      // Actually, better to just let the slider control it or set a default.
       setPrice(dayData.close.toString());
     } else {
-      // No data for this date (e.g. weekend selected manually?)
-      // Keep previous or clear?
-      // Let's clear to indicate "manual entry needed"
       setPrice(''); 
     }
   }, [date, ohlcData]);
@@ -314,8 +322,6 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     if (!date) return null;
     
     // Find closest date before or equal to selected date
-    // Array is likely sorted by date (or we can just sort to be safe, but usually API returns sorted)
-    // Assuming API returns descending or ascending. Let's filter dates <= selectedDate and take latest.
     const target = new Date(date).getTime();
     
     // Sort desc to find latest before target
@@ -324,7 +330,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     return sorted.find(d => {
         const dt = new Date(d.date).getTime();
         return dt <= target;
-    }) || sorted[0]; // fallback to most recent if everything is in future?
+    }) || sorted[0]; 
   }, [ohlcData, date, selectedDateData]);
 
   return (
@@ -426,7 +432,12 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                     <div className="flex items-center gap-4 flex-1 min-w-0">
                       <TickerLogo url={selectedTicker.logo_url} symbol={selectedTicker.symbol} className="w-12 h-12 rounded-full shadow-lg border-2 border-background flex-shrink-0" />
                       <div className="min-w-0">
-                        <h3 className="text-lg font-bold text-foreground leading-none">{selectedTicker.symbol}</h3>
+                        <div className="flex items-center gap-2">
+                             <h3 className="text-lg font-bold text-foreground leading-none">{selectedTicker.symbol}</h3>
+                             {selectedTicker.currency && selectedTicker.currency !== 'USD' && (
+                                 <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded font-bold">{selectedTicker.currency}</span>
+                             )}
+                        </div>
                         <p className="text-sm text-muted-foreground font-medium truncate">{selectedTicker.name}</p>
                         {(selectedTicker.industry || snapshot?.ticker?.industry) && (
                           <p className="text-[10px] text-muted-foreground/60 mt-0.5 uppercase tracking-wider">
@@ -447,7 +458,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                     {/* Right: Price & Change */}
                     <div className="flex flex-col items-end flex-shrink-0">
                       <div className="text-xl font-mono font-bold">
-                        ${(snapshot?.price || snapshot?.latestPrice?.close)?.toFixed(2) || '---'}
+                        {getSelectedTickerPriceDisplay(snapshot?.price || snapshot?.latestPrice?.close, selectedTicker?.currency)}
                       </div>
                       {snapshot && (
                         <div className={cn(
@@ -515,7 +526,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                         <div className="space-y-1.5">
                             <Label htmlFor="investment-input" className="text-xs font-bold text-muted-foreground">Investment Amount</Label>
                             <div className="relative">
-                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <span className="absolute left-3 top-2.5 text-sm text-muted-foreground font-bold font-mono w-4 text-center">{currencySymbol}</span>
                                 <Input
                                     id="investment-input"
                                     type="number"
@@ -586,8 +597,8 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                             </div>
                             {investment && parseFloat(investment) > 0 && (
                                 <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
-                                    <DollarSign size={12} />
-                                    Result: <strong>${parseFloat(investment).toLocaleString()}</strong> total
+                                    <span className="font-bold font-mono text-xs">{currencySymbol}</span>
+                                    Result: <strong>{currencySymbol}{parseFloat(investment).toLocaleString()}</strong> total
                                 </p>
                             )}
                         </div>
@@ -610,6 +621,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                                 value={parseFloat(price) || effectiveDateData?.close || 0}
                                 onChange={(val) => setPrice(val.toFixed(2))}
                                 className={cn("pt-0 pb-2", !effectiveDateData && "opacity-50 grayscale")}
+                                currency={selectedTicker?.currency || 'USD'}
                             />
                         </div>
                 </div>
@@ -637,4 +649,10 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
       </DialogContent>
     </Dialog>
   );
+}
+
+// Helper to format price with symbol
+function getSelectedTickerPriceDisplay(price?: number, currency = 'USD') {
+    if (price === undefined) return '---';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price);
 }
