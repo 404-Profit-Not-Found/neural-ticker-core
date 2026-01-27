@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 import { SuperLoading } from './components/ui/SuperLoading';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
@@ -75,9 +76,10 @@ function App() {
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
-        <ThemeController />
-        <ToastProvider>
-          <Routes>
+        <CurrencyProvider>
+          <ThemeController />
+          <ToastProvider>
+            <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/access-denied" element={<AccessDenied />} />
@@ -119,7 +121,8 @@ function App() {
             {/* Redirect Legacy Route */}
             <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
           </Routes>
-        </ToastProvider>
+          </ToastProvider>
+        </CurrencyProvider>
       </AuthProvider>
     </BrowserRouter>
   );

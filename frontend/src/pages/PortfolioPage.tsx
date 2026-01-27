@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Header } from '../components/layout/Header';
 import { PortfolioTable } from '../components/portfolio/PortfolioTable';
 import { PortfolioGridView } from '../components/portfolio/PortfolioGridView';
@@ -64,10 +65,14 @@ export function PortfolioPage() {
     overallScore: null,
   });
 
+  const { displayCurrency } = useCurrency();
+
   const { data: positions = [], isLoading, refetch } = useQuery({
-    queryKey: ['portfolio'],
+    queryKey: ['portfolio', displayCurrency],
     queryFn: async () => {
-      const { data } = await api.get('/portfolio/positions');
+      const { data } = await api.get('/portfolio/positions', {
+        params: { displayCurrency },
+      });
       return data;
     },
   });

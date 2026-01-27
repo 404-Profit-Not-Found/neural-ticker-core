@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
   HttpCode,
+  Query,
 } from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
@@ -16,7 +17,7 @@ import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreditGuard } from '../research/guards/credit.guard';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Portfolio')
 @ApiBearerAuth()
@@ -36,8 +37,12 @@ export class PortfolioController {
 
   @Get('positions')
   @ApiOperation({ summary: 'Get portfolio positions with real-time data' })
-  findAll(@Req() req: AuthenticatedRequest) {
-    return this.portfolioService.findAll(req.user.id);
+  @ApiQuery({ name: 'displayCurrency', required: false, example: 'EUR' })
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('displayCurrency') displayCurrency?: string,
+  ) {
+    return this.portfolioService.findAll(req.user.id, displayCurrency);
   }
 
   @Patch('positions/:id')

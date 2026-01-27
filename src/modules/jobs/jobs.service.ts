@@ -7,6 +7,7 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
 import { StockTwitsService } from '../stocktwits/stocktwits.service';
+import { PortfolioService } from '../portfolio/portfolio.service';
 import {
   RequestQueue,
   RequestStatus,
@@ -31,6 +32,8 @@ export class JobsService {
     private readonly stocktwitsService: StockTwitsService,
     @InjectRepository(RequestQueue)
     private readonly requestQueueRepo: Repository<RequestQueue>,
+    @Inject(forwardRef(() => PortfolioService))
+    private readonly portfolioService: PortfolioService,
   ) {}
 
   async cleanupStuckResearch() {
@@ -481,6 +484,30 @@ export class JobsService {
           updated_at: new Date(),
         });
       }
+    }
+  }
+
+  /**
+   * Daily job to backfill currency on portfolio positions from their ticker's native currency.
+   * This auto-heals positions that were created before currency tracking was added.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  private async backfillPositionCurrenciesCron() {
+    if (!this.isDevMode) return;
+    await this.backfillPositionCurrencies();
+  }
+
+  async backfillPositionCurrencies() {
+    this.logger.log('Starting portfolio position currency backfill...');
+    try {
+      const result = await this.portfolioService.backfillPositionCurrencies();
+      this.logger.log(
+        `Currency backfill complete. Updated: ${result.updated}, Skipped: ${result.skipped}`,
+      );
+      return result;
+    } catch (e) {
+      this.logger.error('Currency backfill failed', e);
+      throw e;
     }
   }
 }

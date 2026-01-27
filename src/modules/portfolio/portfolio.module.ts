@@ -8,6 +8,7 @@ import { MarketDataModule } from '../market-data/market-data.module';
 import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { UsersModule } from '../users/users.module';
+import { CurrencyModule } from '../currency/currency.module';
 
 @Module({
   imports: [
@@ -16,9 +17,11 @@ import { UsersModule } from '../users/users.module';
     LlmModule,
     forwardRef(() => TickersModule),
     forwardRef(() => UsersModule),
+    CurrencyModule,
   ],
   controllers: [PortfolioController],
   providers: [PortfolioService],
   exports: [PortfolioService],
 })
 export class PortfolioModule {}
+
