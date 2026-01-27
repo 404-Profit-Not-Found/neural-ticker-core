@@ -801,15 +801,123 @@ describe('MarketDataService', () => {
       mockMarketStatusService.getAllMarketsStatus.mockResolvedValue({
         us: { isOpen: true, session: 'regular' },
         eu: { isOpen: false, session: 'closed' },
-        asia: { isOpen: false, session: 'closed' },
       });
-      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([]);
+      mockPortfolioService.getAllDistinctPortfolioSymbols.mockResolvedValue([
+        'AAPL',
+      ]);
+      const spySnapshot = jest
+        .spyOn(service as any, 'performGetSnapshot')
+        .mockResolvedValue({});
 
       await service.updateActivePortfolios();
 
-      expect(
-        mockPortfolioService.getAllDistinctPortfolioSymbols,
-      ).toHaveBeenCalled();
+      expect(spySnapshot).toHaveBeenCalledWith('AAPL', expect.any(Object));
+    });
+  });
+
+  describe('Currency Self-Healing (performGetSnapshot)', () => {
+    it('should update ticker currency from Yahoo Finance if missing or different', async () => {
+      const mockTicker = {
+        id: 1,
+        symbol: 'DTE.DE',
+        currency: 'USD',
+        save: jest.fn(),
+      } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
+      mockOhlcvRepo.findOne.mockResolvedValue(null);
+
+      // Force Yahoo path
+      mockFinnhubService.getQuote.mockRejectedValue(new Error('Restricted'));
+      const mockYahooData = {
+        quote: {
+          currency: 'EUR',
+          regularMarketPrice: 20,
+        },
+        summary: {},
+      };
+      // We need to mock fetchFullSnapshotFromYahoo private method or rely on the fact that if finnhub fails it calls it.
+      // But fetchFullSnapshotFromYahoo calls yahooService.getQuote/getSummary.
+      mockYahooService.getQuote.mockResolvedValue(mockYahooData.quote);
+      mockYahooService.getSummary.mockResolvedValue(mockYahooData.summary);
+
+      // We inject a mock repo into tickersService for the save call
+      const mockTickerRepo = {
+        save: jest.fn().mockResolvedValue({ ...mockTicker, currency: 'EUR' }),
+      };
+      (service as any).tickerRepo = mockTickerRepo;
+
+      await service.refreshMarketData('DTE.DE');
+
+      expect(mockTickerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbol: 'DTE.DE',
+          currency: 'EUR',
+        }),
+      );
+    });
+
+    it('should update ticker currency from Finnhub Profile if missing or different', async () => {
+      const mockTicker = {
+        id: 2,
+        symbol: 'AAPL',
+        currency: '',
+      } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
+      mockOhlcvRepo.findOne.mockResolvedValue(null);
+
+      // Finnhub path
+      mockFinnhubService.getQuote.mockResolvedValue({
+        c: 150,
+        t: Date.now() / 1000,
+      });
+      mockFinnhubService.getCompanyProfile.mockResolvedValue({
+        currency: 'USD',
+        marketCapitalization: 2000,
+      });
+      mockFinnhubService.getBasicFinancials.mockResolvedValue({});
+
+      const mockTickerRepo = {
+        save: jest.fn().mockResolvedValue({ ...mockTicker, currency: 'USD' }),
+      };
+      (service as any).tickerRepo = mockTickerRepo;
+
+      await service.refreshMarketData('AAPL');
+
+      expect(mockTickerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbol: 'AAPL',
+          currency: 'USD',
+        }),
+      );
+    });
+
+    it('should NOT update ticker currency if it already matches', async () => {
+      const mockTicker = {
+        id: 3,
+        symbol: 'MSFT',
+        currency: 'USD',
+      } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(mockTicker);
+      mockOhlcvRepo.findOne.mockResolvedValue(null);
+
+      mockFinnhubService.getQuote.mockResolvedValue({
+        c: 300,
+        t: Date.now() / 1000,
+      });
+      mockFinnhubService.getCompanyProfile.mockResolvedValue({
+        currency: 'USD',
+        marketCapitalization: 2000,
+      });
+      mockFinnhubService.getBasicFinancials.mockResolvedValue({});
+
+      const mockTickerRepo = {
+        save: jest.fn(),
+      };
+      (service as any).tickerRepo = mockTickerRepo;
+
+      await service.refreshMarketData('MSFT');
+
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
     });
   });
 });

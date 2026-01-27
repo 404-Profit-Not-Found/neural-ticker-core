@@ -3,6 +3,8 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  OnModuleInit,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -17,7 +19,9 @@ import { CreditService } from '../users/credit.service';
 import { CurrencyService } from '../currency/currency.service';
 
 @Injectable()
-export class PortfolioService {
+export class PortfolioService implements OnModuleInit {
+  private readonly logger = new Logger(PortfolioService.name);
+
   constructor(
     @InjectRepository(PortfolioPosition)
     private readonly positionRepo: Repository<PortfolioPosition>,
@@ -32,6 +36,13 @@ export class PortfolioService {
     private readonly creditService: CreditService,
     private readonly currencyService: CurrencyService,
   ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing PortfolioService...');
+    // Auto-heal currency data on startup
+    const result = await this.backfillPositionCurrencies();
+    this.logger.log(`Currency Backfill Result: Updated ${result.updated}, Skipped ${result.skipped}`);
+  }
 
   async create(
     userId: string,
@@ -147,6 +158,7 @@ export class PortfolioService {
             original_current_value: pos.current_value,
             original_cost_basis: pos.cost_basis,
             original_gain_loss: pos.gain_loss,
+            original_buy_price: pos.buy_price,
 
             // Overwrite with converted values for consistent aggregation
             currency: displayCurrency,
@@ -154,6 +166,7 @@ export class PortfolioService {
             current_value: pos.current_value * rate,
             cost_basis: pos.cost_basis * rate,
             gain_loss: pos.gain_loss * rate,
+            buy_price: pos.buy_price * rate,
             
             conversion_rate: rate,
           };

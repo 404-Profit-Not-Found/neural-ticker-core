@@ -458,7 +458,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                     {/* Right: Price & Change */}
                     <div className="flex flex-col items-end flex-shrink-0">
                       <div className="text-xl font-mono font-bold">
-                        {snapshot ? new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedTicker.currency || 'USD' }).format(snapshot.price || snapshot.latestPrice?.close || 0) : '---'}
+                        {getSelectedTickerPriceDisplay(snapshot?.price || snapshot?.latestPrice?.close, selectedTicker?.currency)}
                       </div>
                       {snapshot && (
                         <div className={cn(
@@ -597,7 +597,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                             </div>
                             {investment && parseFloat(investment) > 0 && (
                                 <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
-                                    <DollarSign size={12} />
+                                    <span className="font-bold font-mono text-xs">{currencySymbol}</span>
                                     Result: <strong>{currencySymbol}{parseFloat(investment).toLocaleString()}</strong> total
                                 </p>
                             )}
@@ -621,6 +621,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                                 value={parseFloat(price) || effectiveDateData?.close || 0}
                                 onChange={(val) => setPrice(val.toFixed(2))}
                                 className={cn("pt-0 pb-2", !effectiveDateData && "opacity-50 grayscale")}
+                                currency={selectedTicker?.currency || 'USD'}
                             />
                         </div>
                 </div>
@@ -648,4 +649,10 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
       </DialogContent>
     </Dialog>
   );
+}
+
+// Helper to format price with symbol
+function getSelectedTickerPriceDisplay(price?: number, currency = 'USD') {
+    if (price === undefined) return '---';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price);
 }

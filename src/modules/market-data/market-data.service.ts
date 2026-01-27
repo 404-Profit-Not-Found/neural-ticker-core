@@ -248,6 +248,12 @@ export class MarketDataService {
           const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
           if (yahooData) {
             source = 'yahoo';
+            
+            // [SELF-HEAL] Update currency if available
+            if (yahooData.quote && yahooData.quote.currency) {
+               await this.updateTickerCurrency(tickerEntity, yahooData.quote.currency);
+            }
+
             if (yahooData.quote) {
               detailedQuote = {
                 c: yahooData.quote.close,
@@ -331,6 +337,12 @@ export class MarketDataService {
             const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
             if (yahooData) {
               source = 'yahoo';
+
+              // [SELF-HEAL] Update currency if available
+              if (yahooData.quote && yahooData.quote.currency) {
+                 await this.updateTickerCurrency(tickerEntity, yahooData.quote.currency);
+              }
+
               if (yahooData.quote) {
                 detailedQuote = {
                   c: yahooData.quote.close,
@@ -399,6 +411,11 @@ export class MarketDataService {
                 this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
 
               if (profile) {
+                // [SELF-HEAL] Update currency from Finnhub profile
+                if (profile.currency) {
+                  await this.updateTickerCurrency(tickerEntity, profile.currency);
+                }
+
                 // Finnhub marketCapitalization is in Millions. Normalize to full Dollars using robust parser.
                 entity.market_cap = NumberUtil.parseMarketCap(
                   profile.marketCapitalization
@@ -470,6 +487,12 @@ export class MarketDataService {
           const yahooData = await this.fetchFullSnapshotFromYahoo(symbol);
           if (yahooData) {
             source = 'yahoo';
+
+            // [SELF-HEAL] Update currency if available
+            if (yahooData.quote && yahooData.quote.currency) {
+               await this.updateTickerCurrency(tickerEntity, yahooData.quote.currency);
+            }
+
             if (yahooData.quote) {
               const newCandle = this.saveYahooQuoteAsCandle(
                 tickerEntity.id,
@@ -2356,6 +2379,16 @@ export class MarketDataService {
         `CRON: Top Picks refresh failed: ${e.message}`,
         e.stack,
       );
+    }
+  }
+
+  private async updateTickerCurrency(ticker: Ticker, currency: string) {
+    if (!currency) return;
+    const normalized = currency.toUpperCase();
+    if (ticker.currency !== normalized) {
+      this.logger.log(`Self-healing currency for ${ticker.symbol}: ${ticker.currency} -> ${normalized}`);
+      ticker.currency = normalized;
+      await this.tickerRepo.save(ticker);
     }
   }
 }

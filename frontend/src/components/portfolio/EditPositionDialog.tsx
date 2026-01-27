@@ -21,6 +21,7 @@ interface Position {
     buy_price: number;
     buy_date: string;
     current_price?: number;
+    currency?: string;
 }
 
 interface OhlcDataPoint {
@@ -73,6 +74,14 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
     const [error, setError] = useState<string | null>(null);
     const [inputMode, setInputMode] = useState<'shares' | 'investment'>('investment');
     const [deleteConfirm, setDeleteConfirm] = useState(false);
+    
+    // Currency helpers
+    const currency = position?.currency || 'USD';
+    const getCurrencySymbol = (curr: string) => {
+        return (0).toLocaleString('en-US', { style: 'currency', currency: curr, minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\d/g, '').trim();
+    };
+    const currencySymbol = getCurrencySymbol(currency);
+    const formatPrice = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
 
     // OHLC Data
     const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
@@ -286,7 +295,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                         {/* Right: Price & Change */}
                         <div className="flex flex-col items-end flex-shrink-0">
                           <div className="text-xl font-mono font-bold tracking-tight text-foreground">
-                            ${(snapshot.price || snapshot.latestPrice?.close)?.toFixed(2) || '---'}
+                            {formatPrice(snapshot.price || snapshot.latestPrice?.close || 0)}
                           </div>
                           {(snapshot.change_percent !== undefined || snapshot.latestPrice?.change_percent !== undefined) && (
                             <div className={cn("text-xs font-bold flex items-center gap-0.5", (snapshot.change_percent ?? snapshot.latestPrice?.change_percent ?? 0) >= 0 ? "text-emerald-500" : "text-red-500")}>
@@ -353,7 +362,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                                 <TabsContent value="investment" className="space-y-1.5 m-0 border-0 p-0">
                                     <Label htmlFor="investment-input" className="text-xs font-bold text-muted-foreground">Investment Amount</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground font-bold font-mono w-4 text-center">{currencySymbol}</span>
                                         <Input
                                             id="investment-input"
                                             type="number"
@@ -390,8 +399,8 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                                     </div>
                                     {investment && parseFloat(investment) > 0 && (
                                         <p className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
-                                            <DollarSign size={12} />
-                                            Result: <strong>${parseFloat(investment).toLocaleString()}</strong> total
+                                            <span className="font-bold font-mono text-xs">{currencySymbol}</span>
+                                            Result: <strong>{currencySymbol}{parseFloat(investment).toLocaleString()}</strong> total
                                         </p>
                                     )}
                                 </TabsContent>
@@ -421,6 +430,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                                                 value={parseFloat(price) || effectiveDateData?.close || 0}
                                                 onChange={(val) => setPrice(val.toFixed(2))}
                                                 className={cn("pt-0 pb-2", (!effectiveDateData) && "opacity-50 grayscale")}
+                                                currency={currency}
                                             />
                                         </>
                                     )}

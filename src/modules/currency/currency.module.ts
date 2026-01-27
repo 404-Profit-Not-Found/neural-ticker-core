@@ -1,10 +1,15 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { CurrencyService } from './currency.service';
 import { CurrencyController } from './currency.controller';
 import { TickersModule } from '../tickers/tickers.module';
+import { ExchangeRateEntity } from './entities/exchange-rate.entity';
 
 @Module({
-  imports: [forwardRef(() => TickersModule)],
+  imports: [
+    TypeOrmModule.forFeature([ExchangeRateEntity]),
+    forwardRef(() => TickersModule)
+  ],
   controllers: [CurrencyController],
   providers: [CurrencyService],
   exports: [CurrencyService],

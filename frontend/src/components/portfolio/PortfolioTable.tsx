@@ -20,6 +20,7 @@ export interface Position {
     cost_basis: number;
     gain_loss: number;
     gain_loss_percent: number;
+    currency?: string; // (e.g. 'USD' or 'EUR')
 
     // Optional native values (if displayCurrency was used)
     original_currency?: string;
@@ -153,10 +154,10 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: 'Value / Return',
             cell: (info) => {
                 const row = info.row.original;
-                // Use native values if available, otherwise current
-                const val = row.original_current_value ?? row.current_value;
-                const gainLoss = row.original_gain_loss ?? row.gain_loss;
-                const currency = row.original_currency || 'USD';
+                // Use converted (Display) values for Value & Return columns
+                const val = row.current_value;
+                const gainLoss = row.gain_loss;
+                const currency = row.currency || 'USD';
                 
                 const pct = info.getValue();
                 const isProfit = gainLoss >= 0;
