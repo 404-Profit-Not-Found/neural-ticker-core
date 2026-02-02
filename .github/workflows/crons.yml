@@ -10,9 +10,10 @@ on:
     # Hourly (Risk Scanner, Posts Sync)
     - cron: '0 * * * *'
     # Every 5 mins during market hours (6 AM - 9 PM UTC covers both EU and US)
-    - cron: '*/5 6-21 * * 1-5'
+    - cron: '0 * * * *'
+    # - cron: '*/5 6-21 * * 1-5'
     # Every 5 minutes (Digest, Queue Processing)
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -54,7 +55,7 @@ jobs:
   frequent-jobs:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Daily Digest Generation
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
