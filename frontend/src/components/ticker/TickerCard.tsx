@@ -32,6 +32,7 @@ export interface TickerCardProps {
     className?: string;
     children?: React.ReactNode;
     marketStatus?: MarketStatusData | null; // Allow passing status directly to avoid hook call
+    currency?: string;
 }
 
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
@@ -61,7 +62,8 @@ export function TickerCard({
     fiftyTwoWeekHigh,
     className,
     children,
-    marketStatus
+    marketStatus,
+    currency = 'USD'
 }: TickerCardProps) {
     const navigate = useNavigate();
     // Use per-ticker market status based on symbol's exchange
@@ -169,7 +171,7 @@ export function TickerCard({
                     <div className="flex flex-col">
                         <div className="flex items-baseline gap-2">
                             <span className="text-xl font-mono font-bold">
-                                ${price.toFixed(2)}
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(price)}
                             </span>
                             <div className={cn("flex items-center gap-0.5 text-xs font-mono font-bold", change >= 0 ? "text-emerald-500" : "text-red-500")}>
                                 {change >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
@@ -211,6 +213,7 @@ export function TickerCard({
                             current={price}
                             showLabels={true}
                             className="w-full"
+                            currency={currency}
                         />
                     </div>
                 )}

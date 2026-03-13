@@ -7,6 +7,7 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
+import { CurrencyService } from '../currency/currency.service';
 
 const mockPosition = {
   id: 'uuid-1',
@@ -51,11 +52,20 @@ const mockLlmService = {
   generateText: jest.fn().mockResolvedValue('Suggested Analysis: Hold NVDA.'),
 };
 
-const mockTickersService = {};
+const mockTickersService = {
+  findOneBySymbol: jest
+    .fn()
+    .mockResolvedValue({ symbol: 'NVDA', currency: 'USD' }),
+};
 
 const mockCreditService = {
   getModelCost: jest.fn().mockReturnValue(1),
   deductCredits: jest.fn().mockResolvedValue({}),
+};
+
+const mockCurrencyService = {
+  convert: jest.fn().mockImplementation((amount: number) => amount),
+  getRate: jest.fn().mockResolvedValue(1),
 };
 
 describe('PortfolioService', () => {
@@ -88,6 +98,10 @@ describe('PortfolioService', () => {
         {
           provide: CreditService,
           useValue: mockCreditService,
+        },
+        {
+          provide: CurrencyService,
+          useValue: mockCurrencyService,
         },
       ],
     }).compile();

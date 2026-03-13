@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { httpClient } from '../lib/api';
 import { queryClient, persister } from '../lib/queryClient';
 
@@ -30,6 +30,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Deduplication: prevent concurrent checkSession calls from racing
+    const sessionCheckRef = useRef<Promise<User | null> | null>(null);
+
+    const checkSession = useCallback(async (): Promise<User | null> => {
+        // If a check is already in-flight, return the existing promise (dedup)
+        if (sessionCheckRef.current) {
+            return sessionCheckRef.current;
+        }
+
+        const promise = (async () => {
+            try {
+                const { data } = await httpClient.get('/api/auth/profile');
+                setUser(data);
+                return data;
+            } catch (err) {
+                console.warn('Session check failed:', err);
+                setUser(null);
+                return null;
+            } finally {
+                setLoading(false);
+                sessionCheckRef.current = null; // Clear after completion
+            }
+        })();
+
+        sessionCheckRef.current = promise;
+        return promise;
+    }, []);
+
     // Check session on mount
     useEffect(() => {
         // Skip check if handling callback or viewing a public report
@@ -38,26 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             window.location.pathname.startsWith('/privacy') ||
             window.location.pathname.startsWith('/terms') ||
             window.location.pathname.startsWith('/about')) {
-            setLoading(false); // Important: set loading to false so components can render
+            setLoading(false);
             return;
         }
         checkSession();
-    }, []);
-
-    const checkSession = async (): Promise<User | null> => {
-        try {
-            // Attempt to fetch profile using cookie - use httpClient (root) not api (v1)
-            const { data } = await httpClient.get('/api/auth/profile');
-            setUser(data);
-            return data;
-        } catch (err) {
-            console.warn('Session check failed:', err); // Log error for debug
-            setUser(null);
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [checkSession]);
 
     const refreshSession = checkSession;
 

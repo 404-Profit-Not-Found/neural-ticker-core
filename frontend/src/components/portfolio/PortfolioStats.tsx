@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Bot } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { format, subDays, differenceInDays, addDays, isBefore, startOfDay, parseISO, isValid } from 'date-fns';
+import { useCurrency } from '../../context/CurrencyContext';
 
 interface Position {
   symbol: string;
@@ -48,20 +49,20 @@ const RANGES = ['1W', '1M', '6M', '1Y'] as const;
 type Range = typeof RANGES[number];
 
 // Standard Tooltip (Theme-Aware)
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<Record<string, unknown>>; label?: string }) => {
+const CustomTooltip = ({ active, payload, label, currency }: { active?: boolean; payload?: Array<Record<string, unknown>>; label?: string; currency?: string }) => {
   if (active && payload && payload.length) {
     const formatCurrency = (val: number) =>
-      new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(val);
 
     return (
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs">
         <p className="font-semibold text-popover-foreground mb-1.5">{label}</p>
         {payload.map((entry, index: number) => {
-          // Check if this data point has added symbols attached
+          // ... existing logic ...
           const entryPayload = entry.payload as Record<string, unknown> | undefined;
           const addedSymbols = entryPayload?.addedSymbols as string[] | undefined;
           if (addedSymbols && index === 0) {
-            return (
+             return (
               <div key={`added-${index}`} className="mt-1 pt-1 border-t border-border/50">
                 {addedSymbols.map((sym: string) => (
                   <p key={sym} className="flex items-center gap-1.5 text-blue-400 font-semibold">
@@ -72,7 +73,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
               </div>
             );
           }
-          return null;
+           return null;
         })}
         {payload.map((entry, index: number) => (
           <p key={index} className="flex items-center gap-2">
@@ -106,9 +107,8 @@ export function PortfolioStats({
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
+  const { formatCurrency, displayCurrency } = useCurrency(); // Use context formatter
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
   // --- Data Preparation ---
 
@@ -402,7 +402,7 @@ export function PortfolioStats({
                   hide={false}
                 />
                 <Tooltip
-                  content={<CustomTooltip />}
+                  content={<CustomTooltip currency={displayCurrency} />}
                   cursor={{ stroke: '#9ca3af', strokeWidth: 1, strokeDasharray: '4 4' }}
                 />
                 <Area

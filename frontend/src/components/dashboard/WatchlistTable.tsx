@@ -47,7 +47,7 @@ interface TickerSearchResult {
 }
 
 interface MarketSnapshot {
-    ticker: { symbol: string; logo_url?: string; name?: string; id: string; industry?: string; sector?: string };
+    ticker: { symbol: string; logo_url?: string; name?: string; id: string; industry?: string; sector?: string; currency?: string };
     latestPrice?: { close: number; prevClose?: number };
     fundamentals?: {
         sector?: string;
@@ -248,7 +248,8 @@ export function WatchlistTable() {
                     analystCount: s.counts?.analysts || 0,
                     socialCount: s.counts?.social || 0,
                     itemId: watchlistItem?.id,
-                    sparkline: s.sparkline
+                    sparkline: s.sparkline,
+                    currency: s.ticker?.currency || 'USD'
                 };
             });
     }, [snapshotData, activeWatchlist, watchlistItems, symbols]);

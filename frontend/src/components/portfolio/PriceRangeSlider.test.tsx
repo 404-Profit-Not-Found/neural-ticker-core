@@ -15,6 +15,7 @@ describe('PriceRangeSlider', () => {
         median={150}
         value={155}
         onChange={mockOnChange}
+        currency="USD"
       />
     );
 
@@ -32,6 +33,7 @@ describe('PriceRangeSlider', () => {
         median={150}
         value={155}
         onChange={mockOnChange}
+        currency="USD"
       />
     );
 
@@ -49,6 +51,7 @@ describe('PriceRangeSlider', () => {
         median={150}
         value={155}
         onChange={mockOnChange}
+        currency="USD"
       />
     );
 

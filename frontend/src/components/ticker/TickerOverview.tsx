@@ -114,7 +114,7 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
                     <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
                         <TrendingUp size={14} /> Price Scenarios & Thesis
                     </h3>
-                    <ScenarioCards scenarios={risk_analysis.scenarios} currentPrice={market_data?.price || 0} />
+                    <ScenarioCards scenarios={risk_analysis.scenarios} currentPrice={market_data?.price || 0} currency={profile?.currency} />
                 </section>
             )}
 
@@ -178,7 +178,7 @@ export function TickerOverview({ risk_analysis, market_data, ratings, profile, n
             )}
 
             {/* Analyst Ratings */}
-            <AnalystRatingsTable ratings={ratings} />
+            <AnalystRatingsTable ratings={ratings} currency={profile?.currency} />
         </div>
     );
 }

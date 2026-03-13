@@ -25,6 +25,7 @@ interface PortfolioItem {
     financial_risk?: number;
     overall_score?: number;
   };
+  currency?: string;
 }
 
 interface PortfolioGridViewProps {
@@ -59,8 +60,8 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
     );
   }
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+  const formatCurrency = (val: number, curr?: string) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: curr || 'USD' }).format(val);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-500">
@@ -130,7 +131,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
               <div>
                 <div className="text-sm text-muted-foreground">Value</div>
                 <div className="text-xl font-bold tracking-tight">
-                  {formatCurrency(item.current_value)}
+                  {formatCurrency(item.current_value, item.currency)}
                 </div>
               </div>
               <div className="text-right">

@@ -14,8 +14,9 @@ export function FiftyTwoWeekRange({
   high, 
   current, 
   className,
-  showLabels = true
-}: FiftyTwoWeekRangeProps) {
+  showLabels = true,
+  currency = 'USD'
+}: FiftyTwoWeekRangeProps & { currency?: string }) {
   
   if (!low || !high || high <= low) {
     return <div className="text-xs text-muted-foreground">-</div>;
@@ -24,6 +25,15 @@ export function FiftyTwoWeekRange({
   // Calculate position percentage (0 to 100)
   const range = high - low;
   const position = Math.min(100, Math.max(0, ((current - low) / range) * 100));
+
+  const format = (val: number) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        notation: 'compact',
+        maximumFractionDigits: 1
+    }).format(val);
+  };
 
   return (
     <div className={cn("flex flex-col gap-1.5 w-full min-w-[140px]", className)}>
@@ -42,9 +52,9 @@ export function FiftyTwoWeekRange({
 
       {showLabels && (
         <div className="flex justify-between items-center text-[10px] text-muted-foreground/60 font-mono leading-none">
-          <span>{low.toFixed(2)}</span>
+          <span>{format(low)}</span>
           <span className="text-foreground/80 font-bold">{((position)).toFixed(0)}%</span>
-          <span>{high.toFixed(2)}</span>
+          <span>{format(high)}</span>
         </div>
       )}
     </div>

@@ -86,7 +86,8 @@ export interface TickerData {
         industry?: string;
         web_url?: string;
         description?: string;
-        country?: string;
+        location?: string;
+        currency?: string;
     };
     market_data: {
         price: number;

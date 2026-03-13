@@ -338,13 +338,26 @@ export class MarketStatusService {
 
     const marketOpen = 8 * 60; // 8:00 AM CET
     const marketClose = 17 * 60 + 30; // 5:30 PM CET
+    const postMarketEnd = 18 * 60; // 6:00 PM CET (30 min grace for closing prices)
 
-    const isOpen =
-      isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+    let session: 'pre' | 'regular' | 'post' | 'closed' = 'closed';
+    let isOpen = false;
+
+    if (isWeekday) {
+      if (timeInMinutes >= marketOpen && timeInMinutes < marketClose) {
+        session = 'regular';
+        isOpen = true;
+      } else if (
+        timeInMinutes >= marketClose &&
+        timeInMinutes < postMarketEnd
+      ) {
+        session = 'post';
+      }
+    }
 
     return {
       isOpen,
-      session: isOpen ? 'regular' : 'closed',
+      session,
       timezone: 'Europe/Berlin',
       exchange: 'EU',
       region: 'EU',

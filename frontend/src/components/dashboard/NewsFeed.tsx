@@ -263,7 +263,7 @@ export function NewsFeed({ tickerCount }: { tickerCount?: number }) {
                             {digest.relatedTickers && digest.relatedTickers.length > 0 && (
                                 <div className="mb-6 pb-4 border-b border-border/50">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; latestPrice?: { close: number; changePercent?: number; change?: number }; riskAnalysis?: { overall_score: number; financial_risk?: number } }) => (
+                                        {digest.relatedTickers.map((t: { id: string; symbol: string; name: string; currency?: string; latestPrice?: { close: number; changePercent?: number; change?: number }; riskAnalysis?: { overall_score: number; financial_risk?: number } }) => (
                                             <MiniTickerTile
                                                 key={t.id}
                                                 symbol={t.symbol}
@@ -273,6 +273,7 @@ export function NewsFeed({ tickerCount }: { tickerCount?: number }) {
                                                 changeAmount={Number(t.latestPrice?.change || 0)}
                                                 riskScore={t.riskAnalysis?.financial_risk ?? t.riskAnalysis?.overall_score ?? 0}
                                                 href={`/ticker/${t.symbol}`}
+                                                currency={t.currency || 'USD'}
                                             />
                                         ))}
 

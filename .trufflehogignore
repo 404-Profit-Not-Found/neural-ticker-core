@@ -1,15 +1,28 @@
 # regex for trufflehog exclusion
-^.git/
-^node_modules/
-^dist/
-^coverage/
-^.vscode/
-^.idea/
-^.DS_Store$
-^.env$
-^.gemini/
+# Directories (match anywhere in path)
+\.git/
+node_modules/
+dist/
+coverage/
+\.vscode/
+\.idea/
+\.claude/
+
+# Env files (contain secrets by design)
+\.env$
+\.env\..*
+
+# Gemini workspace
+\.gemini/
+
+# Lock files
 \.lock$
-# ignore images/assets
-\.(png|jpg|jpeg|gif|svg|ico)$
-# ignore binary
+
+# Images/assets
+\.(png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$
+
+# Binary files
 \.(exe|dll|so|dylib)$
+
+# Firebase service account (local dev only)
+firebase.*\.json$

@@ -712,6 +712,110 @@ export class TickersService {
     return results.map((r) => r.sector).filter((s) => s && s.trim().length > 0);
   }
 
+  /**
+   * Get all unique currencies from tracked tickers
+   */
+  async getUniqueCurrencies(): Promise<string[]> {
+    const results = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .select('DISTINCT ticker.currency', 'currency')
+      .where('ticker.currency IS NOT NULL')
+      .andWhere("ticker.currency != ''")
+      .orderBy('currency', 'ASC')
+      .getRawMany();
+
+    return results
+      .map((r) => r.currency)
+      .filter((c) => c && c.trim().length > 0);
+  }
+
+  /**
+   * Backfill currency on existing tickers from Yahoo Finance.
+   * Updates tickers where currency is NULL, empty, or 'USD' (potential default).
+   */
+  async backfillTickerCurrencies(): Promise<{
+    updated: number;
+    skipped: number;
+    failed: number;
+  }> {
+    this.logger.log('Starting ticker currency backfill...');
+
+    // Get tickers that might need currency updates
+    const tickers = await this.tickerRepo.find({
+      where: [
+        { currency: '' },
+        { currency: 'USD' }, // USD might be the default fallback
+      ],
+    });
+
+    // Also get tickers with NULL currency
+    const nullCurrencyTickers = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .where('ticker.currency IS NULL')
+      .getMany();
+
+    // US-listed tickers (no '.' in symbol) with non-USD currency — likely ADR misclassification
+    const misclassifiedUS = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .where("ticker.symbol NOT LIKE '%.__'")
+      .andWhere("ticker.symbol NOT LIKE '%.%'")
+      .andWhere("ticker.currency != 'USD'")
+      .andWhere('ticker.currency IS NOT NULL')
+      .getMany();
+
+    const allTickers = [...tickers, ...nullCurrencyTickers, ...misclassifiedUS];
+    const uniqueTickers = [
+      ...new Map(allTickers.map((t) => [t.symbol, t])).values(),
+    ];
+
+    this.logger.log(
+      `Found ${uniqueTickers.length} tickers to check for currency backfill`,
+    );
+
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const ticker of uniqueTickers) {
+      try {
+        const quote = await this.yahooFinanceService.getQuote(ticker.symbol);
+        let currency = quote?.currency?.toUpperCase();
+
+        // US-listed stocks (no exchange suffix like .DE, .PA, .L) always trade in USD,
+        // even if Yahoo reports the company's home currency (e.g. DKK for NVO ADR).
+        if (currency && !ticker.symbol.includes('.') && currency !== 'USD') {
+          this.logger.debug(
+            `Overriding reported currency ${currency} -> USD for US-listed ${ticker.symbol}`,
+          );
+          currency = 'USD';
+        }
+
+        if (currency && currency !== ticker.currency) {
+          await this.tickerRepo.update(ticker.id, { currency });
+          this.logger.log(
+            `Updated ${ticker.symbol} currency: ${ticker.currency} -> ${currency}`,
+          );
+          updated++;
+        } else {
+          skipped++;
+        }
+
+        // Small delay to avoid rate limiting
+        await new Promise((r) => setTimeout(r, 200));
+      } catch (error) {
+        this.logger.warn(
+          `Failed to update currency for ${ticker.symbol}: ${error}`,
+        );
+        failed++;
+      }
+    }
+
+    this.logger.log(
+      `Currency backfill complete. Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}`,
+    );
+    return { updated, skipped, failed };
+  }
+
   private async fetchFromYahoo(symbol: string): Promise<any> {
     try {
       this.logger.log(`Fetching ${symbol} from Yahoo Finance...`);

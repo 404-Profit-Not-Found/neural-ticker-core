@@ -20,6 +20,14 @@ export interface Position {
     cost_basis: number;
     gain_loss: number;
     gain_loss_percent: number;
+    currency?: string; // (e.g. 'USD' or 'EUR')
+
+    // Optional native values (if displayCurrency was used)
+    original_currency?: string;
+    original_current_price?: number;
+    original_current_value?: number;
+    original_cost_basis?: number;
+    original_gain_loss?: number;
 
     // Sparkline & Range
     sparkline?: number[];
@@ -31,7 +39,8 @@ export interface Position {
         logo_url?: string;
         name?: string;
         sector?: string;
-        industry?: string;
+ industry?: string;
+        currency?: string; // Add currency to ticker
     };
     fundamentals?: {
         pe_ttm?: number;
@@ -61,8 +70,8 @@ interface PortfolioTableProps {
 }
 
 // Helpers
-const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+const formatCurrency = (val: number, currency = 'USD') =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
 
 const formatPct = (val: number) =>
     `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
@@ -81,6 +90,8 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const ticker = info.row.original.ticker;
                 const fundamentals = info.row.original.fundamentals;
                 const counts = info.row.original.counts;
+                const row = info.row.original;
+                const currency = row.original_currency || row.ticker?.currency || 'USD';
                 const showCounts = (counts?.research || 0) + (counts?.news || 0) + (counts?.social || 0) > 0;
 
                 return (
@@ -98,6 +109,9 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                                         navigate(`/ticker/${info.getValue()}`);
                                     }}
                                 >{info.getValue()}</span>
+                                <span className="text-[10px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground font-mono">
+                                    {currency}
+                                </span>
 
                                 {showCounts && (
                                     <div className="flex items-center gap-2">
@@ -139,18 +153,22 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             id: 'gain_loss_percent', // Sort by percentage
             header: 'Value / Return',
             cell: (info) => {
-                const val = info.row.original.current_value;
-                const gainLoss = info.row.original.gain_loss;
+                const row = info.row.original;
+                // Use converted (Display) values for Value & Return columns
+                const val = row.current_value;
+                const gainLoss = row.gain_loss;
+                const currency = row.currency || 'USD';
+                
                 const pct = info.getValue();
                 const isProfit = gainLoss >= 0;
 
                 return (
                     <div className="flex flex-col items-start min-w-[100px]">
                         <span className="font-bold text-foreground text-sm">
-                            {formatCurrency(val)}
+                            {formatCurrency(val, currency)}
                         </span>
                         <div className={cn("flex items-center gap-1 text-xs font-bold", isProfit ? "text-emerald-500" : "text-red-500")}>
-                            <span>{gainLoss > 0 ? '+' : ''}{formatCurrency(gainLoss)}</span>
+                            <span>{gainLoss > 0 ? '+' : ''}{formatCurrency(gainLoss, currency)}</span>
                             <span className="opacity-80">({formatPct(pct)})</span>
                         </div>
                     </div>
@@ -161,26 +179,44 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
         // 3. Position (Shares) (Moved Here)
         columnHelper.accessor('shares', {
             header: () => <span className="hidden md:inline">Position</span>,
-            cell: (info) => (
-                <div className="hidden md:flex flex-col min-w-[80px]">
-                    <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
-                    <span className="text-xs text-muted-foreground">Avg: {formatCurrency(Number(info.row.original.buy_price))}</span>
-                </div>
-            )
+            cell: (info) => {
+                const row = info.row.original;
+                const buyPrice = Number(row.original_current_price ? Number(row.original_cost_basis) / Number(row.shares) : row.buy_price); 
+                // Note: buy_price might not have an original_buy_price field, but cost_basis does. 
+                // Simpler: Just use buy_price unless we want to be super precise about cost basis currency.
+                // Actually, buy_price is usually stored in native currency. Check PortfolioService.
+                // create() stores it. findAll returns it.
+                // The conversion logic converts cost_basis.
+                // If we want to show 'Avg: $X', X should be in the same currency as Value.
+                // Since Value is Native, Avg should be Native.
+                // 'pos.buy_price' IS native in the DB.
+                // So plain 'buy_price' is correct!
+                
+                const currency = row.original_currency || 'USD';
+
+                return (
+                    <div className="hidden md:flex flex-col min-w-[80px]">
+                        <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
+                        <span className="text-xs text-muted-foreground">Avg: {formatCurrency(buyPrice, currency)}</span>
+                    </div>
+                );
+            }
         }),
 
         // 4. Price / Change
         columnHelper.accessor('current_price', {
             header: () => <span className="hidden md:inline">Price / Change</span>,
             cell: (info) => {
-                const price = info.getValue();
-                const change = info.row.original.change_percent || 0;
+                const row = info.row.original;
+                const price = row.original_current_price ?? info.getValue();
+                const currency = row.original_currency || 'USD';
+                const change = row.change_percent || 0;
                 const isPositive = change >= 0;
 
                 return (
                     <div className="hidden md:flex flex-col items-start min-w-[90px]">
                         <span className="text-sm font-mono font-medium text-foreground/90">
-                            {formatCurrency(price)}
+                            {formatCurrency(price, currency)}
                         </span>
                         <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
                             {isPositive ? <ArrowUp size={12} className="mr-0.5" /> : <ArrowDown size={12} className="mr-0.5" />}

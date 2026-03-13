@@ -172,10 +172,12 @@ export function AnalyzerTable({
 
         const isPositive = (change || 0) >= 0;
 
+        const currency = info.row.original.ticker?.currency || 'USD';
+
         return (
           <div className="flex flex-col items-end">
             <span className="text-sm font-mono font-medium text-foreground/70">
-              ${price.toFixed(2)}
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(price)}
             </span>
             {change !== undefined && change !== null ? (
               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
@@ -227,6 +229,7 @@ export function AnalyzerTable({
               high={Number(high)}
               current={price}
               showLabels={true}
+              currency={row.ticker?.currency || 'USD'}
             />
           </div>
         );

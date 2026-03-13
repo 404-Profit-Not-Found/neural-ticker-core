@@ -3,6 +3,8 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  OnModuleInit,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,9 +16,12 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
+import { CurrencyService } from '../currency/currency.service';
 
 @Injectable()
-export class PortfolioService {
+export class PortfolioService implements OnModuleInit {
+  private readonly logger = new Logger(PortfolioService.name);
+
   constructor(
     @InjectRepository(PortfolioPosition)
     private readonly positionRepo: Repository<PortfolioPosition>,
@@ -29,20 +34,38 @@ export class PortfolioService {
     private readonly tickersService: TickersService,
     @Inject(forwardRef(() => CreditService))
     private readonly creditService: CreditService,
+    private readonly currencyService: CurrencyService,
   ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing PortfolioService...');
+    // Auto-heal currency data on startup
+    const result = await this.backfillPositionCurrencies();
+    this.logger.log(
+      `Currency Backfill Result: Updated ${result.updated}, Skipped ${result.skipped}`,
+    );
+  }
 
   async create(
     userId: string,
     dto: CreatePortfolioPositionDto,
   ): Promise<PortfolioPosition> {
+    // Auto-detect currency from ticker if not explicitly provided
+    let currency = dto.currency;
+    if (!currency) {
+      const ticker = await this.tickersService.findOneBySymbol(dto.symbol);
+      currency = ticker?.currency || 'USD';
+    }
+
     const position = this.positionRepo.create({
       ...dto,
+      currency,
       user_id: userId,
     });
     return this.positionRepo.save(position);
   }
 
-  async findAll(userId: string): Promise<any[]> {
+  async findAll(userId: string, displayCurrency?: string): Promise<any[]> {
     const positions = await this.positionRepo.find({
       where: { user_id: userId },
       order: { symbol: 'ASC' },
@@ -104,7 +127,8 @@ export class PortfolioService {
       // - aiAnalysis (risk, upside, rating)
       // - ticker (logo, name)
       // - counts (analysts, news)
-      return {
+      // Base result in native currency
+      const result = {
         ...pos,
         ...snapshot, // Spread the full snapshot (ticker, fundamentals, aiAnalysis, etc.)
         current_price: currentPrice,
@@ -114,7 +138,47 @@ export class PortfolioService {
         gain_loss: gainLoss,
         gain_loss_percent: gainLossPercent,
       };
+
+      return result;
     });
+
+    // If displayCurrency is specified and differs, convert values
+    if (displayCurrency) {
+      const conversions = await Promise.all(
+        enriched.map(async (pos) => {
+          const nativeCurrency = pos.currency || 'USD';
+          if (nativeCurrency === displayCurrency) {
+            return { ...pos, display_currency: displayCurrency };
+          }
+          const rate = await this.currencyService.getRate(
+            nativeCurrency,
+            displayCurrency,
+          );
+
+          return {
+            ...pos,
+            // Preserve original native values
+            original_currency: pos.currency,
+            original_current_price: pos.current_price,
+            original_current_value: pos.current_value,
+            original_cost_basis: pos.cost_basis,
+            original_gain_loss: pos.gain_loss,
+            original_buy_price: pos.buy_price,
+
+            // Overwrite with converted values for consistent aggregation
+            currency: displayCurrency,
+            current_price: pos.current_price * rate,
+            current_value: pos.current_value * rate,
+            cost_basis: pos.cost_basis * rate,
+            gain_loss: pos.gain_loss * rate,
+            buy_price: pos.buy_price * rate,
+
+            conversion_rate: rate,
+          };
+        }),
+      );
+      return conversions;
+    }
 
     return enriched;
   }
@@ -126,6 +190,35 @@ export class PortfolioService {
       .getRawMany();
 
     return positions.map((p) => p.symbol);
+  }
+
+  /**
+   * Backfill currency on positions that have 'USD' default by looking up their ticker's native currency.
+   * Call this from a cron job to auto-heal existing positions.
+   */
+  async backfillPositionCurrencies(): Promise<{
+    updated: number;
+    skipped: number;
+  }> {
+    const positions = await this.positionRepo.find({
+      where: { currency: 'USD' }, // Only positions with default USD
+    });
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const pos of positions) {
+      const ticker = await this.tickersService.findOneBySymbol(pos.symbol);
+      if (ticker && ticker.currency && ticker.currency !== 'USD') {
+        pos.currency = ticker.currency;
+        await this.positionRepo.save(pos);
+        updated++;
+      } else {
+        skipped++;
+      }
+    }
+
+    return { updated, skipped };
   }
 
   async findOne(userId: string, id: string): Promise<PortfolioPosition> {

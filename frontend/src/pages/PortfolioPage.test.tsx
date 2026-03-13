@@ -6,10 +6,14 @@ import { BrowserRouter } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useMarketSnapshots } from '../hooks/useWatchlist';
+import { useCurrency } from '../context/CurrencyContext';
 import { api } from '../lib/api';
 import '@testing-library/jest-dom';
 
 // Mocks
+vi.mock('../context/CurrencyContext', () => ({
+  useCurrency: vi.fn(),
+}));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: vi.fn(),
 }));
@@ -82,6 +86,10 @@ describe('PortfolioPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useAuth as Mock).mockReturnValue({ user: { uid: '1', credits_balance: 10 } });
+    (useCurrency as Mock).mockReturnValue({ 
+      displayCurrency: 'USD',
+      formatCurrency: (val: number) => `$${val.toLocaleString()}`
+    });
     (useQuery as Mock).mockReturnValue({ data: mockPositions, isLoading: false, refetch: vi.fn() });
     (useMarketSnapshots as Mock).mockReturnValue({ data: [], isLoading: false });
   });

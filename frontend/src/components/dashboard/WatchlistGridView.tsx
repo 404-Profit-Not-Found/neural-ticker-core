@@ -67,6 +67,7 @@ export function WatchlistGridView({ data, isLoading, onRemove }: WatchlistGridVi
                         fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
                         fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
                         marketStatus={status}
+                        currency={item.currency}
                     >
                         {/* Action Overlays */}
                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">

@@ -11,6 +11,18 @@ vi.mock('../../context/AuthContext', () => ({
   }),
 }));
 
+vi.mock('../../context/CurrencyContext', () => ({
+  useCurrency: () => ({
+    displayCurrency: 'USD',
+    availableCurrencies: [{ code: 'USD', flag: '🇺🇸' }],
+    setDisplayCurrency: vi.fn(),
+    formatCurrency: (val: number) => `$${val.toFixed(2)}`,
+    convert: (amount: number) => amount,
+    rates: {},
+    loading: false,
+  }),
+}));
+
 vi.mock('../../hooks/useTicker', () => ({
   useActiveResearchCount: () => ({ data: 0 }),
 }));

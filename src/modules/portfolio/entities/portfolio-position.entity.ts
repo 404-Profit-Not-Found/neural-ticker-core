@@ -40,4 +40,7 @@ export class PortfolioPosition {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
+
+  @Column({ length: 3, default: 'USD' })
+  currency: string;
 }

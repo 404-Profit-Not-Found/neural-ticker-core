@@ -1,12 +1,13 @@
 import { cn } from '../../lib/api';
 
-interface PriceRangeSliderProps {
+export interface PriceRangeSliderProps {
   high: number;
   low: number;
   median: number;
   value: number;
   onChange: (price: number) => void;
   className?: string;
+  currency: string;
 }
 
 export function PriceRangeSlider({
@@ -16,9 +17,14 @@ export function PriceRangeSlider({
   value,
   onChange,
   className,
+  currency,
 }: PriceRangeSliderProps) {
   const range = high - low;
   const medianPercentage = range === 0 ? 50 : ((median - low) / range) * 100;
+
+  const formatPrice = (val: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
+  }
 
   return (
     <div className={cn("space-y-4 py-2", className)}>
@@ -26,7 +32,7 @@ export function PriceRangeSlider({
         <div className="space-y-0.5">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Price Selection</span>
           <div className="text-xl font-mono font-bold">
-            ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatPrice(value)}
           </div>
         </div>
       </div>
@@ -70,8 +76,8 @@ export function PriceRangeSlider({
       </div>
 
       <div className="flex justify-between text-[10px] font-mono text-muted-foreground pt-1">
-        <span>${low.toFixed(2)}</span>
-        <span>${high.toFixed(2)}</span>
+        <span>{formatPrice(low)}</span>
+        <span>{formatPrice(high)}</span>
       </div>
     </div>
   );

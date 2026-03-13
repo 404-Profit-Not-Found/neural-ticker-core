@@ -13,10 +13,19 @@ interface PublicAnalystRating {
 
 interface PublicAnalystRatingsTableProps {
     ratings?: PublicAnalystRating[];
+    currency?: string;
 }
 
-export function PublicRatingsTable({ ratings }: PublicAnalystRatingsTableProps) {
+export function PublicRatingsTable({ ratings, currency = 'USD' }: PublicAnalystRatingsTableProps) {
     if (!ratings || ratings.length === 0) return null;
+
+    const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: 2
+        }).format(val);
+    };
 
     return (
         <Card className="bg-transparent shadow-sm border border-border/50">
@@ -71,7 +80,7 @@ export function PublicRatingsTable({ ratings }: PublicAnalystRatingsTableProps) 
                                             </Badge>
                                         </td>
                                         <td className="p-2 text-right font-mono font-medium align-top pt-3">
-                                            {rating.price_target ? `$${rating.price_target.toFixed(2)}` : '-'}
+                                            {rating.price_target ? formatCurrency(rating.price_target) : '-'}
                                         </td>
                                     </tr>
                                 );

@@ -157,7 +157,10 @@ export function PublicResearchPage() {
                                         <div className="flex items-center gap-4 pt-2">
                                             <div className="flex flex-col">
                                                 <span className="text-2xl font-bold tracking-tight">
-                                                    ${market_context?.price?.toFixed(2) || '0.00'}
+                                                    {new Intl.NumberFormat('en-US', {
+                                                        style: 'currency',
+                                                        currency: profile?.currency || 'USD'
+                                                    }).format(market_context?.price || 0)}
                                                 </span>
                                                 <span className={`text-sm font-medium flex items-center ${market_context?.change_percent >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                                                     {market_context?.change_percent > 0 ? '+' : ''}{market_context?.change_percent?.toFixed(2) || '0.00'}%

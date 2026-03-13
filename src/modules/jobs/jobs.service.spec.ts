@@ -8,6 +8,7 @@ import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
 import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import { RequestQueue } from './entities/request-queue.entity';
+import { PortfolioService } from '../portfolio/portfolio.service';
 
 describe('JobsService', () => {
   let service: JobsService;
@@ -66,6 +67,12 @@ describe('JobsService', () => {
         {
           provide: getRepositoryToken(RequestQueue),
           useValue: mockRequestQueueRepo,
+        },
+        {
+          provide: PortfolioService,
+          useValue: {
+            updateActivePortfolios: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

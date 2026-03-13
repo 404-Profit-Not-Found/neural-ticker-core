@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 import { SuperLoading } from './components/ui/SuperLoading';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
@@ -23,7 +24,7 @@ import { TermsOfService } from './pages/TermsOfService';
 
 
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
 function ScrollToTop() {
@@ -75,9 +76,10 @@ function App() {
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
-        <ThemeController />
-        <ToastProvider>
-          <Routes>
+        <CurrencyProvider>
+          <ThemeController />
+          <ToastProvider>
+            <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/access-denied" element={<AccessDenied />} />
@@ -119,7 +121,8 @@ function App() {
             {/* Redirect Legacy Route */}
             <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
           </Routes>
-        </ToastProvider>
+          </ToastProvider>
+        </CurrencyProvider>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -213,24 +216,24 @@ function ThemeController() {
 
 // Simple Callback Handler to refresh user state
 function OAuthCallback() {
-  const { refreshSession, user } = useAuth();
+  const { refreshSession } = useAuth();
   const navigate = useNavigate();
+  const didRun = useRef(false);
 
   useEffect(() => {
-    // Only attempt refresh if we don't have a user yet
-    if (!user) {
-        refreshSession().then((sessionUser) => {
-            if (!sessionUser) {
-                // If refresh failed, go to login
-                console.error("OAuth Callback: Failed to refresh session");
-                navigate('/login', { replace: true });
-            }
-        });
-    } else {
-        // If we have a user (either from refresh or already there), go to home
-         navigate('/', { replace: true });
-    }
-  }, [refreshSession, navigate, user]);
+    // Guard: only run once to prevent double-fire from StrictMode or re-renders
+    if (didRun.current) return;
+    didRun.current = true;
+
+    refreshSession().then((sessionUser) => {
+      if (sessionUser) {
+        navigate('/', { replace: true });
+      } else {
+        console.error('OAuth Callback: Failed to refresh session');
+        navigate('/login', { replace: true });
+      }
+    });
+  }, [refreshSession, navigate]);
 
   return <SuperLoading text="Authenticating..." fullScreen />;
 }

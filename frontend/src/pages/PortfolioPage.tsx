@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Header } from '../components/layout/Header';
 import { PortfolioTable } from '../components/portfolio/PortfolioTable';
 import { PortfolioGridView } from '../components/portfolio/PortfolioGridView';
@@ -16,6 +17,20 @@ import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { calculateAiRating } from '../lib/rating-utils';
 import { useMarketSnapshots } from '../hooks/useWatchlist';
+
+interface MarketSnapshot {
+  ticker: { symbol: string; logo_url?: string; name?: string; id: string; currency?: string };
+  latestPrice?: { close: number; prevClose?: number };
+  fundamentals?: {
+    fifty_two_week_high?: number;
+    fifty_two_week_low?: number;
+    sector?: string;
+    pe_ttm?: number;
+    market_cap?: number;
+  };
+  sparkline?: number[];
+  quote?: Record<string, unknown>;
+}
 
 interface PortfolioPosition {
   id: string;
@@ -64,10 +79,14 @@ export function PortfolioPage() {
     overallScore: null,
   });
 
+  const { displayCurrency } = useCurrency();
+
   const { data: positions = [], isLoading, refetch } = useQuery({
-    queryKey: ['portfolio'],
+    queryKey: ['portfolio', displayCurrency],
     queryFn: async () => {
-      const { data } = await api.get('/portfolio/positions');
+      const { data } = await api.get('/portfolio/positions', {
+        params: { displayCurrency },
+      });
       return data;
     },
   });
@@ -75,15 +94,20 @@ export function PortfolioPage() {
 
 
   // -- Market Data for Sparklines & 52-Week Range --
-  const symbols = useMemo(() => positions.map((p: PortfolioPosition) => p.symbol), [positions]);
+  const symbols = useMemo(() => (positions || []).filter((p: PortfolioPosition) => p && p.symbol).map((p: PortfolioPosition) => p.symbol), [positions]);
   const { data: snapshots = [] } = useMarketSnapshots(symbols, { refetchInterval: 10000 });
 
   // Merge Snapshots with Positions
   const enrichedPositions = useMemo(() => {
-    if (!snapshots || snapshots.length === 0) return positions;
-    const snapMap = new Map(snapshots.map((s: Record<string, unknown> & { ticker: { symbol: string }; quote?: { d?: number; dp?: number }; fundamentals?: { fifty_two_week_high?: number; fifty_two_week_low?: number }; sparkline?: unknown }) => [s.ticker.symbol, s]));
+    if (!snapshots || snapshots.length === 0) return (positions || []);
+    
+    const snapMap = new Map(
+      (snapshots as MarketSnapshot[])
+        .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
+        .map((s: MarketSnapshot) => [s.ticker.symbol, s])
+    );
 
-    return positions.map((p: PortfolioPosition) => {
+    return (positions || []).map((p: PortfolioPosition) => {
       const snap = snapMap.get(p.symbol);
       if (!snap) return p;
       return {

@@ -65,6 +65,7 @@ export interface TickerData {
     potentialDownside: number | null;
     itemId?: string;
     sparkline?: number[];
+    currency?: string;
 }
 
 interface WatchlistTableViewProps {
@@ -183,15 +184,21 @@ export function WatchlistTableView({
                 cell: (info) => {
                     const change = info.getValue();
                     const price = info.row.original.price;
+                    const currency = info.row.original.currency;
 
                     if (!price) return '-';
 
                     const isPositive = (change || 0) >= 0;
+                    const formattedPrice = new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: currency || 'USD',
+                        minimumFractionDigits: 2
+                    }).format(price);
 
                     return (
                         <div className="flex flex-col items-end">
                             <span className="text-sm font-mono font-medium text-foreground/70">
-                                ${price.toFixed(2)}
+                                {formattedPrice}
                             </span>
                             {change !== undefined && change !== null ? (
                                 <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
@@ -237,6 +244,7 @@ export function WatchlistTableView({
                             high={row.fiftyTwoWeekHigh}
                             current={row.price}
                             showLabels={true}
+                            currency={row.currency}
                         />
                     );
                 },

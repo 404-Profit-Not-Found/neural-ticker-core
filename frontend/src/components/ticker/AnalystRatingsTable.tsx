@@ -5,10 +5,19 @@ import type { AnalystRating } from '../../types/ticker';
 
 interface AnalystRatingsTableProps {
     ratings?: AnalystRating[];
+    currency?: string;
 }
 
-export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
+export function AnalystRatingsTable({ ratings, currency = 'USD' }: AnalystRatingsTableProps) {
     if (!ratings || ratings.length === 0) return null;
+
+    const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: 2
+        }).format(val);
+    };
 
     return (
         <Card className="bg-transparent shadow-sm border border-border/50">
@@ -63,7 +72,7 @@ export function AnalystRatingsTable({ ratings }: AnalystRatingsTableProps) {
                                             </Badge>
                                         </td>
                                         <td className="p-2 text-right font-mono font-medium align-top pt-3">
-                                            {rating.price_target ? `$${rating.price_target.toFixed(2)}` : '-'}
+                                            {rating.price_target ? formatCurrency(rating.price_target) : '-'}
                                         </td>
                                     </tr>
                                 );

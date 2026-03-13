@@ -18,14 +18,25 @@ interface Scenario {
 interface ScenarioCardsProps {
     scenarios: Scenario[];
     currentPrice: number;
+    currency?: string;
 }
 
-export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
+export function ScenarioCards({ scenarios, currentPrice, currency = 'USD' }: ScenarioCardsProps) {
     // Sort logic to ensure layout order: Bear -> Base -> Bull
     const sortedScenarios = [...scenarios].sort((a, b) => {
         const order = { bear: 0, base: 1, bull: 2 };
         return order[a.scenario_type] - order[b.scenario_type];
     });
+
+    const formatCurrency = (val: number, compact = false) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency,
+            notation: compact ? 'compact' : 'standard',
+            minimumFractionDigits: compact ? 1 : 2,
+            maximumFractionDigits: compact ? 1 : 2
+        }).format(val);
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -77,7 +88,7 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                                             {scenario.scenario_type} CASE
                                         </h3>
                                         <div className="text-lg font-bold flex items-center gap-1.5 leading-tight mt-0.5">
-                                            ${targetPrice.toFixed(2)}
+                                            {formatCurrency(targetPrice)}
                                             <span className={cn(
                                                 "text-sm font-medium flex items-center",
                                                 isPositive ? "text-green-500" : "text-red-500"
@@ -97,11 +108,11 @@ export function ScenarioCards({ scenarios, currentPrice }: ScenarioCardsProps) {
                             <div className="mt-auto pt-2 border-t border-dashed border-border flex items-center justify-between text-xs text-muted-foreground font-medium">
                                 <div className="flex gap-2">
                                     <span className="opacity-70">Range:</span>
-                                    <span>${Number(scenario.price_low || 0)} - ${Number(scenario.price_high || 0)}</span>
+                                    <span>{formatCurrency(Number(scenario.price_low || 0))} - {formatCurrency(Number(scenario.price_high || 0))}</span>
                                 </div>
                                 <div className="flex gap-2">
                                     <span className="opacity-70">Cap:</span>
-                                    <span>${(Number(scenario.expected_market_cap || 0) / 1e9).toFixed(1)}B</span>
+                                    <span>{formatCurrency(Number(scenario.expected_market_cap || 0), true)}</span>
                                 </div>
                             </div>
                         </CardContent>

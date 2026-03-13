@@ -17,6 +17,7 @@ import {
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
 import { cn, api } from '../lib/api';
+import { useCurrency } from '../context/CurrencyContext';
 import {
   useStockAnalyzer,
   type StockSnapshot,
@@ -96,20 +97,22 @@ function mapSnapshotToTickerData(item: StockSnapshot): TickerData {
     overallScore: item.aiAnalysis?.overall_score ?? null,
     itemId: item.ticker.id,
     sparkline: item.sparkline,
+    currency: item.ticker.currency || 'USD',
   };
 }
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { displayCurrency } = useCurrency();
 
   const { data: stats } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', displayCurrency],
     queryFn: async () => {
       const [tickers, strongBuy, sell, positions, recentResearch] = await Promise.all([
         api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
         api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
         api.get('/stats/sell').catch(() => ({ data: { count: 0 } })),
-        api.get('/portfolio/positions').catch(() => ({ data: [] })),
+        api.get('/portfolio/positions', { params: { displayCurrency } }).catch(() => ({ data: [] })),
         api.get('/research', { params: { since: 24, limit: 1 } }).catch(() => ({ data: { total: 0 } })),
       ]);
 
@@ -157,8 +160,8 @@ export function Dashboard() {
                 icon={PieChart}
                 label="My Portfolio"
                 value={stats?.portfolio && stats.portfolio.value > 0
-                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.portfolio.value)
-                  : '$0.00'}
+                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: displayCurrency, maximumFractionDigits: 0 }).format(stats.portfolio.value)
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: displayCurrency }).format(0)}
                 subValue={stats?.portfolio && stats.portfolio.value > 0 ? (
                   <span className={cn(
                     "text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
