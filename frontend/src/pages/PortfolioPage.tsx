@@ -18,6 +18,20 @@ import { cn } from '../lib/utils';
 import { calculateAiRating } from '../lib/rating-utils';
 import { useMarketSnapshots } from '../hooks/useWatchlist';
 
+interface MarketSnapshot {
+  ticker: { symbol: string; logo_url?: string; name?: string; id: string; currency?: string };
+  latestPrice?: { close: number; prevClose?: number };
+  fundamentals?: {
+    fifty_two_week_high?: number;
+    fifty_two_week_low?: number;
+    sector?: string;
+    pe_ttm?: number;
+    market_cap?: number;
+  };
+  sparkline?: number[];
+  quote?: Record<string, unknown>;
+}
+
 interface PortfolioPosition {
   id: string;
   symbol: string;
@@ -80,7 +94,7 @@ export function PortfolioPage() {
 
 
   // -- Market Data for Sparklines & 52-Week Range --
-  const symbols = useMemo(() => (positions || []).filter((p: any) => p && p.symbol).map((p: PortfolioPosition) => p.symbol), [positions]);
+  const symbols = useMemo(() => (positions || []).filter((p: PortfolioPosition) => p && p.symbol).map((p: PortfolioPosition) => p.symbol), [positions]);
   const { data: snapshots = [] } = useMarketSnapshots(symbols, { refetchInterval: 10000 });
 
   // Merge Snapshots with Positions
@@ -88,9 +102,9 @@ export function PortfolioPage() {
     if (!snapshots || snapshots.length === 0) return (positions || []);
     
     const snapMap = new Map(
-      (snapshots as any[])
-        .filter((s: any) => s && s.ticker && s.ticker.symbol)
-        .map((s: any) => [s.ticker.symbol, s])
+      (snapshots as MarketSnapshot[])
+        .filter((s: MarketSnapshot) => s && s.ticker && s.ticker.symbol)
+        .map((s: MarketSnapshot) => [s.ticker.symbol, s])
     );
 
     return (positions || []).map((p: PortfolioPosition) => {

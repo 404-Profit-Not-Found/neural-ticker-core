@@ -180,12 +180,14 @@ export class JobsService {
    * Syncs tickers only when their respective market is open.
    */
   async syncSnapshots(force = false) {
-    // Check if any market is open (unless forced via HTTP call)
+    // Check if any market is active (pre/regular/post) unless forced via HTTP call.
+    // Allow pre-market and post-market sessions to capture opening/closing prices.
     if (!force) {
       const status = await this.marketStatusService.getAllMarketsStatus();
-      const isAnyOpen = status.us.isOpen || status.eu.isOpen;
+      const allClosed =
+        status.us.session === 'closed' && status.eu.session === 'closed';
 
-      if (!isAnyOpen) {
+      if (allClosed) {
         this.logger.log('All markets are closed. Skipping snapshot sync.');
         return {
           success: 0,
@@ -215,7 +217,7 @@ export class JobsService {
           exchange,
         );
 
-        if (!force && !status.isOpen) {
+        if (!force && status.session === 'closed') {
           skippedMarketClosed++;
           continue;
         }

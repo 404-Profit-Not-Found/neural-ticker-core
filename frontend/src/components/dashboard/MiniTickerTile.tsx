@@ -9,9 +9,11 @@ interface MiniTickerTileProps {
     changeAmount?: number;
     riskScore: number;
     href: string;
+    currency?: string;
 }
 
-export function MiniTickerTile({ symbol, company, price, change, changeAmount, riskScore, href }: MiniTickerTileProps) {
+export function MiniTickerTile({ symbol, company, price, change, changeAmount, riskScore, href, currency = 'USD' }: MiniTickerTileProps) {
+    const fmt = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(val);
     return (
         <a
             href={href}
@@ -28,13 +30,13 @@ export function MiniTickerTile({ symbol, company, price, change, changeAmount, r
                     </Badge>
                     {changeAmount !== undefined && (
                         <span className={cn("text-[10px] font-mono", changeAmount >= 0 ? "text-emerald-500" : "text-red-500")}>
-                            {changeAmount >= 0 ? '+' : ''}{changeAmount.toFixed(2)}
+                            {changeAmount >= 0 ? '+' : ''}{fmt(Math.abs(changeAmount))}
                         </span>
                     )}
                 </div>
             </div>
             <div className="flex justify-between items-end mt-auto">
-                <span className="text-xs font-semibold font-mono">${price.toFixed(2)}</span>
+                <span className="text-xs font-semibold font-mono">{fmt(price)}</span>
 
                 <span className={cn(
                     "text-[10px] font-bold px-1.5 py-0.5 rounded-sm",

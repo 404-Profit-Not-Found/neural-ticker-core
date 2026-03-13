@@ -66,9 +66,9 @@ export class MarketDataService {
   async updateActivePortfoliosCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
 
-    // Safety: Don't refresh if markets are closed
+    // Allow fetching during pre/regular/post market, skip only when fully closed (nights/weekends)
     const status = await this.marketStatusService.getAllMarketsStatus();
-    if (!status.us.isOpen && !status.eu.isOpen) {
+    if (status.us.session === 'closed' && status.eu.session === 'closed') {
       return;
     }
 
@@ -76,13 +76,10 @@ export class MarketDataService {
   }
 
   async updateActivePortfolios() {
-    // Create a set of open regions to avoid checking status for every symbol individually if global markets are closed
     const { us, eu } = await this.marketStatusService.getAllMarketsStatus();
-    const isUsOpen = us.isOpen; // Strict open check (ignore post-market to reduce API usage/logs)
-    const isEuOpen = eu.isOpen;
 
-    if (!isUsOpen && !isEuOpen) {
-      // Silent return - no debug log to avoid spamming "closed" every 30s
+    // Allow pre-market and post-market sessions (captures closing/opening prices)
+    if (us.session === 'closed' && eu.session === 'closed') {
       return;
     }
 
@@ -2396,7 +2393,19 @@ export class MarketDataService {
 
   private async updateTickerCurrency(ticker: Ticker, currency: string) {
     if (!currency) return;
-    const normalized = currency.toUpperCase();
+    let normalized = currency.toUpperCase();
+
+    // For US-listed stocks (no exchange suffix like .DE, .PA, .L),
+    // the trading currency is always USD regardless of what Yahoo/Finnhub
+    // reports as the company's home currency (e.g. DKK for Novo Nordisk ADR).
+    const isUSListed = !ticker.symbol.includes('.');
+    if (isUSListed && normalized !== 'USD') {
+      this.logger.debug(
+        `Overriding reported currency ${normalized} -> USD for US-listed ${ticker.symbol}`,
+      );
+      normalized = 'USD';
+    }
+
     if (ticker.currency !== normalized) {
       this.logger.log(
         `Self-healing currency for ${ticker.symbol}: ${ticker.currency} -> ${normalized}`,

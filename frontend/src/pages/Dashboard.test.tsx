@@ -23,6 +23,16 @@ vi.mock('../context/AuthContext', () => ({
     })
 }));
 
+vi.mock('../context/CurrencyContext', () => ({
+    useCurrency: () => ({
+        displayCurrency: 'USD',
+        formatCurrency: (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val),
+        convert: (amount: number) => amount,
+        rates: {},
+        loading: false,
+    }),
+}));
+
 // Mock Hooks
 vi.mock('../hooks/useTicker', () => ({
     useTickerResearch: vi.fn(),

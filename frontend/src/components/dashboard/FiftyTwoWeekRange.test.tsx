@@ -7,9 +7,9 @@ import '@testing-library/jest-dom';
 describe('FiftyTwoWeekRange', () => {
   it('renders correctly with given values', () => {
     render(<FiftyTwoWeekRange low={100} high={200} current={150} />);
-    
-    expect(screen.getByText('100.00')).toBeInTheDocument();
-    expect(screen.getByText('200.00')).toBeInTheDocument();
+
+    expect(screen.getByText('$100.0')).toBeInTheDocument();
+    expect(screen.getByText('$200.0')).toBeInTheDocument();
     expect(screen.getByText('50%')).toBeInTheDocument();
   });
 
@@ -36,7 +36,7 @@ describe('FiftyTwoWeekRange', () => {
 
   it('hides labels when showLabels is false', () => {
     render(<FiftyTwoWeekRange low={100} high={200} current={150} showLabels={false} />);
-    expect(screen.queryByText('100.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$100.0')).not.toBeInTheDocument();
     expect(screen.queryByText('50%')).not.toBeInTheDocument();
   });
 });

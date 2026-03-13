@@ -35,7 +35,7 @@ interface OhlcDataPoint {
 }
 
 const getCurrencySymbol = (currencyCode?: string) => {
-  if (!currencyCode) return '$';
+  if (!currencyCode) currencyCode = 'USD';
   try {
     return (0).toLocaleString('en-US', { style: 'currency', currency: currencyCode, minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\d/g, '').trim();
   } catch {

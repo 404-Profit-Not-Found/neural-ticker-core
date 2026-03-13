@@ -8,6 +8,16 @@ vi.mock('../../lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
+vi.mock('../../context/CurrencyContext', () => ({
+  useCurrency: () => ({
+    displayCurrency: 'USD',
+    formatCurrency: (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val),
+    convert: (amount: number) => amount,
+    rates: {},
+    loading: false,
+  }),
+}));
+
 // Mock Recharts
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

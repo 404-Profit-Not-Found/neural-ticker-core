@@ -22,7 +22,7 @@ describe('MiniTickerTile', () => {
     expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
     expect(screen.getByText('$150.50')).toBeInTheDocument();
     expect(screen.getByText('+1.20%')).toBeInTheDocument();
-    expect(screen.getByText('+1.80')).toBeInTheDocument();
+    expect(screen.getByText('+$1.80')).toBeInTheDocument();
     expect(screen.getByText('R2')).toBeInTheDocument();
     expect(screen.getByRole('link')).toHaveAttribute('href', '/ticker/AAPL');
   });

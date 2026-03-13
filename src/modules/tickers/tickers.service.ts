@@ -754,7 +754,16 @@ export class TickersService {
       .where('ticker.currency IS NULL')
       .getMany();
 
-    const allTickers = [...tickers, ...nullCurrencyTickers];
+    // US-listed tickers (no '.' in symbol) with non-USD currency — likely ADR misclassification
+    const misclassifiedUS = await this.tickerRepo
+      .createQueryBuilder('ticker')
+      .where("ticker.symbol NOT LIKE '%.__'")
+      .andWhere("ticker.symbol NOT LIKE '%.%'")
+      .andWhere("ticker.currency != 'USD'")
+      .andWhere('ticker.currency IS NOT NULL')
+      .getMany();
+
+    const allTickers = [...tickers, ...nullCurrencyTickers, ...misclassifiedUS];
     const uniqueTickers = [
       ...new Map(allTickers.map((t) => [t.symbol, t])).values(),
     ];
@@ -770,7 +779,16 @@ export class TickersService {
     for (const ticker of uniqueTickers) {
       try {
         const quote = await this.yahooFinanceService.getQuote(ticker.symbol);
-        const currency = quote?.currency;
+        let currency = quote?.currency?.toUpperCase();
+
+        // US-listed stocks (no exchange suffix like .DE, .PA, .L) always trade in USD,
+        // even if Yahoo reports the company's home currency (e.g. DKK for NVO ADR).
+        if (currency && !ticker.symbol.includes('.') && currency !== 'USD') {
+          this.logger.debug(
+            `Overriding reported currency ${currency} -> USD for US-listed ${ticker.symbol}`,
+          );
+          currency = 'USD';
+        }
 
         if (currency && currency !== ticker.currency) {
           await this.tickerRepo.update(ticker.id, { currency });
