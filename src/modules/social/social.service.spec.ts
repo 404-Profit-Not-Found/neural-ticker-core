@@ -245,7 +245,9 @@ describe('SocialService', () => {
       );
       expect(mockWebPushService.sendToUser).toHaveBeenCalledWith(
         mentionedUserId,
-        expect.objectContaining({ title: expect.stringContaining('mentioned you') }),
+        expect.objectContaining({
+          title: expect.stringContaining('mentioned you'),
+        }),
       );
     });
 
@@ -293,15 +295,16 @@ describe('SocialService', () => {
       mockCommentRepo.save.mockResolvedValue(newComment);
       // findOne called twice: once for full comment, once for parent
       mockCommentRepo.findOne
-        .mockResolvedValueOnce(newComment)  // full comment lookup
+        .mockResolvedValueOnce(newComment) // full comment lookup
         .mockResolvedValueOnce(parentComment); // parent lookup for reply notify
 
       await service.postComment('user123', 'AAPL', content, 'parent-1');
       await new Promise((r) => setTimeout(r, 10));
 
-      const mentionNotifyCalls = mockNotificationsService.create.mock.calls.filter(
-        (call) => call[1] === 'comment_mention',
-      );
+      const mentionNotifyCalls =
+        mockNotificationsService.create.mock.calls.filter(
+          (call) => call[1] === 'comment_mention',
+        );
       expect(mentionNotifyCalls).toHaveLength(0);
     });
 
@@ -319,7 +322,7 @@ describe('SocialService', () => {
       mockCommentRepo.create.mockReturnValue(replyComment);
       mockCommentRepo.save.mockResolvedValue(replyComment);
       mockCommentRepo.findOne
-        .mockResolvedValueOnce(replyComment)  // full comment
+        .mockResolvedValueOnce(replyComment) // full comment
         .mockResolvedValueOnce(parentComment); // parent
 
       await service.postComment('user123', 'AAPL', 'I agree!', 'parent-1');

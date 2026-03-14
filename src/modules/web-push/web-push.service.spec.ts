@@ -34,7 +34,10 @@ describe('WebPushService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue?: string) => config[key] ?? defaultValue),
+            get: jest.fn(
+              (key: string, defaultValue?: string) =>
+                config[key] ?? defaultValue,
+            ),
           },
         },
       ],
@@ -88,13 +91,20 @@ describe('WebPushService', () => {
 
     it('should create a new subscription when none exists', async () => {
       mockSubRepo.findOne.mockResolvedValue(null);
-      const newSub = { id: '1', user_id: 'user1', endpoint: 'https://push.example.com' };
+      const newSub = {
+        id: '1',
+        user_id: 'user1',
+        endpoint: 'https://push.example.com',
+      };
       mockSubRepo.create.mockReturnValue(newSub);
       mockSubRepo.save.mockResolvedValue(newSub);
 
       const result = await service.subscribe(
         'user1',
-        { endpoint: 'https://push.example.com', keys: { p256dh: 'p256', auth: 'auth' } },
+        {
+          endpoint: 'https://push.example.com',
+          keys: { p256dh: 'p256', auth: 'auth' },
+        },
         'Mozilla/5.0',
       );
 
@@ -118,17 +128,28 @@ describe('WebPushService', () => {
         user_agent: 'OldBrowser',
       };
       mockSubRepo.findOne.mockResolvedValue(existing);
-      mockSubRepo.save.mockResolvedValue({ ...existing, user_id: 'user1', p256dh: 'new-p256' });
+      mockSubRepo.save.mockResolvedValue({
+        ...existing,
+        user_id: 'user1',
+        p256dh: 'new-p256',
+      });
 
       const result = await service.subscribe(
         'user1',
-        { endpoint: 'https://push.example.com', keys: { p256dh: 'new-p256', auth: 'new-auth' } },
+        {
+          endpoint: 'https://push.example.com',
+          keys: { p256dh: 'new-p256', auth: 'new-auth' },
+        },
         'NewBrowser',
       );
 
       expect(mockSubRepo.create).not.toHaveBeenCalled();
       expect(mockSubRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ user_id: 'user1', p256dh: 'new-p256', user_agent: 'NewBrowser' }),
+        expect.objectContaining({
+          user_id: 'user1',
+          p256dh: 'new-p256',
+          user_agent: 'NewBrowser',
+        }),
       );
       expect(result.user_id).toBe('user1');
     });
@@ -194,8 +215,20 @@ describe('WebPushService', () => {
 
     it('should send push notification to all user subscriptions', async () => {
       const subs = [
-        { id: '1', user_id: 'user1', endpoint: 'https://push1.example.com', p256dh: 'p1', auth: 'a1' },
-        { id: '2', user_id: 'user1', endpoint: 'https://push2.example.com', p256dh: 'p2', auth: 'a2' },
+        {
+          id: '1',
+          user_id: 'user1',
+          endpoint: 'https://push1.example.com',
+          p256dh: 'p1',
+          auth: 'a1',
+        },
+        {
+          id: '2',
+          user_id: 'user1',
+          endpoint: 'https://push2.example.com',
+          p256dh: 'p2',
+          auth: 'a2',
+        },
       ];
       mockSubRepo.find.mockResolvedValue(subs);
       (webpush.sendNotification as jest.Mock).mockResolvedValue({});
@@ -204,14 +237,23 @@ describe('WebPushService', () => {
 
       expect(webpush.sendNotification).toHaveBeenCalledTimes(2);
       expect(webpush.sendNotification).toHaveBeenCalledWith(
-        { endpoint: 'https://push1.example.com', keys: { p256dh: 'p1', auth: 'a1' } },
+        {
+          endpoint: 'https://push1.example.com',
+          keys: { p256dh: 'p1', auth: 'a1' },
+        },
         JSON.stringify({ title: 'Test', body: 'Message' }),
       );
     });
 
     it('should remove expired subscriptions on 410 error', async () => {
       const subs = [
-        { id: '1', user_id: 'user1', endpoint: 'https://push.example.com', p256dh: 'p1', auth: 'a1' },
+        {
+          id: '1',
+          user_id: 'user1',
+          endpoint: 'https://push.example.com',
+          p256dh: 'p1',
+          auth: 'a1',
+        },
       ];
       mockSubRepo.find.mockResolvedValue(subs);
       const err = Object.assign(new Error('Gone'), { statusCode: 410 });
@@ -225,7 +267,13 @@ describe('WebPushService', () => {
 
     it('should remove expired subscriptions on 404 error', async () => {
       const subs = [
-        { id: '2', user_id: 'user1', endpoint: 'https://push.example.com', p256dh: 'p1', auth: 'a1' },
+        {
+          id: '2',
+          user_id: 'user1',
+          endpoint: 'https://push.example.com',
+          p256dh: 'p1',
+          auth: 'a1',
+        },
       ];
       mockSubRepo.find.mockResolvedValue(subs);
       const err = Object.assign(new Error('Not Found'), { statusCode: 404 });
@@ -240,10 +288,18 @@ describe('WebPushService', () => {
     it('should not send when VAPID is not configured', async () => {
       const unconfigured = await buildModule({});
       mockSubRepo.find.mockResolvedValue([
-        { id: '1', endpoint: 'https://push.example.com', p256dh: 'p', auth: 'a' },
+        {
+          id: '1',
+          endpoint: 'https://push.example.com',
+          p256dh: 'p',
+          auth: 'a',
+        },
       ]);
 
-      await unconfigured.sendToUser('user1', { title: 'Test', body: 'Message' });
+      await unconfigured.sendToUser('user1', {
+        title: 'Test',
+        body: 'Message',
+      });
 
       expect(webpush.sendNotification).not.toHaveBeenCalled();
     });
