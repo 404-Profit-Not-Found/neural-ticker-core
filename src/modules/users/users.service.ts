@@ -343,17 +343,20 @@ export class UsersService {
   ): Promise<Pick<User, 'id' | 'nickname' | 'avatar_url' | 'tier'>[]> {
     if (!query || query.length < 1) return [];
 
-    const sanitized = query.replace(/[%_]/g, '\\$&');
+    const sanitized = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
 
     return this.userRepo
       .createQueryBuilder('user')
       .select(['user.id', 'user.nickname', 'user.avatar_url', 'user.tier'])
       .where('user.role IN (:...roles)', { roles: ['user', 'admin'] })
       .andWhere('user.nickname IS NOT NULL')
-      .andWhere('(user.nickname ILIKE :q OR user.email ILIKE :emailQ)', {
-        q: `${sanitized}%`,
-        emailQ: `${sanitized}%`,
-      })
+      .andWhere(
+        "(user.nickname ILIKE :q ESCAPE '\\\\' OR user.email ILIKE :emailQ ESCAPE '\\\\')",
+        {
+          q: `${sanitized}%`,
+          emailQ: `${sanitized}%`,
+        },
+      )
       .orderBy('user.nickname', 'ASC')
       .take(limit)
       .getMany();

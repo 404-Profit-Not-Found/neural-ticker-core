@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Comment } from './entities/comment.entity';
@@ -119,9 +124,17 @@ export class SocialService {
   async postComment(
     userId: string,
     symbol: string,
-    content: string,
+    content: any,
     parentId?: string,
   ) {
+    // Normalize and validate content to prevent type confusion from HTTP body.
+    if (Array.isArray(content)) {
+      content = content.length > 0 ? String(content[0]) : '';
+    }
+    if (typeof content !== 'string') {
+      throw new BadRequestException('Invalid content');
+    }
+
     const comment = this.commentRepo.create({
       user_id: userId,
       ticker_symbol: symbol,
