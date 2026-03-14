@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__Claude_Preview__preview_start",
-      "Bash(command -v npm)"
+      "Bash(command -v npm)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -153,6 +153,8 @@ export class SocialService {
       relations: ['user'],
     });
 
+    const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
+
     // If this is a reply, notify the parent comment author
     if (parentId) {
       const parent = await this.commentRepo.findOne({
@@ -182,7 +184,6 @@ export class SocialService {
           );
 
         // Web push
-        const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
         this.webPushService
           .sendToUser(parent.user_id, {
             title: `${replierName} replied to your comment`,
