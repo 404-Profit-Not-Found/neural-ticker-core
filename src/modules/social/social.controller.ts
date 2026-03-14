@@ -51,13 +51,24 @@ export class SocialController {
   async postComment(
     @Request() req: any,
     @Param('symbol') symbol: string,
-    @Body('content') content: string,
+    @Body('content') content: any,
     @Body('parent_id') parentId?: string,
   ) {
+    let normalizedContent: string;
+
+    if (typeof content === 'string') {
+      normalizedContent = content;
+    } else if (Array.isArray(content)) {
+      normalizedContent =
+        content.length > 0 ? String(content[0]) : '';
+    } else {
+      normalizedContent = content != null ? String(content) : '';
+    }
+
     return this.socialService.postComment(
       req.user.id,
       symbol,
-      content,
+      normalizedContent,
       parentId,
     );
   }
