@@ -49,6 +49,7 @@ import {
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { SharePopover } from '../components/common/SharePopover';
 import type { TickerData, NewsItem, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
@@ -128,6 +129,7 @@ export function TickerDetail() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
     const queryClient = useQueryClient();
+    const { displayCurrency, convert, formatCurrency: ctxFormatCurrency } = useCurrency();
 
     // Validate tab or default to overview
     const validTabs = ['overview', 'financials', 'research', 'social'] as const;
@@ -285,13 +287,32 @@ export function TickerDetail() {
 
 
 
+    const [showRetry, setShowRetry] = useState(false);
+
+    useEffect(() => {
+        if (isLoadingDetails) {
+            const timer = setTimeout(() => setShowRetry(true), 10000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowRetry(false);
+        }
+    }, [isLoadingDetails]);
+
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
             <Header />
 
             {isLoadingDetails ? (
-                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-6 min-h-screen">
                     <SuperLoading symbol={symbol} />
+                    {showRetry && (
+                        <div className="flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 z-50">
+                            <p className="text-muted-foreground text-sm">Still loading? The connection might be slow.</p>
+                            <Button variant="outline" size="lg" onClick={() => window.location.reload()} className="gap-2">
+                                <RefreshCw className="w-4 h-4" /> Try Refreshing
+                            </Button>
+                        </div>
+                    )}
                 </main>
             ) : !tickerData ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
@@ -303,11 +324,11 @@ export function TickerDetail() {
                 const { profile, market_data, risk_analysis, fundamentals, watchers } = tickerData as TickerData;
                 const isPriceUp = market_data?.change_percent >= 0;
 
+                const nativeCurrency = profile?.currency || 'USD';
                 const formatCurrency = (val: number, currencyCode?: string) => {
-                    return new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: currencyCode || profile?.currency || 'USD'
-                    }).format(val);
+                    const from = currencyCode || nativeCurrency;
+                    const converted = convert(val, from);
+                    return ctxFormatCurrency(converted, displayCurrency);
                 };
 
                 return (

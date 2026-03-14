@@ -11,12 +11,14 @@ export function cn(...inputs: ClassValue[]) {
 export const api = axios.create({
   baseURL: '/api/v1',
   withCredentials: true,
+  timeout: 15000,
 });
 
 // Generic Client (for Auth, etc.)
 export const httpClient = axios.create({
   baseURL: '/',
   withCredentials: true,
+  timeout: 15000,
 });
 
 // Add strict interceptors for error handling

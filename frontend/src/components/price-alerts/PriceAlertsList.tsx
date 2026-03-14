@@ -1,5 +1,6 @@
 import { usePriceAlerts, useDeletePriceAlert, useTogglePriceAlert } from '../../hooks/usePriceAlerts';
 import type { PriceAlert } from '../../hooks/usePriceAlerts';
+import { useCurrency } from '../../context/CurrencyContext';
 import { toast } from 'sonner';
 import {
   Bell,
@@ -35,6 +36,7 @@ export function PriceAlertsList() {
   const { data: alerts, isLoading } = usePriceAlerts();
   const deleteAlert = useDeletePriceAlert();
   const toggleAlert = useTogglePriceAlert();
+  const { formatCurrency } = useCurrency();
 
   const handleDelete = async (id: string, symbol: string) => {
     try {
@@ -119,7 +121,7 @@ export function PriceAlertsList() {
                         {config.label}{' '}
                         {isPercent
                           ? `${alert.target_value.toFixed(1)}%`
-                          : `$${alert.target_value.toFixed(2)}`}
+                          : formatCurrency(alert.target_value)}
                       </span>
                       {alert.triggered_at && (
                         <span className="text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">
@@ -131,7 +133,7 @@ export function PriceAlertsList() {
                       <Clock size={10} />
                       <span>Cooldown: {alert.cooldown_minutes}m</span>
                       {isPercent && alert.reference_price && (
-                        <span>• Base: ${alert.reference_price.toFixed(2)}</span>
+                        <span>• Base: {formatCurrency(alert.reference_price)}</span>
                       )}
                     </div>
                   </div>

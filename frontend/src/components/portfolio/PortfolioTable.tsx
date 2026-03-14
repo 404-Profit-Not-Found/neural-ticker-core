@@ -208,8 +208,8 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: () => <span className="hidden md:inline">Price / Change</span>,
             cell: (info) => {
                 const row = info.row.original;
-                const price = row.original_current_price ?? info.getValue();
-                const currency = row.original_currency || 'USD';
+                const price = info.getValue();
+                const currency = row.currency || 'USD';
                 const change = row.change_percent || 0;
                 const isPositive = change >= 0;
 

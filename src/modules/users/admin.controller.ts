@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  BadRequestException,
   Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -76,6 +77,12 @@ export class AdminController {
     @Param('id') id: string,
     @Body() body: { role: string },
   ) {
+    const validRoles = ['admin', 'user', 'waitlist'];
+    if (!validRoles.includes(body.role)) {
+      throw new BadRequestException(
+        `Invalid role. Must be one of: ${validRoles.join(', ')}`,
+      );
+    }
     return this.usersService.updateRole(id, body.role);
   }
 
