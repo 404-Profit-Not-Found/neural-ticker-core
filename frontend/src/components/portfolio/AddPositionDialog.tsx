@@ -12,6 +12,7 @@ import { SimpleCalendar } from '../ui/simple-calendar';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Sparkline } from '../ui/Sparkline';
 import { PriceRangeSlider } from './PriceRangeSlider';
+import { useCurrency } from '../../context/CurrencyContext';
 
 interface TickerResult {
   symbol: string;
@@ -85,10 +86,13 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
     };
   } | null>(null);
 
-  // Helper for dynamic currency
+  const { displayCurrency } = useCurrency();
+
+  // Helper for dynamic currency — use ticker's native currency, fall back to user's display currency
+  const tickerCurrency = selectedTicker?.currency || displayCurrency;
   const currencySymbol = useMemo(() => {
-    return getCurrencySymbol(selectedTicker?.currency);
-  }, [selectedTicker]);
+    return getCurrencySymbol(tickerCurrency);
+  }, [tickerCurrency]);
 
   // Derived calculations
   useEffect(() => {
@@ -458,7 +462,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                     {/* Right: Price & Change */}
                     <div className="flex flex-col items-end flex-shrink-0">
                       <div className="text-xl font-mono font-bold">
-                        {getSelectedTickerPriceDisplay(snapshot?.price || snapshot?.latestPrice?.close, selectedTicker?.currency)}
+                        {getSelectedTickerPriceDisplay(snapshot?.price || snapshot?.latestPrice?.close, tickerCurrency)}
                       </div>
                       {snapshot && (
                         <div className={cn(
@@ -621,7 +625,7 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                                 value={parseFloat(price) || effectiveDateData?.close || 0}
                                 onChange={(val) => setPrice(val.toFixed(2))}
                                 className={cn("pt-0 pb-2", !effectiveDateData && "opacity-50 grayscale")}
-                                currency={selectedTicker?.currency || 'USD'}
+                                currency={tickerCurrency}
                             />
                         </div>
                 </div>

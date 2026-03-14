@@ -71,7 +71,18 @@ export function useDeletePriceAlert() {
     mutationFn: async (id: string) => {
       await api.delete(`/price-alerts/${id}`);
     },
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: alertKeys.all });
+      const previous = queryClient.getQueryData<PriceAlert[]>(alertKeys.all);
+      queryClient.setQueryData<PriceAlert[]>(alertKeys.all, (old) =>
+        old ? old.filter((a) => a.id !== id) : [],
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(alertKeys.all, context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: alertKeys.all });
     },
   });
@@ -87,7 +98,18 @@ export function useTogglePriceAlert() {
       const { data } = await api.patch<PriceAlert>(`/price-alerts/${id}`, { enabled });
       return data;
     },
-    onSuccess: () => {
+    onMutate: async ({ id, enabled }) => {
+      await queryClient.cancelQueries({ queryKey: alertKeys.all });
+      const previous = queryClient.getQueryData<PriceAlert[]>(alertKeys.all);
+      queryClient.setQueryData<PriceAlert[]>(alertKeys.all, (old) =>
+        old ? old.map((a) => (a.id === id ? { ...a, enabled } : a)) : [],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(alertKeys.all, context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: alertKeys.all });
     },
   });

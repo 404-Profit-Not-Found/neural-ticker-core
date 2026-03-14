@@ -225,7 +225,7 @@ export class PriceAlertsService {
       .sendToUser(alert.user_id, {
         title,
         body: message,
-        icon: '/logo192.png',
+        icon: '/favicon.svg',
         data: {
           url: `/ticker/${alert.symbol}`,
           symbol: alert.symbol,
