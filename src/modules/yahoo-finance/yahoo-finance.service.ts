@@ -7,6 +7,7 @@ export class YahooFinanceService implements OnModuleInit {
   private readonly logger = new Logger(YahooFinanceService.name);
   private yahoo = new YahooFinance({
     suppressNotices: ['yahooSurvey', 'ripHistorical'],
+    validation: { logErrors: false }, // Suppress schema validation logs
     fetchOptions: {
       headers: {
         'User-Agent':

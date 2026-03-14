@@ -10,6 +10,7 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../web-push/web-push.service';
 import { QualityScoringService } from './quality-scoring.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { CreditService } from '../users/credit.service';
@@ -71,6 +72,10 @@ describe('ResearchService - Digest', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        {
+          provide: WebPushService,
+          useValue: { sendToUser: jest.fn().mockResolvedValue(undefined) },
+        },
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: PortfolioService, useValue: mockPortfolioService },
         { provide: ConfigService, useValue: mockConfigService },

@@ -196,7 +196,7 @@ export class AuthService {
         loginAt: new Date(),
       });
     } catch (e) {
-      console.error('Failed to save auth log', e);
+      this.logger.error('Failed to save auth log', e);
     }
   }
 }

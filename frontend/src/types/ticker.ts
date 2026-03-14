@@ -39,10 +39,14 @@ export interface SocialComment {
         nickname?: string;
         name?: string;
         avatar_url?: string;
-        tier?: string; // Added tier
+        tier?: string;
     };
     created_at: string;
     content: string;
+    parent_id?: string | null;
+    replies?: SocialComment[];
+    like_count?: number;
+    moderation_status?: string; // 'pending' | 'ok' | 'flagged'
 }
 
 export interface AnalystRating {

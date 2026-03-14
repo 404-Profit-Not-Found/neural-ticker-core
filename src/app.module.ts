@@ -31,6 +31,8 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module'; // Added
 import { YahooFinanceModule } from './modules/yahoo-finance/yahoo-finance.module';
 import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.module';
 import { CurrencyModule } from './modules/currency/currency.module';
+import { PriceAlertsModule } from './modules/price-alerts/price-alerts.module';
+import { WebPushModule } from './modules/web-push/web-push.module';
 import configuration from './config/configuration';
 // ...
 
@@ -108,6 +110,8 @@ import configuration from './config/configuration';
     YahooFinanceModule,
     TickerRequestsModule,
     CurrencyModule,
+    PriceAlertsModule,
+    WebPushModule,
   ],
   controllers: [],
   providers: [

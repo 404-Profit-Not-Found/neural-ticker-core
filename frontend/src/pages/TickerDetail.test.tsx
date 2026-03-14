@@ -12,6 +12,8 @@ import {
   useTriggerResearch,
   usePostComment,
   useDeleteResearch,
+  useToggleCommentLike,
+  useMyCommentLikes,
 } from '../hooks/useTicker';
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus } from '../hooks/useMarketStatus';
@@ -42,6 +44,8 @@ vi.mock('../hooks/useTicker', () => ({
   useTriggerResearch: vi.fn(),
   usePostComment: vi.fn(),
   useDeleteResearch: vi.fn(),
+  useToggleCommentLike: vi.fn(),
+  useMyCommentLikes: vi.fn(),
   tickerKeys: {
     details: (s: string) => ['ticker', 'details', s],
     research: (s: string) => ['ticker', 'research', s],
@@ -85,6 +89,7 @@ vi.mock('../components/dashboard/TickerLogo', () => ({ TickerLogo: () => <div>Lo
 vi.mock('../components/dashboard/FiftyTwoWeekRange', () => ({ FiftyTwoWeekRange: () => <div>52W Range</div> }));
 vi.mock('../components/common/SharePopover', () => ({ SharePopover: () => <div>Share</div> }));
 vi.mock('../components/layout/Header', () => ({ Header: () => <div>Header</div> }));
+vi.mock('../components/price-alerts/CreateAlertDialog', () => ({ CreateAlertDialog: () => <div data-testid="create-alert-dialog">CreateAlertDialog</div> }));
 
 describe('TickerDetail', () => {
   const mockNavigate = vi.fn();
@@ -104,7 +109,9 @@ describe('TickerDetail', () => {
     (useAuth as Mock).mockReturnValue({ user: { id: 'user1', nickname: 'Tester', role: 'admin' } });
     (useTickerDetails as Mock).mockReturnValue({ data: mockTickerData, isLoading: false });
     (useTickerNews as Mock).mockReturnValue({ data: [] });
-    (useTickerSocial as Mock).mockReturnValue({ data: [] });
+    (useTickerSocial as Mock).mockReturnValue({ data: { comments: [], mentionedUsers: {} } });
+    (useMyCommentLikes as Mock).mockReturnValue({ data: [] });
+    (useToggleCommentLike as Mock).mockReturnValue({ mutate: vi.fn() });
     (useTickerResearch as Mock).mockReturnValue({ data: [] });
     (useTriggerResearch as Mock).mockReturnValue({ mutate: vi.fn(), isPending: false });
     (usePostComment as Mock).mockReturnValue({ mutate: vi.fn(), isPending: false });
@@ -133,21 +140,21 @@ describe('TickerDetail', () => {
     const mockToggle = vi.fn();
     (useFavorite as Mock).mockReturnValue({ isFavorite: false, toggle: mockToggle, isLoading: false });
     render(<BrowserRouter><TickerDetail /></BrowserRouter>);
-    
+
     const favBtn = screen.getByTitle('Add to Favorites');
     fireEvent.click(favBtn);
     expect(mockToggle).toHaveBeenCalled();
   });
 
   it('switches tabs correctly', () => {
-     // Default is overview
-     render(<BrowserRouter><TickerDetail /></BrowserRouter>);
-     expect(screen.getByText('TickerOverview')).toBeInTheDocument();
+    // Default is overview
+    render(<BrowserRouter><TickerDetail /></BrowserRouter>);
+    expect(screen.getByText('TickerOverview')).toBeInTheDocument();
 
-     // Click Research tab
-     fireEvent.click(screen.getByText('AI Research'));
-     // TickerDetail component uses navigate to change tab, and then location changes
-     expect(mockNavigate).toHaveBeenCalledWith('/ticker/AAPL/research');
+    // Click Research tab
+    fireEvent.click(screen.getByText('AI Research'));
+    // TickerDetail component uses navigate to change tab, and then location changes
+    expect(mockNavigate).toHaveBeenCalledWith('/ticker/AAPL/research');
   });
 
   it('renders 404 state when no ticker found', () => {
@@ -159,19 +166,19 @@ describe('TickerDetail', () => {
   it('handles sync data button click', async () => {
     (api.post as Mock).mockResolvedValue({});
     render(<BrowserRouter><TickerDetail /></BrowserRouter>);
-    
+
     const syncBtn = screen.getByTitle('Sync Data');
     fireEvent.click(syncBtn);
-    
+
     expect(api.post).toHaveBeenCalledWith('/research/sync/AAPL');
   });
 
   it('opens logo upload dialog on double click (Admin only)', () => {
     render(<BrowserRouter><TickerDetail /></BrowserRouter>);
-    
+
     const logoContainer = screen.getByTitle('Double-click to update logo (Admin)');
     fireEvent.doubleClick(logoContainer);
-    
+
     expect(screen.getByText('Update Logo (Admin)')).toBeInTheDocument();
   });
 });

@@ -116,9 +116,15 @@ export function useTickerSocial(symbol?: string) {
     return useQuery({
         queryKey: tickerKeys.social(symbol || ''),
         queryFn: async () => {
-             if (!symbol) return [];
+             if (!symbol) return { comments: [], mentionedUsers: {} };
              const res = await api.get(`/social/comments/${symbol}`);
-             return res.data || [];
+             // Backend returns { comments, mentionedUsers }
+             const data = res.data;
+             if (Array.isArray(data)) {
+                 // Backward compat: old format was just an array
+                 return { comments: data, mentionedUsers: {} };
+             }
+             return { comments: data.comments || [], mentionedUsers: data.mentionedUsers || {} };
         },
         enabled: !!symbol,
         staleTime: 1000 * 30, // 30s
@@ -128,8 +134,50 @@ export function useTickerSocial(symbol?: string) {
 export function usePostComment() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ symbol, content }: { symbol: string, content: string }) => {
-            await api.post(`/social/comments/${symbol}`, { content });
+        mutationFn: async ({ symbol, content, parentId }: { symbol: string; content: string; parentId?: string }) => {
+            await api.post(`/social/comments/${symbol}`, {
+                content,
+                ...(parentId ? { parent_id: parentId } : {}),
+            });
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+        },
+    });
+}
+
+export function useToggleCommentLike() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ commentId }: { commentId: string; symbol: string }) => {
+            const res = await api.post(`/social/comments/${commentId}/like`);
+            return res.data as { liked: boolean; likeCount: number };
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+            queryClient.invalidateQueries({ queryKey: ['social', 'my-likes', variables.symbol] });
+        },
+    });
+}
+
+export function useMyCommentLikes(symbol?: string) {
+    return useQuery({
+        queryKey: ['social', 'my-likes', symbol || ''],
+        queryFn: async () => {
+            if (!symbol) return [];
+            const res = await api.get(`/social/comments/${symbol}/my-likes`);
+            return (res.data?.liked_ids || []) as string[];
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 30,
+    });
+}
+
+export function useDeleteComment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ commentId }: { commentId: string; symbol: string }) => {
+            await api.delete(`/social/comments/${commentId}`);
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });

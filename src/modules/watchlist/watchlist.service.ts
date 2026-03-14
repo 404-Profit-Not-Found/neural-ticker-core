@@ -186,6 +186,24 @@ export class WatchlistService {
     return result.map((r) => r.symbol);
   }
 
+  /**
+   * Get distinct user IDs who have a given symbol in any of their watchlists.
+   * Used to notify watchers when research completes on a ticker they follow.
+   */
+  async getWatcherUserIds(symbol: string): Promise<string[]> {
+    const ticker = await this.tickersService.findOneBySymbol(symbol);
+    if (!ticker) return [];
+
+    const result = await this.itemRepo
+      .createQueryBuilder('item')
+      .innerJoin('item.watchlist', 'watchlist')
+      .select('DISTINCT watchlist.user_id', 'user_id')
+      .where('item.ticker_id = :tickerId', { tickerId: ticker.id })
+      .getRawMany();
+
+    return result.map((r) => r.user_id);
+  }
+
   async toggleFavorite(
     userId: string,
     symbol: string,

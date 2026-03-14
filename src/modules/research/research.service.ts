@@ -35,6 +35,7 @@ export interface ResearchEvent {
 }
 
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../web-push/web-push.service';
 import { QualityScoringService } from './quality-scoring.service';
 
 @Injectable()
@@ -51,6 +52,7 @@ export class ResearchService implements OnModuleInit {
     private readonly usersService: UsersService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly webPushService: WebPushService,
     private readonly watchlistService: WatchlistService,
     private readonly portfolioService: PortfolioService,
 
@@ -288,20 +290,94 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       await this.noteRepo.save(note);
       this.logger.log(`Core research saved for ticket ${id}. Unlocking UI.`);
 
-      // 6. EARLY NOTIFICATION: Alert creator now, don't wait for extraction
+      // 6. EARLY NOTIFICATION: Alert creator + watchers
       if (note.user_id) {
-        // Fire and forget notification
+        const tickerSymbol = note.tickers[0];
+        const notifData = { researchId: note.id, ticker: tickerSymbol };
+
+        // 6a. In-app notification for creator (existing)
         this.notificationsService
           .create(
             note.user_id,
             'research_complete',
             `Research Ready: ${note.tickers.join(', ')}`,
             `Your AI research on ${note.tickers.join(', ')} is complete.`,
-            { researchId: note.id, ticker: note.tickers[0] },
+            notifData,
           )
           .catch((err) =>
             this.logger.error(
               `Failed to send early notification for ${id}`,
+              err,
+            ),
+          );
+
+        // 6b. Web push for creator
+        this.webPushService
+          .sendToUser(note.user_id, {
+            title: `Research Ready: ${note.tickers.join(', ')}`,
+            body: `Your AI research on ${note.tickers.join(', ')} is complete.`,
+            icon: '/favicon-robot.png',
+            data: {
+              url: `/ticker/${tickerSymbol}/research/${note.id}`,
+              symbol: tickerSymbol,
+            },
+          })
+          .catch((err) =>
+            this.logger.warn(
+              `Web push failed for creator ${note.user_id}: ${err.message}`,
+            ),
+          );
+
+        // 6c. Notify watchers (users who favourited this ticker, excluding creator)
+        this.watchlistService
+          .getWatcherUserIds(tickerSymbol)
+          .then((watcherIds) => {
+            const otherWatchers = watcherIds.filter(
+              (uid) => uid !== note.user_id,
+            );
+            for (const watcherId of otherWatchers) {
+              // In-app
+              this.notificationsService
+                .create(
+                  watcherId,
+                  'research_complete_watcher',
+                  `New research on ${tickerSymbol}`,
+                  `New AI research on ${note.tickers.join(', ')} has been published.`,
+                  notifData,
+                )
+                .catch((err) =>
+                  this.logger.error(
+                    `Failed to notify watcher ${watcherId}`,
+                    err,
+                  ),
+                );
+
+              // Web push
+              this.webPushService
+                .sendToUser(watcherId, {
+                  title: `New research on ${tickerSymbol}`,
+                  body: `New AI research on ${note.tickers.join(', ')} has been published.`,
+                  icon: '/favicon-robot.png',
+                  data: {
+                    url: `/ticker/${tickerSymbol}/research/${note.id}`,
+                    symbol: tickerSymbol,
+                  },
+                })
+                .catch((err) =>
+                  this.logger.warn(
+                    `Web push failed for watcher ${watcherId}: ${err.message}`,
+                  ),
+                );
+            }
+            if (otherWatchers.length > 0) {
+              this.logger.log(
+                `Notified ${otherWatchers.length} watchers for research on ${tickerSymbol}`,
+              );
+            }
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to fetch watchers for ${tickerSymbol}`,
               err,
             ),
           );

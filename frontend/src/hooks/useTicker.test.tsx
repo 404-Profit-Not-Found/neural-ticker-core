@@ -109,7 +109,7 @@ describe('useTicker Hooks', () => {
             (api.get as Mock).mockResolvedValueOnce({ data: [{ id: 1 }] });
             const { result } = renderHook(() => useTickerSocial('AAPL'), { wrapper });
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
-            expect(result.current.data).toEqual([{ id: 1 }]);
+            expect(result.current.data).toEqual({ comments: [{ id: 1 }], mentionedUsers: {} });
         });
     });
 

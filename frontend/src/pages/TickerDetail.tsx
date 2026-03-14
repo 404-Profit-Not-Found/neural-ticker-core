@@ -41,15 +41,19 @@ import {
     useTickerResearch,
     useTriggerResearch,
     usePostComment,
-    useDeleteResearch
+    useDeleteResearch,
+    useToggleCommentLike,
+    useMyCommentLikes,
+    useDeleteComment,
 } from '../hooks/useTicker';
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
 import { SharePopover } from '../components/common/SharePopover';
-import type { TickerData, NewsItem, SocialComment, ResearchItem } from '../types/ticker';
+import type { TickerData, NewsItem, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
-import { Star } from 'lucide-react';
+import { Star, BellPlus } from 'lucide-react';
+import { CreateAlertDialog } from '../components/price-alerts/CreateAlertDialog';
 
 // Market Status Badge for per-ticker display
 function TickerMarketStatusBadge({ symbol }: { symbol?: string }) {
@@ -122,6 +126,7 @@ export function TickerDetail() {
     };
     const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
     const queryClient = useQueryClient();
 
     // Validate tab or default to overview
@@ -144,16 +149,23 @@ export function TickerDetail() {
 
 
     const { data: news = [] } = useTickerNews(symbol) as { data: NewsItem[] };
-    const { data: socialComments = [] } = useTickerSocial(symbol) as { data: SocialComment[] };
+    const { data: socialData } = useTickerSocial(symbol);
+    const socialComments = socialData?.comments || [];
+    const mentionedUsers = socialData?.mentionedUsers || {};
     const { data: researchList = [] } = useTickerResearch(symbol) as { data: ResearchItem[] };
 
     // Unified Favorite Hook
     const { isFavorite, toggle, isLoading: isFavLoading } = useFavorite(symbol);
 
+    // -- Social hooks --
+    const { data: likedCommentIds = [] } = useMyCommentLikes(symbol);
+    const toggleLikeMutation = useToggleCommentLike();
+
     // -- Mutations --
     const triggerResearchMutation = useTriggerResearch();
     const postCommentMutation = usePostComment();
     const deleteResearchMutation = useDeleteResearch();
+    const deleteCommentMutation = useDeleteComment();
 
     const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
         if (!symbol) return;
@@ -292,9 +304,9 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 const formatCurrency = (val: number, currencyCode?: string) => {
-                    return new Intl.NumberFormat('en-US', { 
-                        style: 'currency', 
-                        currency: currencyCode || profile?.currency || 'USD' 
+                    return new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: currencyCode || profile?.currency || 'USD'
                     }).format(val);
                 };
 
@@ -413,6 +425,17 @@ export function TickerDetail() {
                                                         className={isFavorite ? "fill-yellow-500" : ""}
                                                     />
                                                     <span>FAVOURITE</span>
+                                                </Button>
+
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-auto gap-1.5 rounded-full border border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 hover:border-primary text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 transition-all"
+                                                    onClick={() => setIsAlertDialogOpen(true)}
+                                                    title="Set Price Alert"
+                                                >
+                                                    <BellPlus size={14} />
+                                                    <span>ALERT</span>
                                                 </Button>
                                             </div>
                                         </div>
@@ -698,12 +721,24 @@ export function TickerDetail() {
                         <div className="mt-12 border-t border-border pt-8 pb-12">
                             <TickerDiscussion
                                 comments={socialComments}
-                                onPostComment={(content) => {
+                                onPostComment={(content, parentId) => {
                                     if (symbol) {
-                                        postCommentMutation.mutate({ symbol, content });
+                                        postCommentMutation.mutate({ symbol, content, parentId });
                                     }
                                 }}
                                 isPosting={postCommentMutation.isPending}
+                                likedCommentIds={likedCommentIds}
+                                onToggleLike={(commentId) => {
+                                    if (symbol) {
+                                        toggleLikeMutation.mutate({ commentId, symbol });
+                                    }
+                                }}
+                                onDeleteComment={(commentId) => {
+                                    if (symbol) {
+                                        deleteCommentMutation.mutate({ commentId, symbol });
+                                    }
+                                }}
+                                mentionedUsers={mentionedUsers}
                             />
                         </div>
 
@@ -733,6 +768,15 @@ export function TickerDetail() {
                     </DialogFooter>
                 </div>
             </Dialog>
+
+            {/* Price Alert Dialog */}
+            <CreateAlertDialog
+                key={`${symbol}-${isAlertDialogOpen}`}
+                symbol={symbol || ''}
+                currentPrice={(tickerData as TickerData)?.market_data?.price ?? 0}
+                open={isAlertDialogOpen}
+                onOpenChange={setIsAlertDialogOpen}
+            />
         </div>
     );
 }

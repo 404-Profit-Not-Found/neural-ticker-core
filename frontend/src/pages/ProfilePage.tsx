@@ -17,6 +17,7 @@ import {
     Cloud,
     Check,
     Loader2,
+    Bell,
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { UserTierBadge } from '../components/ui/user-tier-badge';
@@ -24,6 +25,7 @@ import { UserStatusBadge } from '../components/ui/user-status-badge';
 import { useQuery } from '@tanstack/react-query';
 import { cn, debounce } from '../lib/utils';
 import { TransactionHistoryDialog } from '../components/profile/TransactionHistoryDialog';
+import { useWebPush } from '../hooks/useWebPush';
 
 // Version is injected by Vite (same as SuperLoading)
 declare const __APP_VERSION__: string;
@@ -36,6 +38,7 @@ export function ProfilePage() {
     const [avatarUrl, setAvatarUrl] = useState('');
     const [theme, setTheme] = useState('g100');
     const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+    const { isSupported: pushSupported, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = useWebPush();
 
     // Live Preview Effect
     useEffect(() => {
@@ -362,6 +365,44 @@ export function ProfilePage() {
                         </div>
                     </div>
                 </div>
+
+                {/* NOTIFICATIONS SECTION */}
+                {pushSupported && (
+                    <div className="space-y-3">
+                        <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Notifications</h2>
+
+                        <div className="bg-card border border-border/40 rounded-xl p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                    <Bell size={18} className="text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium">Push Notifications</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {pushSubscribed
+                                            ? 'Receive alerts even when the tab is closed'
+                                            : 'Enable to get price alerts in your browser'}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => pushSubscribed ? pushUnsubscribe() : pushSubscribe()}
+                                    disabled={pushLoading}
+                                    className={cn(
+                                        "relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50",
+                                        pushSubscribed ? "bg-emerald-500" : "bg-muted"
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200",
+                                            pushSubscribed && "translate-x-5"
+                                        )}
+                                    />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* VERSION FOOTER */}
                 <div className="pt-8 text-center">

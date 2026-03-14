@@ -52,6 +52,13 @@ export class UsersController {
     return this.authService.getAuthLogs(filter);
   }
 
+  @ApiOperation({ summary: 'Search users for @mention autocomplete' })
+  @ApiResponse({ status: 200, description: 'List of matching users' })
+  @Get('search')
+  async searchUsers(@Query('q') q: string) {
+    return this.usersService.searchUsers(q || '', 10);
+  }
+
   @Roles('admin')
   @ApiOperation({ summary: 'Update User Role (Admin only)' })
   @ApiBody({ schema: { example: { role: 'admin' } } })
