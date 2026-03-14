@@ -313,11 +313,13 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           );
 
         // 6b. Web push for creator
+        const frontendUrl = this.config.get<string>('frontendUrl') ?? '';
+        const tickerIconUrl = `${frontendUrl}/v1/tickers/${tickerSymbol}/logo`;
         this.webPushService
           .sendToUser(note.user_id, {
             title: `Research Ready: ${note.tickers.join(', ')}`,
             body: `Your AI research on ${note.tickers.join(', ')} is complete.`,
-            icon: '/favicon-robot.png',
+            icon: tickerIconUrl,
             data: {
               url: `/ticker/${tickerSymbol}/research/${note.id}`,
               symbol: tickerSymbol,
@@ -358,7 +360,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
                 .sendToUser(watcherId, {
                   title: `New research on ${tickerSymbol}`,
                   body: `New AI research on ${note.tickers.join(', ')} has been published.`,
-                  icon: '/favicon-robot.png',
+                  icon: tickerIconUrl,
                   data: {
                     url: `/ticker/${tickerSymbol}/research/${note.id}`,
                     symbol: tickerSymbol,

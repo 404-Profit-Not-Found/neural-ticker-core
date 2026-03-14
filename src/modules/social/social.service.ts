@@ -182,11 +182,12 @@ export class SocialService {
           );
 
         // Web push
+        const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
         this.webPushService
           .sendToUser(parent.user_id, {
             title: `${replierName} replied to your comment`,
             body: `on ${symbol}: "${content.slice(0, 80)}"`,
-            icon: '/favicon-robot.png',
+            icon: `${frontendUrl}/v1/tickers/${symbol}/logo`,
             data: { url: `/ticker/${symbol}`, symbol },
           })
           .catch((err) =>
@@ -230,7 +231,7 @@ export class SocialService {
           .sendToUser(mentionedId, {
             title: `${commenterName} mentioned you`,
             body: `on ${symbol}`,
-            icon: '/favicon-robot.png',
+            icon: `${frontendUrl}/v1/tickers/${symbol}/logo`,
             data: { url: `/ticker/${symbol}`, symbol },
           })
           .catch((err) =>
@@ -302,11 +303,12 @@ export class SocialService {
             this.logger.error(`Failed to send like notification`, err),
           );
 
+        const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
         this.webPushService
           .sendToUser(comment.user_id, {
             title: `${likerName} liked your comment`,
             body: `on ${comment.ticker_symbol}`,
-            icon: '/favicon-robot.png',
+            icon: `${frontendUrl}/v1/tickers/${comment.ticker_symbol}/logo`,
             data: {
               url: `/ticker/${comment.ticker_symbol}`,
               symbol: comment.ticker_symbol,
