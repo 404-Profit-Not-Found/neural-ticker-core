@@ -75,6 +75,9 @@ jobs:
              FRONTEND_URL=${{ secrets.FRONTEND_URL }}
              APP_ENV=${{ secrets.APP_ENV }}
              APP_PORT=${{ secrets.APP_PORT }}
+             VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }}
+             VAPID_PRIVATE_KEY=${{ secrets.VAPID_PRIVATE_KEY }}
+             VAPID_EMAIL=${{ secrets.VAPID_EMAIL }}
           timeout: '5m'
           flags: '--allow-unauthenticated --no-use-http2'
 
