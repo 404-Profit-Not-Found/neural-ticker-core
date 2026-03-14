@@ -19,8 +19,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body || '',
-    icon: payload.icon || '/favicon-robot.png',
-    badge: '/favicon-robot.png',
+    icon: payload.icon || '/favicon.svg',
+    badge: '/favicon.svg',
     data: payload.data || {},
     vibrate: [100, 50, 100],
     tag: payload.data?.alertType

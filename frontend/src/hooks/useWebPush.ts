@@ -47,9 +47,10 @@ export function useWebPush() {
   const subscribe = useCallback(async () => {
     if (!isSupported) return false;
 
-    try {
-      setIsLoading(true);
+    setIsSubscribed(true); // optimistic
+    setIsLoading(true);
 
+    try {
       // Register service worker
       const registration = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
@@ -60,6 +61,7 @@ export function useWebPush() {
 
       if (!vapidKey) {
         console.warn('No VAPID key configured on server');
+        setIsSubscribed(false);
         return false;
       }
 
@@ -67,6 +69,7 @@ export function useWebPush() {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         console.warn('Notification permission denied');
+        setIsSubscribed(false);
         return false;
       }
 
@@ -86,10 +89,10 @@ export function useWebPush() {
         },
       });
 
-      setIsSubscribed(true);
       return true;
     } catch (err) {
       console.error('Failed to subscribe to push:', err);
+      setIsSubscribed(false); // revert on error
       return false;
     } finally {
       setIsLoading(false);
@@ -97,9 +100,10 @@ export function useWebPush() {
   }, [isSupported]);
 
   const unsubscribe = useCallback(async () => {
-    try {
-      setIsLoading(true);
+    setIsSubscribed(false); // optimistic
+    setIsLoading(true);
 
+    try {
       const registration = await navigator.serviceWorker.getRegistration('/sw.js');
       if (registration) {
         const sub = await registration.pushManager.getSubscription();
@@ -113,10 +117,10 @@ export function useWebPush() {
         }
       }
 
-      setIsSubscribed(false);
       return true;
     } catch (err) {
       console.error('Failed to unsubscribe from push:', err);
+      setIsSubscribed(true); // revert on error
       return false;
     } finally {
       setIsLoading(false);
