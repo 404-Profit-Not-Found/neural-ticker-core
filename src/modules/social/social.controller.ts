@@ -131,9 +131,7 @@ export class SocialController {
   @ApiOperation({ summary: 'Cron: scan pending comments with LLM moderation' })
   @ApiResponse({ status: 200, description: 'Moderation results' })
   @Post('moderation/scan')
-  async runModerationScan(
-    @Headers('x-cron-secret') secret: string,
-  ) {
+  async runModerationScan(@Headers('x-cron-secret') secret: string) {
     this.validateCronSecret(secret);
     return this.socialService.moderatePendingComments();
   }

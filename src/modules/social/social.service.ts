@@ -444,9 +444,7 @@ export class SocialService {
         }> = JSON.parse(rawText);
 
         // Build lookup map by id for O(1) updates
-        const resultMap = new Map(
-          results.map((r) => [String(r.id), r]),
-        );
+        const resultMap = new Map(results.map((r) => [String(r.id), r]));
 
         for (const comment of batch) {
           const result = resultMap.get(String(comment.id));
