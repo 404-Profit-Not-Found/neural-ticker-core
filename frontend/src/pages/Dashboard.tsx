@@ -108,36 +108,49 @@ export function Dashboard() {
   const { data: stats } = useQuery({
     queryKey: ['dashboard-stats', displayCurrency],
     queryFn: async () => {
-      const [tickers, strongBuy, sell, positions, recentResearch] = await Promise.all([
-        api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
-        api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
-        api.get('/stats/sell').catch(() => ({ data: { count: 0 } })),
-        api.get('/portfolio/positions', { params: { displayCurrency } }).catch(() => ({ data: [] })),
-        api.get('/research', { params: { since: 24, limit: 1 } }).catch(() => ({ data: { total: 0 } })),
-      ]);
+      try {
+        const [tickers, strongBuy, sell, positions, recentResearch] = await Promise.all([
+          api.get('/tickers/count').catch(() => ({ data: { count: 0 } })),
+          api.get('/stats/strong-buy').catch(() => ({ data: { count: 0 } })),
+          api.get('/stats/sell').catch(() => ({ data: { count: 0 } })),
+          api.get('/portfolio/positions', { params: { displayCurrency } }).catch(() => ({ data: [] })),
+          api.get('/research', { params: { since: 24, limit: 1 } }).catch(() => ({ data: { total: 0 } })),
+        ]);
 
-      // Calculate portfolio stats
-      let totalValue = 0;
-      let totalCost = 0;
-      const posData = (positions.data || []) as Array<{ current_value?: number; cost_basis?: number }>;
-      posData.forEach((p) => {
-        totalValue += p.current_value || 0;
-        totalCost += p.cost_basis || 0;
-      });
-      const totalGain = totalValue - totalCost;
-      const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+        // Calculate portfolio stats
+        let totalValue = 0;
+        let totalCost = 0;
+        const posData = (positions.data || []) as Array<{ current_value?: number; cost_basis?: number }>;
+        posData.forEach((p) => {
+          totalValue += p.current_value || 0;
+          totalCost += p.cost_basis || 0;
+        });
+        const totalGain = totalValue - totalCost;
+        const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
-      return {
-        tickers: tickers.data.count,
-        strongBuy: strongBuy.data.count,
-        sell: sell.data.count,
-        portfolio: {
-          value: totalValue,
-          gainPct: totalGainPct,
-        },
-        recentResearch: recentResearch.data.total || 0,
-      };
+        return {
+          tickers: tickers.data.count,
+          strongBuy: strongBuy.data.count,
+          sell: sell.data.count,
+          portfolio: {
+            value: totalValue,
+            gainPct: totalGainPct,
+          },
+          recentResearch: recentResearch.data.total || 0,
+        };
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats', err);
+        return {
+          tickers: 0,
+          strongBuy: 0,
+          sell: 0,
+          portfolio: { value: 0, gainPct: 0 },
+          recentResearch: 0,
+        };
+      }
     },
+    staleTime: 1000 * 60, // 1 min
+    retry: 1,
   });
 
   return (

@@ -285,13 +285,32 @@ export function TickerDetail() {
 
 
 
+    const [showRetry, setShowRetry] = useState(false);
+
+    useEffect(() => {
+        if (isLoadingDetails) {
+            const timer = setTimeout(() => setShowRetry(true), 10000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowRetry(false);
+        }
+    }, [isLoadingDetails]);
+
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
             <Header />
 
             {isLoadingDetails ? (
-                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4 min-h-screen">
+                <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-6 min-h-screen">
                     <SuperLoading symbol={symbol} />
+                    {showRetry && (
+                        <div className="flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 z-50">
+                            <p className="text-muted-foreground text-sm">Still loading? The connection might be slow.</p>
+                            <Button variant="outline" size="lg" onClick={() => window.location.reload()} className="gap-2">
+                                <RefreshCw className="w-4 h-4" /> Try Refreshing
+                            </Button>
+                        </div>
+                    )}
                 </main>
             ) : !tickerData ? (
                 <main className="container mx-auto px-4 py-32 max-w-[80rem] flex flex-col items-center justify-center gap-4">
