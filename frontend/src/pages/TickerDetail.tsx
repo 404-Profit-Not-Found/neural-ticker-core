@@ -49,6 +49,7 @@ import {
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { SharePopover } from '../components/common/SharePopover';
 import type { TickerData, NewsItem, ResearchItem } from '../types/ticker';
 import { useEffect, useState, useRef } from 'react';
@@ -128,6 +129,7 @@ export function TickerDetail() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
     const queryClient = useQueryClient();
+    const { displayCurrency, convert, formatCurrency: ctxFormatCurrency } = useCurrency();
 
     // Validate tab or default to overview
     const validTabs = ['overview', 'financials', 'research', 'social'] as const;
@@ -322,11 +324,11 @@ export function TickerDetail() {
                 const { profile, market_data, risk_analysis, fundamentals, watchers } = tickerData as TickerData;
                 const isPriceUp = market_data?.change_percent >= 0;
 
+                const nativeCurrency = profile?.currency || 'USD';
                 const formatCurrency = (val: number, currencyCode?: string) => {
-                    return new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: currencyCode || profile?.currency || 'USD'
-                    }).format(val);
+                    const from = currencyCode || nativeCurrency;
+                    const converted = convert(val, from);
+                    return ctxFormatCurrency(converted, displayCurrency);
                 };
 
                 return (

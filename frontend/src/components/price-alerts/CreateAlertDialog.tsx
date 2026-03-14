@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { useCreatePriceAlert } from '../../hooks/usePriceAlerts';
+import { useCurrency } from '../../context/CurrencyContext';
 import { toast } from 'sonner';
 import { Bell, TrendingUp, TrendingDown, Percent } from 'lucide-react';
 
@@ -31,6 +32,8 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
   const [targetValue, setTargetValue] = useState<string>(currentPrice.toFixed(2));
   const [cooldown, setCooldown] = useState(60);
   const createAlert = useCreatePriceAlert();
+  const { formatCurrency, displayCurrency } = useCurrency();
+  const currencySymbol = new Intl.NumberFormat('en-US', { style: 'currency', currency: displayCurrency }).formatToParts(0).find(p => p.type === 'currency')?.value ?? displayCurrency;
 
   const isPercentType = alertType === 'percent_change_up' || alertType === 'percent_change_down';
 
@@ -76,7 +79,7 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
           Set Price Alert for {symbol}
         </DialogTitle>
         <DialogDescription>
-          Current price: ${currentPrice.toFixed(2)}
+          Current price: {formatCurrency(currentPrice)}
         </DialogDescription>
       </DialogHeader>
 
@@ -108,11 +111,11 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
         {/* Target Value */}
         <div>
           <label className="text-sm font-medium text-muted-foreground mb-2 block">
-            {isPercentType ? 'Target Percentage (%)' : 'Target Price ($)'}
+            {isPercentType ? 'Target Percentage (%)' : `Target Price (${currencySymbol})`}
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-              {isPercentType ? '%' : '$'}
+              {isPercentType ? '%' : currencySymbol}
             </span>
             <input
               type="number"
@@ -134,8 +137,8 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
           {isPercentType && (
             <p className="text-xs text-muted-foreground mt-1">
               {alertType === 'percent_change_up'
-                ? `Alert when ${symbol} rises ${targetValue}% from $${currentPrice.toFixed(2)}`
-                : `Alert when ${symbol} drops ${targetValue}% from $${currentPrice.toFixed(2)}`}
+                ? `Alert when ${symbol} rises ${targetValue}% from ${formatCurrency(currentPrice)}`
+                : `Alert when ${symbol} drops ${targetValue}% from ${formatCurrency(currentPrice)}`}
             </p>
           )}
         </div>
