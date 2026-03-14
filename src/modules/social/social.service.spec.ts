@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { SocialService } from './social.service';
 import { Comment } from './entities/comment.entity';
 import { CommentLike } from './entities/comment-like.entity';
@@ -9,6 +10,20 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { WebPushService } from '../web-push/web-push.service';
 import { UsersService } from '../users/users.service';
 
+// Mock @google/genai for moderation tests
+jest.mock('@google/genai', () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    models: {
+      generateContent: jest.fn().mockResolvedValue({
+        text: JSON.stringify([
+          { id: 1, status: 'flagged', reason: 'spam' },
+          { id: 2, status: 'ok', reason: null },
+        ]),
+      }),
+    },
+  })),
+}));
+
 describe('SocialService', () => {
   let service: SocialService;
 
@@ -17,6 +32,8 @@ describe('SocialService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     query: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnValue({
       innerJoin: jest.fn().mockReturnThis(),
@@ -98,6 +115,15 @@ describe('SocialService', () => {
         {
           provide: UsersService,
           useValue: mockUsersService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'GEMINI_API_KEY') return 'test-api-key';
+              return undefined;
+            }),
+          },
         },
       ],
     }).compile();
@@ -334,6 +360,102 @@ describe('SocialService', () => {
         expect.stringContaining('replied'),
         expect.any(String),
         expect.objectContaining({ symbol: 'AAPL' }),
+      );
+    });
+  });
+
+  describe('deleteComment', () => {
+    it('should delete a comment by id', async () => {
+      await service.deleteComment('42');
+
+      expect(mockCommentRepo.delete).toHaveBeenCalledWith({ id: '42' });
+    });
+
+    it('should delete a different comment id', async () => {
+      await service.deleteComment('99');
+
+      expect(mockCommentRepo.delete).toHaveBeenCalledWith({ id: '99' });
+    });
+  });
+
+  describe('moderatePendingComments', () => {
+    it('should return zero counts when no pending comments', async () => {
+      mockCommentRepo.find.mockResolvedValue([]);
+
+      const result = await service.moderatePendingComments();
+
+      expect(result).toEqual({ scanned: 0, flagged: 0, ok: 0 });
+    });
+
+    it('should scan pending comments and update moderation_status', async () => {
+      const pendingComments = [
+        { id: '1', content: 'spam comment' },
+        { id: '2', content: 'great stock analysis' },
+      ];
+      mockCommentRepo.find.mockResolvedValue(pendingComments);
+
+      const result = await service.moderatePendingComments();
+
+      expect(result.scanned).toBe(2);
+      expect(result.flagged).toBe(1);
+      expect(result.ok).toBe(1);
+      // Verify update was called for each comment
+      expect(mockCommentRepo.update).toHaveBeenCalledTimes(2);
+      expect(mockCommentRepo.update).toHaveBeenCalledWith(
+        { id: '1' },
+        { moderation_status: 'flagged', moderation_reason: 'spam' },
+      );
+      expect(mockCommentRepo.update).toHaveBeenCalledWith(
+        { id: '2' },
+        { moderation_status: 'ok', moderation_reason: null },
+      );
+    });
+
+    it('should throw when GEMINI_API_KEY is missing', async () => {
+      mockCommentRepo.find.mockResolvedValue([{ id: '1', content: 'test' }]);
+
+      // Build a service instance with no API key
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          SocialService,
+          {
+            provide: getRepositoryToken(Comment),
+            useValue: mockCommentRepo,
+          },
+          {
+            provide: getRepositoryToken(CommentLike),
+            useValue: mockLikeRepo,
+          },
+          {
+            provide: getRepositoryToken(WatchlistItem),
+            useValue: mockWatchlistItemRepo,
+          },
+          {
+            provide: getRepositoryToken(TickerEntity),
+            useValue: mockTickerRepo,
+          },
+          {
+            provide: NotificationsService,
+            useValue: mockNotificationsService,
+          },
+          {
+            provide: WebPushService,
+            useValue: mockWebPushService,
+          },
+          {
+            provide: UsersService,
+            useValue: mockUsersService,
+          },
+          {
+            provide: ConfigService,
+            useValue: { get: jest.fn().mockReturnValue(undefined) },
+          },
+        ],
+      }).compile();
+      const unconfigured = module.get<SocialService>(SocialService);
+
+      await expect(unconfigured.moderatePendingComments()).rejects.toThrow(
+        /GEMINI_API_KEY/,
       );
     });
   });

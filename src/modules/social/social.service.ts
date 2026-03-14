@@ -3,9 +3,12 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
 import { Comment } from './entities/comment.entity';
 import { CommentLike } from './entities/comment-like.entity';
 import { WatchlistItem } from '../watchlist/entities/watchlist-item.entity';
@@ -30,6 +33,7 @@ export class SocialService {
     private readonly notificationsService: NotificationsService,
     private readonly webPushService: WebPushService,
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -347,5 +351,132 @@ export class SocialService {
     return this.watchlistItemRepo.count({
       where: { ticker_id: ticker.id },
     });
+  }
+
+  /**
+   * Hard-delete a comment by ID (admin only).
+   * TypeORM cascade removes child replies and likes automatically.
+   */
+  async deleteComment(commentId: string): Promise<void> {
+    await this.commentRepo.delete({ id: commentId });
+    this.logger.log(`Comment ${commentId} deleted by admin`);
+  }
+
+  /**
+   * LLM moderation cron — scans all pending comments in batches of 30
+   * and marks each as 'ok' or 'flagged' using Gemini Flash Lite.
+   * Comments already reviewed (status != 'pending') are skipped.
+   */
+  async moderatePendingComments(): Promise<{
+    scanned: number;
+    flagged: number;
+    ok: number;
+  }> {
+    const pending = await this.commentRepo.find({
+      where: { moderation_status: 'pending' },
+      take: 200,
+      select: ['id', 'content'],
+    });
+
+    if (pending.length === 0) {
+      return { scanned: 0, flagged: 0, ok: 0 };
+    }
+
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'GEMINI_API_KEY is not configured — cannot run comment moderation',
+      );
+    }
+
+    const genai = new GoogleGenAI({ apiKey });
+
+    const SYSTEM_PROMPT =
+      'You are a content moderator for a financial investment discussion platform. ' +
+      'Classify each comment as "ok" (stock analysis, opinions, questions, market commentary — even if strongly worded) ' +
+      'or "flagged" (hate speech, slurs, threats, explicit sexual content, spam, or personal attacks unrelated to finance). ' +
+      'Return a JSON array where each element has: id (integer), status ("ok" or "flagged"), reason (string or null). ' +
+      'Only return the JSON array, no other text.';
+
+    const BATCH_SIZE = 30;
+    let totalFlagged = 0;
+    let totalOk = 0;
+
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      const batch = pending.slice(i, i + BATCH_SIZE);
+      const batchInput = batch.map((c) => ({ id: c.id, content: c.content }));
+
+      try {
+        const response = await genai.models.generateContent({
+          model: 'gemini-2.0-flash-lite',
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: JSON.stringify(batchInput) }],
+            },
+          ],
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'array' as any,
+              items: {
+                type: 'object' as any,
+                properties: {
+                  id: { type: 'integer' as any },
+                  status: {
+                    type: 'string' as any,
+                    enum: ['ok', 'flagged'],
+                  },
+                  reason: { type: 'string' as any, nullable: true },
+                },
+                required: ['id', 'status'],
+              },
+            },
+          },
+        });
+
+        const rawText = response.text ?? '[]';
+        const results: Array<{
+          id: string | number;
+          status: 'ok' | 'flagged';
+          reason?: string | null;
+        }> = JSON.parse(rawText);
+
+        // Build lookup map by id for O(1) updates
+        const resultMap = new Map(
+          results.map((r) => [String(r.id), r]),
+        );
+
+        for (const comment of batch) {
+          const result = resultMap.get(String(comment.id));
+          if (!result) continue;
+
+          await this.commentRepo.update(
+            { id: comment.id },
+            {
+              moderation_status: result.status,
+              moderation_reason: result.reason ?? null,
+            },
+          );
+
+          if (result.status === 'flagged') {
+            totalFlagged++;
+          } else {
+            totalOk++;
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          `Moderation batch [${i}–${i + batch.length - 1}] failed: ${err.message}`,
+        );
+        // Continue with next batch even if one fails
+      }
+    }
+
+    this.logger.log(
+      `Moderation complete: scanned=${pending.length}, flagged=${totalFlagged}, ok=${totalOk}`,
+    );
+    return { scanned: pending.length, flagged: totalFlagged, ok: totalOk };
   }
 }

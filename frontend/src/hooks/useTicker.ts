@@ -173,6 +173,18 @@ export function useMyCommentLikes(symbol?: string) {
     });
 }
 
+export function useDeleteComment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ commentId }: { commentId: string; symbol: string }) => {
+            await api.delete(`/social/comments/${commentId}`);
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+        },
+    });
+}
+
 // Research is tricky because of polling. 
 // We can use useQuery for fetching completed research, and manual mutation for triggering.
 export function useTickerResearch(symbol?: string) {

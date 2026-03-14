@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { Send, MessageSquare, ThumbsUp, Reply, MoreHorizontal, X } from 'lucide-react';
+import { Send, MessageSquare, ThumbsUp, Reply, MoreHorizontal, X, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { ScrollArea } from '../ui/scroll-area';
@@ -23,6 +24,7 @@ interface TickerDiscussionProps {
     isPosting: boolean;
     likedCommentIds?: string[];
     onToggleLike?: (commentId: string) => void;
+    onDeleteComment?: (commentId: string) => void;
     mentionedUsers?: Record<string, MentionedUser>;
 }
 
@@ -33,6 +35,8 @@ function CommentRow({
     likedIds,
     onToggleLike,
     onReply,
+    onDelete,
+    isAdmin,
     mentionedUsers,
 }: {
     comment: SocialComment;
@@ -41,6 +45,8 @@ function CommentRow({
     likedIds: Set<string>;
     onToggleLike?: (commentId: string) => void;
     onReply: (parentId: string, authorName: string) => void;
+    onDelete?: (commentId: string) => void;
+    isAdmin?: boolean;
     mentionedUsers?: Record<string, MentionedUser>;
 }) {
     const isLiked = likedIds.has(comment.id);
@@ -64,14 +70,30 @@ function CommentRow({
                             {authorName}
                         </span>
                         <UserTierBadge tier={comment.user?.tier} />
+                        {isAdmin && comment.moderation_status === 'flagged' && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                                Flagged
+                            </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground">•</span>
                         <span className="text-xs text-muted-foreground">
                             {new Date(comment.created_at).toLocaleDateString()}
                         </span>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal size={14} />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        {isAdmin && onDelete && (
+                            <button
+                                onClick={() => onDelete(comment.id)}
+                                title="Delete comment"
+                                className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all rounded"
+                            >
+                                <Trash2 size={13} />
+                            </button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreHorizontal size={14} />
+                        </Button>
+                    </div>
                 </div>
 
                 <p className={`${isReply ? 'text-xs' : 'text-sm'} text-foreground/90 leading-relaxed whitespace-pre-wrap`}>
@@ -103,8 +125,9 @@ function CommentRow({
     );
 }
 
-export function TickerDiscussion({ comments, onPostComment, isPosting, likedCommentIds, onToggleLike, mentionedUsers }: TickerDiscussionProps) {
+export function TickerDiscussion({ comments, onPostComment, isPosting, likedCommentIds, onToggleLike, onDeleteComment, mentionedUsers }: TickerDiscussionProps) {
     const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [commentInput, setCommentInput] = useState('');
     const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
     const mentionRef = useRef<MentionTextareaRef>(null);
@@ -152,6 +175,8 @@ export function TickerDiscussion({ comments, onPostComment, isPosting, likedComm
                                         likedIds={likedIds}
                                         onToggleLike={onToggleLike}
                                         onReply={handleReply}
+                                        onDelete={onDeleteComment}
+                                        isAdmin={isAdmin}
                                         mentionedUsers={mentionedUsers}
                                     />
                                     {/* Replies */}
@@ -166,6 +191,8 @@ export function TickerDiscussion({ comments, onPostComment, isPosting, likedComm
                                                     likedIds={likedIds}
                                                     onToggleLike={onToggleLike}
                                                     onReply={handleReply}
+                                                    onDelete={onDeleteComment}
+                                                    isAdmin={isAdmin}
                                                     mentionedUsers={mentionedUsers}
                                                 />
                                             ))}

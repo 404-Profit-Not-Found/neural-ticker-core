@@ -2,10 +2,13 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
+  Headers,
   Request,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +21,8 @@ import {
 import { SocialService } from './social.service';
 import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Social')
 @ApiBearerAuth()
@@ -105,5 +110,37 @@ export class SocialController {
   async getWatcherCount(@Param('symbol') symbol: string) {
     const count = await this.socialService.getWatcherCount(symbol);
     return { symbol, watchers: count };
+  }
+
+  // ── Admin: hard-delete a comment ─────────────────────────────────────────
+
+  @ApiOperation({ summary: 'Admin: delete a comment by ID' })
+  @ApiParam({ name: 'id', description: 'Comment ID' })
+  @ApiResponse({ status: 200, description: 'Comment deleted' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('comments/:id')
+  async deleteComment(@Param('id') id: string) {
+    await this.socialService.deleteComment(id);
+    return { success: true };
+  }
+
+  // ── Cron: LLM moderation scan ────────────────────────────────────────────
+
+  @ApiOperation({ summary: 'Cron: scan pending comments with LLM moderation' })
+  @ApiResponse({ status: 200, description: 'Moderation results' })
+  @Post('moderation/scan')
+  async runModerationScan(
+    @Headers('x-cron-secret') secret: string,
+  ) {
+    this.validateCronSecret(secret);
+    return this.socialService.moderatePendingComments();
+  }
+
+  private validateCronSecret(secret: string) {
+    if (!secret || secret !== process.env.CRON_SECRET) {
+      throw new UnauthorizedException('Invalid Cron Secret');
+    }
   }
 }

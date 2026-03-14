@@ -44,6 +44,7 @@ import {
     useDeleteResearch,
     useToggleCommentLike,
     useMyCommentLikes,
+    useDeleteComment,
 } from '../hooks/useTicker';
 import { useFavorite } from '../hooks/useWatchlist';
 import { useTickerMarketStatus, getSessionLabel, getSessionColor } from '../hooks/useMarketStatus';
@@ -164,6 +165,7 @@ export function TickerDetail() {
     const triggerResearchMutation = useTriggerResearch();
     const postCommentMutation = usePostComment();
     const deleteResearchMutation = useDeleteResearch();
+    const deleteCommentMutation = useDeleteComment();
 
     const handleTriggerResearch = (opts?: { provider?: 'gemini' | 'openai' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string; modelKey?: string }) => {
         if (!symbol) return;
@@ -729,6 +731,11 @@ export function TickerDetail() {
                                 onToggleLike={(commentId) => {
                                     if (symbol) {
                                         toggleLikeMutation.mutate({ commentId, symbol });
+                                    }
+                                }}
+                                onDeleteComment={(commentId) => {
+                                    if (symbol) {
+                                        deleteCommentMutation.mutate({ commentId, symbol });
                                     }
                                 }}
                                 mentionedUsers={mentionedUsers}

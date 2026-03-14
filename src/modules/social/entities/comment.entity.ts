@@ -56,6 +56,13 @@ export class Comment {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
+  // Moderation fields — populated by LLM cron or admin action
+  @Column({ type: 'text', default: 'pending' })
+  moderation_status: string; // 'pending' | 'ok' | 'flagged'
+
+  @Column({ type: 'text', nullable: true })
+  moderation_reason: string | null;
+
   // Virtual field — populated by query, not a DB column
   like_count?: number;
 }

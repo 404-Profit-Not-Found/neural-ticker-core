@@ -46,6 +46,7 @@ export interface SocialComment {
     parent_id?: string | null;
     replies?: SocialComment[];
     like_count?: number;
+    moderation_status?: string; // 'pending' | 'ok' | 'flagged'
 }
 
 export interface AnalystRating {
