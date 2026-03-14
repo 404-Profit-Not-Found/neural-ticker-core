@@ -9,6 +9,8 @@ describe('SocialController', () => {
     getComments: jest.fn(),
     postComment: jest.fn(),
     getWatcherCount: jest.fn(),
+    toggleLike: jest.fn(),
+    getUserLikedCommentIds: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -58,6 +60,23 @@ describe('SocialController', () => {
         'user123',
         'AAPL',
         'Great stock!',
+        undefined,
+      );
+    });
+
+    it('should post a reply', async () => {
+      const mockReply = { id: '2', content: 'I agree!', parent_id: '1' };
+      mockSocialService.postComment.mockResolvedValue(mockReply);
+      const req = { user: { id: 'user123' } };
+
+      const result = await controller.postComment(req, 'AAPL', 'I agree!', '1');
+
+      expect(result).toEqual(mockReply);
+      expect(mockSocialService.postComment).toHaveBeenCalledWith(
+        'user123',
+        'AAPL',
+        'I agree!',
+        '1',
       );
     });
   });

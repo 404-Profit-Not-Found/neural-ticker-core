@@ -173,8 +173,12 @@ export function Header() {
         void queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
       }
 
-      if (n.type === 'research_complete' && n.data?.ticker && n.data?.researchId) {
+      if ((n.type === 'research_complete' || n.type === 'research_complete_watcher') && n.data?.ticker && n.data?.researchId) {
         navigate(`/ticker/${n.data.ticker}/research/${n.data.researchId}`);
+      } else if (n.type === 'price_alert' && n.data?.symbol) {
+        navigate(`/ticker/${n.data.symbol}`);
+      } else if ((n.type === 'comment_reply' || n.type === 'comment_like' || n.type === 'comment_mention') && n.data?.symbol) {
+        navigate(`/ticker/${n.data.symbol}`);
       } else if (n.data?.ticker) {
         navigate(`/ticker/${n.data.ticker}`);
       }
@@ -261,6 +265,9 @@ export function Header() {
               </Link>
               <Link to="/portfolio" className={linkClass('/portfolio')}>
                 Portfolio
+              </Link>
+              <Link to="/alerts" className={linkClass('/alerts')}>
+                Alerts
               </Link>
             </nav>
           </div>
@@ -456,6 +463,9 @@ export function Header() {
             </Link>
             <Link to="/portfolio" className={mobileLinkClass('/portfolio')}>
               Portfolio
+            </Link>
+            <Link to="/alerts" className={mobileLinkClass('/alerts')}>
+              Alerts
             </Link>
             <div className="h-px bg-border my-2" />
           </div>

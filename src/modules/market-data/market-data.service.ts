@@ -8,6 +8,7 @@ import { TickersService } from '../tickers/tickers.service';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { PriceAlertsService } from '../price-alerts/price-alerts.service';
 import { MarketStatusService } from './market-status.service';
 
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
@@ -53,6 +54,8 @@ export class MarketDataService {
     private readonly marketStatusService: MarketStatusService,
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
+    @Inject(forwardRef(() => PriceAlertsService))
+    private readonly priceAlertsService: PriceAlertsService,
   ) {}
 
   private snapshotRequests = new Map<string, Promise<any>>();
@@ -86,22 +89,33 @@ export class MarketDataService {
     this.logger.log('Cron: Refreshing active portfolio symbols...');
 
     try {
-      const symbols =
+      // Merge portfolio symbols + price alert symbols (deduplicated)
+      const portfolioSymbols =
         await this.portfolioService.getAllDistinctPortfolioSymbols();
+      const alertSymbols =
+        await this.priceAlertsService.findActiveAlertSymbols();
+      const symbols = [...new Set([...portfolioSymbols, ...alertSymbols])];
+
       if (symbols.length === 0) return;
 
       this.logger.debug(
-        `Found ${symbols.length} distinct symbols to refresh: ${symbols.join(', ')}`,
+        `Found ${symbols.length} symbols to refresh (${portfolioSymbols.length} portfolio, ${alertSymbols.length} alerts): ${symbols.join(', ')}`,
       );
 
-      // Process sequentially or with limited concurrency to respect rate limits
+      // Process sequentially to respect rate limits
       for (const symbol of symbols) {
         try {
           // Force refresh if data is older than 30 seconds
-          await this.performGetSnapshot(symbol, {
+          const snapshot = await this.performGetSnapshot(symbol, {
             updateIfStale: true,
             staleThresholdSeconds: 30,
           });
+
+          // Evaluate price alerts against the fresh price
+          const currentPrice = snapshot?.latestPrice?.close;
+          if (currentPrice && currentPrice > 0) {
+            await this.priceAlertsService.evaluateAlerts(symbol, currentPrice);
+          }
         } catch (e) {
           this.logger.error(
             `Failed to refresh ${symbol} in cron: ${e.message}`,

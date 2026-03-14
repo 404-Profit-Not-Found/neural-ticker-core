@@ -13,6 +13,7 @@ import { FinnhubService } from '../finnhub/finnhub.service';
 import { Repository } from 'typeorm';
 import { TickerEntity } from '../tickers/entities/ticker.entity';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { PriceAlertsService } from '../price-alerts/price-alerts.service';
 
 import { ConfigService } from '@nestjs/config';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
@@ -206,6 +207,13 @@ describe('MarketDataService', () => {
         {
           provide: MarketStatusService,
           useValue: mockMarketStatusService,
+        },
+        {
+          provide: PriceAlertsService,
+          useValue: {
+            findActiveAlertSymbols: jest.fn().mockResolvedValue([]),
+            evaluateAlerts: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: getRepositoryToken(TickerEntity),

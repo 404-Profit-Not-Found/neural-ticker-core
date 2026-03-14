@@ -34,10 +34,16 @@ export class SocialController {
     return this.socialService.getComments(symbol);
   }
 
-  @ApiOperation({ summary: 'Post a Comment' })
+  @ApiOperation({ summary: 'Post a Comment or Reply' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
   @ApiBody({
-    schema: { type: 'object', properties: { content: { type: 'string' } } },
+    schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string' },
+        parent_id: { type: 'string', nullable: true },
+      },
+    },
   })
   @ApiResponse({ status: 201, description: 'Comment created' })
   @UseGuards(JwtAuthGuard)
@@ -46,8 +52,36 @@ export class SocialController {
     @Request() req: any,
     @Param('symbol') symbol: string,
     @Body('content') content: string,
+    @Body('parent_id') parentId?: string,
   ) {
-    return this.socialService.postComment(req.user.id, symbol, content);
+    return this.socialService.postComment(
+      req.user.id,
+      symbol,
+      content,
+      parentId,
+    );
+  }
+
+  @ApiOperation({ summary: 'Toggle like on a comment' })
+  @ApiParam({ name: 'commentId', example: '1' })
+  @ApiResponse({ status: 200, description: 'Like toggled' })
+  @UseGuards(JwtAuthGuard)
+  @Post('comments/:commentId/like')
+  async toggleLike(@Request() req: any, @Param('commentId') commentId: string) {
+    return this.socialService.toggleLike(req.user.id, commentId);
+  }
+
+  @ApiOperation({ summary: 'Get comment IDs liked by current user' })
+  @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiResponse({ status: 200, description: 'List of liked comment IDs' })
+  @UseGuards(JwtAuthGuard)
+  @Get('comments/:symbol/my-likes')
+  async getMyLikes(@Request() req: any, @Param('symbol') symbol: string) {
+    const ids = await this.socialService.getUserLikedCommentIds(
+      req.user.id,
+      symbol,
+    );
+    return { liked_ids: ids };
   }
 
   @ApiOperation({ summary: 'Get Watcher Count' })

@@ -19,6 +19,7 @@ import { NewsPage } from './pages/NewsPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { PublicResearchPage } from './pages/PublicResearchPage';
 import { AboutPage } from './pages/AboutPage';
+import { AlertsPage } from './pages/AlertsPage';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 
@@ -108,6 +109,7 @@ function App() {
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
             <Route path="/analyzer" element={<ProtectedRoute><AnalyzerPage /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+            <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
 
             {/* Admin Route */}
             <Route path="/admin" element={

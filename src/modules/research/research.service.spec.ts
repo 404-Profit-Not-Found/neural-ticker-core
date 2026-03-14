@@ -15,6 +15,7 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../web-push/web-push.service';
 import { QualityScoringService } from './quality-scoring.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
 
@@ -63,6 +64,10 @@ describe('ResearchService', () => {
     create: jest.fn(),
   };
 
+  const mockWebPushService = {
+    sendToUser: jest.fn().mockResolvedValue(undefined),
+  };
+
   const mockWatchlistService = {
     // Add any methods used by ResearchService, likely related to notifying watchlist users
     findAll: jest.fn().mockResolvedValue([]),
@@ -94,6 +99,7 @@ describe('ResearchService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: WebPushService, useValue: mockWebPushService },
         { provide: QualityScoringService, useValue: mockQualityScoringService }, // Added
         { provide: WatchlistService, useValue: mockWatchlistService },
         { provide: CreditService, useValue: mockCreditService },

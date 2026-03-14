@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -34,6 +35,19 @@ export class Comment {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  @Column({ type: 'bigint', nullable: true })
+  parent_id: string | null;
+
+  @ManyToOne(() => Comment, (comment) => comment.replies, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'parent_id' })
+  parent: Comment | null;
+
+  @OneToMany(() => Comment, (comment) => comment.parent)
+  replies: Comment[];
+
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
@@ -41,4 +55,7 @@ export class Comment {
   @ApiProperty()
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
+
+  // Virtual field — populated by query, not a DB column
+  like_count?: number;
 }

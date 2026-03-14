@@ -23,6 +23,7 @@ import { CompanyNews } from './entities/company-news.entity';
 import { TickerEntity } from '../tickers/entities/ticker.entity';
 
 import { ResearchModule } from '../research/research.module';
+import { PriceAlertsModule } from '../price-alerts/price-alerts.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ResearchModule } from '../research/research.module';
     forwardRef(() => TickersModule),
     YahooFinanceModule,
     forwardRef(() => PortfolioModule),
+    forwardRef(() => PriceAlertsModule),
   ],
   controllers: [
     MarketDataController,

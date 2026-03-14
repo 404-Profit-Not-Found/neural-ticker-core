@@ -12,6 +12,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
 
 import { NotificationsModule } from '../notifications/notifications.module';
+import { WebPushModule } from '../web-push/web-push.module';
 
 import { QualityScoringService } from './quality-scoring.service';
 import { PublicViewController } from './public-view.controller';
@@ -27,6 +28,7 @@ import { PublicViewController } from './public-view.controller';
     forwardRef(() => WatchlistModule),
     forwardRef(() => PortfolioModule),
     NotificationsModule,
+    WebPushModule,
   ],
   controllers: [ResearchController, PublicViewController],
   providers: [ResearchService, QualityScoringService],
