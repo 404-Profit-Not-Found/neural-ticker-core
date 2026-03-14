@@ -79,7 +79,9 @@ export class AdminController {
   ) {
     const validRoles = ['admin', 'user', 'waitlist'];
     if (!validRoles.includes(body.role)) {
-      throw new BadRequestException(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+      throw new BadRequestException(
+        `Invalid role. Must be one of: ${validRoles.join(', ')}`,
+      );
     }
     return this.usersService.updateRole(id, body.role);
   }
