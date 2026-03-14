@@ -854,7 +854,8 @@ export class MarketDataService {
       // Deduplicate locally by ts to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
       const seenTs = new Set();
       const dedupedEntities = validEntities.filter((e) => {
-        const timeKey = e.ts instanceof Date ? e.ts.toISOString() : String(e.ts);
+        const timeKey =
+          e.ts instanceof Date ? e.ts.toISOString() : String(e.ts);
         if (seenTs.has(timeKey)) return false;
         seenTs.add(timeKey);
         return true;
