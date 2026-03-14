@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-globals */
-
 /**
  * Service Worker for Web Push Notifications
  * Handles incoming push events and notification click actions.

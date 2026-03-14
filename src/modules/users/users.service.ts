@@ -351,7 +351,7 @@ export class UsersService {
       .where('user.role IN (:...roles)', { roles: ['user', 'admin'] })
       .andWhere('user.nickname IS NOT NULL')
       .andWhere(
-        "(user.nickname ILIKE :q ESCAPE '\\\\' OR user.email ILIKE :emailQ ESCAPE '\\\\')",
+        "(user.nickname ILIKE :q ESCAPE '\\' OR user.email ILIKE :emailQ ESCAPE '\\')",
         {
           q: `${sanitized}%`,
           emailQ: `${sanitized}%`,

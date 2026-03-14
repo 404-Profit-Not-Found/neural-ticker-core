@@ -1,9 +1,11 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GoogleAuthGuard extends AuthGuard('google') {
+  private readonly logger = new Logger(GoogleAuthGuard.name);
+
   constructor(private readonly configService: ConfigService) {
     super();
   }
@@ -36,12 +38,13 @@ export class GoogleAuthGuard extends AuthGuard('google') {
       callbackURL = `${protocol}://${host}/api/auth/google/callback`;
     }
 
-    console.log('[GoogleAuthGuard] Generated Options:', { callbackURL, state });
-
-    return {
+    const options = {
       callbackURL,
       state,
       prompt: 'select_account',
     };
+
+    this.logger.debug(`Generated Options: ${JSON.stringify(options, null, 2)}`);
+    return options;
   }
 }
