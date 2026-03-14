@@ -851,15 +851,30 @@ export class MarketDataService {
 
       if (validEntities.length === 0) return;
 
-      // Bulk Upsert using TypeORM
-      // Conflict on [symbol_id, timeframe, ts]
-      await this.ohlcvRepo.upsert(validEntities, [
-        'symbol_id',
-        'timeframe',
-        'ts',
-      ]);
+      // Deduplicate locally by ts to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      const seenTs = new Set();
+      const dedupedEntities = validEntities.filter((e) => {
+        const timeKey = e.ts instanceof Date ? e.ts.toISOString() : String(e.ts);
+        if (seenTs.has(timeKey)) return false;
+        seenTs.add(timeKey);
+        return true;
+      });
 
-      this.logger.log(`Upserted ${validEntities.length} candles for ${symbol}`);
+      // Bulk Upsert using TypeORM
+      try {
+        await this.ohlcvRepo.upsert(dedupedEntities, [
+          'symbol_id',
+          'timeframe',
+          'ts',
+        ]);
+        this.logger.log(
+          `Upserted ${dedupedEntities.length} candles for ${symbol}`,
+        );
+      } catch (upsertErr) {
+        this.logger.warn(
+          `Graceful Upsert Failure for ${symbol}: ${upsertErr.message}`,
+        );
+      }
     } catch (e) {
       this.logger.error(
         `Failed to sync history for ${symbol}: ${e.message}`,
@@ -929,15 +944,30 @@ export class MarketDataService {
               .filter((c: any) => c.close !== null && c.close !== undefined);
 
             if (mappedData.length > 0) {
+              const seenTs = new Set();
+              const uniqueData = mappedData.filter((q: any) => {
+                const key = q.ts.toISOString();
+                if (seenTs.has(key)) return false;
+                seenTs.add(key);
+                return true;
+              });
+
               this.logger.debug(
-                `Persisting ${mappedData.length} intraday candles (Yahoo Parsed) to DB...`,
+                `Persisting ${uniqueData.length} intraday candles (Yahoo Parsed) to DB...`,
               );
-              await this.ohlcvRepo.upsert(mappedData, [
-                'symbol_id',
-                'timeframe',
-                'ts',
-              ]);
-              return mappedData;
+              try {
+                await this.ohlcvRepo.upsert(uniqueData, [
+                  'symbol_id',
+                  'timeframe',
+                  'ts',
+                ]);
+                return uniqueData;
+              } catch (upsertErr) {
+                this.logger.warn(
+                  `Intraday Upsert Failed (Parsed): ${upsertErr.message}`,
+                );
+                return uniqueData;
+              }
             }
           }
 
@@ -961,15 +991,30 @@ export class MarketDataService {
               .filter((c: any) => c.close !== null && c.close !== undefined);
 
             if (mappedData.length > 0) {
+              const seenTs = new Set();
+              const uniqueData = mappedData.filter((q: any) => {
+                const key = q.ts.toISOString();
+                if (seenTs.has(key)) return false;
+                seenTs.add(key);
+                return true;
+              });
+
               this.logger.debug(
-                `Persisting ${mappedData.length} intraday candles (Yahoo Raw) to DB...`,
+                `Persisting ${uniqueData.length} intraday candles (Yahoo Raw) to DB...`,
               );
-              await this.ohlcvRepo.upsert(mappedData, [
-                'symbol_id',
-                'timeframe',
-                'ts',
-              ]);
-              return mappedData;
+              try {
+                await this.ohlcvRepo.upsert(uniqueData, [
+                  'symbol_id',
+                  'timeframe',
+                  'ts',
+                ]);
+                return uniqueData;
+              } catch (upsertErr) {
+                this.logger.warn(
+                  `Intraday Upsert Failed (Raw): ${upsertErr.message}`,
+                );
+                return uniqueData;
+              }
             }
           }
         }
