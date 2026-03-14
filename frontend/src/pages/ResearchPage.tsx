@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
@@ -60,8 +60,9 @@ interface ResearchNote {
 
 export function ResearchPage() {
     // Route: /ticker/:symbol/research/:id
-    const { id } = useParams<{ id: string; symbol: string }>();
+    const { id, symbol } = useParams<{ id: string; symbol: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const { data: note, isLoading, error } = useQuery<ResearchNote>({
         queryKey: ['research', id],
@@ -99,7 +100,7 @@ export function ResearchPage() {
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
                     <AlertTriangle className="w-12 h-12 text-destructive opacity-50" />
                     <h2 className="text-xl font-bold">Research Note Not Found</h2>
-                    <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+                    <Button variant="outline" onClick={() => location.key !== 'default' ? navigate(-1) : navigate(symbol ? `/ticker/${symbol}` : '/dashboard')}>Go Back</Button>
                 </div>
             </div>
         );
@@ -131,7 +132,7 @@ export function ResearchPage() {
                 {/* --- HERO HEADER (matching TickerDetail style exactly) --- */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted h-8 w-8">
+                        <Button variant="ghost" size="icon" onClick={() => location.key !== 'default' ? navigate(-1) : navigate(symbol ? `/ticker/${symbol}` : '/dashboard')} className="rounded-full hover:bg-muted h-8 w-8">
                             <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                         </Button>
 
