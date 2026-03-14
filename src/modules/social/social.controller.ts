@@ -59,8 +59,7 @@ export class SocialController {
     if (typeof content === 'string') {
       normalizedContent = content;
     } else if (Array.isArray(content)) {
-      normalizedContent =
-        content.length > 0 ? String(content[0]) : '';
+      normalizedContent = content.length > 0 ? String(content[0]) : '';
     } else {
       normalizedContent = content != null ? String(content) : '';
     }
