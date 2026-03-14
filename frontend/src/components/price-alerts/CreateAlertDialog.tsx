@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { useCreatePriceAlert } from '../../hooks/usePriceAlerts';
 import { toast } from 'sonner';
@@ -33,13 +33,6 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
   const createAlert = useCreatePriceAlert();
 
   const isPercentType = alertType === 'percent_change_up' || alertType === 'percent_change_down';
-
-  // Sync target value when dialog opens or price updates
-  useEffect(() => {
-    if (open && currentPrice > 0 && !isPercentType) {
-      setTargetValue(currentPrice.toFixed(2));
-    }
-  }, [open, currentPrice, isPercentType]);
 
   const handleTypeChange = (type: typeof alertType) => {
     setAlertType(type);
@@ -99,11 +92,10 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
                   key={type.value}
                   type="button"
                   onClick={() => handleTypeChange(type.value)}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
-                    alertType === type.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${alertType === type.value
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    }`}
                 >
                   <Icon size={14} className={type.color} />
                   {type.label}

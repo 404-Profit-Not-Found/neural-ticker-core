@@ -302,9 +302,9 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 const formatCurrency = (val: number, currencyCode?: string) => {
-                    return new Intl.NumberFormat('en-US', { 
-                        style: 'currency', 
-                        currency: currencyCode || profile?.currency || 'USD' 
+                    return new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: currencyCode || profile?.currency || 'USD'
                     }).format(val);
                 };
 
@@ -764,8 +764,9 @@ export function TickerDetail() {
 
             {/* Price Alert Dialog */}
             <CreateAlertDialog
+                key={`${symbol}-${isAlertDialogOpen}`}
                 symbol={symbol || ''}
-                currentPrice={(tickerData as any)?.market_data?.price ?? 0}
+                currentPrice={(tickerData as TickerData)?.market_data?.price ?? 0}
                 open={isAlertDialogOpen}
                 onOpenChange={setIsAlertDialogOpen}
             />

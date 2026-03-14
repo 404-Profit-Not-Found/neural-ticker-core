@@ -58,7 +58,7 @@
     "toon-parser": "^1.1.1",
     "typeorm": "^0.3.28",
     "web-push": "^3.6.7",
-    "yahoo-finance2": "^3.11.2"
+    "yahoo-finance2": "^3.13.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
