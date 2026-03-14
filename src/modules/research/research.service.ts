@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  InternalServerErrorException,
   OnModuleInit,
   Inject,
   forwardRef,
@@ -1293,10 +1294,12 @@ Title:`;
    * Generates a signature for the research ID to allow secure public sharing.
    */
   generatePublicSignature(researchId: string): string {
-    const secret = this.config.get<string>(
-      'RESEARCH_SHARE_SECRET',
-      'dev-secret-salt', // Fallback for dev convenience
-    );
+    const secret = this.config.get<string>('RESEARCH_SHARE_SECRET');
+    if (!secret) {
+      throw new InternalServerErrorException(
+        'RESEARCH_SHARE_SECRET is not configured',
+      );
+    }
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(researchId);
     return hmac.digest('hex');
