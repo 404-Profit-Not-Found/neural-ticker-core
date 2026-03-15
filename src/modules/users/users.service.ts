@@ -245,6 +245,20 @@ export class UsersService {
     return this.userRepo.findOne({ where: { id } });
   }
 
+  /**
+   * Get notification channel preferences for a user, with defaults.
+   */
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<{ push_enabled: boolean; email_enabled: boolean }> {
+    const user = await this.findById(userId);
+    const prefs = user?.preferences?.notifications;
+    return {
+      push_enabled: prefs?.push_enabled ?? true,
+      email_enabled: prefs?.email_enabled ?? false,
+    };
+  }
+
   async getProfile(id: string): Promise<User | null> {
     return this.userRepo.findOne({
       where: { id },

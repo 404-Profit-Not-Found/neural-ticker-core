@@ -14,6 +14,7 @@ interface User {
     credits_balance?: number;
     avatar_url: string;
     has_onboarded?: boolean;
+    preferences?: Record<string, any>;
 }
 
 interface AuthContextType {
