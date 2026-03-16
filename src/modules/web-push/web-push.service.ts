@@ -90,12 +90,9 @@ export class WebPushService {
     if (!this.isConfigured) return;
 
     // Check user's notification preferences
-    const prefs =
-      await this.usersService.getNotificationPreferences(userId);
+    const prefs = await this.usersService.getNotificationPreferences(userId);
     if (!prefs.push_enabled) {
-      this.logger.debug(
-        `Push disabled for user ${userId}, skipping`,
-      );
+      this.logger.debug(`Push disabled for user ${userId}, skipping`);
       return;
     }
 
