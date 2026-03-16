@@ -174,7 +174,7 @@ export function useToggleCommentLike() {
                 if (!old) return old;
                 const delta = wasLiked ? -1 : 1;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const updateComments = (comments: any[]) =>
+                const updateComments = (comments: any[]): any[] =>
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     comments.map((c: any) => ({
                         ...c,
