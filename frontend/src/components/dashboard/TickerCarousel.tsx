@@ -58,6 +58,7 @@ export function TickerCarousel({ data, isLoading }: TickerCarouselProps) {
                             fiftyTwoWeekLow={item.fiftyTwoWeekLow ?? undefined}
                             fiftyTwoWeekHigh={item.fiftyTwoWeekHigh ?? undefined}
                             marketStatus={status}
+                            currency={item.currency}
                         />
                     );
                 })}
