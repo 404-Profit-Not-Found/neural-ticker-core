@@ -173,7 +173,9 @@ export function useToggleCommentLike() {
             queryClient.setQueryData(tickerKeys.social(symbol), (old: any) => {
                 if (!old) return old;
                 const delta = wasLiked ? -1 : 1;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const updateComments = (comments: any[]) =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     comments.map((c: any) => ({
                         ...c,
                         like_count: c.id === commentId ? Math.max(0, (c.like_count || 0) + delta) : c.like_count,
