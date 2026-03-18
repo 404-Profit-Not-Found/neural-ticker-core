@@ -40,6 +40,11 @@ export function ProfilePage() {
     const [isEditingAvatar, setIsEditingAvatar] = useState(false);
     const { isSupported: pushSupported, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = useWebPush();
 
+    // DB-backed notification preferences (cross-device)
+    const [pushEnabled, setPushEnabled] = useState(true);
+    const [emailEnabled, setEmailEnabled] = useState(false);
+    const [isSavingNotifPrefs, setIsSavingNotifPrefs] = useState(false);
+
     // Live Preview Effect
     useEffect(() => {
         let previewTheme = theme;
@@ -64,6 +69,10 @@ export function ProfilePage() {
             setOriginalNickname(nick);
             setAvatarUrl(user.avatar_url || '');
             setTheme(user.theme || 'g100');
+            // Hydrate notification preferences from DB
+            const notifPrefs = user.preferences?.notifications;
+            setPushEnabled(notifPrefs?.push_enabled ?? true);
+            setEmailEnabled(notifPrefs?.email_enabled ?? false);
         }
     }, [user]);
 
@@ -126,6 +135,49 @@ export function ProfilePage() {
         setTheme(newTheme);
         saveChanges(nickname, avatarUrl, newTheme);
     };
+
+    // Save notification preferences to DB (cross-device)
+    const saveNotificationPreference = useCallback(async (key: 'push_enabled' | 'email_enabled', value: boolean) => {
+        setIsSavingNotifPrefs(true);
+        try {
+            await api.post('/users/me/preferences', {
+                notifications: {
+                    ...(user?.preferences?.notifications || {}),
+                    [key]: value,
+                },
+            });
+            await refreshSession();
+        } catch (error) {
+            console.error('Failed to save notification preference', error);
+        } finally {
+            setIsSavingNotifPrefs(false);
+        }
+    }, [user?.preferences?.notifications, refreshSession]);
+
+    // Toggle push: save to DB + subscribe/unsubscribe browser push
+    const handlePushToggle = useCallback(async () => {
+        const newValue = !pushEnabled;
+        setPushEnabled(newValue); // optimistic
+
+        if (newValue) {
+            const ok = await pushSubscribe();
+            if (!ok) {
+                setPushEnabled(false); // revert if browser denied
+                return;
+            }
+        } else {
+            await pushUnsubscribe();
+        }
+
+        await saveNotificationPreference('push_enabled', newValue);
+    }, [pushEnabled, pushSubscribe, pushUnsubscribe, saveNotificationPreference]);
+
+    // Toggle email: save to DB only
+    const handleEmailToggle = useCallback(async () => {
+        const newValue = !emailEnabled;
+        setEmailEnabled(newValue); // optimistic
+        await saveNotificationPreference('email_enabled', newValue);
+    }, [emailEnabled, saveNotificationPreference]);
 
     // Get tier badge (exact match to Admin Console UserAdminCard)
     const getTierBadge = (tier: string | undefined) => {
@@ -367,42 +419,75 @@ export function ProfilePage() {
                 </div>
 
                 {/* NOTIFICATIONS SECTION */}
-                {pushSupported && (
-                    <div className="space-y-3">
-                        <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Notifications</h2>
+                <div className="space-y-3">
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Notifications</h2>
 
-                        <div className="bg-card border border-border/40 rounded-xl p-4">
-                            <div className="flex items-center gap-3">
+                    <div className="bg-card border border-border/40 rounded-xl overflow-hidden">
+                        {/* Push Notifications Toggle */}
+                        {pushSupported && (
+                            <div className="p-4 flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
                                     <Bell size={18} className="text-muted-foreground" />
                                 </div>
                                 <div className="flex-1">
                                     <div className="text-sm font-medium">Push Notifications</div>
                                     <div className="text-xs text-muted-foreground">
-                                        {pushSubscribed
+                                        {pushEnabled && pushSubscribed
                                             ? 'Receive alerts even when the tab is closed'
                                             : 'Enable to get price alerts in your browser'}
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => pushSubscribed ? pushUnsubscribe() : pushSubscribe()}
-                                    disabled={pushLoading}
+                                    onClick={handlePushToggle}
+                                    disabled={pushLoading || isSavingNotifPrefs}
                                     className={cn(
                                         "relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50",
-                                        pushSubscribed ? "bg-emerald-500" : "bg-muted"
+                                        pushEnabled ? "bg-emerald-500" : "bg-muted"
                                     )}
                                 >
                                     <span
                                         className={cn(
                                             "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200",
-                                            pushSubscribed && "translate-x-5"
+                                            pushEnabled && "translate-x-5"
                                         )}
                                     />
                                 </button>
                             </div>
+                        )}
+
+                        {pushSupported && <div className="h-px bg-border/40" />}
+
+                        {/* Email Notifications Toggle */}
+                        <div className="p-4 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                <Mail size={18} className="text-muted-foreground" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium">Email Notifications</div>
+                                <div className="text-xs text-muted-foreground">
+                                    {emailEnabled
+                                        ? 'Receive alerts via email'
+                                        : 'Enable to get notifications by email'}
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleEmailToggle}
+                                disabled={isSavingNotifPrefs}
+                                className={cn(
+                                    "relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50",
+                                    emailEnabled ? "bg-emerald-500" : "bg-muted"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200",
+                                        emailEnabled && "translate-x-5"
+                                    )}
+                                />
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
 
                 {/* VERSION FOOTER */}
                 <div className="pt-8 text-center">

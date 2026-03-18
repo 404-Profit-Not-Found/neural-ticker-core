@@ -8,6 +8,7 @@ import { calculateLiveUpside } from '../../lib/rating-utils';
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
 import { Sparkline } from '../ui/Sparkline';
+import { useCurrency } from '../../context/CurrencyContext';
 
 export interface Position {
     id: string;
@@ -79,6 +80,7 @@ const formatPct = (val: number) =>
 
 export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
+    const { displayCurrency } = useCurrency();
     const columnHelper = createColumnHelper<Position>();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,7 +159,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 // Use converted (Display) values for Value & Return columns
                 const val = row.current_value;
                 const gainLoss = row.gain_loss;
-                const currency = row.currency || 'USD';
+                const currency = row.currency || displayCurrency || 'USD';
                 
                 const pct = info.getValue();
                 const isProfit = gainLoss >= 0;
@@ -209,7 +211,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             cell: (info) => {
                 const row = info.row.original;
                 const price = info.getValue();
-                const currency = row.currency || 'USD';
+                const currency = row.currency || displayCurrency || 'USD';
                 const change = row.change_percent || 0;
                 const isPositive = change >= 0;
 

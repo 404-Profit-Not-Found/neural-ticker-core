@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
 import { PushSubscriptionEntity } from './entities/push-subscription.entity';
+import { UsersService } from '../users/users.service';
 
 interface PushPayload {
   title: string;
@@ -21,6 +22,8 @@ export class WebPushService {
     @InjectRepository(PushSubscriptionEntity)
     private readonly subRepo: Repository<PushSubscriptionEntity>,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
   ) {
     const vapidPublic = this.configService.get<string>('VAPID_PUBLIC_KEY');
     const vapidPrivate = this.configService.get<string>('VAPID_PRIVATE_KEY');
@@ -85,6 +88,13 @@ export class WebPushService {
    */
   async sendToUser(userId: string, payload: PushPayload): Promise<void> {
     if (!this.isConfigured) return;
+
+    // Check user's notification preferences
+    const prefs = await this.usersService.getNotificationPreferences(userId);
+    if (!prefs.push_enabled) {
+      this.logger.debug(`Push disabled for user ${userId}, skipping`);
+      return;
+    }
 
     const subscriptions = await this.subRepo.find({
       where: { user_id: userId },

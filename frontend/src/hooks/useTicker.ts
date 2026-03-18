@@ -153,7 +153,50 @@ export function useToggleCommentLike() {
             const res = await api.post(`/social/comments/${commentId}/like`);
             return res.data as { liked: boolean; likeCount: number };
         },
-        onSuccess: (_, variables) => {
+        onMutate: async ({ commentId, symbol }) => {
+            // Cancel outgoing refetches so they don't overwrite our optimistic update
+            await queryClient.cancelQueries({ queryKey: tickerKeys.social(symbol) });
+            await queryClient.cancelQueries({ queryKey: ['social', 'my-likes', symbol] });
+
+            // Snapshot previous values for rollback
+            const prevSocial = queryClient.getQueryData(tickerKeys.social(symbol));
+            const prevLikes = queryClient.getQueryData<string[]>(['social', 'my-likes', symbol]);
+
+            // Optimistically toggle the liked IDs
+            const wasLiked = prevLikes?.includes(commentId) ?? false;
+            queryClient.setQueryData<string[]>(['social', 'my-likes', symbol], (old = []) =>
+                wasLiked ? old.filter((id) => id !== commentId) : [...old, commentId],
+            );
+
+            // Optimistically update like_count on the comment
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            queryClient.setQueryData(tickerKeys.social(symbol), (old: any) => {
+                if (!old) return old;
+                const delta = wasLiked ? -1 : 1;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const updateComments = (comments: any[]): any[] =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    comments.map((c: any) => ({
+                        ...c,
+                        like_count: c.id === commentId ? Math.max(0, (c.like_count || 0) + delta) : c.like_count,
+                        replies: c.replies ? updateComments(c.replies) : c.replies,
+                    }));
+                return { ...old, comments: updateComments(old.comments || []) };
+            });
+
+            return { prevSocial, prevLikes };
+        },
+        onError: (_err, variables, context) => {
+            // Rollback on error
+            if (context?.prevSocial) {
+                queryClient.setQueryData(tickerKeys.social(variables.symbol), context.prevSocial);
+            }
+            if (context?.prevLikes) {
+                queryClient.setQueryData(['social', 'my-likes', variables.symbol], context.prevLikes);
+            }
+        },
+        onSettled: (_, _err, variables) => {
+            // Refetch to ensure server state is in sync
             queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
             queryClient.invalidateQueries({ queryKey: ['social', 'my-likes', variables.symbol] });
         },

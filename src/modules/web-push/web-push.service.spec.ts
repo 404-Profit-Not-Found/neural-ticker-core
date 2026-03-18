@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { WebPushService } from './web-push.service';
 import { PushSubscriptionEntity } from './entities/push-subscription.entity';
+import { UsersService } from '../users/users.service';
 
 // Mock web-push module
 jest.mock('web-push', () => ({
@@ -23,6 +24,13 @@ describe('WebPushService', () => {
     delete: jest.fn(),
   };
 
+  const mockUsersService = {
+    getNotificationPreferences: jest.fn().mockResolvedValue({
+      push_enabled: true,
+      email_enabled: false,
+    }),
+  };
+
   const buildModule = async (config: Record<string, string>) => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +47,10 @@ describe('WebPushService', () => {
                 config[key] ?? defaultValue,
             ),
           },
+        },
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
         },
       ],
     }).compile();
@@ -283,6 +295,27 @@ describe('WebPushService', () => {
       await service.sendToUser('user1', { title: 'Test', body: 'Missing' });
 
       expect(mockSubRepo.delete).toHaveBeenCalledWith({ id: '2' });
+    });
+
+    it('should not send when push_enabled is false in user preferences', async () => {
+      mockUsersService.getNotificationPreferences.mockResolvedValueOnce({
+        push_enabled: false,
+        email_enabled: false,
+      });
+      mockSubRepo.find.mockResolvedValue([
+        {
+          id: '1',
+          user_id: 'user1',
+          endpoint: 'https://push.example.com',
+          p256dh: 'p1',
+          auth: 'a1',
+        },
+      ]);
+
+      await service.sendToUser('user1', { title: 'Test', body: 'Disabled' });
+
+      expect(mockSubRepo.find).not.toHaveBeenCalled();
+      expect(webpush.sendNotification).not.toHaveBeenCalled();
     });
 
     it('should not send when VAPID is not configured', async () => {

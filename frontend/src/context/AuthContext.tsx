@@ -2,6 +2,16 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { httpClient } from '../lib/api';
 import { queryClient, persister } from '../lib/queryClient';
 
+interface NotificationPreferences {
+    push_enabled?: boolean;
+    email_enabled?: boolean;
+}
+
+interface UserPreferences {
+    notifications?: NotificationPreferences;
+    [key: string]: unknown;
+}
+
 interface User {
     id: string;
     email: string;
@@ -14,6 +24,7 @@ interface User {
     credits_balance?: number;
     avatar_url: string;
     has_onboarded?: boolean;
+    preferences?: UserPreferences;
 }
 
 interface AuthContextType {
