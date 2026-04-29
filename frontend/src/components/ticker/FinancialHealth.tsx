@@ -1,5 +1,6 @@
 import { TrendingUp, AlertTriangle, DollarSign, Wallet } from 'lucide-react';
 import type { TickerData } from '../../types/ticker';
+import { useCurrency } from '../../context/CurrencyContext';
 
 interface FinancialHealthProps {
     fundamentals: TickerData['fundamentals'];
@@ -23,11 +24,18 @@ const SectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode }
 );
 
 export function FinancialHealth({ fundamentals, currency = 'USD' }: FinancialHealthProps) {
+    const { displayCurrency, convert, rates } = useCurrency();
     if (!fundamentals) return <div className="text-muted-foreground">No financial data available</div>;
 
     const formatCurrency = (val: number | undefined | null) => {
         if (val === undefined || val === null) return 'N/A';
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact", maximumFractionDigits: 2 }).format(val);
+        const native = (currency || 'USD').toUpperCase();
+        const fromRate = native === 'USD' ? 1 : rates[native];
+        const toRate = displayCurrency === 'USD' ? 1 : rates[displayCurrency];
+        const canConvert = !!(fromRate && toRate);
+        const targetCurrency = canConvert ? displayCurrency : native;
+        const value = canConvert ? convert(val, native, displayCurrency) : val;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: targetCurrency, notation: 'compact', maximumFractionDigits: 2 }).format(value);
     };
 
     const formatNumber = (val: number | undefined | null, decimals = 2) => {

@@ -6,6 +6,7 @@ import { TickerLogo } from '../dashboard/TickerLogo';
 import { VerdictBadge } from './VerdictBadge';
 import { useFavorite } from '../../hooks/useWatchlist';
 import type { MarketStatusData } from '../../hooks/useMarketStatus';
+import { useCurrency } from '../../context/CurrencyContext';
 
 export interface TickerCardProps {
     symbol: string;
@@ -66,6 +67,7 @@ export function TickerCard({
     currency = 'USD'
 }: TickerCardProps) {
     const navigate = useNavigate();
+    const { formatNative } = useCurrency();
     // Use per-ticker market status based on symbol's exchange
     // If status is passed via props, use it. Otherwise fetch it.
     // Note: useTickerMarketStatus needs to be updated to accept an "enabled" option
@@ -171,7 +173,7 @@ export function TickerCard({
                     <div className="flex flex-col">
                         <div className="flex items-baseline gap-2">
                             <span className="text-xl font-mono font-bold">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(price)}
+                                {formatNative(price, currency)}
                             </span>
                             <div className={cn("flex items-center gap-0.5 text-xs font-mono font-bold", change >= 0 ? "text-emerald-500" : "text-red-500")}>
                                 {change >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}

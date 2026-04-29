@@ -40,6 +40,7 @@ import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
 import { Sparkline } from "../ui/Sparkline";
 import { FavoriteStar } from '../watchlist/FavoriteStar';
+import { useCurrency } from '../../context/CurrencyContext';
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -94,6 +95,7 @@ export function WatchlistTableView({
     tableRef
 }: WatchlistTableViewProps) {
     const navigate = useNavigate();
+    const { formatNative } = useCurrency();
 
     const columns = useMemo(() => {
         const columnHelper = createColumnHelper<TickerData>();
@@ -189,11 +191,7 @@ export function WatchlistTableView({
                     if (!price) return '-';
 
                     const isPositive = (change || 0) >= 0;
-                    const formattedPrice = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: currency || 'USD',
-                        minimumFractionDigits: 2
-                    }).format(price);
+                    const formattedPrice = formatNative(price, currency || 'USD');
 
                     return (
                         <div className="flex flex-col items-end">

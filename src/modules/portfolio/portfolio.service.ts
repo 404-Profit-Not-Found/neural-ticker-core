@@ -155,9 +155,16 @@ export class PortfolioService implements OnModuleInit {
             displayCurrency,
           );
 
+          if (rate === null) {
+            return {
+              ...pos,
+              display_currency: displayCurrency,
+              conversion_unavailable: true,
+            };
+          }
+
           return {
             ...pos,
-            // Preserve original native values
             original_currency: pos.currency,
             original_current_price: pos.current_price,
             original_current_value: pos.current_value,
@@ -165,7 +172,6 @@ export class PortfolioService implements OnModuleInit {
             original_gain_loss: pos.gain_loss,
             original_buy_price: pos.buy_price,
 
-            // Overwrite with converted values for consistent aggregation
             currency: displayCurrency,
             current_price: pos.current_price * rate,
             current_value: pos.current_value * rate,

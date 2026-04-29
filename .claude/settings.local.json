@@ -4,7 +4,10 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(command -v npm)",
       "Bash(npm run:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(find /Users/branislavlang/Documents/GitHub/neural-ticket-core/src/modules -name \"*.controller.ts\" -type f -exec grep -l \"download\\\\|export\\\\|csv\" {} \\\\;)",
+      "Read(//Users/branislavlang/Documents/GitHub/**)",
+      "Read(//Users/branislavlang/Documents/**)"
     ]
   }
 }

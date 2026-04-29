@@ -21,6 +21,7 @@ vi.mock('../../context/CurrencyContext', () => ({
     availableCurrencies: [{ code: 'USD', flag: '🇺🇸' }],
     setDisplayCurrency: vi.fn(),
     formatCurrency: (val: number) => `$${val.toFixed(2)}`,
+    formatNative: (val: number) => `$${val.toFixed(2)}`,
     convert: (amount: number) => amount,
     rates: {},
     loading: false,

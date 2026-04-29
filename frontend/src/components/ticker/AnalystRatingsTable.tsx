@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import type { AnalystRating } from '../../types/ticker';
+import { useCurrency } from '../../context/CurrencyContext';
 
 
 interface AnalystRatingsTableProps {
@@ -9,15 +10,10 @@ interface AnalystRatingsTableProps {
 }
 
 export function AnalystRatingsTable({ ratings, currency = 'USD' }: AnalystRatingsTableProps) {
+    const { formatNative } = useCurrency();
     if (!ratings || ratings.length === 0) return null;
 
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: currency,
-            minimumFractionDigits: 2
-        }).format(val);
-    };
+    const formatCurrency = (val: number) => formatNative(val, currency);
 
     return (
         <Card className="bg-transparent shadow-sm border border-border/50">

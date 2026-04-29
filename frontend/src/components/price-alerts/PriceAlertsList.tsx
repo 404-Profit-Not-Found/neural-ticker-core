@@ -36,7 +36,7 @@ export function PriceAlertsList() {
   const { data: alerts, isLoading } = usePriceAlerts();
   const deleteAlert = useDeletePriceAlert();
   const toggleAlert = useTogglePriceAlert();
-  const { formatCurrency } = useCurrency();
+  const { formatNative } = useCurrency();
 
   const handleDelete = async (id: string, symbol: string) => {
     try {
@@ -121,7 +121,7 @@ export function PriceAlertsList() {
                         {config.label}{' '}
                         {isPercent
                           ? `${alert.target_value.toFixed(1)}%`
-                          : formatCurrency(alert.target_value)}
+                          : formatNative(alert.target_value, alert.ticker?.currency || 'USD')}
                       </span>
                       {alert.triggered_at && (
                         <span className="text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">
@@ -133,7 +133,7 @@ export function PriceAlertsList() {
                       <Clock size={10} />
                       <span>Cooldown: {alert.cooldown_minutes}m</span>
                       {isPercent && alert.reference_price && (
-                        <span>• Base: {formatCurrency(alert.reference_price)}</span>
+                        <span>• Base: {formatNative(alert.reference_price, alert.ticker?.currency || 'USD')}</span>
                       )}
                     </div>
                   </div>
