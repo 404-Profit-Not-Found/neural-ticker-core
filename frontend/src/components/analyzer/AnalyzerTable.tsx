@@ -74,6 +74,7 @@ export function AnalyzerTable({
     upside: filters?.upside,
     sector: filters?.sector,
     overallScore: filters?.overallScore,
+    region: filters?.region,
   });
 
   const items = data?.items || [];
@@ -426,7 +427,7 @@ export function AnalyzerTable({
           </div>
 
           <FilterBar
-            filters={filters || { risk: [], aiRating: [], sector: [], upside: null, overallScore: null }}
+            filters={filters || { risk: [], aiRating: [], sector: [], upside: null, overallScore: null, region: [] }}
             onFilterChange={onFilterChange || (() => { })}
             onReset={onReset || (() => { })}
           />

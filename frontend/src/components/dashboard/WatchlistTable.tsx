@@ -104,6 +104,7 @@ export function WatchlistTable() {
         upside: null,
         sector: [],
         overallScore: null,
+        region: [],
     });
 
     // UI State
@@ -312,6 +313,7 @@ export function WatchlistTable() {
             upside: null,
             sector: [],
             overallScore: null,
+            region: [],
         });
     };
 

@@ -77,6 +77,7 @@ export function PortfolioPage() {
     upside: null,
     sector: [],
     overallScore: null,
+    region: [],
   });
 
   const { displayCurrency } = useCurrency();
@@ -277,7 +278,7 @@ export function PortfolioPage() {
                 <FilterBar
                   filters={filters}
                   onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
-                  onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null })}
+                  onReset={() => setFilters({ risk: [], aiRating: [], upside: null, sector: [], overallScore: null, region: [] })}
                 />
               </div>
             </div>

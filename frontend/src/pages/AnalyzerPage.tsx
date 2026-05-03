@@ -17,6 +17,7 @@ export function AnalyzerPage() {
     const aiRatingParam = searchParams.getAll('aiRating');
     const sectorParam = searchParams.getAll('sector');
     const upsideParam = searchParams.get('upside');
+    const regionParam = searchParams.getAll('region');
     const filterParam = searchParams.get('filter');
 
     const initialFilters: AnalyzerFilters = {
@@ -25,6 +26,7 @@ export function AnalyzerPage() {
       sector: sectorParam.length > 0 ? sectorParam : [],
       upside: upsideParam || null,
       overallScore: null,
+      region: regionParam.length > 0 ? regionParam : [],
     };
 
     if (filterParam === 'strong_buy' && initialFilters.aiRating.length === 0) {
@@ -33,6 +35,14 @@ export function AnalyzerPage() {
 
     if (filterParam === 'sell' && initialFilters.aiRating.length === 0) {
       initialFilters.aiRating = ['Sell'];
+    }
+
+    if (filterParam === 'eu_market' && initialFilters.region.length === 0) {
+      initialFilters.region = ['EU'];
+    }
+
+    if (filterParam === 'us_market' && initialFilters.region.length === 0) {
+      initialFilters.region = ['US'];
     }
 
     return initialFilters;
@@ -64,6 +74,7 @@ export function AnalyzerPage() {
     filters.risk?.forEach((r) => params.append('risk', r));
     filters.aiRating?.forEach((r) => params.append('aiRating', r));
     filters.sector?.forEach((s) => params.append('sector', s));
+    filters.region?.forEach((r) => params.append('region', r));
     if (filters.upside) params.append('upside', filters.upside);
 
     // View
@@ -80,7 +91,7 @@ export function AnalyzerPage() {
   };
 
   const handleReset = () => {
-    setFilters({ risk: [], aiRating: [], sector: [], upside: null, overallScore: null });
+    setFilters({ risk: [], aiRating: [], sector: [], upside: null, overallScore: null, region: [] });
     // View mode persists on reset usually, or reset to table? Let's persist.
   };
 
