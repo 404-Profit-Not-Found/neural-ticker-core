@@ -1943,6 +1943,38 @@ export class MarketDataService {
       );
     }
 
+    // Region Filter (EU / US)
+    const EU_SYMBOL_SUFFIXES = ['.DE', '.L', '.PA', '.AS', '.MC', '.MI', '.SW', '.VI', '.BR', '.HE', '.CO', '.ST', '.OL'];
+    const EU_EXCHANGE_CODES = ['LSE', 'XETRA', 'PA', 'AS', 'MC', 'MI', 'SW', 'VI', 'BR', 'HE', 'CO', 'ST', 'OL'];
+
+    if (options.region && options.region.length > 0) {
+      qb.andWhere(
+        new Brackets((regionBracket: any) => {
+          options.region!.forEach((r: string) => {
+            if (r === 'EU') {
+              regionBracket.orWhere(
+                new Brackets((eu: any) => {
+                  EU_SYMBOL_SUFFIXES.forEach((suffix, i) => {
+                    const paramKey = `euSuffix${i}`;
+                    if (i === 0) eu.where(`UPPER(ticker.symbol) LIKE :${paramKey}`, { [paramKey]: `%${suffix.toUpperCase()}` });
+                    else eu.orWhere(`UPPER(ticker.symbol) LIKE :${paramKey}`, { [paramKey]: `%${suffix.toUpperCase()}` });
+                  });
+                  eu.orWhere(`UPPER(ticker.exchange) IN (:...euExchanges)`, { euExchanges: EU_EXCHANGE_CODES });
+                }),
+              );
+            } else if (r === 'US') {
+              regionBracket.orWhere(
+                new Brackets((us: any) => {
+                  us.where(`ticker.symbol NOT LIKE '%.%'`)
+                    .andWhere(`UPPER(ticker.exchange) NOT IN (:...usExcludedExchanges)`, { usExcludedExchanges: EU_EXCHANGE_CODES });
+                }),
+              );
+            }
+          });
+        }),
+      );
+    }
+
     // --- NEW: Filters ---
 
     // 1. Risk Filter (Updated to Financial Risk)
