@@ -4,8 +4,6 @@ import {
   Param,
   Post,
   Query,
-  Headers,
-  UnauthorizedException,
   Logger,
   UseGuards,
   Req,
@@ -31,6 +29,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreditGuard } from '../research/guards/credit.guard';
+import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
 
 @ApiTags('StockTwits')
 @ApiBearerAuth()
@@ -40,13 +39,6 @@ export class StockTwitsController {
   private readonly logger = new Logger(StockTwitsController.name);
 
   constructor(private readonly stockTwitsService: StockTwitsService) {}
-
-  private validateSecret(secret: string) {
-    if (secret !== process.env.CRON_SECRET) {
-      this.logger.warn('Unauthorized cron attempt');
-      throw new UnauthorizedException('Invalid Cron Secret');
-    }
-  }
 
   @Get(':symbol/posts')
   @Public()
@@ -119,22 +111,22 @@ export class StockTwitsController {
 
   @Post('jobs/sync-posts')
   @Public()
+  @UseGuards(CronSecretGuard)
   @ApiOperation({ summary: 'Trigger hourly posts sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
-  async handleHourlyPostsSync(@Headers('X-Cron-Secret') secret: string) {
-    this.validateSecret(secret);
+  async handleHourlyPostsSync() {
     await this.stockTwitsService.handleHourlyPostsSync();
     return { message: 'Hourly posts sync completed' };
   }
 
   @Post('jobs/sync-watchers')
   @Public()
+  @UseGuards(CronSecretGuard)
   @ApiOperation({ summary: 'Trigger daily watchers sync (Cron)' })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Job started' })
-  async handleDailyWatchersSync(@Headers('X-Cron-Secret') secret: string) {
-    this.validateSecret(secret);
+  async handleDailyWatchersSync() {
     await this.stockTwitsService.handleDailyWatchersSync();
     return { message: 'Daily watchers sync completed' };
   }
