@@ -254,9 +254,8 @@ export class JobsService {
   }
 
   async runRiskRewardScanner() {
-    const maxAgeHours = this.configService.get<number>(
-      'riskReward.maxAgeHours',
-    ) || 24;
+    const maxAgeHours =
+      this.configService.get<number>('riskReward.maxAgeHours') || 24;
     this.logger.log(
       `Starting risk/reward scanner (cron tier, staleness: ${maxAgeHours}h)...`,
     );
@@ -302,8 +301,7 @@ export class JobsService {
 
             const isStale =
               !existingAnalysis ||
-              Date.now() - existingAnalysis.created_at.getTime() >
-                stalenessMs;
+              Date.now() - existingAnalysis.created_at.getTime() > stalenessMs;
 
             if (!isStale) {
               batchSkipped++;

@@ -42,8 +42,7 @@ export default () => {
         low: process.env.GEMINI_MODEL_LOW || 'gemini-2.5-flash-lite',
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
-        extraction:
-          process.env.GEMINI_MODEL_EXTRACTION || 'gemma-4-26b-it',
+        extraction: process.env.GEMINI_MODEL_EXTRACTION || 'gemma-4-26b-it',
         cron: process.env.GEMINI_MODEL_CRON || 'gemini-3.1-flash-lite',
         summary: process.env.GEMINI_MODEL_SUMMARY || 'gemma-4-26b-it',
         recommendation:

@@ -72,7 +72,13 @@ export class MarketDataBulkController {
     type: String,
     example: '> 8.5',
   })
-  @ApiQuery({ name: 'region', required: false, isArray: true, type: String, enum: ['US', 'EU'] })
+  @ApiQuery({
+    name: 'region',
+    required: false,
+    isArray: true,
+    type: String,
+    enum: ['US', 'EU'],
+  })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',

@@ -25,10 +25,7 @@ export class GeminiProvider implements ILlmProvider {
   };
 
   // Gemma models don't support Google Search grounding or thinking
-  private readonly gemmaModels = new Set([
-    'gemma-4-26b-it',
-    'gemma-4-31b-it',
-  ]);
+  private readonly gemmaModels = new Set(['gemma-4-26b-it', 'gemma-4-31b-it']);
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
@@ -47,8 +44,7 @@ export class GeminiProvider implements ILlmProvider {
     const modelName = this.resolveModel(prompt.quality);
     const isGemma = this.gemmaModels.has(modelName);
     const isThinkingModel =
-      !isGemma &&
-      (modelName.includes('thinking') || modelName.includes('pro'));
+      !isGemma && (modelName.includes('thinking') || modelName.includes('pro'));
 
     // Gemma models don't support Google Search grounding or thinking
     const tools: Tool[] = isGemma ? [] : [{ googleSearch: {} }];

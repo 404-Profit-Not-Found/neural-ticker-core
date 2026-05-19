@@ -146,7 +146,10 @@ describe('GeminiProvider', () => {
     });
 
     it('should use Gemma 26B for "summary" quality without search tools', async () => {
-      mockGenerateContent.mockResolvedValue({ text: 'Summary', candidates: [] });
+      mockGenerateContent.mockResolvedValue({
+        text: 'Summary',
+        candidates: [],
+      });
 
       await provider.generate({ ...validPrompt, quality: 'summary' });
 
@@ -196,7 +199,9 @@ describe('GeminiProvider', () => {
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            systemInstruction: expect.stringContaining('concise financial analyst'),
+            systemInstruction: expect.stringContaining(
+              'concise financial analyst',
+            ),
           }),
         }),
       );

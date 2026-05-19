@@ -661,7 +661,9 @@ describe('MarketDataService', () => {
       await service.getAnalyzerTickers({ region: [] });
       // No region brackets added (only the standard is_hidden + maybe others)
       // This is a smoke check — region: [] should behave like undefined.
-      expect(mockQueryBuilder.andWhere.mock.calls.length).toBeGreaterThanOrEqual(beforeCount);
+      expect(
+        mockQueryBuilder.andWhere.mock.calls.length,
+      ).toBeGreaterThanOrEqual(beforeCount);
     });
 
     it('should apply dynamic upside filter when provided', async () => {
