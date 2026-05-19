@@ -72,6 +72,7 @@ export class MarketDataBulkController {
     type: String,
     example: '> 8.5',
   })
+  @ApiQuery({ name: 'region', required: false, isArray: true, type: String, enum: ['US', 'EU'] })
   @ApiResponse({
     status: 200,
     description: 'Analyzer list retrieved.',
@@ -92,6 +93,7 @@ export class MarketDataBulkController {
     @Query('overallScore') overallScore?: string,
     @Query('minMarketCap') minMarketCap?: number,
     @Query('profitableOnly') profitableOnly?: boolean | string,
+    @Query('region') region?: string[],
   ) {
     return this.service.getAnalyzerTickers({
       page,
@@ -107,6 +109,7 @@ export class MarketDataBulkController {
       overallScore,
       minMarketCap: minMarketCap ? Number(minMarketCap) : undefined,
       profitableOnly: profitableOnly === true || profitableOnly === 'true',
+      region: Array.isArray(region) ? region : region ? [region] : [],
       isAdmin: req.user?.role === 'admin',
     });
   }

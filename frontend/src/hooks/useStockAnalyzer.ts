@@ -71,6 +71,7 @@ export interface AnalyzerParams {
     overallScore?: string | null;
     minMarketCap?: number;
     profitableOnly?: boolean;
+    region?: string[];
 }
 
 export function useStockAnalyzer(params: AnalyzerParams) {
@@ -92,6 +93,7 @@ export function useStockAnalyzer(params: AnalyzerParams) {
       if (params.overallScore) queryParams.append('overallScore', params.overallScore);
       if (params.minMarketCap) queryParams.append('minMarketCap', String(params.minMarketCap));
       if (params.profitableOnly) queryParams.append('profitableOnly', String(params.profitableOnly));
+      params.region?.forEach(r => queryParams.append('region', r));
 
       const { data } = await api.get<AnalyzerResponse>('/market-data/analyzer', {
         params: queryParams,

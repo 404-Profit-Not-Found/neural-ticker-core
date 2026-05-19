@@ -13,5 +13,6 @@ export interface GetAnalyzerTickersOptions {
   overallScore?: string;
   minMarketCap?: number;
   profitableOnly?: boolean;
+  region?: string[];
   isAdmin?: boolean;
 }

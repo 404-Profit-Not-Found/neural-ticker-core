@@ -21,6 +21,7 @@ export interface AnalyzerFilters {
   upside: string | null;
   sector: string[];
   overallScore: string | null;
+  region: string[];
 }
 
 export function FilterBar({
@@ -35,7 +36,8 @@ export function FilterBar({
     filters.aiRating.length +
     (filters.upside ? 1 : 0) +
     filters.sector.length +
-    (filters.overallScore ? 1 : 0);
+    (filters.overallScore ? 1 : 0) +
+    (filters.region?.length ?? 0);
 
   const sectors = dynamicSectors || [];
 
@@ -185,6 +187,33 @@ export function FilterBar({
           </div>
       </FilterButton>
 
+      {/* 6. Market / Region (Rose) */}
+      <FilterButton
+        label="Market"
+        count={filters.region?.length}
+        variant="rose"
+      >
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b bg-muted/30">
+          Market Region
+        </div>
+        <div className="p-1">
+          {(['EU', 'US'] as const).map((region) => (
+            <Item
+              key={region}
+              label={region === 'EU' ? 'EU Stocks' : 'US Stocks'}
+              selected={filters.region?.includes(region) ?? false}
+              onClick={() => {
+                const current = filters.region ?? [];
+                const newRegions = current.includes(region)
+                  ? current.filter((r) => r !== region)
+                  : [...current, region];
+                onFilterChange('region', newRegions);
+              }}
+            />
+          ))}
+        </div>
+      </FilterButton>
+
       {/* Reset Button */}
       {activeFilterCount > 0 && (
         <Button
@@ -212,7 +241,7 @@ const FilterButton = ({
   label: string;
   count?: number;
   activeValue?: string | null;
-  variant?: 'purple' | 'amber' | 'emerald' | 'cyan' | 'blue' | 'default';
+  variant?: 'purple' | 'amber' | 'emerald' | 'cyan' | 'blue' | 'rose' | 'default';
   children: React.ReactNode;
 }) => {
   const isActive = (count && count > 0) || !!activeValue;
@@ -232,6 +261,7 @@ const FilterButton = ({
     emerald: "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20",
     cyan:    "border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20",
     blue:    "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20",
+    rose:    "border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20",
     default: "border-primary text-primary bg-primary/10 hover:bg-primary/20",
   };
 
