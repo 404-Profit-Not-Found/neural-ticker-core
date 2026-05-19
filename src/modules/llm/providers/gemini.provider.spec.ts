@@ -145,6 +145,63 @@ describe('GeminiProvider', () => {
       );
     });
 
+    it('should use Gemma 26B for "summary" quality without search tools', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Summary', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'summary' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemma-4-26b-it',
+          config: expect.objectContaining({ tools: undefined }),
+        }),
+      );
+    });
+
+    it('should use Gemma 31B for "recommendation" quality', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Rec', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'recommendation' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemma-4-31b-it' }),
+      );
+    });
+
+    it('should use Gemma 26B for "scoring" quality', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Score', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'scoring' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemma-4-26b-it' }),
+      );
+    });
+
+    it('should use gemini-3.1-flash-lite for "cron" quality', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Cron', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'cron' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemini-3.1-flash-lite' }),
+      );
+    });
+
+    it('should use concise system prompt for Gemma (no search instruction)', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Gemma', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'summary' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            systemInstruction: expect.stringContaining('concise financial analyst'),
+          }),
+        }),
+      );
+    });
+
     it('should return result with markdown and models', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Final Answer',

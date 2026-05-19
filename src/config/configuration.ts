@@ -43,13 +43,18 @@ export default () => {
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
         extraction:
-          process.env.GEMINI_MODEL_EXTRACTION || 'gemini-2.5-flash-lite',
+          process.env.GEMINI_MODEL_EXTRACTION || 'gemma-4-26b-it',
+        cron: process.env.GEMINI_MODEL_CRON || 'gemini-3.1-flash-lite',
+        summary: process.env.GEMINI_MODEL_SUMMARY || 'gemma-4-26b-it',
+        recommendation:
+          process.env.GEMINI_MODEL_RECOMMENDATION || 'gemma-4-31b-it',
+        scoring: process.env.GEMINI_MODEL_SCORING || 'gemma-4-26b-it',
       },
     },
     riskReward: {
       enabled: process.env.RRSCORE_ENABLED !== 'false',
       cron: process.env.RRSCORE_CRON_EXPRESSION || '0 * * * *',
-      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '168', 10),
+      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '24', 10),
       batchSize: parseInt(process.env.RRSCORE_BATCH_SIZE || '50', 10),
       provider: process.env.RRSCORE_PROVIDER || 'gemini',
     },

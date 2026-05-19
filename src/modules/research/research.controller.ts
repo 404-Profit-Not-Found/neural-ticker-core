@@ -475,6 +475,17 @@ export class ResearchController {
     return { message: 'Sync completed', deduped: dedupe.removed };
   }
 
+  @ApiOperation({
+    summary: 'Get free Gemma-powered news summary for a ticker',
+    description:
+      'Two-step pipeline: Gemini Flash searches latest news, Gemma 26B summarizes',
+  })
+  @ApiResponse({ status: 200, description: '4-bullet summary with sources' })
+  @Get('news-summary/:symbol')
+  async getNewsSummary(@Param('symbol') symbol: string) {
+    return this.researchService.getNewsSummary(symbol.toUpperCase());
+  }
+
   @ApiOperation({ summary: 'Generate secure shareable public link' })
   @ApiResponse({
     status: 200,

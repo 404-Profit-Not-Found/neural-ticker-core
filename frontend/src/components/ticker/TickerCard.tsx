@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, ShieldCheck, AlertTriangle, Flame, MessageCircle, Star } from 'lucide-react';
+import { ArrowUp, ArrowDown, Bot, Brain, Newspaper, MessageCircle, Star } from 'lucide-react';
 import { Sparkline } from '../ui/Sparkline';
+import { RiskBar } from '../ui/RiskBar';
 import { cn } from '../../lib/api';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { VerdictBadge } from './VerdictBadge';
@@ -87,19 +88,7 @@ export function TickerCard({
     const sessionLabel = status?.session ? getSessionLabel(status.session) : 'Closed';
     const sessionColor = status?.session ? getSessionColor(status.session) : 'text-muted-foreground';
 
-    // --- Risk Logic ---
-    let riskColorClass = "text-muted-foreground";
-    let RiskIcon = ShieldCheck;
-    if (risk <= 3.5) {
-        riskColorClass = "text-emerald-500 font-bold";
-        RiskIcon = ShieldCheck;
-    } else if (risk <= 6.5) {
-        riskColorClass = "text-yellow-500 font-bold";
-        RiskIcon = AlertTriangle;
-    } else {
-        riskColorClass = "text-red-500 font-bold";
-        RiskIcon = Flame;
-    }
+    // --- Risk Tone (for gradient border) ---
 
     // --- Styling Logic (Gradient Border match) ---
     // Adapting StatPill logic:
@@ -223,11 +212,8 @@ export function TickerCard({
                 {/* Stats Grid */}
                 <div className="flex items-center gap-2 mt-3 mb-1 w-full">
                     <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">
-                        <RiskIcon size={12} className={riskColorClass.split(' ')[0]} />
                         <span className="text-muted-foreground whitespace-nowrap">Risk:</span>
-                        <span className={riskColorClass}>
-                            {Math.round(risk)}
-                        </span>
+                        <RiskBar value={risk} segments={5} size="sm" />
                     </div>
 
                     <div className="flex-1 flex items-center justify-center gap-1.5 text-[10px] bg-muted/50 px-2 py-1 rounded font-medium border border-border/50">

@@ -99,6 +99,14 @@ export class LlmService {
       return { provider: 'gemini', quality: 'medium' };
     if (k === 'gemini-3-pro-preview' || k === 'gemini-3-pro')
       return { provider: 'gemini', quality: 'deep' };
+    if (k === 'gemini-3.1-flash-lite')
+      return { provider: 'gemini', quality: 'cron' };
+
+    // Gemma models (free tier, high RPD)
+    if (k === 'gemma-4-26b-it' || k === 'gemma-4-26b')
+      return { provider: 'gemini', quality: 'summary' };
+    if (k === 'gemma-4-31b-it' || k === 'gemma-4-31b')
+      return { provider: 'gemini', quality: 'recommendation' };
 
     if (k === 'gpt-4.1-mini') return { provider: 'openai', quality: 'medium' };
     if (k === 'gpt-5.1' || k === 'openai')
@@ -106,7 +114,6 @@ export class LlmService {
 
     if (k === 'ensemble') return { provider: 'ensemble', quality: 'deep' };
 
-    // Default fallback
     return { provider: 'gemini', quality: 'medium' };
   }
 
