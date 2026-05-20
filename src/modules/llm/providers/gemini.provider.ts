@@ -13,14 +13,19 @@ export class GeminiProvider implements ILlmProvider {
   private readonly logger = new Logger(GeminiProvider.name);
   private client: GoogleGenAI;
 
-  // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
-  // Cost-effective models with Google Search grounding
   private readonly defaultModels = {
     deep: 'gemini-3-pro-preview',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-2.5-flash-lite',
+    cron: 'gemini-3.1-flash-lite',
+    summary: 'gemma-4-26b-a4b-it',
+    recommendation: 'gemma-4-31b-it',
+    scoring: 'gemma-4-26b-a4b-it',
   };
+
+  // Gemma models don't support Google Search grounding or thinking
+  private readonly gemmaModels = new Set(['gemma-4-26b-a4b-it', 'gemma-4-31b-it']);
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
@@ -34,33 +39,34 @@ export class GeminiProvider implements ILlmProvider {
       prompt.apiKey || this.configService.get<string>('gemini.apiKey');
     if (!apiKey) throw new Error('Gemini API Key not configured');
 
-    // Re-initialize client if a custom key is provided (or rely on singleton)
     const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
 
     const modelName = this.resolveModel(prompt.quality);
+    const isGemma = this.gemmaModels.has(modelName);
     const isThinkingModel =
-      modelName.includes('thinking') || modelName.includes('pro'); // simplified check
+      !isGemma && (modelName.includes('thinking') || modelName.includes('pro'));
 
-    // 1. Configure Tools (Google Search)
-    const tools: Tool[] = [{ googleSearch: {} }]; // Native Grounding
+    // Gemma models don't support Google Search grounding or thinking
+    const tools: Tool[] = isGemma ? [] : [{ googleSearch: {} }];
 
-    // 2. Configure Thinking (per SDK types: use thinkingBudget for depth control)
     let thinkingConfig: ThinkingConfig | undefined;
-
     if (isThinkingModel) {
-      // Default thinking budget for pro/flash models
       thinkingConfig = {
         includeThoughts: true,
         thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
       };
     }
 
-    const config: GenerateContentConfig = {
-      tools: tools,
-      thinkingConfig: thinkingConfig,
-      systemInstruction: `You are a financial analyst performing deep research. 
+    const systemInstruction = isGemma
+      ? `You are a concise financial analyst. Provide actionable insights based on the data provided. Context: ${JSON.stringify(prompt.numericContext)}`
+      : `You are a financial analyst performing deep research.
       CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge. Gather all available information and resources including news, filings, and press releases, fundamentals, and market data.
-      Context: ${JSON.stringify(prompt.numericContext)}`,
+      Context: ${JSON.stringify(prompt.numericContext)}`;
+
+    const config: GenerateContentConfig = {
+      tools: tools.length > 0 ? tools : undefined,
+      thinkingConfig: thinkingConfig,
+      systemInstruction,
     };
 
     // Retry & Fallback Logic
@@ -132,7 +138,13 @@ export class GeminiProvider implements ILlmProvider {
     currentModel = modelName;
 
     // Models available on the Primary (Free) Key
-    const freeModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    const freeModels = [
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemma-4-26b-a4b-it',
+      'gemma-4-31b-it',
+    ];
 
     const triedOnCurrentKey = new Set<string>();
 
@@ -260,17 +272,23 @@ export class GeminiProvider implements ILlmProvider {
     // Default to 'medium' if quality is not specified
     if (!quality) return models.medium;
 
-    // Map quality to config key
     switch (quality) {
       case 'deep':
         return models.deep;
       case 'high':
-        // Fallback for 'high' if code still uses it, map to deep or medium? Map to deep as it was previously.
         return models.deep;
       case 'low':
         return models.low;
       case 'extraction':
         return models.extraction;
+      case 'cron':
+        return models.cron;
+      case 'summary':
+        return models.summary;
+      case 'recommendation':
+        return models.recommendation;
+      case 'scoring':
+        return models.scoring;
       case 'medium':
       default:
         return models.medium;

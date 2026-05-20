@@ -110,4 +110,16 @@ export class JobsController {
     await this.jobsService.processPendingRequests();
     return { message: 'Pending requests processing triggered' };
   }
+
+  @Post('cleanup-old-research')
+  @ApiOperation({
+    summary: 'Delete research notes older than 30 days (Cron)',
+  })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
+  @ApiResponse({ status: 200, description: 'Cleanup completed' })
+  async cleanupOldResearch(@Headers('X-Cron-Secret') secret: string) {
+    this.validateSecret(secret);
+    const result = await this.jobsService.cleanupOldResearch();
+    return { message: 'Old research cleanup completed', stats: result };
+  }
 }
