@@ -7,7 +7,9 @@
       "Bash(npm install:*)",
       "Bash(find /Users/branislavlang/Documents/GitHub/neural-ticket-core/src/modules -name \"*.controller.ts\" -type f -exec grep -l \"download\\\\|export\\\\|csv\" {} \\\\;)",
       "Read(//Users/branislavlang/Documents/GitHub/**)",
-      "Read(//Users/branislavlang/Documents/**)"
+      "Read(//Users/branislavlang/Documents/**)",
+      "Bash(npx tsc *)",
+      "mcp__Claude_in_Chrome__browser_batch"
     ]
   }
 }
