@@ -25,7 +25,10 @@ export class GeminiProvider implements ILlmProvider {
   };
 
   // Gemma models don't support Google Search grounding or thinking
-  private readonly gemmaModels = new Set(['gemma-4-26b-a4b-it', 'gemma-4-31b-it']);
+  private readonly gemmaModels = new Set([
+    'gemma-4-26b-a4b-it',
+    'gemma-4-31b-it',
+  ]);
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
