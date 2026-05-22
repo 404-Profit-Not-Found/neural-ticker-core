@@ -1,7 +1,5 @@
-// Converted from legacy JSX. Strict TS would require rewriting; we keep the
-// runtime behaviour 1:1 and accept loose types via ts-nocheck for this file.
-// @ts-nocheck
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+// Design System index — single-page tour of all tokens & components
+import { useState, type ReactNode } from 'react';
 import {
   PixelPanel,
   PixelBadge,
@@ -12,53 +10,48 @@ import {
   VerdictPill,
   PriceDelta,
   RangeBar,
-  SpriteMascot,
   TickerSprite,
   VolumeBars,
   PixelDonut,
   PixelHeart,
   RankBadge,
   StatusLED,
-  RiskRadar,
-  useMediaQuery,
   useBreakpoint,
+  type Breakpoint,
 } from '../components/pixel.tsx';
 import {
   Skel,
-  SkelText,
   SkelDither,
   SkelChart,
   SkelBar,
-  SkelDots,
   Spinner,
   StatTileSkel,
   OpportunityCardSkel,
   NewsRowSkel,
   WatchlistRowSkel,
-  TableRowSkel,
   AIDigestSkel,
-  TypedLine,
   DonutSkel,
-  PanelSkel,
   LoadingOverlay,
   EmptyState,
 } from '../components/Skeletons.tsx';
-import { BootSequence, StatusBar } from '../components/Chrome.tsx';
-import { API } from '../lib/api.ts';
 import { MOCK } from '../lib/data.ts';
-import { useApi, useMutation, useIsFetching, invalidateQueries } from '../lib/hooks.ts';
-import {
-  useLiveTickers,
-  useTickersWithFallback,
-  useTickerHistory,
-  useTickerNews,
-  useTickerComposite,
-} from '../lib/tickers.ts';
 
-// Design System index — single-page tour of all tokens & components
+type PaletteName =
+  | 'neural'
+  | 'phosphor'
+  | 'amber'
+  | 'cyber'
+  | 'matrix'
+  | 'graphite'
+  | 'paper';
+type PaletteColors = Record<string, string>;
 
-function DesignSystem({ onClose }) {
-  const [palette, setPalette] = useStateDS("phosphor");
+export interface DesignSystemProps {
+  onClose?: () => void;
+}
+
+export function DesignSystem(_props: DesignSystemProps) {
+  const [_palette, _setPalette] = useState<PaletteName>('phosphor');
   const bp = useBreakpoint();
   const m = MOCK;
 
@@ -139,7 +132,12 @@ function DesignSystem({ onClose }) {
             ["graphite",  "GRAPHITE · Neutral gray",          PALETTES_DS.graphite],
             ["paper",     "PAPER · Light terminal",           PALETTES_DS.paper]
           ].map(([name, label, p]) => (
-            <PaletteCard key={name} name={name} label={label} colors={p} />
+            <PaletteCard
+              key={String(name)}
+              name={String(name)}
+              label={String(label)}
+              colors={p as PaletteColors}
+            />
           ))}
         </div>
 
@@ -432,9 +430,13 @@ function DesignSystem({ onClose }) {
   );
 }
 
-function SkeletonsSection({ bp }) {
+export function SkeletonsSection({ bp }: { bp: Breakpoint }) {
   return (
-    <Section id="loading" title="08 · LOADING STATES" subtitle="Chunky shimmer, dithered scans, typed-out AI reasoning. Real characters, not spinner stubs.">
+    <Section
+      id="loading"
+      title="08 · LOADING STATES"
+      subtitle="Chunky shimmer, dithered scans, typed-out AI reasoning. Real characters, not spinner stubs."
+    >
 
       {/* Primitives */}
       <div className="pxl-inset" style={{ padding: 20, marginBottom: 16 }}>
@@ -565,11 +567,25 @@ function SkeletonsSection({ bp }) {
 
 // Inject loading section into DesignSystem
 
-function Section({ id, title, subtitle, children }) {
+interface SectionProps {
+  id: string;
+  title: string;
+  subtitle?: string;
+  children?: ReactNode;
+}
+
+function Section({ id, title, subtitle, children }: SectionProps) {
   return (
     <section id={id} style={{ scrollMarginTop: 80 }}>
       <div className="col gap-1 mb-3">
-        <h2 style={{ fontFamily: "Silkscreen", fontSize: 22, letterSpacing: "0.04em", color: "var(--amber)" }}>
+        <h2
+          style={{
+            fontFamily: 'Silkscreen',
+            fontSize: 22,
+            letterSpacing: '0.04em',
+            color: 'var(--amber)',
+          }}
+        >
           {title}
         </h2>
         {subtitle && <span className="t-sm dim">{subtitle}</span>}
@@ -579,20 +595,38 @@ function Section({ id, title, subtitle, children }) {
   );
 }
 
-function TypeCard({ fam, role, use, cls }) {
+interface TypeCardProps {
+  fam: string;
+  role: string;
+  use: string;
+  cls: string;
+}
+
+function TypeCard({ fam, role, use, cls }: TypeCardProps) {
   return (
     <div className="pxl-inset" style={{ padding: 18 }}>
       <span className="font-display t-xs faint">{role}</span>
-      <div className={cls} style={{ fontSize: 28, marginTop: 6, marginBottom: 8 }}>
+      <div
+        className={cls}
+        style={{ fontSize: 28, marginTop: 6, marginBottom: 8 }}
+      >
         Aa Bb 1234
       </div>
-      <div className="font-mono t-sm" style={{ marginBottom: 6 }}>{fam}</div>
+      <div className="font-mono t-sm" style={{ marginBottom: 6 }}>
+        {fam}
+      </div>
       <div className="t-xs dim">{use}</div>
     </div>
   );
 }
 
-function PaletteCard({ name, label, colors }) {
+interface PaletteCardProps {
+  name: string;
+  label: string;
+  colors: PaletteColors;
+}
+
+function PaletteCard({ name, label, colors }: PaletteCardProps) {
   return (
     <div className="pxl pxl-raised" style={{ padding: 14, background: colors["--bg-1"], borderColor: colors["--line"] }}>
       <div className="row gap-2 mb-3" style={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -627,7 +661,7 @@ function PaletteCard({ name, label, colors }) {
 }
 
 // Inline palette definitions (copied from app.jsx for self-contained DS preview)
-const PALETTES_DS = {
+const PALETTES_DS: Record<PaletteName, PaletteColors> = {
   neural:   { "--bg-0":"#000000","--bg-1":"#070709","--bg-2":"#0d0d11","--bg-3":"#16161c","--bg-row":"#040406","--line":"#1a1a22","--line-soft":"#0f0f14","--ink":"#fafafa","--ink-dim":"#8a8a93","--ink-faint":"#4a4a52","--green":"#10b981","--green-dark":"#064e3b","--red":"#f43f5e","--red-dark":"#7f1d1d","--amber":"#f59e0b","--amber-dark":"#78350f","--cyan":"#3b82f6","--cyan-dark":"#1e3a8a","--violet":"#a855f7" },
   phosphor: { "--bg-0":"#07090f","--bg-1":"#0c1220","--bg-2":"#131c30","--bg-3":"#1a2540","--bg-row":"#0f1626","--line":"#233052","--line-soft":"#1a2440","--ink":"#d6dff0","--ink-dim":"#8693ad","--ink-faint":"#4d5a78","--green":"#5ce8a0","--green-dark":"#1b6b41","--red":"#ff5577","--red-dark":"#7a1d33","--amber":"#ffc23c","--amber-dark":"#7a5a10","--cyan":"#58d3ff","--cyan-dark":"#155e7a","--violet":"#b67bff" },
   amber:    { "--bg-0":"#0c0805","--bg-1":"#181208","--bg-2":"#22190d","--bg-3":"#2e2210","--bg-row":"#140e07","--line":"#3e2f18","--line-soft":"#241a0c","--ink":"#f8e5b0","--ink-dim":"#a68c5e","--ink-faint":"#5a4828","--green":"#b4e85c","--green-dark":"#4a6b1b","--red":"#ff8a5c","--red-dark":"#7a2d1d","--amber":"#f5b740","--amber-dark":"#7a5400","--cyan":"#ffd87a","--cyan-dark":"#7a6028","--violet":"#ff9558" },
@@ -638,6 +672,4 @@ const PALETTES_DS = {
 };
 
 
-export { DesignSystem };
-export { SkeletonsSection };
 
