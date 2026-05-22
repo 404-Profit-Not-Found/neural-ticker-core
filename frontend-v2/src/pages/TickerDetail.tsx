@@ -1,7 +1,12 @@
-// Converted from legacy JSX. Strict TS would require rewriting; we keep the
-// runtime behaviour 1:1 and accept loose types via ts-nocheck for this file.
-// @ts-nocheck
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+// Ticker detail view — pixel terminal deep-dive.
+import {
+  useState,
+  useEffect,
+  useMemo,
+  type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   PixelPanel,
   PixelBadge,
@@ -12,97 +17,200 @@ import {
   VerdictPill,
   PriceDelta,
   RangeBar,
-  SpriteMascot,
   TickerSprite,
   VolumeBars,
-  PixelDonut,
-  PixelHeart,
-  RankBadge,
-  StatusLED,
   RiskRadar,
-  useMediaQuery,
   useBreakpoint,
 } from '../components/pixel.tsx';
 import {
   Skel,
   SkelText,
-  SkelDither,
   SkelChart,
-  SkelBar,
-  SkelDots,
   Spinner,
-  StatTileSkel,
-  OpportunityCardSkel,
-  NewsRowSkel,
-  WatchlistRowSkel,
-  TableRowSkel,
-  AIDigestSkel,
-  TypedLine,
-  DonutSkel,
-  PanelSkel,
-  LoadingOverlay,
   EmptyState,
 } from '../components/Skeletons.tsx';
-import { BootSequence, StatusBar } from '../components/Chrome.tsx';
 import { API } from '../lib/api.ts';
 import { MOCK } from '../lib/data.ts';
-import { useApi, useMutation, useIsFetching, invalidateQueries } from '../lib/hooks.ts';
+import { useApi, invalidateQueries } from '../lib/hooks.ts';
 import {
-  useLiveTickers,
-  useTickersWithFallback,
   useTickerHistory,
   useTickerNews,
   useTickerComposite,
 } from '../lib/tickers.ts';
+import type { Candle, NavFn, Ticker } from '../lib/types.ts';
+
+// Domain shapes (permissive — backend evolves).
+interface ScenarioRow {
+  scenario_type?: string;
+  scenario?: string;
+  description?: string;
+  probability?: number;
+  price_low?: number;
+  price_mid?: number;
+  price_high?: number;
+  key_drivers?: string[];
+}
+
+interface CatalystRow {
+  description?: string;
+  title?: string;
+  name?: string;
+}
+
+interface RiskAnalysis {
+  scenarios?: ScenarioRow[];
+  catalysts?: Array<CatalystRow | string>;
+  red_flags?: string[];
+  sentiment?: string;
+  overall_score?: number;
+  upside_percent?: number;
+  price_target?: number;
+  financial_risk?: number;
+  execution_risk?: number;
+  dilution_risk?: number;
+  competitive_risk?: number;
+  regulatory_risk?: number;
+}
+
+interface FundamentalsRow {
+  market_cap?: number;
+  pe_ttm?: number;
+  trailing_pe?: number;
+  forward_pe?: number;
+  revenue_ttm?: number;
+  net_income_ttm?: number;
+  gross_margin?: number;
+  operating_margin?: number;
+  dividend_yield?: number;
+  beta?: number;
+  fifty_two_week_high?: number;
+  fifty_two_week_low?: number;
+  shares_outstanding?: number;
+  eps_ttm?: number;
+  yearly?: Array<Record<string, number>>;
+  free_cash_flow_ttm?: number;
+  free_cash_flow?: number;
+  fcf?: number;
+  debt_to_equity?: number;
+  current_ratio?: number;
+  return_on_equity?: number;
+  return_on_assets?: number;
+  revenue_growth?: number;
+  earnings_growth?: number;
+  total_cash?: number;
+  total_debt?: number;
+  debt?: number;
+  book_value_per_share?: number;
+  // Loose nested metadata pocket — yahoo_finance dump
+  yahoo_metadata?: {
+    summary?: {
+      financialsChart?: { yearly?: Array<{ date?: number | string; revenue?: number; earnings?: number }> };
+    };
+  };
+}
+
+interface Composite {
+  risk_analysis?: RiskAnalysis;
+  fundamentals?: FundamentalsRow;
+  ratings?: Record<string, number | undefined>;
+  market_data?: { history?: unknown[] };
+}
+
+interface VerdictScenario {
+  name: 'BULL' | 'BASE' | 'BEAR';
+  prob: number;
+  target: number;
+  label: string;
+}
+
+interface LiveVerdict {
+  summary: string;
+  pros: string[];
+  cons: string[];
+  scenarios: VerdictScenario[];
+  risks: {
+    financial: number;
+    execution: number;
+    dilution: number;
+    competitive: number;
+    regulatory: number;
+  };
+  sentiment?: string;
+  overall_score: number;
+  upside_percent: number;
+  _live: true;
+}
 
 // Ticker detail view — pixel terminal deep-dive
 
 // Build view-model from a /composite payload's risk_analysis + scenarios so
 // the verdict / risk / scenarios panels render with real DB data.
-function buildLiveVerdict(composite, t) {
-  const r = composite.risk_analysis || {};
-  const clamp = (n) => Math.max(0, Math.min(10, Math.round(Number(n) || 0)));
-  const num = (n, d = 0) => {
+function buildLiveVerdict(composite: Composite, t: Ticker): LiveVerdict {
+  const r: RiskAnalysis = composite.risk_analysis || {};
+  const clamp = (n: unknown): number =>
+    Math.max(0, Math.min(10, Math.round(Number(n) || 0)));
+  const num = (n: unknown, d = 0): number => {
     const x = Number(n);
     return isFinite(x) ? x : d;
   };
 
-  const scenarioRows = Array.isArray(r.scenarios) ? r.scenarios : [];
-  const findS = (kind) =>
-    scenarioRows.find(s => (s.scenario_type || s.scenario || "").toLowerCase() === kind);
-  const sBull = findS("bull");
-  const sBase = findS("base");
-  const sBear = findS("bear");
+  const scenarioRows: ScenarioRow[] = Array.isArray(r.scenarios)
+    ? r.scenarios
+    : [];
+  const findS = (kind: 'bull' | 'base' | 'bear'): ScenarioRow | undefined =>
+    scenarioRows.find(
+      (s) =>
+        (s.scenario_type || s.scenario || '').toLowerCase() === kind,
+    );
+  const sBull = findS('bull');
+  const sBase = findS('base');
+  const sBear = findS('bear');
 
-  const scenarios = ["BULL", "BASE", "BEAR"].map((name) => {
-    const s = name === "BULL" ? sBull : name === "BASE" ? sBase : sBear;
-    if (!s) return { name, prob: 0, target: t.price || 0, label: "—" };
+  const scenarios: VerdictScenario[] = (
+    ['BULL', 'BASE', 'BEAR'] as const
+  ).map((name): VerdictScenario => {
+    const s = name === 'BULL' ? sBull : name === 'BASE' ? sBase : sBear;
+    if (!s) return { name, prob: 0, target: t.price || 0, label: '—' };
     return {
       name,
       prob: num(s.probability, 0),
-      target: num(s.price_mid ?? s.price_high ?? s.price_low, t.price || 0),
-      label: s.description ? truncate(s.description, 80) : "—",
+      target: num(
+        s.price_mid ?? s.price_high ?? s.price_low,
+        t.price || 0,
+      ),
+      label: s.description ? truncate(s.description, 80) : '—',
     };
   });
 
-  const summary = sBase?.description ||
-    `${r.sentiment ? r.sentiment + " — " : ""}Overall score ${num(r.overall_score).toFixed(1)}/10, upside ${num(r.upside_percent).toFixed(1)}% to ${num(r.price_target).toFixed(2)} target.`;
+  const summary =
+    sBase?.description ||
+    `${r.sentiment ? r.sentiment + ' — ' : ''}Overall score ${num(
+      r.overall_score,
+    ).toFixed(1)}/10, upside ${num(r.upside_percent).toFixed(1)}% to ${num(
+      r.price_target,
+    ).toFixed(2)} target.`;
 
   // Catalysts → pros, red flags → cons
-  const catalysts = Array.isArray((composite.risk_analysis || {}).catalysts)
-    ? composite.risk_analysis.catalysts.slice(0, 5)
-    : [];
-  const pros = catalysts.length > 0
-    ? catalysts.map(c => c.description || c.title || c.name || String(c)).filter(Boolean)
-    : (sBull?.key_drivers || []).slice(0, 5);
-  const cons = Array.isArray(r.red_flags) && r.red_flags.length > 0
-    ? r.red_flags.slice(0, 5)
-    : (sBear?.key_drivers || []).slice(0, 5);
+  const catalysts = Array.isArray(r.catalysts) ? r.catalysts.slice(0, 5) : [];
+  const pros: string[] =
+    catalysts.length > 0
+      ? catalysts
+          .map((c) =>
+            typeof c === 'string'
+              ? c
+              : c.description || c.title || c.name || String(c),
+          )
+          .filter((s): s is string => Boolean(s))
+      : (sBull?.key_drivers || []).slice(0, 5);
+  const cons: string[] =
+    Array.isArray(r.red_flags) && r.red_flags.length > 0
+      ? r.red_flags.slice(0, 5)
+      : (sBear?.key_drivers || []).slice(0, 5);
 
   return {
     summary,
-    pros: pros.length ? pros : ["No catalysts recorded."],
-    cons: cons.length ? cons : ["No red flags recorded."],
+    pros: pros.length ? pros : ['No catalysts recorded.'],
+    cons: cons.length ? cons : ['No red flags recorded.'],
     scenarios,
     risks: {
       financial: clamp(r.financial_risk),
@@ -118,26 +226,26 @@ function buildLiveVerdict(composite, t) {
   };
 }
 
-function truncate(s, n) {
-  if (!s) return "";
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+function truncate(s: string | null | undefined, n: number): string {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
-function formatMC(n) {
+function formatMC(n: unknown): string | null {
   const x = Number(n);
   if (!isFinite(x) || x === 0) return null;
   const abs = Math.abs(x);
-  if (abs >= 1e12) return (x / 1e12).toFixed(2) + "T";
-  if (abs >= 1e9) return (x / 1e9).toFixed(2) + "B";
-  if (abs >= 1e6) return (x / 1e6).toFixed(2) + "M";
+  if (abs >= 1e12) return (x / 1e12).toFixed(2) + 'T';
+  if (abs >= 1e9) return (x / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (x / 1e6).toFixed(2) + 'M';
   return x.toFixed(0);
 }
 
 // Short "5m ago" / "2h ago" / "3d ago" stamp for social posts.
-function __agoStr(iso) {
-  if (!iso) return "—";
+function __agoStr(iso: string | null | undefined): string {
+  if (!iso) return '—';
   const t = new Date(iso).getTime();
-  if (!isFinite(t)) return "—";
+  if (!isFinite(t)) return '—';
   const diff = Math.max(0, (Date.now() - t) / 1000);
   if (diff < 60) return `${Math.floor(diff)}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -147,10 +255,13 @@ function __agoStr(iso) {
 }
 
 // Deterministic candle stub for instant render while history is fetching.
-function __stubCandles(seed, n, anchor) {
+function __stubCandles(seed: number, n: number, anchor: number): Candle[] {
   let s = (seed || 1) >>> 0;
-  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-  const out = [];
+  const rnd = (): number => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const out: Candle[] = [];
   let close = anchor || 100;
   for (let i = 0; i < n; i++) {
     const open = close;
@@ -166,74 +277,144 @@ function __stubCandles(seed, n, anchor) {
 
 // Range presets for the chart range selector. Backend supports interval ∈
 // {1m,5m,15m,1h,1d}, days, from. We use intraday for 1D/5D, daily otherwise.
-const RANGE_PRESETS = {
-  "1D":  { days: 1,    interval: "15m" },
-  "5D":  { days: 5,    interval: "1h"  },
-  "1M":  { days: 30,   interval: "1d"  },
-  "3M":  { days: 90,   interval: "1d"  },
-  "YTD": { _ytd: true, interval: "1d"  },
-  "1Y":  { days: 365,  interval: "1d"  },
-  "5Y":  { days: 1825, interval: "1d"  },
-  "MAX": { days: 3650, interval: "1d"  },
+type RangeKey = '1D' | '5D' | '1M' | '3M' | 'YTD' | '1Y' | '5Y' | 'MAX';
+
+interface RangePreset {
+  days?: number;
+  interval: string;
+  _ytd?: boolean;
+}
+
+const RANGE_PRESETS: Record<RangeKey, RangePreset> = {
+  '1D': { days: 1, interval: '15m' },
+  '5D': { days: 5, interval: '1h' },
+  '1M': { days: 30, interval: '1d' },
+  '3M': { days: 90, interval: '1d' },
+  YTD: { _ytd: true, interval: '1d' },
+  '1Y': { days: 365, interval: '1d' },
+  '5Y': { days: 1825, interval: '1d' },
+  MAX: { days: 3650, interval: '1d' },
 };
 
-function rangePresetOpts(key) {
-  const p = RANGE_PRESETS[key] || RANGE_PRESETS["1M"];
+interface RangeOpts {
+  days?: number;
+  from?: string;
+  interval: string;
+}
+
+function rangePresetOpts(key: RangeKey): RangeOpts {
+  const p = RANGE_PRESETS[key] || RANGE_PRESETS['1M'];
   if (p._ytd) {
-    const from = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
+    const from = new Date(new Date().getFullYear(), 0, 1)
+      .toISOString()
+      .slice(0, 10);
     return { from, interval: p.interval };
   }
   return { days: p.days, interval: p.interval };
 }
 
-function TickerDetail({ t, onBack }) {
-  const [tab, setTab] = useStateT("overview");
-  const [actionPanel, setActionPanel] = useStateT(null); // null | "alert" | "buy" | "watchlist"
-  const [actionMsg, setActionMsg] = useStateT(null);
-  const [range, setRange] = useStateT("1M");
+type ActionPanel = null | 'alert' | 'buy' | 'watchlist' | 'research';
+type Tab = 'overview' | 'research' | 'financials' | 'social';
+
+interface ActionMsg {
+  tone: 'green' | 'red' | 'amber';
+  text: string;
+}
+
+interface NewsItemRaw {
+  publish_time?: string;
+  source?: string;
+  publisher?: string;
+  category?: string;
+  impact?: 'high' | 'med' | 'low';
+  title?: string;
+  headline?: string;
+  tickers?: string[];
+}
+
+interface DetailNewsItem {
+  time: string;
+  src: string;
+  tag: string;
+  impact: 'high' | 'med' | 'low';
+  title: string;
+  tickers: string[];
+}
+
+function NewsRow({ n }: { n: DetailNewsItem }) {
+  const tone: 'red' | 'amber' | 'cyan' =
+    n.impact === 'high' ? 'red' : n.impact === 'med' ? 'amber' : 'cyan';
+  return (
+    <div
+      style={{
+        padding: '10px 14px',
+        borderBottom: '1px solid var(--line-soft)',
+      }}
+    >
+      <div className="row gap-2" style={{ alignItems: 'center', marginBottom: 4 }}>
+        <span className="font-mono t-xs faint">{n.time}</span>
+        <PixelBadge tone={tone}>{n.tag}</PixelBadge>
+        <span style={{ flex: 1 }} />
+        <span className="font-display t-xs faint">{n.src}</span>
+      </div>
+      <div className="t-sm" style={{ lineHeight: 1.4 }}>
+        {n.title}
+      </div>
+    </div>
+  );
+}
+
+export interface TickerDetailProps {
+  t: Ticker;
+  onBack: () => void;
+}
+
+export function TickerDetail({ t, onBack }: TickerDetailProps) {
+  const [tab, setTab] = useState<Tab>('overview');
+  const [actionPanel, setActionPanel] = useState<ActionPanel>(null);
+  const [actionMsg, setActionMsg] = useState<ActionMsg | null>(null);
+  const [range, setRange] = useState<RangeKey>('1M');
   const bp = useBreakpoint();
   const m = MOCK;
 
   // Lazy-load real candles + news + composite (risk/scenarios/fundamentals)
   // when this is a live ticker.
-  const [liveCandles, candlesMeta] = useTickerHistory
-    ? useTickerHistory(t._live ? t.sym : null, rangePresetOpts(range))
-    : [null, {}];
-  const [liveNews] = useTickerNews
-    ? useTickerNews(t._live ? t.sym : null)
-    : [null];
-  const [composite] = useTickerComposite
-    ? useTickerComposite(t._live ? t.sym : null)
-    : [null];
+  const [liveCandles, candlesMeta] = useTickerHistory(
+    t._live ? t.sym : null,
+    rangePresetOpts(range),
+  );
+  const [liveNews] = useTickerNews(t._live ? t.sym : null);
+  const [composite] = useTickerComposite(t._live ? t.sym : null);
+  const comp: Composite = (composite as Composite | undefined) ?? {};
 
   // Build the verdict view-model: prefer live composite.risk_analysis, fall
   // back to MOCK for the demo flow.
-  const v = composite && composite.risk_analysis
-    ? buildLiveVerdict(composite, t)
+  const v: LiveVerdict | typeof m.aiVerdict = comp.risk_analysis
+    ? buildLiveVerdict(comp, t)
     : m.aiVerdict;
-  const fundamentals = composite && composite.fundamentals
-    ? composite.fundamentals
-    : null;
+  const fundamentals: FundamentalsRow | null = comp.fundamentals ?? null;
 
-  const candles = (Array.isArray(liveCandles) && liveCandles.length > 0)
-    ? liveCandles
-    : (Array.isArray(t.candles) && t.candles.length > 0)
-      ? t.candles
-      : __stubCandles(t.seed, 60, t.price);
+  const candles: Candle[] =
+    Array.isArray(liveCandles) && liveCandles.length > 0
+      ? liveCandles
+      : Array.isArray(t.candles) && t.candles.length > 0
+        ? t.candles
+        : __stubCandles(t.seed, 60, t.price);
 
-  const newsList = Array.isArray(liveNews) && liveNews.length > 0
-    ? liveNews.map(n => ({
-        time: (n.publish_time || "").slice(11, 16) || "—",
-        src: n.source || n.publisher || "",
-        tag: (n.category || "NEWS").toUpperCase(),
-        impact: n.impact || "low",
-        title: n.title || n.headline || "",
-        tickers: n.tickers || [t.sym],
-      }))
-    : m.news;
+  const newsList: DetailNewsItem[] | typeof m.news =
+    Array.isArray(liveNews) && liveNews.length > 0
+      ? (liveNews as NewsItemRaw[]).map<DetailNewsItem>((n) => ({
+          time: (n.publish_time || '').slice(11, 16) || '—',
+          src: n.source || n.publisher || '',
+          tag: (n.category || 'NEWS').toUpperCase(),
+          impact: n.impact || 'low',
+          title: n.title || n.headline || '',
+          tickers: n.tickers || [t.sym],
+        }))
+      : m.news;
 
-  const high = Math.max(...candles.map(c => c.h));
-  const low = Math.min(...candles.map(c => c.l));
+  const high = Math.max(...candles.map((c) => c.h));
+  const low = Math.min(...candles.map((c) => c.l));
 
   // Responsive widths
   const heroGrid = bp.mobile ? "1fr" : bp.tablet ? "1fr 1fr" : "1.2fr 1.5fr 1.3fr";
@@ -264,15 +445,21 @@ function TickerDetail({ t, onBack }) {
           className="pxl-btn sm"
           onClick={async () => {
             setActionPanel(null);
-            if (!API) return;
-            const res = await API.favoritesToggle(t.sym).catch(() => null);
+            const res = (await API.favoritesToggle(t.sym).catch(
+              () => null,
+            )) as { added?: boolean } | null;
             // Invalidate watchlist queries so sidebar + watchlist page refresh
-            if (invalidateQueries) invalidateQueries("/watchlists");
-            if (res?.added != null) {
-              setActionMsg({ tone: res.added ? "green" : "amber", text: res.added ? `Added ${t.sym} to favourites` : `Removed ${t.sym} from favourites` });
+            invalidateQueries('/watchlists');
+            if (res && res.added != null) {
+              setActionMsg({
+                tone: res.added ? 'green' : 'amber',
+                text: res.added
+                  ? `Added ${t.sym} to favourites`
+                  : `Removed ${t.sym} from favourites`,
+              });
               setTimeout(() => setActionMsg(null), 2400);
             } else {
-              setActionMsg({ tone: "red", text: "Favourite toggle failed (auth?)" });
+              setActionMsg({ tone: 'red', text: 'Favourite toggle failed (auth?)' });
               setTimeout(() => setActionMsg(null), 2400);
             }
           }}
@@ -433,14 +620,20 @@ function TickerDetail({ t, onBack }) {
       </div>
 
       {/* Tabs */}
-      <div className="row" style={{ gap: 0, borderBottom: "2px solid var(--line)", marginTop: -8 }}>
-        {[
-          ["overview", "OVERVIEW"],
-          ["research", "AI RESEARCH"],
-          ["financials", "FINANCIALS"],
-          ["social", "SOCIAL / EVENTS"]
-        ].map(([k, lbl]) => (
-          <button key={k} className={`pxl-tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>
+      <div className="row" style={{ gap: 0, borderBottom: '2px solid var(--line)', marginTop: -8 }}>
+        {(
+          [
+            ['overview', 'OVERVIEW'],
+            ['research', 'AI RESEARCH'],
+            ['financials', 'FINANCIALS'],
+            ['social', 'SOCIAL / EVENTS'],
+          ] as const
+        ).map(([k, lbl]) => (
+          <button
+            key={k}
+            className={`pxl-tab ${tab === k ? 'active' : ''}`}
+            onClick={() => setTab(k)}
+          >
             {lbl}
           </button>
         ))}
@@ -455,8 +648,12 @@ function TickerDetail({ t, onBack }) {
             accent="cyan"
             actions={
               <span className="row gap-1" style={{ flexWrap: "wrap" }}>
-                {(bp.mobile ? ["1D", "1M", "1Y"] : ["1D", "5D", "1M", "3M", "YTD", "1Y", "5Y", "MAX"]).map(p => (
-                  <button key={p}
+                {(bp.mobile
+                  ? (['1D', '1M', '1Y'] as const)
+                  : (['1D', '5D', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'] as const)
+                ).map((p) => (
+                  <button
+                    key={p}
                     onClick={() => setRange(p)}
                     className="pxl-btn sm ghost"
                     style={{
@@ -571,24 +768,35 @@ function TickerDetail({ t, onBack }) {
   );
 }
 
-function ResearchTab({ t, bp }) {
+interface TabProps {
+  t: Ticker;
+  bp: { mobile: boolean; tablet: boolean; desktop: boolean };
+}
+
+function ResearchTab({ t, bp }: TabProps) {
   // Pull this ticker's recent research notes from the live backend (paginated).
   // Falls back to a tiny mocked timeline when API not reachable.
-  const [liveData] = useApi
-    ? useApi(
-        () => (t._live && API
-          ? API.researchList({ ticker: t.sym, limit: 12, status: "all" })
-          : Promise.resolve(null)),
-        [t.sym, t._live],
-      )
-    : [null];
+  const [liveData] = useApi<{ data?: ReportRow[] } | null>(
+    () =>
+      t._live
+        ? (API.researchList({
+            ticker: t.sym,
+            limit: 12,
+            status: 'all',
+          }) as Promise<{ data?: ReportRow[] }>)
+        : Promise.resolve(null),
+    [t.sym, t._live],
+  );
 
-  const liveReports = (liveData && Array.isArray(liveData.data)) ? liveData.data : null;
-  const latest = liveReports && liveReports.find(r => r.status === "completed");
+  const liveReports: ReportRow[] | null =
+    liveData && Array.isArray(liveData.data) ? liveData.data : null;
+  const latest: ReportRow | undefined = liveReports
+    ? liveReports.find((r) => r.status === 'completed')
+    : undefined;
   const reports = liveReports
-    ? liveReports.map(r => ({
+    ? liveReports.map<ReportRow>((r) => ({
         id: r.id,
-        date: r.created_at ? r.created_at.slice(0, 10) : "—",
+        date: r.created_at ? r.created_at.slice(0, 10) : '—',
         model: ((r.models_used && r.models_used.join(" / ")) || r.provider || "—").toUpperCase().slice(0, 40),
         quality: (r.quality || "—").toUpperCase(),
         verdict: r.numeric_context?.[t.sym]?.risk_reward?.sentiment?.toUpperCase()
@@ -600,13 +808,16 @@ function ResearchTab({ t, bp }) {
         by: r.user?.email?.split("@")[0] || "you",
         title: r.title,
       }))
-    : [
-        { date: "2026-05-18", model: "GEMINI-2.5 / ENSEMBLE", quality: "DEEP", verdict: "STRONG BUY", tokens: "184K", by: "you" },
-        { date: "2026-05-12", model: "GPT-5 / SOLO", quality: "HIGH", verdict: "STRONG BUY", tokens: "92K", by: "you" },
-      ];
+    : ([
+        { date: '2026-05-18', model: 'GEMINI-2.5 / ENSEMBLE', quality: 'DEEP', verdict: 'STRONG BUY', tokens: '184K', by: 'you' },
+        { date: '2026-05-12', model: 'GPT-5 / SOLO', quality: 'HIGH', verdict: 'STRONG BUY', tokens: '92K', by: 'you' },
+      ] as ReportRow[]);
 
   // Markdown → plain text (very rough — strips #, *, _, `)
-  const stripMd = (s) => String(s || "").replace(/[#*_`]/g, "").replace(/\n{3,}/g, "\n\n");
+  const stripMd = (s: unknown): string =>
+    String(s || '')
+      .replace(/[#*_`]/g, '')
+      .replace(/\n{3,}/g, '\n\n');
   const latestBody = latest?.answer_markdown ? stripMd(latest.answer_markdown) : null;
   const latestModels = latest?.models_used?.length
     ? latest.models_used.join(" ▸ ").toUpperCase()
@@ -660,10 +871,17 @@ function ResearchTab({ t, bp }) {
           <div className="pxl-inset" style={{ padding: 12 }}>
             <span className="font-display t-xs amber">ASK A FOLLOW-UP</span>
             <div className="row gap-2 mt-2">
-              <input type="text" className="pxl-input" placeholder="> ask follow-up..." style={{ paddingLeft: 10 }}
+              <input
+                type="text"
+                className="pxl-input"
+                placeholder="> ask follow-up..."
+                style={{ paddingLeft: 10 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.target.value.trim()) {
-                    window.dispatchEvent(new CustomEvent("v2:toggle-chat"));
+                  if (
+                    e.key === 'Enter' &&
+                    (e.target as HTMLInputElement).value.trim()
+                  ) {
+                    window.dispatchEvent(new CustomEvent('v2:toggle-chat'));
                   }
                 }}
               />
@@ -686,63 +904,98 @@ function ResearchTab({ t, bp }) {
   );
 }
 
-function FinancialsTab({ t, bp }) {
+interface AnalystRating {
+  rating?: string;
+  price_target?: number | string;
+}
+
+interface YearlyFinancials {
+  date?: number | string;
+  revenue?: number;
+  earnings?: number;
+}
+
+interface ExtendedComposite extends Omit<Composite, 'ratings'> {
+  ratings?: AnalystRating[] | Record<string, number | undefined>;
+}
+
+function FinancialsTab({ t, bp }: TabProps) {
   // Pull live composite for analyst ratings (and yearly financials if Yahoo has them).
-  const [composite] = useTickerComposite
-    ? useTickerComposite(t._live ? t.sym : null)
-    : [null];
+  const [compositeRaw] = useTickerComposite(t._live ? t.sym : null);
+  const composite = (compositeRaw as ExtendedComposite | null) ?? null;
 
   // Group analyst ratings into buckets used by the consensus widget.
   const live = (() => {
     const ratings = composite?.ratings;
     if (!Array.isArray(ratings) || ratings.length === 0) return null;
-    const buckets = { "STRONG BUY": 0, "BUY": 0, "HOLD": 0, "SELL": 0, "STRONG SELL": 0 };
-    const targets = [];
-    for (const r of ratings) {
-      const k = String(r.rating || "").toLowerCase();
-      if (k.includes("strong") && k.includes("buy")) buckets["STRONG BUY"]++;
-      else if (k === "buy" || k.includes("outperform") || k.includes("overweight")) buckets["BUY"]++;
-      else if (k.includes("strong") && k.includes("sell")) buckets["STRONG SELL"]++;
-      else if (k === "sell" || k.includes("underperform") || k.includes("underweight")) buckets["SELL"]++;
-      else buckets["HOLD"]++;
+    const buckets: Record<string, number> = {
+      'STRONG BUY': 0,
+      BUY: 0,
+      HOLD: 0,
+      SELL: 0,
+      'STRONG SELL': 0,
+    };
+    const targets: number[] = [];
+    for (const r of ratings as AnalystRating[]) {
+      const k = String(r.rating || '').toLowerCase();
+      if (k.includes('strong') && k.includes('buy')) buckets['STRONG BUY']++;
+      else if (k === 'buy' || k.includes('outperform') || k.includes('overweight'))
+        buckets['BUY']++;
+      else if (k.includes('strong') && k.includes('sell'))
+        buckets['STRONG SELL']++;
+      else if (
+        k === 'sell' ||
+        k.includes('underperform') ||
+        k.includes('underweight')
+      )
+        buckets['SELL']++;
+      else buckets['HOLD']++;
       const pt = Number(r.price_target);
       if (isFinite(pt) && pt > 0) targets.push(pt);
     }
-    const mean = targets.length ? targets.reduce((a, b) => a + b, 0) / targets.length : null;
+    const mean = targets.length
+      ? targets.reduce((a, b) => a + b, 0) / targets.length
+      : null;
     const total = ratings.length;
     return { buckets, mean, total };
   })();
 
   // Yearly revenue / earnings — composite's fundamentals.yahoo_metadata may have it
   const yearly = (() => {
-    const arr = composite?.fundamentals?.yahoo_metadata?.summary?.financialsChart?.yearly;
+    const arr =
+      composite?.fundamentals?.yahoo_metadata?.summary?.financialsChart?.yearly;
     if (!Array.isArray(arr) || arr.length === 0) return null;
-    return arr.map(y => ({
-      y: y.date != null ? `FY${String(y.date).slice(-2)}` : "—",
-      revB: y.revenue ? Number(y.revenue) / 1e9 : 0,
-      earnB: y.earnings ? Number(y.earnings) / 1e9 : 0,
-    })).slice(-4);
+    return arr
+      .map((y) => ({
+        y: y.date != null ? `FY${String(y.date).slice(-2)}` : '—',
+        revB: y.revenue ? Number(y.revenue) / 1e9 : 0,
+        earnB: y.earnings ? Number(y.earnings) / 1e9 : 0,
+      }))
+      .slice(-4);
   })();
 
   // Build a single-column "current TTM" income statement from fundamentals
-  // when the multi-year yearly array isn't available. Honest about what's known.
-  const fundB = composite?.fundamentals || {};
-  const fmtB = (n) => {
-    if (n == null || !isFinite(Number(n))) return "—";
+  // when the multi-year yearly array isn't available.
+  const fundB = composite?.fundamentals || ({} as FundamentalsRow);
+  const fmtB = (n: unknown): string => {
+    if (n == null || !isFinite(Number(n))) return '—';
     const x = Number(n);
     const abs = Math.abs(x);
-    const sign = x < 0 ? "-" : "";
+    const sign = x < 0 ? '-' : '';
     if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
     if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
     if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(0)}K`;
     return `${sign}$${abs.toFixed(0)}`;
   };
-  const fmtPct = (n) => (n == null || !isFinite(Number(n))) ? "—" : `${(Number(n) * 100).toFixed(1)}%`;
+  const fmtPct = (n: unknown): string =>
+    n == null || !isFinite(Number(n))
+      ? '—'
+      : `${(Number(n) * 100).toFixed(1)}%`;
 
   const haveLive = composite && composite.fundamentals;
   const years = (yearly && yearly.length > 0)
-    ? yearly.map(y => y.y)
-    : (haveLive ? ["TTM"] : ["FY22", "FY23", "FY24", "FY25E"]);
+    ? yearly.map((y) => y.y)
+    : (haveLive ? ['TTM'] : ['FY22', 'FY23', 'FY24', 'FY25E']);
 
   const rows = (yearly && yearly.length > 0)
     ? [
@@ -842,22 +1095,52 @@ function FinancialsTab({ t, bp }) {
           <div style={{ padding: 16 }}>
             <div className="col gap-2">
               {(() => {
-                const buckets = live?.buckets || { "STRONG BUY": 18, "BUY": 9, "HOLD": 4, "SELL": 1, "STRONG SELL": 0 };
-                const total = live?.total || Object.values(buckets).reduce((a, b) => a + b, 0) || 1;
+                const buckets: Record<string, number> = live?.buckets || {
+                  'STRONG BUY': 18,
+                  BUY: 9,
+                  HOLD: 4,
+                  SELL: 1,
+                  'STRONG SELL': 0,
+                };
                 const max = Math.max(1, ...Object.values(buckets));
-                return [
-                  ["STRONG BUY", buckets["STRONG BUY"], "green"],
-                  ["BUY",         buckets["BUY"],         "green"],
-                  ["HOLD",        buckets["HOLD"],        "cyan"],
-                  ["SELL",        buckets["SELL"],        "red"],
-                  ["STRONG SELL", buckets["STRONG SELL"], "red"],
-                ].map(([lbl, n, c]) => (
-                  <div key={lbl} className="row gap-2" style={{ alignItems: "center" }}>
-                    <span className="font-display t-xs" style={{ width: 96, color: `var(--${c})` }}>{lbl}</span>
-                    <div style={{ flex: 1, height: 12, background: "var(--bg-0)", border: "2px solid var(--line)", position: "relative" }}>
-                      <div style={{ width: `${(n / max) * 100}%`, height: "100%", background: `var(--${c})` }} />
+                const rows: Array<[string, number, 'green' | 'cyan' | 'red']> = [
+                  ['STRONG BUY', buckets['STRONG BUY'], 'green'],
+                  ['BUY', buckets['BUY'], 'green'],
+                  ['HOLD', buckets['HOLD'], 'cyan'],
+                  ['SELL', buckets['SELL'], 'red'],
+                  ['STRONG SELL', buckets['STRONG SELL'], 'red'],
+                ];
+                return rows.map(([lbl, n, c]) => (
+                  <div key={lbl} className="row gap-2" style={{ alignItems: 'center' }}>
+                    <span
+                      className="font-display t-xs"
+                      style={{ width: 96, color: `var(--${c})` }}
+                    >
+                      {lbl}
+                    </span>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 12,
+                        background: 'var(--bg-0)',
+                        border: '2px solid var(--line)',
+                        position: 'relative',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${(n / max) * 100}%`,
+                          height: '100%',
+                          background: `var(--${c})`,
+                        }}
+                      />
                     </div>
-                    <span className="font-mono t-xs" style={{ width: 24, textAlign: "right" }}>{n.toString().padStart(2, "0")}</span>
+                    <span
+                      className="font-mono t-xs"
+                      style={{ width: 24, textAlign: 'right' }}
+                    >
+                      {n.toString().padStart(2, '0')}
+                    </span>
                   </div>
                 ));
               })()}
@@ -876,83 +1159,157 @@ function FinancialsTab({ t, bp }) {
   );
 }
 
-function SocialTab({ t, bp }) {
+interface CommentRow {
+  id?: string | number;
+  user?: { email?: string; name?: string };
+  author?: string;
+  created_at?: string;
+  sentiment?: 'bullish' | 'positive' | 'bearish' | 'negative' | 'neutral';
+  body?: string;
+  text?: string;
+  content?: string;
+  likes_count?: number;
+  likes?: number;
+}
+
+interface CommentsResponse {
+  items?: CommentRow[];
+  data?: CommentRow[];
+}
+
+interface WatcherCountRow {
+  count?: number;
+  watchers?: number;
+}
+
+interface CatalystEvent {
+  expected_date?: string;
+  date?: string;
+  deadline?: string;
+  event_date?: string;
+  description?: string;
+  title?: string;
+  name?: string;
+  impact?: 'high' | 'medium' | 'low';
+  priority?: 'high' | 'medium' | 'low';
+  category?: string;
+  type?: string;
+}
+
+type PostTone = 'bull' | 'bear' | 'neutral';
+
+interface SocialPost {
+  id?: string | number;
+  user: string;
+  time: string;
+  tone: PostTone;
+  text: string;
+  likes: number;
+}
+
+function SocialTab({ t, bp }: TabProps) {
   // Live community comments for this ticker (with MOCK fallback for the demo flow).
-  const [liveComments, commentsMeta] = useApi
-    ? useApi(
-        () => (t._live && API ? API.socialComments(t.sym) : Promise.resolve(null)),
-        [t.sym, t._live],
-      )
-    : [null, {}];
-  const [watchersData] = useApi
-    ? useApi(
-        () => (t._live && API ? API.socialWatchers(t.sym) : Promise.resolve(null)),
-        [t.sym, t._live],
-      )
-    : [null];
+  const [liveComments, commentsMeta] = useApi<CommentRow[] | CommentsResponse | null>(
+    () =>
+      t._live
+        ? (API.socialComments(t.sym) as Promise<CommentRow[] | CommentsResponse>)
+        : Promise.resolve(null),
+    ['social-comments', t.sym, t._live],
+  );
+  const [watchersData] = useApi<WatcherCountRow | null>(
+    () =>
+      t._live
+        ? (API.socialWatchers(t.sym) as Promise<WatcherCountRow>)
+        : Promise.resolve(null),
+    ['social-watchers', t.sym, t._live],
+  );
 
   // StockTwits public sentiment + watchers history (no auth required).
-  const [stAnalysis] = useApi
-    ? useApi(
-        () => (t._live && API ? API.stocktwitsAnalysis(t.sym) : Promise.resolve(null)),
-        [t.sym, t._live],
-      )
-    : [null];
-  const [stWatchers] = useApi
-    ? useApi(
-        () => (t._live && API ? API.stocktwitsWatchers(t.sym) : Promise.resolve(null)),
-        [t.sym, t._live],
-      )
-    : [null];
+  const [stAnalysis] = useApi<StockTwitsAnalysis | null>(
+    () =>
+      t._live
+        ? (API.stocktwitsAnalysis(t.sym) as Promise<StockTwitsAnalysis>)
+        : Promise.resolve(null),
+    ['stocktwits-analysis', t.sym, t._live],
+  );
+  const [stWatchers] = useApi<{ count?: number } | null>(
+    () =>
+      t._live
+        ? (API.stocktwitsWatchers(t.sym) as Promise<{ count?: number }>)
+        : Promise.resolve(null),
+    ['stocktwits-watchers', t.sym, t._live],
+  );
 
   // Live posts when API responds with an array; fall back to a small mocked seed.
-  const liveList = Array.isArray(liveComments)
+  const liveList: CommentRow[] | null = Array.isArray(liveComments)
     ? liveComments
-    : (liveComments && Array.isArray(liveComments.items) ? liveComments.items
-      : (liveComments && Array.isArray(liveComments.data) ? liveComments.data : null));
-  const posts = liveList && liveList.length > 0
-    ? liveList.map(c => ({
-        id: c.id,
-        user: c.user?.email?.split("@")[0] || c.user?.name || c.author || "anon",
-        time: c.created_at ? __agoStr(c.created_at) : "—",
-        tone: (c.sentiment === "bullish" || c.sentiment === "positive") ? "bull"
-              : (c.sentiment === "bearish" || c.sentiment === "negative") ? "bear"
-              : "neutral",
-        text: c.body || c.text || c.content || "",
-        likes: Number(c.likes_count ?? c.likes ?? 0),
-      }))
-    : (t._live ? [] : [
-        { user: "kai_77", time: "12m", tone: "bull", text: "Long ZYRA into print. Backlog disclosure on the Q is the line in the sand. Looking for 28%+ GM commentary.", likes: 42 },
-        { user: "macroratter", time: "1h", tone: "bear", text: "Capex sensitivity here is non-trivial — if ISM new orders re-roll, the multiple compresses fast. Sized small.", likes: 18 },
-        { user: "helix.fund", time: "3h", tone: "bull", text: "Helix-7 is a real platform shift. Pricing power into 2027 looks underwritten by the order book.", likes: 91 },
-        { user: "ts_quant", time: "5h", tone: "neutral", text: "Cup-and-handle on the daily, breakout level $192 with volume confirmation. Watching the close.", likes: 31 }
-      ]);
+    : liveComments && Array.isArray((liveComments as CommentsResponse).items)
+      ? (liveComments as CommentsResponse).items ?? null
+      : liveComments && Array.isArray((liveComments as CommentsResponse).data)
+        ? (liveComments as CommentsResponse).data ?? null
+        : null;
+  const posts: SocialPost[] =
+    liveList && liveList.length > 0
+      ? liveList.map<SocialPost>((c) => ({
+          id: c.id,
+          user:
+            c.user?.email?.split('@')[0] ||
+            c.user?.name ||
+            c.author ||
+            'anon',
+          time: c.created_at ? __agoStr(c.created_at) : '—',
+          tone:
+            c.sentiment === 'bullish' || c.sentiment === 'positive'
+              ? 'bull'
+              : c.sentiment === 'bearish' || c.sentiment === 'negative'
+                ? 'bear'
+                : 'neutral',
+          text: c.body || c.text || c.content || '',
+          likes: Number(c.likes_count ?? c.likes ?? 0),
+        }))
+      : t._live
+        ? []
+        : [
+            { user: 'kai_77', time: '12m', tone: 'bull', text: 'Long ZYRA into print. Backlog disclosure on the Q is the line in the sand. Looking for 28%+ GM commentary.', likes: 42 },
+            { user: 'macroratter', time: '1h', tone: 'bear', text: 'Capex sensitivity here is non-trivial — if ISM new orders re-roll, the multiple compresses fast. Sized small.', likes: 18 },
+            { user: 'helix.fund', time: '3h', tone: 'bull', text: 'Helix-7 is a real platform shift. Pricing power into 2027 looks underwritten by the order book.', likes: 91 },
+            { user: 'ts_quant', time: '5h', tone: 'neutral', text: 'Cup-and-handle on the daily, breakout level $192 with volume confirmation. Watching the close.', likes: 31 },
+          ];
 
   // Watchers count for the panel header
-  const watchersCount = watchersData?.count ?? watchersData?.watchers ?? null;
+  const watchersCount: number | null =
+    watchersData?.count ?? watchersData?.watchers ?? null;
 
   // Upcoming events derived from composite.risk_analysis.catalysts when present.
-  const [composite] = useTickerComposite
-    ? useTickerComposite(t._live ? t.sym : null)
-    : [null];
-  const liveCatalysts = Array.isArray(composite?.risk_analysis?.catalysts)
-    ? composite.risk_analysis.catalysts
+  const [compositeRaw] = useTickerComposite(t._live ? t.sym : null);
+  const composite = compositeRaw as Composite | null;
+  const liveCatalysts: CatalystEvent[] | null = Array.isArray(
+    composite?.risk_analysis?.catalysts,
+  )
+    ? (composite!.risk_analysis!.catalysts as CatalystEvent[])
     : null;
   const liveEvents = liveCatalysts && liveCatalysts.length > 0
     ? liveCatalysts.slice(0, 6).map((c) => {
         const dt = c.expected_date || c.date || c.deadline || c.event_date;
         const d = dt ? new Date(dt) : null;
-        const label = (c.description || c.title || c.name || "—").toString();
-        const tone = (c.impact === "high" || c.priority === "high") ? "amber"
-                   : (c.impact === "low" || c.priority === "low") ? "default"
-                   : "cyan";
-        const tag = (c.category || c.type || "CATALYST").toString().toUpperCase().slice(0, 10);
+        const label = (c.description || c.title || c.name || '—').toString();
+        const tone: 'amber' | 'default' | 'cyan' =
+          c.impact === 'high' || c.priority === 'high'
+            ? 'amber'
+            : c.impact === 'low' || c.priority === 'low'
+              ? 'default'
+              : 'cyan';
+        const tag = (c.category || c.type || 'CATALYST')
+          .toString()
+          .toUpperCase()
+          .slice(0, 10);
         return {
           date: d
-            ? `${d.toLocaleString("en", { month: "short" }).toUpperCase()} ${String(d.getDate()).padStart(2, "0")}`
-            : "TBD",
-          label: label.length > 60 ? label.slice(0, 57) + "…" : label,
-          tag, tone,
+            ? `${d.toLocaleString('en', { month: 'short' }).toUpperCase()} ${String(d.getDate()).padStart(2, '0')}`
+            : 'TBD',
+          label: label.length > 60 ? label.slice(0, 57) + '…' : label,
+          tag,
+          tone,
         };
       })
     : null;
@@ -968,7 +1325,13 @@ function SocialTab({ t, bp }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: bp?.mobile ? "1fr" : "1fr 320px", gap: 16 }}>
       <div className="col gap-4">
-      {stAnalysis && <StockTwitsWidget analysis={stAnalysis} watchers={stWatchers} sym={t.sym} />}
+      {stAnalysis && (
+        <StockTwitsWidget
+          analysis={stAnalysis}
+          watchers={stWatchers ?? null}
+          sym={t.sym}
+        />
+      )}
       <PixelPanel
         title="COMMUNITY DISCUSSION"
         accent="cyan"
@@ -1059,10 +1422,16 @@ function SocialTab({ t, bp }) {
 // ─────────────────────────────────────────────────────────────
 // AlertCreatePanel — inline form, POSTs /price-alerts
 // ─────────────────────────────────────────────────────────────
-function AlertCreatePanel({ t, onClose, onDone }) {
-  const [type, setType] = useStateT("price_above");
-  const [target, setTarget] = useStateT(String((t.price * 1.05).toFixed(2)));
-  const [busy, setBusy] = useStateT(false);
+interface ActionPanelProps {
+  t: Ticker;
+  onClose: () => void;
+  onDone: (msg: ActionMsg) => void;
+}
+
+function AlertCreatePanel({ t, onClose, onDone }: ActionPanelProps) {
+  const [type, setType] = useState("price_above");
+  const [target, setTarget] = useState(String((t.price * 1.05).toFixed(2)));
+  const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (!API) return;
@@ -1072,11 +1441,11 @@ function AlertCreatePanel({ t, onClose, onDone }) {
       return;
     }
     setBusy(true);
-    const res = await API.alertCreate({
+    const res = (await API.alertCreate({
       symbol: t.sym,
       alert_type: type,
       target_value: num,
-    }).catch((e) => ({ _err: e }));
+    }).catch((e: unknown) => ({ _err: e }))) as { _err?: unknown } | null;
     setBusy(false);
     if (res && !res._err) {
       onDone({ tone: "green", text: `Alert armed: ${t.sym} ${type.replace("_", " ")} ${num}` });
@@ -1128,11 +1497,11 @@ function AlertCreatePanel({ t, onClose, onDone }) {
 // ─────────────────────────────────────────────────────────────
 // BuyPositionPanel — inline form, POSTs /portfolio/positions
 // ─────────────────────────────────────────────────────────────
-function BuyPositionPanel({ t, onClose, onDone }) {
-  const [shares, setShares] = useStateT("10");
-  const [price, setPrice] = useStateT(String((t.price || 0).toFixed(2)));
-  const [date, setDate] = useStateT(new Date().toISOString().slice(0, 10));
-  const [busy, setBusy] = useStateT(false);
+function BuyPositionPanel({ t, onClose, onDone }: ActionPanelProps) {
+  const [shares, setShares] = useState("10");
+  const [price, setPrice] = useState(String((t.price || 0).toFixed(2)));
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (!API) return;
@@ -1142,12 +1511,12 @@ function BuyPositionPanel({ t, onClose, onDone }) {
       return;
     }
     setBusy(true);
-    const res = await API.portfolioCreate({
+    const res = (await API.portfolioCreate({
       symbol: t.sym,
       shares: n,
       buy_price: p,
       buy_date: date,
-    }).catch(() => null);
+    }).catch(() => null)) as { id?: string | number } | null;
     setBusy(false);
     if (res && res.id) {
       onDone({ tone: "green", text: `Added ${n} ${t.sym} @ $${p.toFixed(2)}` });
@@ -1189,67 +1558,113 @@ function BuyPositionPanel({ t, onClose, onDone }) {
 // ─────────────────────────────────────────────────────────────
 // ReportHistoryRow — single research entry + Share button
 // ─────────────────────────────────────────────────────────────
-function ReportHistoryRow({ r }) {
-  const [shareBusy, setShareBusy] = useStateT(false);
-  const [shareMsg, setShareMsg] = useStateT(null);
+interface ReportRow {
+  id?: string | number;
+  title?: string;
+  status?: string;
+  created_at?: string;
+  question?: string;
+  tickers?: string[];
+  date?: string;
+  verdict?: string;
+  model?: string;
+  quality?: string;
+  tokens?: number | string;
+  by?: string;
+  models_used?: string[];
+  provider?: string;
+  numeric_context?: Record<string, { risk_reward?: { sentiment?: string } }>;
+  tokens_in?: number;
+  tokens_out?: number;
+  user?: { email?: string };
+  answer_markdown?: string;
+  quality_score?: number;
+  rarity?: string;
+}
 
-  const onShare = async (e) => {
+interface ShareResponse {
+  signature?: string;
+  path?: string;
+}
+
+function ReportHistoryRow({ r }: { r: ReportRow }) {
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMsg, setShareMsg] = useState<ActionMsg | null>(null);
+
+  const onShare = async (e: ReactMouseEvent): Promise<void> => {
     e.stopPropagation();
-    if (!r.id || !API) return;
+    if (!r.id) return;
     setShareBusy(true);
-    const res = await API.researchPublicLink(r.id).catch(() => null);
+    const res = (await API.researchPublicLink(r.id).catch(
+      () => null,
+    )) as ShareResponse | null;
     setShareBusy(false);
     if (res && (res.signature || res.path)) {
-      const sig = res.signature || (res.path || "").split("/").pop();
-      const url = `${window.location.origin}/v2/?share=${encodeURIComponent(r.id + ":" + sig)}`;
+      const sig = res.signature || (res.path || '').split('/').pop();
+      const url = `${window.location.origin}/v2/?share=${encodeURIComponent(r.id + ':' + sig)}`;
       try {
         await navigator.clipboard.writeText(url);
-        setShareMsg({ tone: "green", text: "Share link copied to clipboard" });
-      } catch (err) {
-        setShareMsg({ tone: "amber", text: url });
+        setShareMsg({ tone: 'green', text: 'Share link copied to clipboard' });
+      } catch {
+        setShareMsg({ tone: 'amber', text: url });
       }
     } else {
-      setShareMsg({ tone: "red", text: "Couldn't generate share link" });
+      setShareMsg({ tone: 'red', text: "Couldn't generate share link" });
     }
     setTimeout(() => setShareMsg(null), 3200);
   };
 
   return (
-    <div className="col gap-1" style={{
-      padding: "12px 14px",
-      borderBottom: "1px solid var(--line-soft)",
-      cursor: "pointer",
-    }}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+    <div
+      className="col gap-1"
+      style={{
+        padding: '12px 14px',
+        borderBottom: '1px solid var(--line-soft)',
+        cursor: 'pointer',
+      }}
+    >
+      <div
+        className="row"
+        style={{ justifyContent: 'space-between', alignItems: 'center' }}
+      >
         <span className="font-mono t-xs faint">{r.date}</span>
-        <span className="row gap-2" style={{ alignItems: "center" }}>
-          <VerdictPill verdict={r.verdict} />
+        <span className="row gap-2" style={{ alignItems: 'center' }}>
+          <VerdictPill verdict={r.verdict ?? '—'} />
           {r.id && (
             <button
               className="pxl-btn sm ghost"
               onClick={onShare}
               disabled={shareBusy}
               title="Copy public share link"
-              style={{ padding: "2px 6px", color: "var(--violet)", boxShadow: "none" }}
+              style={{
+                padding: '2px 6px',
+                color: 'var(--violet)',
+                boxShadow: 'none',
+              }}
             >
-              {shareBusy ? "…" : "↗ SHARE"}
+              {shareBusy ? '…' : '↗ SHARE'}
             </button>
           )}
         </span>
       </div>
       <div className="font-display t-xs">{r.model}</div>
       <div className="row gap-2 t-xs faint">
-        <PixelBadge tone={r.quality === "DEEP" ? "amber" : "cyan"}>{r.quality}</PixelBadge>
+        <PixelBadge tone={r.quality === 'DEEP' ? 'amber' : 'cyan'}>
+          {r.quality}
+        </PixelBadge>
         <span>{r.tokens}</span>
         <span>·</span>
         <span>@{r.by}</span>
       </div>
       {shareMsg && (
-        <div className="t-xs mt-2" style={{
-          color: `var(--${shareMsg.tone})`,
-          wordBreak: "break-all",
-          fontFamily: "JetBrains Mono, monospace",
-        }}>
+        <div
+          className="t-xs mt-2"
+          style={{
+            color: `var(--${shareMsg.tone})`,
+            wordBreak: 'break-all',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}
+        >
           ▸ {shareMsg.text}
         </div>
       )}
@@ -1260,7 +1675,27 @@ function ReportHistoryRow({ r }) {
 // ─────────────────────────────────────────────────────────────
 // StockTwitsWidget — sentiment gauge + watchers trend (public)
 // ─────────────────────────────────────────────────────────────
-function StockTwitsWidget({ analysis, watchers, sym }) {
+interface StockTwitsAnalysis {
+  sentiment_score?: number;
+  weighted_sentiment_score?: number;
+  bullish_pct?: number;
+  bearish_pct?: number;
+  watcher_count?: number;
+  message_volume?: number;
+  posts_analyzed?: number;
+  summary?: string;
+  sentiment_label?: string;
+}
+
+function StockTwitsWidget({
+  analysis,
+  watchers,
+  sym,
+}: {
+  analysis: StockTwitsAnalysis | null;
+  watchers: { count?: number } | null;
+  sym: string;
+}) {
   if (!analysis) return null;
   const score = Number(analysis.sentiment_score ?? analysis.weighted_sentiment_score ?? 0);
   const pct = Math.max(0, Math.min(1, (score + 1) / 2)); // -1..1 → 0..1
@@ -1371,51 +1806,85 @@ function StockTwitsWidget({ analysis, watchers, sym }) {
 // ─────────────────────────────────────────────────────────────
 // RunResearchPanel — inline form, POST /research/ask + poll
 // ─────────────────────────────────────────────────────────────
-function RunResearchPanel({ t, onClose, onDone }) {
-  const [provider, setProvider] = useStateT("gemini");
-  const [quality, setQuality]   = useStateT("medium");
-  const [question, setQuestion] = useStateT(
-    `Analyze the risk/reward profile for ${t.sym}. What are the key catalysts and downside vectors over the next 12 months?`
-  );
-  const [busy, setBusy]   = useStateT(false);
-  const [phase, setPhase] = useStateT(null); // null | "submitting" | "polling" | "done"
-  const [ticket, setTicket] = useStateT(null);
-  const [progress, setProgress] = useStateT(0);
+type ResearchPhase = null | 'submitting' | 'polling' | 'done';
 
-  const submit = async () => {
-    if (!API) return;
-    setBusy(true); setPhase("submitting"); setProgress(2);
-    const res = await API.researchAsk({
+interface ResearchAskResponse {
+  id?: string | number;
+  _err?: { body?: { message?: string } };
+}
+
+interface ResearchGetResponse {
+  status?: 'completed' | 'failed' | string;
+  error?: string;
+}
+
+function RunResearchPanel({ t, onClose, onDone }: ActionPanelProps) {
+  const [provider, setProvider] = useState<string>('gemini');
+  const [quality, setQuality] = useState<string>('medium');
+  const [question, setQuestion] = useState<string>(
+    `Analyze the risk/reward profile for ${t.sym}. What are the key catalysts and downside vectors over the next 12 months?`,
+  );
+  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<ResearchPhase>(null);
+  const [ticket, setTicket] = useState<ResearchAskResponse | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const submit = async (): Promise<void> => {
+    setBusy(true);
+    setPhase('submitting');
+    setProgress(2);
+    const res = (await API.researchAsk({
       tickers: [t.sym],
       question,
       provider,
       quality,
-    }).catch((e) => ({ _err: e }));
+    }).catch((e: { body?: { message?: string } }) => ({
+      _err: e,
+    }))) as ResearchAskResponse;
 
     if (!res || res._err || !res.id) {
-      onDone({ tone: "red", text: res?._err?.body?.message
-        ? `Research failed: ${res._err.body.message}`
-        : "Research failed (insufficient credits or auth?)" });
+      onDone({
+        tone: 'red',
+        text: res?._err?.body?.message
+          ? `Research failed: ${res._err.body.message}`
+          : 'Research failed (insufficient credits or auth?)',
+      });
       setBusy(false);
       return;
     }
-    setTicket(res); setPhase("polling"); setProgress(10);
+    setTicket(res);
+    setPhase('polling');
+    setProgress(10);
     pollUntilDone(res.id);
   };
 
-  const pollUntilDone = async (id) => {
+  const pollUntilDone = async (id: string | number): Promise<void> => {
     let attempt = 0;
-    const tick = async () => {
+    const tick = async (): Promise<void> => {
       attempt++;
-      const r = await API.researchGet(id).catch(() => null);
-      if (!r) return setTimeout(tick, 3000);
+      const r = (await API.researchGet(id).catch(() => null)) as
+        | ResearchGetResponse
+        | null;
+      if (!r) {
+        setTimeout(tick, 3000);
+        return;
+      }
       setProgress(Math.min(95, 10 + attempt * 4));
-      if (r.status === "completed") {
-        setPhase("done"); setProgress(100); setBusy(false);
-        onDone({ tone: "green", text: `Research complete for ${t.sym} — see AI RESEARCH tab.` });
-      } else if (r.status === "failed") {
-        setPhase("done"); setBusy(false);
-        onDone({ tone: "red", text: `Research failed: ${r.error || "unknown"}` });
+      if (r.status === 'completed') {
+        setPhase('done');
+        setProgress(100);
+        setBusy(false);
+        onDone({
+          tone: 'green',
+          text: `Research complete for ${t.sym} — see AI RESEARCH tab.`,
+        });
+      } else if (r.status === 'failed') {
+        setPhase('done');
+        setBusy(false);
+        onDone({
+          tone: 'red',
+          text: `Research failed: ${r.error || 'unknown'}`,
+        });
       } else {
         setTimeout(tick, 3000);
       }
@@ -1492,7 +1961,7 @@ function RunResearchPanel({ t, onClose, onDone }) {
             <div className="row gap-2" style={{ alignItems: "center" }}>
               <Spinner label="ANALYZING" />
               <span className="font-mono t-xs faint" style={{ marginLeft: "auto" }}>
-                TICKET {ticket?.id?.slice(0, 8)}…
+                TICKET {String(ticket?.id ?? '').slice(0, 8)}…
               </span>
             </div>
             <div style={{ height: 8, background: "var(--bg-0)", border: "2px solid var(--line)", position: "relative" }}>
@@ -1523,13 +1992,14 @@ function RunResearchPanel({ t, onClose, onDone }) {
 }
 
 
-export { TickerDetail };
-export { ResearchTab };
-export { FinancialsTab };
-export { SocialTab };
-export { AlertCreatePanel };
-export { BuyPositionPanel };
-export { ReportHistoryRow };
-export { StockTwitsWidget };
-export { RunResearchPanel };
+export {
+  ResearchTab,
+  FinancialsTab,
+  SocialTab,
+  AlertCreatePanel,
+  BuyPositionPanel,
+  ReportHistoryRow,
+  StockTwitsWidget,
+  RunResearchPanel,
+};
 
