@@ -1,11 +1,7 @@
 // Ticker detail view — pixel terminal deep-dive.
 import {
   useState,
-  useEffect,
-  useMemo,
-  type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
 } from 'react';
 import {
   PixelPanel,
@@ -13,7 +9,6 @@ import {
   Sparkline,
   CandleChart,
   PixelIcon,
-  SegmentedBar,
   VerdictPill,
   PriceDelta,
   RangeBar,
@@ -22,13 +17,7 @@ import {
   RiskRadar,
   useBreakpoint,
 } from '../components/pixel.tsx';
-import {
-  Skel,
-  SkelText,
-  SkelChart,
-  Spinner,
-  EmptyState,
-} from '../components/Skeletons.tsx';
+import { Spinner, EmptyState } from '../components/Skeletons.tsx';
 import { API } from '../lib/api.ts';
 import { MOCK } from '../lib/data.ts';
 import { useApi, invalidateQueries } from '../lib/hooks.ts';
@@ -37,7 +26,7 @@ import {
   useTickerNews,
   useTickerComposite,
 } from '../lib/tickers.ts';
-import type { Candle, NavFn, Ticker } from '../lib/types.ts';
+import type { Candle, Ticker } from '../lib/types.ts';
 
 // Domain shapes (permissive — backend evolves).
 interface ScenarioRow {
@@ -416,12 +405,11 @@ export function TickerDetail({ t, onBack }: TickerDetailProps) {
   const high = Math.max(...candles.map((c) => c.h));
   const low = Math.min(...candles.map((c) => c.l));
 
-  // Responsive widths
-  const heroGrid = bp.mobile ? "1fr" : bp.tablet ? "1fr 1fr" : "1.2fr 1.5fr 1.3fr";
-  const tabsGrid = bp.mobile ? "1fr" : bp.tablet ? "1fr" : "1.6fr 1fr";
-  const sideGrid = bp.mobile ? "1fr" : "1fr 320px";
+  // Responsive widths (heroGrid + sideGrid removed when the hero layout was
+  // collapsed into a single panel; restore here if the split re-appears).
+  const tabsGrid = bp.mobile ? '1fr' : bp.tablet ? '1fr' : '1.6fr 1fr';
   const chartW = bp.mobile ? 340 : bp.tablet ? 620 : 720;
-  const pageGutter = bp.mobile ? "0 12px 24px" : "0 20px 32px";
+  const pageGutter = bp.mobile ? '0 12px 24px' : '0 20px 32px';
 
   return (
     <div style={{ padding: pageGutter, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -909,11 +897,6 @@ interface AnalystRating {
   price_target?: number | string;
 }
 
-interface YearlyFinancials {
-  date?: number | string;
-  revenue?: number;
-  earnings?: number;
-}
 
 interface ExtendedComposite extends Omit<Composite, 'ratings'> {
   ratings?: AnalystRating[] | Record<string, number | undefined>;

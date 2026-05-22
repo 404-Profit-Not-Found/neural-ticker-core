@@ -21,7 +21,6 @@ import {
 } from '../components/pixel.tsx';
 import {
   Skel,
-  SkelChart,
   Spinner,
   StatTileSkel,
   OpportunityCardSkel,

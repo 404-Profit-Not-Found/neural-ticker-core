@@ -4,20 +4,15 @@ import {
   useEffect,
   useMemo,
   useCallback,
-  type ChangeEvent,
-  type MouseEvent,
   type ReactNode,
 } from 'react';
 import {
   PixelIcon,
   RankBadge,
   SpriteMascot,
-  TickerSprite,
   PriceDelta,
-  StatusLED,
   useBreakpoint,
 } from './components/pixel.tsx';
-import { EmptyState } from './components/Skeletons.tsx';
 import { BootSequence, StatusBar } from './components/Chrome.tsx';
 import { API } from './lib/api.ts';
 import { useApi, useIsFetching } from './lib/hooks.ts';
@@ -979,60 +974,6 @@ function BottomTabBar({ route, onNav }: { route: string; onNav: NavFn }) {
         );
       })}
     </nav>
-  );
-}
-
-interface PlaceholderPageProps {
-  title: string;
-  icon: string;
-  tone: string;
-  lines: string[];
-}
-
-function PlaceholderPage({ title, icon, tone, lines }: PlaceholderPageProps) {
-  return (
-    <div style={{ padding: '0 20px 32px' }}>
-      <div
-        className="pxl pxl-raised"
-        style={{ padding: 32, marginTop: 16, textAlign: 'center' }}
-      >
-        <PixelIcon name={icon} color={`var(--${tone})`} size={48} />
-        <h2
-          className="font-display t-xl mt-3"
-          style={{ color: `var(--${tone})` }}
-        >
-          {title}
-        </h2>
-        <p className="dim mt-2">This screen is reachable from the dashboard.</p>
-        <div
-          className="pxl-inset mt-4"
-          style={{
-            padding: 14,
-            textAlign: 'left',
-            maxWidth: 560,
-            margin: '16px auto',
-          }}
-        >
-          {lines.map((l, i) => (
-            <div
-              key={i}
-              className="font-mono t-sm"
-              style={{
-                color:
-                  i === lines.length - 1
-                    ? 'var(--green)'
-                    : 'var(--ink-dim)',
-              }}
-            >
-              <span className="faint">
-                {(i + 1).toString().padStart(2, '0')} │
-              </span>{' '}
-              {l}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
