@@ -103,3 +103,14 @@ export type Route =
   | 'design-system';
 
 export type NavFn = (route: Route | string, payload?: unknown) => void;
+
+// User profile shape returned from /auth/profile (loosely modelled).
+export interface UserProfile {
+  id?: string | number;
+  email?: string;
+  name?: string;
+  role?: 'admin' | 'user' | string;
+  tier?: 'free' | 'pro' | 'premium' | string;
+  credits?: number;
+  picture?: string;
+}

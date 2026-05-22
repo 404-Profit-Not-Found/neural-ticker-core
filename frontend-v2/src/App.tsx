@@ -1,67 +1,36 @@
-// Top-level App shell — converted from app.jsx.
-// @ts-nocheck
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+// Top-level App shell.
 import {
-  PixelPanel,
-  PixelBadge,
-  Sparkline,
-  CandleChart,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  type ChangeEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
+import {
   PixelIcon,
-  SegmentedBar,
-  VerdictPill,
-  PriceDelta,
-  RangeBar,
+  RankBadge,
   SpriteMascot,
   TickerSprite,
-  VolumeBars,
-  PixelDonut,
-  PixelHeart,
-  RankBadge,
+  PriceDelta,
   StatusLED,
-  RiskRadar,
-  useMediaQuery,
   useBreakpoint,
 } from './components/pixel.tsx';
-import {
-  Skel,
-  Spinner,
-  StatTileSkel,
-  OpportunityCardSkel,
-  NewsRowSkel,
-  WatchlistRowSkel,
-  TableRowSkel,
-  AIDigestSkel,
-  TypedLine,
-  DonutSkel,
-  PanelSkel,
-  LoadingOverlay,
-  EmptyState,
-} from './components/Skeletons.tsx';
+import { EmptyState } from './components/Skeletons.tsx';
 import { BootSequence, StatusBar } from './components/Chrome.tsx';
 import { API } from './lib/api.ts';
-import { MOCK } from './lib/data.ts';
-import { useApi, useMutation, useIsFetching, invalidateQueries } from './lib/hooks.ts';
+import { useApi, useIsFetching } from './lib/hooks.ts';
 import {
-  useLiveTickers,
-  useTickersWithFallback,
-  useTickerHistory,
-  useTickerNews,
-  useTickerComposite,
-} from './lib/tickers.ts';
-import {
-  useTweaks,
   TweaksPanel,
   TweakSection,
-  TweakRow,
+  TweakSelect,
   TweakSlider,
   TweakToggle,
-  TweakRadio,
-  TweakSelect,
-  TweakText,
-  TweakNumber,
-  TweakColor,
-  TweakButton,
+  useTweaks,
 } from './features/TweaksPanel.tsx';
+import { MOCK } from './lib/data.ts';
+import { useTickersWithFallback } from './lib/tickers.ts';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { Analyzer } from './pages/Analyzer.tsx';
 import { TickerDetail } from './pages/TickerDetail.tsx';
@@ -78,10 +47,22 @@ import { PublicReportPage } from './pages/PublicReport.tsx';
 import { AboutPage } from './pages/About.tsx';
 import { TermsPage } from './pages/Terms.tsx';
 import { PrivacyPage } from './pages/Privacy.tsx';
-import { CommandPalette, useGlobalShortcuts } from './features/CommandPalette.tsx';
+import { CommandPalette, useGlobalShortcuts, type PaletteActionId } from './features/CommandPalette.tsx';
 import { ChatOverlay } from './features/ChatOverlay.tsx';
 import { HelpDialog } from './features/HelpDialog.tsx';
 import { ToastBus } from './features/ToastBus.tsx';
+import type { NavFn, Ticker, UserProfile } from './lib/types.ts';
+
+type PaletteName =
+  | 'phosphor'
+  | 'amber'
+  | 'neural'
+  | 'rgb'
+  | 'cyber'
+  | 'matrix'
+  | 'paper'
+  | 'graphite';
+type PaletteColors = Record<string, string>;
 
 
 // Tweaks defaults — JSON between markers so host can persist
@@ -97,7 +78,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "showLoading": false
 }/*EDITMODE-END*/;
 
-const PALETTES = {
+const PALETTES: Record<PaletteName, PaletteColors> = {
   phosphor: {
     "--bg-0": "#07090f", "--bg-1": "#0c1220", "--bg-2": "#131c30", "--bg-3": "#1a2540",
     "--bg-row": "#0f1626", "--line": "#233052", "--line-soft": "#1a2440",
@@ -186,13 +167,14 @@ const PALETTES = {
   }
 };
 
-function applyPalette(name) {
-  const p = PALETTES[name] || PALETTES.phosphor;
+function applyPalette(name: string): void {
+  const safeName = (name in PALETTES ? name : 'phosphor') as PaletteName;
+  const p = PALETTES[safeName];
   const root = document.documentElement;
   Object.entries(p).forEach(([k, v]) => root.style.setProperty(k, v));
   // Tag body so light-mode-specific tweaks can kick in via CSS
-  document.body.setAttribute("data-palette", name);
-  document.body.setAttribute("data-light", name === "paper" ? "1" : "0");
+  document.body.setAttribute('data-palette', safeName);
+  document.body.setAttribute('data-light', safeName === 'paper' ? '1' : '0');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -202,7 +184,7 @@ function applyPalette(name) {
 // being validated against the backend in the background.
 // ─────────────────────────────────────────────────────────────
 function SyncingDot() {
-  const fetching = useIsFetching ? useIsFetching() : 0;
+  const fetching = useIsFetching();
   const active = fetching > 0;
   return (
     <span
@@ -224,22 +206,63 @@ function SyncingDot() {
 // NotificationsBell — header bell that opens a dropdown of
 // recent triggered price alerts + recently completed research.
 // ─────────────────────────────────────────────────────────────
-function NotificationsBell({ signedIn, onNav }) {
+interface NotificationItem {
+  id: string;
+  kind: 'alert' | 'research';
+  ts?: string;
+  title: string;
+  sym: string | null;
+  researchId?: string | number;
+}
+
+interface AlertRowApp {
+  id: string | number;
+  symbol: string;
+  alert_type?: string;
+  target_value?: number;
+  triggered_at?: string;
+}
+
+interface ResearchRowApp {
+  id: string | number;
+  title?: string;
+  tickers?: string[];
+  created_at?: string;
+}
+
+interface ResearchListAppResponse {
+  data?: ResearchRowApp[];
+}
+
+function NotificationsBell({ signedIn, onNav }: { signedIn: boolean; onNav: NavFn }) {
   const [open, setOpen] = useState(false);
-  const [readKey, setReadKey] = useState(() => {
-    try { return Number(localStorage.getItem("v2_notif_read_until")) || 0; }
-    catch (e) { return 0; }
+  const [readKey, setReadKey] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('v2_notif_read_until')) || 0;
+    } catch {
+      return 0;
+    }
   });
 
-  const [alerts] = useApi
-    ? useApi(() => (signedIn ? API.alerts() : Promise.resolve([])), [signedIn], { poll: 60000, staleTime: 30000 })
-    : [null];
-  const [completed] = useApi
-    ? useApi(() => (signedIn ? API.researchList({ status: "completed", limit: 5 }) : Promise.resolve(null)), [signedIn], { staleTime: 60000 })
-    : [null];
+  const [alerts] = useApi<AlertRowApp[] | null>(
+    () =>
+      signedIn
+        ? (API.alerts() as Promise<AlertRowApp[]>)
+        : Promise.resolve([] as AlertRowApp[]),
+    ['notif-alerts', signedIn],
+    { poll: 60000, staleTime: 30000 },
+  );
+  const [completed] = useApi<ResearchListAppResponse | null>(
+    () =>
+      signedIn
+        ? (API.researchList({ status: 'completed', limit: 5 }) as Promise<ResearchListAppResponse>)
+        : Promise.resolve(null),
+    ['notif-research', signedIn],
+    { staleTime: 60000 },
+  );
 
   // Build unified list
-  const items = [];
+  const items: NotificationItem[] = [];
   if (Array.isArray(alerts)) {
     for (const a of alerts) {
       if (!a.triggered_at) continue;
@@ -264,28 +287,32 @@ function NotificationsBell({ signedIn, onNav }) {
       });
     }
   }
-  items.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-  const unread = items.filter(i => new Date(i.ts).getTime() > readKey).length;
+  items.sort((a, b) => new Date(b.ts ?? 0).getTime() - new Date(a.ts ?? 0).getTime());
+  const unread = items.filter((i) => new Date(i.ts ?? 0).getTime() > readKey).length;
 
-  const markAllRead = () => {
+  const markAllRead = (): void => {
     const now = Date.now();
     setReadKey(now);
-    try { localStorage.setItem("v2_notif_read_until", String(now)); } catch (e) {}
+    try {
+      localStorage.setItem('v2_notif_read_until', String(now));
+    } catch {
+      /* ignore */
+    }
   };
 
   // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e) => {
-      const el = document.getElementById("v2-notif-dropdown");
-      if (el && !el.contains(e.target)) setOpen(false);
+    const onDoc = (e: Event): void => {
+      const el = document.getElementById('v2-notif-dropdown');
+      if (el && !el.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("click", onDoc);
-    return () => document.removeEventListener("click", onDoc);
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
   }, [open]);
 
-  const formatTs = (iso) => {
-    if (!iso) return "—";
+  const formatTs = (iso: string | undefined | null): string => {
+    if (!iso) return '—';
     const diff = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
     if (diff < 60) return `${Math.floor(diff)}s`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m`;
@@ -357,14 +384,30 @@ function NotificationsBell({ signedIn, onNav }) {
                 <div className="t-xs faint mt-2">Triggered alerts and completed research will land here.</div>
               </div>
             ) : (
-              items.slice(0, 12).map(it => {
-                const isUnread = new Date(it.ts).getTime() > readKey;
-                const onClick = () => {
+              items.slice(0, 12).map((it) => {
+                const isUnread = new Date(it.ts ?? 0).getTime() > readKey;
+                const onClick = (): void => {
                   setOpen(false);
-                  if (it.kind === "research" && it.sym) {
-                    onNav("ticker", { sym: it.sym, name: it.sym, sector: "—", price: 0, change: 0, ai: "HOLD", risk: 5, upside: 0, mc: "—", pe: null, seed: it.sym.charCodeAt(0), spark: [0, 0], candles: [], _live: true });
-                  } else if (it.kind === "alert") {
-                    onNav("alerts");
+                  if (it.kind === 'research' && it.sym) {
+                    const stub: Ticker = {
+                      sym: it.sym,
+                      name: it.sym,
+                      sector: '—',
+                      price: 0,
+                      change: 0,
+                      ai: 'HOLD',
+                      risk: 5,
+                      upside: 0,
+                      mc: '—',
+                      pe: null,
+                      seed: it.sym.charCodeAt(0),
+                      spark: [0, 0],
+                      candles: [],
+                      _live: true,
+                    };
+                    onNav('ticker', stub);
+                  } else if (it.kind === 'alert') {
+                    onNav('alerts');
                   }
                 };
                 return (
@@ -403,18 +446,26 @@ function NotificationsBell({ signedIn, onNav }) {
   );
 }
 
-function Header({ route, onNav, query, setQuery }) {
+interface HeaderProps {
+  route: string;
+  onNav: NavFn;
+  query: string;
+  setQuery: (q: string) => void;
+}
+
+function Header({ route, onNav, query, setQuery }: HeaderProps) {
   const [now, setNow] = useState(new Date());
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] = useState<Ticker[] | null>(null);
   const bp = useBreakpoint();
 
   // Real user from /auth/profile; null when unauth.
-  const [profile, profileMeta] = useApi
-    ? useApi(() => API.profile(), [])
-    : [null, {}];
+  const [profile] = useApi<UserProfile | null>(
+    () => API.profile() as Promise<UserProfile | null>,
+    ['auth-profile'],
+  );
   const signedIn = !!profile;
 
   // Display name + rank
@@ -428,35 +479,60 @@ function Header({ route, onNav, query, setQuery }) {
 
   // Live ticker search (debounced) against /tickers?search=
   useEffect(() => {
-    if (!query || query.length < 1) { setSearchResults(null); return; }
+    if (!query || query.length < 1) {
+      setSearchResults(null);
+      return;
+    }
     let abort = false;
     const t = setTimeout(() => {
-      if (API && signedIn) {
-        API.tickers(query).then((rows) => {
+      if (!signedIn) {
+        setSearchResults(null);
+        return;
+      }
+      interface TickerSearchRow {
+        symbol: string;
+        name?: string;
+        sector?: string;
+        industry?: string;
+        finnhub_industry?: string;
+        logo_url?: string;
+      }
+      (API.tickers(query) as Promise<TickerSearchRow[] | null>)
+        .then((rows) => {
           if (abort) return;
           if (Array.isArray(rows) && rows.length > 0) {
-            setSearchResults(rows.slice(0, 8).map(r => ({
-              sym: r.symbol,
-              name: r.name,
-              sector: r.sector || r.industry || r.finnhub_industry || "—",
-              price: 0,
-              change: 0,
-              ai: "HOLD", risk: 5, upside: 0, mc: "—", pe: null,
-              seed: (r.symbol || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0),
-              logo: r.logo_url,
-              spark: [0, 0],
-              candles: [],
-              _live: true,
-            })));
+            setSearchResults(
+              rows.slice(0, 8).map<Ticker>((r) => ({
+                sym: r.symbol,
+                name: r.name || r.symbol,
+                sector:
+                  r.sector || r.industry || r.finnhub_industry || '—',
+                price: 0,
+                change: 0,
+                ai: 'HOLD',
+                risk: 5,
+                upside: 0,
+                mc: '—',
+                pe: null,
+                seed: (r.symbol || '')
+                  .split('')
+                  .reduce((a: number, c: string) => a + c.charCodeAt(0), 0),
+                logo: r.logo_url,
+                spark: [0, 0],
+                candles: [],
+                _live: true,
+              })),
+            );
           } else {
             setSearchResults([]); // empty — show "no matches"
           }
-        }).catch(() => setSearchResults(null));
-      } else {
-        setSearchResults(null);
-      }
+        })
+        .catch(() => setSearchResults(null));
     }, 200);
-    return () => { abort = true; clearTimeout(t); };
+    return () => {
+      abort = true;
+      clearTimeout(t);
+    };
   }, [query, signedIn]);
 
   useEffect(() => {
@@ -464,15 +540,15 @@ function Header({ route, onNav, query, setQuery }) {
     return () => clearInterval(id);
   }, []);
 
-  const tabs = [
-    ["dashboard", "DASH"],
-    ["workspace", "WORKSPACE"],
-    ["analyzer", "ANALYZER"],
-    ["watchlist", "WATCHLIST"],
-    ["research", "RESEARCH"],
-    ["portfolio", "PORTFOLIO"],
-    ["alerts", "ALERTS"],
-    ["news", "NEWS"]
+  const tabs: Array<readonly [string, string]> = [
+    ['dashboard', 'DASH'],
+    ['workspace', 'WORKSPACE'],
+    ['analyzer', 'ANALYZER'],
+    ['watchlist', 'WATCHLIST'],
+    ['research', 'RESEARCH'],
+    ['portfolio', 'PORTFOLIO'],
+    ['alerts', 'ALERTS'],
+    ['news', 'NEWS'],
   ];
 
   const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -666,9 +742,21 @@ function Header({ route, onNav, query, setQuery }) {
 
           {signedIn ? (
             <div className="row gap-2" style={{ alignItems: "center", position: "relative" }}>
-              <SpriteMascot seed={(profile.id || "777").split("").reduce((a, c) => a + c.charCodeAt(0), 0) || 777}
+              <SpriteMascot
+                seed={
+                  String(profile?.id ?? '777')
+                    .split('')
+                    .reduce((a: number, c: string) => a + c.charCodeAt(0), 0) ||
+                  777
+                }
                 size={32}
-                colors={["transparent", "var(--cyan)", "var(--cyan-dark)", "var(--amber)"]} />
+                colors={[
+                  'transparent',
+                  'var(--cyan)',
+                  'var(--cyan-dark)',
+                  'var(--amber)',
+                ]}
+              />
               <div
                 className="col"
                 style={{ lineHeight: 1.1, cursor: "pointer", userSelect: "none" }}
@@ -707,10 +795,10 @@ function Header({ route, onNav, query, setQuery }) {
             <button
               className="pxl-btn sm primary"
               onClick={() => setLoginOpen(true)}
-              disabled={profileMeta?.loading}
+              disabled={false}
             >
               <PixelIcon name="shield" size={8} color="currentColor" />
-              {profileMeta?.loading ? "…" : "SIGN IN"}
+              {false ? "…" : "SIGN IN"}
             </button>
           )}
         </div>
@@ -754,22 +842,26 @@ function Header({ route, onNav, query, setQuery }) {
 // -----------------------------------------------------------
 // LoginModal — Google OAuth + Dev token shortcut
 // -----------------------------------------------------------
-function LoginModal({ onClose }) {
-  const [devEmail, setDevEmail] = useState("dev@test.com");
+function LoginModal({ onClose }: { onClose: () => void }) {
+  const [devEmail, setDevEmail] = useState('dev@test.com');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  const runDevLogin = async () => {
-    setBusy(true); setErr(null);
+  const runDevLogin = async (): Promise<void> => {
+    setBusy(true);
+    setErr(null);
     try {
-      const res = await API.devLogin(devEmail);
+      const res = (await API.devLogin(devEmail)) as
+        | { access_token?: string }
+        | null;
       if (res && res.access_token) {
         window.location.reload();
       } else {
-        setErr("Dev login refused. Make sure NODE_ENV is not production.");
+        setErr('Dev login refused. Make sure NODE_ENV is not production.');
       }
-    } catch (e) {
-      setErr("Network error: " + (e.message || "unknown"));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'unknown';
+      setErr('Network error: ' + msg);
     }
     setBusy(false);
   };
@@ -838,7 +930,7 @@ function LoginModal({ onClose }) {
 // -----------------------------------------------------------
 // BottomTabBar — mobile-only nav at the screen bottom
 // -----------------------------------------------------------
-function BottomTabBar({ route, onNav }) {
+function BottomTabBar({ route, onNav }: { route: string; onNav: NavFn }) {
   const tabs = [
     ["dashboard", "DASH",     "chart"],
     ["analyzer",  "ANALYZER", "search"],
@@ -890,17 +982,52 @@ function BottomTabBar({ route, onNav }) {
   );
 }
 
-function PlaceholderPage({ title, icon, tone, lines }) {
+interface PlaceholderPageProps {
+  title: string;
+  icon: string;
+  tone: string;
+  lines: string[];
+}
+
+function PlaceholderPage({ title, icon, tone, lines }: PlaceholderPageProps) {
   return (
-    <div style={{ padding: "0 20px 32px" }}>
-      <div className="pxl pxl-raised" style={{ padding: 32, marginTop: 16, textAlign: "center" }}>
+    <div style={{ padding: '0 20px 32px' }}>
+      <div
+        className="pxl pxl-raised"
+        style={{ padding: 32, marginTop: 16, textAlign: 'center' }}
+      >
         <PixelIcon name={icon} color={`var(--${tone})`} size={48} />
-        <h2 className="font-display t-xl mt-3" style={{ color: `var(--${tone})` }}>{title}</h2>
+        <h2
+          className="font-display t-xl mt-3"
+          style={{ color: `var(--${tone})` }}
+        >
+          {title}
+        </h2>
         <p className="dim mt-2">This screen is reachable from the dashboard.</p>
-        <div className="pxl-inset mt-4" style={{ padding: 14, textAlign: "left", maxWidth: 560, margin: "16px auto" }}>
+        <div
+          className="pxl-inset mt-4"
+          style={{
+            padding: 14,
+            textAlign: 'left',
+            maxWidth: 560,
+            margin: '16px auto',
+          }}
+        >
           {lines.map((l, i) => (
-            <div key={i} className="font-mono t-sm" style={{ color: i === lines.length - 1 ? "var(--green)" : "var(--ink-dim)" }}>
-              <span className="faint">{(i + 1).toString().padStart(2, "0")} │</span> {l}
+            <div
+              key={i}
+              className="font-mono t-sm"
+              style={{
+                color:
+                  i === lines.length - 1
+                    ? 'var(--green)'
+                    : 'var(--ink-dim)',
+              }}
+            >
+              <span className="faint">
+                {(i + 1).toString().padStart(2, '0')} │
+              </span>{' '}
+              {l}
             </div>
           ))}
         </div>
@@ -910,14 +1037,18 @@ function PlaceholderPage({ title, icon, tone, lines }) {
 }
 
 function App() {
-  const [route, setRoute] = useState("dashboard");
-  const [ticker, setTicker] = useState(null);
-  const [query, setQuery] = useState("");
+  const [route, setRoute] = useState<string>('dashboard');
+  const [ticker, setTicker] = useState<Ticker | null>(null);
+  const [query, setQuery] = useState('');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [signInToast, setSignInToast] = useState(false);
-  const [booted, setBooted] = useState(() => {
-    try { return sessionStorage.getItem("nt_booted") === "1"; } catch (e) { return false; }
+  const [booted, setBooted] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('nt_booted') === '1';
+    } catch {
+      return false;
+    }
   });
   const bp = useBreakpoint();
 
@@ -941,134 +1072,136 @@ function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   // Live tickers list — fuels command palette + future watchlist features.
-  const paletteTickers = useTickersWithFallback
-    ? useTickersWithFallback({ limit: 80 })
-    : MOCK.tickers;
+  const paletteTickers: Ticker[] = useTickersWithFallback({ limit: 80 });
 
-  // Profile (shared via query cache with Header's hook)
-  const [appProfile] = useApi
-    ? useApi(() => API.profile(), [])
-    : [null];
+  // Profile (shared via query cache with Header's hook so dedup'd by TanStack)
+  const [appProfile] = useApi<UserProfile | null>(
+    () => API.profile() as Promise<UserProfile | null>,
+    ['auth-profile'],
+  );
   const appSignedIn = !!appProfile;
 
   // Apply palette + crt vars when tweaks change
   useEffect(() => {
-    applyPalette(tweaks.palette);
-    document.documentElement.style.setProperty("--scanline-opacity", tweaks.scanlines);
+    applyPalette(String(tweaks.palette));
+    document.documentElement.style.setProperty(
+      '--scanline-opacity',
+      String(tweaks.scanlines),
+    );
   }, [tweaks.palette, tweaks.scanlines]);
 
-  const handleBootDone = () => {
-    try { sessionStorage.setItem("nt_booted", "1"); } catch (e) {}
-    setBooted(true);
-  };
-
-  const navigate = (r, t) => {
-    if (t) setTicker(t);
-    setRoute(r);
-    window.scrollTo({ top: 0, behavior: "instant" });
+  const navigate: NavFn = (r, t) => {
+    if (t) setTicker(t as Ticker);
+    setRoute(String(r));
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // ── Global keyboard shortcuts + command palette ──
-  const PALETTE_LIST = ["neural", "rgb", "phosphor", "amber", "cyber", "matrix", "graphite", "paper"];
-  const handleAction = useCallback((a) => {
-    if (a === "replayBoot") {
-      try { sessionStorage.removeItem("nt_booted"); } catch (e) {}
-      setBooted(false);
-    } else if (a === "openDesignSystem") {
-      window.open("Design System.html", "_blank");
-    } else if (a === "cyclePalette") {
-      const i = PALETTE_LIST.indexOf(tweaks.palette);
-      const next = PALETTE_LIST[(i + 1) % PALETTE_LIST.length];
-      setTweak("palette", next);
-    } else if (a === "toggleChat") {
-      window.dispatchEvent(new CustomEvent("v2:toggle-chat"));
-    } else if (a === "showHelp") {
-      setHelpOpen(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tweaks.palette]);
+  const PALETTE_LIST = useMemo<PaletteName[]>(
+    () => [
+      'neural',
+      'rgb',
+      'phosphor',
+      'amber',
+      'cyber',
+      'matrix',
+      'graphite',
+      'paper',
+    ],
+    [],
+  );
+  const handleAction = useCallback(
+    (a: PaletteActionId): void => {
+      if (a === 'replayBoot') {
+        try {
+          sessionStorage.removeItem('nt_booted');
+        } catch {
+          /* ignore */
+        }
+        setBooted(false);
+      } else if (a === 'openDesignSystem') {
+        window.open('Design System.html', '_blank');
+      } else if (a === 'cyclePalette') {
+        const cur = String(tweaks.palette) as PaletteName;
+        const i = PALETTE_LIST.indexOf(cur);
+        const next = PALETTE_LIST[(i + 1) % PALETTE_LIST.length];
+        setTweak('palette', next);
+      } else if (a === 'toggleChat') {
+        window.dispatchEvent(new CustomEvent('v2:toggle-chat'));
+      } else if (a === 'showHelp') {
+        setHelpOpen(true);
+      }
+    },
+    [tweaks.palette, PALETTE_LIST, setTweak],
+  );
 
-  if (useGlobalShortcuts) {
-    useGlobalShortcuts({
-      onPalette: () => setPaletteOpen(true),
-      onNav: (r) => navigate(r),
-      onAction: handleAction,
-    });
-  }
+  useGlobalShortcuts({
+    onPalette: () => setPaletteOpen(true),
+    onNav: (r: string) => navigate(r),
+    onAction: handleAction,
+  });
 
-  let content;
+  let content: ReactNode;
+  const showLoading: boolean = Boolean(tweaks.showLoading);
   switch (route) {
-    case "dashboard":
-      content = <Dashboard onNav={navigate} loading={tweaks.showLoading} />;
+    case 'dashboard':
+      content = <Dashboard onNav={navigate} loading={showLoading} />;
       break;
-    case "ticker":
-      content = ticker
-        ? <TickerDetail t={ticker} onBack={() => navigate("dashboard")} />
-        : <Dashboard onNav={navigate} />;
+    case 'ticker':
+      content = ticker ? (
+        <TickerDetail t={ticker} onBack={() => navigate('dashboard')} />
+      ) : (
+        <Dashboard onNav={navigate} />
+      );
       break;
-    case "analyzer":
+    case 'analyzer':
       content = <Analyzer onNav={navigate} />;
       break;
-    case "workspace":
-      content = window.Workspace
-        ? <window.Workspace onNav={navigate} />
-        : <Dashboard onNav={navigate} />;
+    case 'workspace':
+      content = <Workspace onNav={navigate} />;
       break;
-    case "research":
-      content = window.ResearchPage
-        ? <window.ResearchPage onNav={navigate} />
-        : <PlaceholderPage title="AI RESEARCH FEED" icon="brain" tone="amber" lines={["[ LOADING ]"]} />;
+    case 'research':
+      content = <ResearchPage onNav={navigate} />;
       break;
-    case "watchlist":
-      content = window.WatchlistPage
-        ? <window.WatchlistPage onNav={navigate} />
-        : <PlaceholderPage title="WATCHLISTS" icon="star" tone="amber" lines={["[ LOADING ]"]} />;
+    case 'watchlist':
+      content = <WatchlistPage onNav={navigate} />;
       break;
-    case "profile":
-      content = window.ProfilePage
-        ? <window.ProfilePage />
-        : <PlaceholderPage title="PROFILE" icon="shield" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'profile':
+      content = <ProfilePage />;
       break;
-    case "admin":
-      content = window.AdminPage
-        ? <window.AdminPage />
-        : <PlaceholderPage title="ADMIN" icon="shield" tone="red" lines={["[ LOADING ]"]} />;
+    case 'admin':
+      content = <AdminPage />;
       break;
-    case "compare":
-      content = window.ComparePage
-        ? <window.ComparePage onNav={navigate} />
-        : <PlaceholderPage title="COMPARE" icon="chart" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'compare':
+      content = <ComparePage onNav={navigate} />;
       break;
-    case "share": {
+    case 'share': {
       const params = new URLSearchParams(window.location.search);
-      content = window.PublicReportPage
-        ? <window.PublicReportPage shareKey={params.get("share")} onNav={navigate} />
-        : <PlaceholderPage title="SHARED REPORT" icon="news" tone="violet" lines={["[ LOADING ]"]} />;
+      content = (
+        <PublicReportPage
+          shareKey={params.get('share') ?? ''}
+          onNav={navigate}
+        />
+      );
       break;
     }
-    case "about":
-      content = window.AboutPage ? <window.AboutPage /> : <PlaceholderPage title="ABOUT" icon="brain" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'about':
+      content = <AboutPage />;
       break;
-    case "terms":
-      content = window.TermsPage ? <window.TermsPage /> : <PlaceholderPage title="TERMS" icon="shield" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'terms':
+      content = <TermsPage />;
       break;
-    case "privacy":
-      content = window.PrivacyPage ? <window.PrivacyPage /> : <PlaceholderPage title="PRIVACY" icon="shield" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'privacy':
+      content = <PrivacyPage />;
       break;
-    case "portfolio":
-      content = window.PortfolioPage
-        ? <window.PortfolioPage onNav={navigate} />
-        : <PlaceholderPage title="PORTFOLIO COMMAND" icon="wallet" tone="green" lines={["[ LOADING ]"]} />;
+    case 'portfolio':
+      content = <PortfolioPage onNav={navigate} />;
       break;
-    case "alerts":
-      content = window.AlertsPage
-        ? <window.AlertsPage onNav={navigate} />
-        : <PlaceholderPage title="PRICE ALERTS" icon="bell" tone="amber" lines={["[ LOADING ]"]} />;
+    case 'alerts':
+      content = <AlertsPage onNav={navigate} />;
       break;
-    case "news":
-      content = window.NewsPage
-        ? <window.NewsPage />
-        : <PlaceholderPage title="NEWSWIRE // LIVE" icon="news" tone="cyan" lines={["[ LOADING ]"]} />;
+    case 'news':
+      content = <NewsPage />;
       break;
     default:
       content = <Dashboard onNav={navigate} />;
@@ -1163,7 +1296,18 @@ function App() {
 
       {bp.mobile && <BottomTabBar route={route} onNav={navigate} />}
 
-      {!booted && <BootSequence onDone={handleBootDone} />}
+      {!booted && (
+        <BootSequence
+          onDone={() => {
+            try {
+              sessionStorage.setItem('nt_booted', '1');
+            } catch {
+              /* ignore */
+            }
+            setBooted(true);
+          }}
+        />
+      )}
 
       {/* Sign-in success toast after OAuth round-trip — top-right so AI CHAT button stays clickable */}
       {signInToast && (
@@ -1186,21 +1330,19 @@ function App() {
       )}
 
       {/* v2-only: command palette (Cmd-K) */}
-      {window.CommandPalette && (
-        <window.CommandPalette
-          open={paletteOpen}
-          onClose={() => setPaletteOpen(false)}
-          onNav={navigate}
-          tickers={paletteTickers}
-          onAction={handleAction}
-        />
-      )}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNav={navigate}
+        tickers={paletteTickers}
+        onAction={handleAction}
+      />
 
       {/* v2-only: AI chat overlay (Cmd-Shift-K) */}
-      {window.ChatOverlay && <window.ChatOverlay currentTicker={ticker} />}
+      <ChatOverlay currentTicker={ticker} />
 
       {/* Background notification toasts (triggered alerts + completed research) */}
-      {window.ToastBus && <window.ToastBus signedIn={appSignedIn} onNav={navigate} />}
+      <ToastBus signedIn={appSignedIn} onNav={navigate} />
 
       {/* Settings (Tweaks) toggle — floating button bottom-left so it doesn't
           clash with AI CHAT (bottom-right). Works in standalone mode where the
@@ -1228,9 +1370,7 @@ function App() {
       </button>
 
       {/* v2-only: keyboard shortcuts help (Shift+?) */}
-      {window.HelpDialog && (
-        <window.HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-      )}
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
