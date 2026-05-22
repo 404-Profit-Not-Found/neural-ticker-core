@@ -2,70 +2,104 @@
 // queryKey so cache hits work both within a session and after rehydration
 // from IndexedDB on reload.
 import { useQuery } from '@tanstack/react-query';
-import { API, normalizeAnalyzerItem, normalizeCompositeToCandles } from './api.js';
+import type { AnalyzerOpts, HistoryOpts } from './api.ts';
+import { API, normalizeAnalyzerItem, normalizeCompositeToCandles } from './api.ts';
+import type { Candle, Ticker, UseApiResult } from './types.ts';
+import { MOCK } from './data.ts';
 
-export function useLiveTickers(opts) {
-  const o = Object.assign({ limit: 50, sortBy: 'market_cap', sortDir: 'DESC' }, opts || {});
-  const q = useQuery({
+interface AnalyzerResponse {
+  items?: unknown[];
+}
+
+export function useLiveTickers(opts?: AnalyzerOpts): UseApiResult<Ticker[]> {
+  const o: AnalyzerOpts = { limit: 50, sortBy: 'market_cap', sortDir: 'DESC', ...(opts ?? {}) };
+  const q = useQuery<AnalyzerResponse>({
     queryKey: ['analyzer', o],
-    queryFn: () => API.analyzer(o),
+    queryFn: () => API.analyzer(o) as Promise<AnalyzerResponse>,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
-  let tickers = null;
+  let tickers: Ticker[] | undefined;
   if (q.data && Array.isArray(q.data.items)) {
-    tickers = q.data.items.map(normalizeAnalyzerItem).filter(Boolean);
+    tickers = q.data.items
+      .map((it) => normalizeAnalyzerItem(it as Parameters<typeof normalizeAnalyzerItem>[0]))
+      .filter((t): t is Ticker => t !== null);
   }
-  return [tickers, {
-    loading: q.isLoading || q.isPending,
-    error: q.error,
-    reload: () => q.refetch(),
-    isStale: q.isStale,
-  }];
+  return [
+    tickers,
+    {
+      loading: q.isLoading || q.isPending,
+      error: q.error,
+      reload: () => q.refetch(),
+      isStale: q.isStale,
+      isFetching: q.isFetching,
+    },
+  ];
 }
 
-export function useTickerHistory(sym, daysOrOpts) {
-  const opts = typeof daysOrOpts === 'number'
-    ? { days: daysOrOpts, interval: '1d' }
-    : Object.assign({ days: 60, interval: '1d' }, daysOrOpts || {});
-  const q = useQuery({
+// Live tickers with MOCK fallback (palette + dashboard rely on always-something).
+export function useTickersWithFallback(opts?: AnalyzerOpts): Ticker[] {
+  const [live] = useLiveTickers(opts);
+  return live && live.length > 0 ? live : MOCK.tickers;
+}
+
+export function useTickerHistory(
+  sym: string | null | undefined,
+  daysOrOpts?: number | HistoryOpts,
+): UseApiResult<Candle[]> {
+  const opts: HistoryOpts =
+    typeof daysOrOpts === 'number'
+      ? { days: daysOrOpts, interval: '1d' }
+      : { days: 60, interval: '1d', ...(daysOrOpts ?? {}) };
+  const q = useQuery<unknown>({
     queryKey: ['ticker-history', sym, opts],
-    queryFn: () => API.history(sym, opts),
+    queryFn: () => (sym ? API.history(sym, opts) : Promise.resolve(null)),
     enabled: !!sym,
     staleTime: 60_000,
   });
-  const candles = q.data ? normalizeCompositeToCandles(q.data) : null;
-  return [candles, {
-    loading: q.isLoading || q.isPending,
-    error: q.error,
-    reload: () => q.refetch(),
-  }];
+  const candles = q.data
+    ? normalizeCompositeToCandles(q.data as Parameters<typeof normalizeCompositeToCandles>[0])
+    : undefined;
+  return [
+    candles,
+    {
+      loading: q.isLoading || q.isPending,
+      error: q.error,
+      reload: () => q.refetch(),
+    },
+  ];
 }
 
-export function useTickerNews(sym) {
-  const q = useQuery({
+export function useTickerNews(sym: string | null | undefined): UseApiResult<unknown[]> {
+  const q = useQuery<unknown[]>({
     queryKey: ['ticker-news', sym],
-    queryFn: () => API.news(sym),
+    queryFn: () => (sym ? (API.news(sym) as Promise<unknown[]>) : Promise.resolve([] as unknown[])),
     enabled: !!sym,
-    staleTime: 5 * 60_000, // news doesn't change as fast as quotes
+    staleTime: 5 * 60_000,
   });
-  return [Array.isArray(q.data) ? q.data : null, {
-    loading: q.isLoading || q.isPending,
-    error: q.error,
-    reload: () => q.refetch(),
-  }];
+  return [
+    Array.isArray(q.data) ? q.data : undefined,
+    {
+      loading: q.isLoading || q.isPending,
+      error: q.error,
+      reload: () => q.refetch(),
+    },
+  ];
 }
 
-export function useTickerComposite(sym) {
-  const q = useQuery({
+export function useTickerComposite(sym: string | null | undefined): UseApiResult<unknown> {
+  const q = useQuery<unknown>({
     queryKey: ['ticker-composite', sym],
-    queryFn: () => API.composite(sym),
+    queryFn: () => (sym ? API.composite(sym) : Promise.resolve(null)),
     enabled: !!sym,
     staleTime: 60_000,
   });
-  return [q.data && typeof q.data === 'object' ? q.data : null, {
-    loading: q.isLoading || q.isPending,
-    error: q.error,
-    reload: () => q.refetch(),
-  }];
+  return [
+    q.data && typeof q.data === 'object' ? q.data : undefined,
+    {
+      loading: q.isLoading || q.isPending,
+      error: q.error,
+      reload: () => q.refetch(),
+    },
+  ];
 }

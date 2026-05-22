@@ -47,8 +47,9 @@ import configuration from './config/configuration';
 
     // Experimental pixel-terminal frontend served under /v2/ (more specific
     // prefix listed first so it claims /v2/* before the catch-all client root).
+    // Built artifact lives under frontend-v2/dist after `npm run build`.
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'frontend-v2'),
+      rootPath: join(__dirname, '..', 'frontend-v2', 'dist'),
       serveRoot: '/v2',
     }),
 

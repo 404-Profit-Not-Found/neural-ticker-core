@@ -42,9 +42,7 @@ export class IndicesController {
   @ApiResponse({
     status: 200,
     schema: {
-      example: [
-        { name: 'S&P 500', symbol: '^GSPC', val: 5842.18, ch: 0.42 },
-      ],
+      example: [{ name: 'S&P 500', symbol: '^GSPC', val: 5842.18, ch: 0.42 }],
     },
   })
   @Public()
@@ -67,10 +65,7 @@ export class IndicesController {
           }
           const q = r.value;
           const val =
-            q.regularMarketPrice ??
-            q.postMarketPrice ??
-            q.preMarketPrice ??
-            0;
+            q.regularMarketPrice ?? q.postMarketPrice ?? q.preMarketPrice ?? 0;
           const ch = q.regularMarketChangePercent ?? 0;
           return {
             name: meta.name,

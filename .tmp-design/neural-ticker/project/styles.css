@@ -1,0 +1,900 @@
+/* ============================================
+   NEURAL//TICKER — Pixel Terminal Stylesheet
+   ============================================ */
+
+:root {
+  /* Palette: tweakable via JS */
+  --bg-0: #07090f;          /* outer void */
+  --bg-1: #0c1220;          /* panel base */
+  --bg-2: #131c30;          /* panel raised */
+  --bg-3: #1a2540;          /* panel hover */
+  --bg-row: #0f1626;        /* row alt */
+  --line: #233052;          /* divider */
+  --line-soft: #1a2440;
+  --ink: #d6dff0;           /* primary text */
+  --ink-dim: #8693ad;       /* muted text */
+  --ink-faint: #4d5a78;     /* ghost text */
+  --green: #5ce8a0;         /* up / strong buy */
+  --green-dark: #1b6b41;
+  --red: #ff5577;           /* down / sell */
+  --red-dark: #7a1d33;
+  --amber: #ffc23c;         /* warning / focus */
+  --amber-dark: #7a5a10;
+  --cyan: #58d3ff;          /* info / accent */
+  --cyan-dark: #155e7a;
+  --violet: #b67bff;        /* exotic accent */
+  --pixel: 2px;             /* base pixel unit */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100%;
+  background: var(--bg-0);
+  color: var(--ink);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Crisp pixel rendering for SVGs that need it */
+.pixel-svg, .pixel-svg * {
+  shape-rendering: crispEdges;
+}
+
+/* ---------- Typography ---------- */
+
+.font-display {
+  font-family: "Silkscreen", "Press Start 2P", monospace;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.font-headline {
+  font-family: "VT323", monospace;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.font-mono { font-family: "JetBrains Mono", monospace; }
+
+.t-xs { font-size: 10px; line-height: 1.3; }
+.t-sm { font-size: 11px; line-height: 1.35; }
+.t-base { font-size: 13px; }
+.t-lg { font-size: 16px; }
+.t-xl { font-size: 22px; line-height: 1.1; }
+.t-2xl { font-size: 32px; line-height: 1; }
+.t-3xl { font-size: 48px; line-height: 1; }
+
+.upper { text-transform: uppercase; letter-spacing: 0.08em; }
+.dim { color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }
+.green { color: var(--green); }
+.red { color: var(--red); }
+.amber { color: var(--amber); }
+.cyan { color: var(--cyan); }
+.violet { color: var(--violet); }
+
+/* ---------- Pixel Panel (chunky inset border, no radius) ---------- */
+
+.pxl {
+  background: var(--bg-1);
+  border: 2px solid var(--line);
+  position: relative;
+}
+.pxl-raised {
+  background: var(--bg-2);
+  border: 2px solid var(--line);
+  box-shadow:
+    inset 0 2px 0 0 rgba(255,255,255,0.04),
+    0 2px 0 0 rgba(0,0,0,0.5);
+}
+.pxl-inset {
+  background: var(--bg-0);
+  border: 2px solid var(--line);
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,0,0,0.6),
+    inset -2px -2px 0 0 rgba(255,255,255,0.02);
+}
+
+/* Notched corners via clip-path - chunky 8-bit style */
+.pxl-notch {
+  --n: 6px;
+  clip-path: polygon(
+    0 var(--n), var(--n) 0,
+    calc(100% - var(--n)) 0, 100% var(--n),
+    100% calc(100% - var(--n)), calc(100% - var(--n)) 100%,
+    var(--n) 100%, 0 calc(100% - var(--n))
+  );
+}
+
+/* Header bar inside a panel */
+.pxl-head {
+  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  border-bottom: 2px solid var(--line);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "Silkscreen", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.pxl-head .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  background: var(--green);
+  box-shadow: 0 0 0 2px var(--bg-2), 0 0 6px var(--green);
+}
+.pxl-head .dot.red { background: var(--red); box-shadow: 0 0 0 2px var(--bg-2), 0 0 6px var(--red); }
+.pxl-head .dot.amber { background: var(--amber); box-shadow: 0 0 0 2px var(--bg-2), 0 0 6px var(--amber); }
+.pxl-head .dot.cyan { background: var(--cyan); box-shadow: 0 0 0 2px var(--bg-2), 0 0 6px var(--cyan); }
+
+/* ---------- Buttons ---------- */
+
+.pxl-btn {
+  font-family: "Silkscreen", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 2px solid var(--line);
+  padding: 7px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  transition: none;
+  box-shadow:
+    inset 0 2px 0 0 rgba(255,255,255,0.04),
+    0 2px 0 0 #000;
+}
+.pxl-btn:hover {
+  background: var(--bg-3);
+  border-color: var(--cyan-dark);
+  color: var(--cyan);
+}
+.pxl-btn:active {
+  transform: translateY(2px);
+  box-shadow: inset 2px 2px 0 0 rgba(0,0,0,0.3);
+}
+.pxl-btn.primary {
+  background: var(--green-dark);
+  border-color: var(--green);
+  color: var(--green);
+}
+.pxl-btn.primary:hover { background: var(--green); color: #06180e; }
+.pxl-btn.danger {
+  background: var(--red-dark);
+  border-color: var(--red);
+  color: var(--red);
+}
+.pxl-btn.ghost {
+  background: transparent;
+  box-shadow: none;
+}
+.pxl-btn.sm { padding: 4px 8px; font-size: 9px; }
+
+/* Tab pill */
+.pxl-tab {
+  font-family: "Silkscreen", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-bottom: 2px solid var(--line);
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.pxl-tab:hover { color: var(--ink); }
+.pxl-tab.active {
+  color: var(--amber);
+  border-color: var(--line);
+  border-bottom-color: var(--bg-1);
+  background: var(--bg-1);
+  position: relative;
+  top: 2px;
+}
+
+/* ---------- Badges ---------- */
+
+.pxl-badge {
+  font-family: "Silkscreen", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pxl-badge.green { color: var(--green); border-color: var(--green-dark); background: rgba(92,232,160,0.08); }
+.pxl-badge.red   { color: var(--red);   border-color: var(--red-dark);   background: rgba(255,85,119,0.08); }
+.pxl-badge.amber { color: var(--amber); border-color: var(--amber-dark); background: rgba(255,194,60,0.08); }
+.pxl-badge.cyan  { color: var(--cyan);  border-color: var(--cyan-dark);  background: rgba(88,211,255,0.08); }
+.pxl-badge.violet{ color: var(--violet);border-color: #5a3a7a; background: rgba(182,123,255,0.08); }
+
+/* ---------- Inputs ---------- */
+.pxl-input {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  background: var(--bg-0);
+  border: 2px solid var(--line);
+  color: var(--ink);
+  padding: 8px 10px 8px 32px;
+  outline: none;
+  width: 100%;
+}
+.pxl-input:focus { border-color: var(--cyan); }
+
+/* ---------- CRT atmosphere ---------- */
+
+.crt-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  /* scanlines */
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.025) 0px,
+      rgba(255,255,255,0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: overlay;
+  opacity: var(--scanline-opacity, 1);
+}
+.crt-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0,0,0,0.55) 100%
+  );
+}
+.crt-glow {
+  text-shadow: 0 0 4px currentColor;
+}
+
+/* Cursor blink */
+.pxl-cursor::after {
+  content: "_";
+  display: inline-block;
+  margin-left: 4px;
+  animation: blink 1s steps(2) infinite;
+  color: var(--green);
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  gap: 32px;
+  width: max-content;
+  animation: marquee 80s linear infinite;
+}
+
+/* Pixel icon container (renders 8x8 px ART via box-shadow) */
+.pxl-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ---------- Layout helpers ---------- */
+
+.app-root {
+  position: relative;
+  z-index: 3;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.row { display: flex; }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1; }
+.center { display: flex; align-items: center; justify-content: center; }
+.gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; } .gap-5 { gap: 20px; } .gap-6 { gap: 24px; }
+.p-2 { padding: 8px; } .p-3 { padding: 12px; } .p-4 { padding: 16px; }
+.p-5 { padding: 20px; } .p-6 { padding: 24px; }
+.px-3 { padding-left: 12px; padding-right: 12px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; } .mb-6 { margin-bottom: 24px; }
+.mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; } .mt-4 { margin-top: 16px; }
+
+/* Table */
+.pxl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pxl-table th {
+  font-family: "Silkscreen", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 2px solid var(--line);
+  background: var(--bg-2);
+  position: sticky;
+  top: 0;
+}
+.pxl-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
+}
+.pxl-table tr { background: var(--bg-1); }
+.pxl-table tr:nth-child(even) { background: var(--bg-row); }
+.pxl-table tr:hover { background: var(--bg-3); cursor: pointer; }
+.pxl-table .num { text-align: right; font-family: "JetBrains Mono", monospace; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-0); }
+::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border: 2px solid var(--bg-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line); }
+
+/* No anti-aliased focus rings */
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+button { font-family: inherit; }
+
+/* Stepped progress bar */
+.pxl-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  width: 100%;
+}
+.pxl-bar > i {
+  flex: 1;
+  background: var(--bg-3);
+  display: block;
+}
+.pxl-bar > i.on { background: var(--green); }
+.pxl-bar > i.warn { background: var(--amber); }
+.pxl-bar > i.danger { background: var(--red); }
+
+/* Pixel rule */
+.pxl-rule {
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--line) 0 4px,
+    transparent 4px 8px
+  );
+  width: 100%;
+}
+
+/* Heart / star empty */
+.glow-green { box-shadow: 0 0 0 2px var(--green-dark), 0 0 12px var(--green); }
+.glow-red   { box-shadow: 0 0 0 2px var(--red-dark), 0 0 12px var(--red); }
+.glow-amber { box-shadow: 0 0 0 2px var(--amber-dark), 0 0 12px var(--amber); }
+
+/* Sticker for "AI" hot label */
+.sticker {
+  display: inline-block;
+  background: var(--amber);
+  color: #1a1200;
+  font-family: "Silkscreen", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 2px 5px;
+  text-transform: uppercase;
+}
+
+/* ---------- CRT Chromatic aberration overlay ---------- */
+.crt-aberration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,0,80,0.04) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(0,120,255,0.04) 0%, transparent 40%);
+}
+
+/* Curved CRT mask — subtle */
+.crt-curve {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 0;
+  box-shadow: inset 0 0 100px rgba(0,0,0,0.35);
+}
+
+/* Phosphor flicker on display text */
+@keyframes phosphor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.97; }
+}
+.flicker {
+  animation: phosphor 4s ease-in-out infinite;
+}
+
+/* ---------- Status bar ---------- */
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: var(--bg-1);
+  border-top: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  font-family: "Silkscreen", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  z-index: 40;
+}
+.status-bar .sep {
+  width: 2px;
+  height: 14px;
+  background: var(--line);
+  display: inline-block;
+}
+
+/* ---------- Boot sequence ---------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-0);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  opacity: 1;
+}
+.boot-content {
+  width: 720px;
+  max-width: 90vw;
+}
+.boot-line {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--green);
+  white-space: pre;
+}
+.boot-line .ok { color: var(--green); }
+.boot-line .info { color: var(--cyan); }
+.boot-line .warn { color: var(--amber); }
+.boot-line .dim { color: var(--ink-faint); }
+.boot-bar {
+  display: inline-block;
+  width: 200px;
+  height: 8px;
+  background: var(--bg-3);
+  margin: 0 12px;
+  vertical-align: middle;
+  position: relative;
+  border: 1px solid var(--line);
+}
+.boot-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+.boot-out {
+  animation: bootOut 0.4s ease-in forwards;
+}
+@keyframes bootOut {
+  to { opacity: 0; transform: scale(1.05); pointer-events: none; }
+}
+
+/* ---------- Heading style: typewriter underline ---------- */
+.tw-h {
+  font-family: "Silkscreen", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tw-h::before {
+  content: "▶";
+  color: var(--amber);
+  font-size: 9px;
+}
+
+/* ---------- Mini sparkline canvas grid ---------- */
+.minigrid {
+  background-image:
+    linear-gradient(to right, var(--line-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line-soft) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+/* ---------- Light palette adjustments ---------- */
+/* When a light palette is active, certain dark-bg-only effects need to flip */
+body[data-light="1"] .pxl-raised {
+  box-shadow:
+    inset 0 2px 0 0 rgba(255,255,255,0.6),
+    0 2px 0 0 rgba(0,0,0,0.08);
+}
+body[data-light="1"] .pxl-btn {
+  box-shadow:
+    inset 0 2px 0 0 rgba(255,255,255,0.5),
+    0 2px 0 0 rgba(0,0,0,0.12);
+}
+body[data-light="1"] .pxl-head {
+  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+}
+body[data-light="1"] .pxl-head .dot {
+  box-shadow: 0 0 0 2px var(--bg-2);
+}
+body[data-light="1"] .pxl-badge.green { background: rgba(23,106,58,0.12); }
+body[data-light="1"] .pxl-badge.red   { background: rgba(168,29,52,0.12); }
+body[data-light="1"] .pxl-badge.amber { background: rgba(154,104,0,0.14); }
+body[data-light="1"] .pxl-badge.cyan  { background: rgba(12,90,130,0.12); }
+body[data-light="1"] .crt-bg {
+  /* darker scanlines on light bg, multiply-blend so they actually subtract */
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.08) 0px,
+      rgba(0,0,0,0.08) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: multiply;
+}
+body[data-light="1"] .crt-vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(70,55,30,0.18) 100%
+  );
+}
+body[data-light="1"] .crt-aberration { display: none; }
+body[data-light="1"] .pxl-tab.active {
+  background: var(--bg-1);
+  border-bottom-color: var(--bg-1);
+}
+body[data-light="1"] ::-webkit-scrollbar-track { background: var(--bg-2); }
+body[data-light="1"] ::-webkit-scrollbar-thumb { background: var(--line); border-color: var(--bg-2); }
+
+/* ─────────────────────────────────────────────────────────
+   RGB PALETTE — animated rainbow borders + accents
+   Activates when body[data-palette="rgb"]
+   ───────────────────────────────────────────────────────── */
+
+@keyframes rgb-rotate {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes rgb-flow {
+  to { background-position: 200% center; }
+}
+
+body[data-palette="rgb"] .pxl-raised,
+body[data-palette="rgb"] .pxl {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-1), var(--bg-1)) padding-box,
+    linear-gradient(45deg,
+      #ff0044,
+      #ff8800,
+      #ffee00,
+      #00ff66,
+      #00ddff,
+      #4466ff,
+      #aa44ff,
+      #ff0099,
+      #ff0044) border-box;
+  background-size: 100% 100%, 400% 400%;
+  animation: rgb-rotate 8s linear infinite;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 4px 24px rgba(255,0,128,0.06);
+}
+
+/* Insets stay neutral so the rainbow border shows clearly */
+body[data-palette="rgb"] .pxl-inset {
+  border: 2px solid var(--line);
+  background: var(--bg-0);
+  animation: none;
+}
+
+/* Panel header — let it sit on the rainbow without re-painting */
+body[data-palette="rgb"] .pxl-head {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border-bottom: 2px solid var(--line);
+}
+
+/* Buttons get rainbow border on hover */
+body[data-palette="rgb"] .pxl-btn:hover {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-3), var(--bg-3)) padding-box,
+    linear-gradient(45deg, #ff0044, #ff8800, #ffee00, #00ff66, #00ddff, #4466ff, #aa44ff, #ff0099, #ff0044) border-box;
+  background-size: 100% 100%, 400% 400%;
+  animation: rgb-rotate 4s linear infinite;
+  color: #fff;
+}
+
+/* Header bottom border — animated rainbow line */
+body[data-palette="rgb"] header {
+  position: relative;
+}
+body[data-palette="rgb"] header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    #ff0044, #ff8800, #ffee00, #00ff66, #00ddff, #4466ff, #aa44ff, #ff0099, #ff0044);
+  background-size: 200% auto;
+  animation: rgb-flow 8s linear infinite;
+  box-shadow: 0 0 12px rgba(255, 0, 200, 0.4);
+}
+
+/* Logo "N" mark — rainbow gradient text */
+body[data-palette="rgb"] header > div > div > div > span:first-child {
+  /* keep the amber tile as-is — too messy to gradient */
+}
+
+/* RGB rainbow accent on the marquee — divider becomes rainbow */
+body[data-palette="rgb"] .marquee-track > span:nth-child(n) {
+  /* leave numbers neutral, but … */
+}
+
+/* Status bar bottom strip — rainbow underline */
+body[data-palette="rgb"] .status-bar {
+  border-top: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-1), var(--bg-1)) padding-box,
+    linear-gradient(90deg, #ff0044, #ff8800, #ffee00, #00ff66, #00ddff, #4466ff, #aa44ff, #ff0099, #ff0044) border-box;
+  background-size: 100% 100%, 200% auto;
+  animation: rgb-flow 12s linear infinite;
+}
+
+/* Verdict pills + price deltas keep their tone — punch them up */
+body[data-palette="rgb"] .pxl-badge.green { box-shadow: 0 0 8px rgba(0,255,136,0.25); }
+body[data-palette="rgb"] .pxl-badge.red   { box-shadow: 0 0 8px rgba(255,0,102,0.25); }
+body[data-palette="rgb"] .pxl-badge.amber { box-shadow: 0 0 8px rgba(255,170,0,0.25); }
+body[data-palette="rgb"] .pxl-badge.cyan  { box-shadow: 0 0 8px rgba(0,221,255,0.25); }
+body[data-palette="rgb"] .pxl-badge.violet{ box-shadow: 0 0 8px rgba(187,68,255,0.25); }
+
+/* Logo monogram in header gets a soft rainbow glow */
+body[data-palette="rgb"] header > div > div:first-child > div:first-child {
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,0.4),
+    0 0 12px rgba(255, 100, 200, 0.5),
+    inset 0 -3px 0 0 rgba(0,0,0,0.25);
+}
+
+/* For all bar segments — light/dark friendly */
+.pxl-bar > i { background: var(--bg-3); }
+
+/* ─────────────────────────────────────────────────────────
+   PIXEL SKELETON / LOADING STATES
+   ───────────────────────────────────────────────────────── */
+
+/* Chunky shimmer block — steps() makes it feel pixelated */
+.pxl-skel {
+  position: relative;
+  background: var(--bg-3);
+  border: 2px solid var(--line);
+  overflow: hidden;
+  display: block;
+}
+.pxl-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: pxl-shimmer 1.6s steps(20) infinite;
+}
+@keyframes pxl-shimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+body[data-light="1"] .pxl-skel::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(0, 0, 0, 0.08) 40%,
+    rgba(0, 0, 0, 0.18) 50%,
+    rgba(0, 0, 0, 0.08) 60%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Dithered loading block — checker pattern that toggles */
+.pxl-skel-dither {
+  background-color: var(--bg-2);
+  background-image:
+    linear-gradient(45deg, var(--bg-3) 25%, transparent 25%, transparent 75%, var(--bg-3) 75%),
+    linear-gradient(45deg, var(--bg-3) 25%, transparent 25%, transparent 75%, var(--bg-3) 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
+  border: 2px solid var(--line);
+  animation: pxl-dither 1.2s steps(2) infinite;
+}
+@keyframes pxl-dither {
+  0%, 100% { background-position: 0 0, 3px 3px; }
+  50%      { background-position: 3px 3px, 0 0; }
+}
+
+/* Scanning line — sweeps top-to-bottom over a chart area */
+.pxl-scan {
+  position: relative;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+.pxl-scan::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan), 0 0 16px rgba(88, 211, 255, 0.4);
+  animation: pxl-scan-line 1.8s steps(40) infinite;
+}
+@keyframes pxl-scan-line {
+  0%   { top: 0%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Loading text with blinking dots */
+.pxl-loading-text {
+  font-family: "Silkscreen", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  text-transform: uppercase;
+}
+.pxl-loading-text::after {
+  content: "...";
+  display: inline-block;
+  margin-left: 4px;
+  animation: pxl-dots 1.2s steps(4) infinite;
+  width: 18px;
+  text-align: left;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+@keyframes pxl-dots {
+  0%   { width: 0; }
+  100% { width: 18px; }
+}
+
+/* Pulsing block (used when shimmer is too busy) */
+.pxl-pulse {
+  background: var(--bg-3);
+  border: 2px solid var(--line);
+  animation: pxl-pulse-keys 1.6s steps(4) infinite;
+}
+@keyframes pxl-pulse-keys {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* Segmented progress that fills then resets */
+.pxl-progress {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.pxl-progress > i {
+  flex: 1;
+  background: var(--bg-3);
+  display: block;
+  animation: pxl-progress-fill 1.6s steps(1) infinite;
+}
+.pxl-progress > i:nth-child(1)  { animation-delay: 0.0s; }
+.pxl-progress > i:nth-child(2)  { animation-delay: 0.1s; }
+.pxl-progress > i:nth-child(3)  { animation-delay: 0.2s; }
+.pxl-progress > i:nth-child(4)  { animation-delay: 0.3s; }
+.pxl-progress > i:nth-child(5)  { animation-delay: 0.4s; }
+.pxl-progress > i:nth-child(6)  { animation-delay: 0.5s; }
+.pxl-progress > i:nth-child(7)  { animation-delay: 0.6s; }
+.pxl-progress > i:nth-child(8)  { animation-delay: 0.7s; }
+.pxl-progress > i:nth-child(9)  { animation-delay: 0.8s; }
+.pxl-progress > i:nth-child(10) { animation-delay: 0.9s; }
+@keyframes pxl-progress-fill {
+  0%, 100% { background: var(--bg-3); }
+  50%      { background: var(--amber); }
+}
+
+/* Spinning bracket — a tiny ASCII spinner */
+.pxl-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  font-family: "Silkscreen", monospace;
+  font-size: 14px;
+  color: var(--amber);
+  text-align: center;
+  line-height: 12px;
+}
+.pxl-spinner::before {
+  content: "|";
+  animation: pxl-spin 0.6s steps(4) infinite;
+}
+@keyframes pxl-spin {
+  0%   { content: "|"; }
+  25%  { content: "/"; }
+  50%  { content: "─"; }
+  75%  { content: "\\"; }
+  100% { content: "|"; }
+}
+
+/* Skeleton text inline — single short line */
+.pxl-skel-line {
+  display: inline-block;
+  height: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.pxl-skel-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: pxl-shimmer 1.6s steps(20) infinite;
+}

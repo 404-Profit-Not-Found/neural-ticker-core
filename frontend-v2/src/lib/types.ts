@@ -63,56 +63,6 @@ export interface NewsItem {
   summary?: string;
 }
 
-export interface PortfolioPosition {
-  id: string | number;
-  symbol: string;
-  quantity: number;
-  cost_basis: number;
-  current_value: number;
-  gain_pct?: number;
-  currency?: string;
-  notes?: string;
-}
-
-export interface PriceAlert {
-  id: string | number;
-  symbol: string;
-  alert_type: string;
-  target_value: number;
-  triggered_at?: string | null;
-  is_active?: boolean;
-}
-
-export interface Watchlist {
-  id: string | number;
-  name: string;
-  items: WatchlistItem[];
-}
-
-export interface WatchlistItem {
-  id: string | number;
-  symbol: string;
-}
-
-export interface ResearchItem {
-  id: string | number;
-  title?: string;
-  tickers?: string[];
-  status?: string;
-  created_at?: string;
-  content?: string;
-}
-
-export interface UserProfile {
-  id?: string;
-  email?: string;
-  name?: string;
-  role?: string;
-  tier?: string;
-  credits?: number;
-  rank?: string;
-}
-
 // Hook return type — keep the legacy shape so call-sites need no refactor.
 export interface UseApiMeta<E = Error> {
   loading: boolean;
@@ -131,3 +81,25 @@ export interface UseMutationResult<TData, TVars, TError = Error> {
   data: TData | undefined;
   reset: () => void;
 }
+
+// Route type — manual nav, no router lib
+export type Route =
+  | 'dashboard'
+  | 'ticker'
+  | 'analyzer'
+  | 'workspace'
+  | 'research'
+  | 'watchlist'
+  | 'profile'
+  | 'admin'
+  | 'compare'
+  | 'share'
+  | 'about'
+  | 'terms'
+  | 'privacy'
+  | 'portfolio'
+  | 'alerts'
+  | 'news'
+  | 'design-system';
+
+export type NavFn = (route: Route | string, payload?: unknown) => void;

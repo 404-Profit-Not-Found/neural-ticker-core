@@ -1,8 +1,8 @@
 // Thin convenience wrappers around TanStack Query.
-// They exist so the existing screen code (which used `useApi(loader, deps,
-// opts)` against the old custom cache) can be migrated with the smallest
-// possible diff per call-site. Long-term, screens should call `useQuery` /
-// `useMutation` directly.
+// They exist so the existing screen code (which used `useApi(loader, deps, opts)`
+// against the old custom cache) can be migrated with the smallest possible diff
+// per call-site. Long-term, screens should call `useQuery` / `useMutation`
+// directly.
 import { useEffect } from 'react';
 import {
   useQuery,
@@ -19,7 +19,7 @@ export interface UseApiOpts {
   enabled?: boolean;
 }
 
-export function useApi<T>(
+export function useApi<T = unknown>(
   loader: () => Promise<T>,
   deps: ReadonlyArray<unknown>,
   opts: UseApiOpts = {},
@@ -70,8 +70,7 @@ export function useMutation<TData, TVars>(
               const k = qq.queryKey;
               if (!Array.isArray(k)) return false;
               return k.some(
-                (part) =>
-                  typeof part === 'string' && part.includes(prefix),
+                (part) => typeof part === 'string' && part.includes(prefix),
               );
             },
           });

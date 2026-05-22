@@ -31,7 +31,12 @@ describe('IndicesController', () => {
     const data = await controller.getIndices();
     expect(data).toHaveLength(10);
     const sp = data.find((d) => d.symbol === '^GSPC');
-    expect(sp).toEqual({ name: 'S&P 500', symbol: '^GSPC', val: 5842.18, ch: 0.42 });
+    expect(sp).toEqual({
+      name: 'S&P 500',
+      symbol: '^GSPC',
+      val: 5842.18,
+      ch: 0.42,
+    });
     expect(getQuoteMock).toHaveBeenCalledTimes(10);
   });
 
