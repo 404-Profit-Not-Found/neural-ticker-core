@@ -6,6 +6,7 @@
     "dist",
     "**/*spec.ts",
     "frontend",
+    "frontend-v2",
     "scripts"
   ]
 }

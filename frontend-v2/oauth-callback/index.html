@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Signing in…</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .box {
+      text-align: center;
+      padding: 24px;
+      max-width: 360px;
+    }
+    .ok {
+      color: var(--green);
+      font-family: "Silkscreen", monospace;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+    }
+    .dim {
+      color: var(--ink-dim);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+    .bar {
+      margin: 16px auto 0;
+      width: 200px;
+      height: 8px;
+      background: var(--bg-3);
+      border: 2px solid var(--line);
+      overflow: hidden;
+      position: relative;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: var(--green);
+      width: 0;
+      animation: fill 1.2s steps(20) forwards;
+    }
+    @keyframes fill { to { width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="ok">▸ SIGN-IN OK</div>
+    <div class="dim">
+      Redirecting to NEURAL//TICKER v2…
+    </div>
+    <div class="bar"><span></span></div>
+    <div class="dim" style="margin-top: 20px; opacity: 0.6">
+      <a href="../" style="color: var(--cyan)">Click here if you're not redirected.</a>
+    </div>
+  </div>
+  <script>
+    // Wait one render frame so the bar animation kicks in, then bounce
+    // to the v2 root with a flag so the app can show a confirmation toast.
+    setTimeout(() => {
+      // strip query/hash from OAuth provider before redirect — we only need
+      // the cookie that the backend already set
+      window.location.replace("../?signed_in=1");
+    }, 900);
+  </script>
+</body>
+</html>
