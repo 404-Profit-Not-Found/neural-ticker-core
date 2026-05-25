@@ -1,4 +1,4 @@
-export type QualityTier = 'low' | 'medium' | 'high' | 'deep';
+export type QualityTier = 'low' | 'medium' | 'high' | 'deep' | 'extraction';
 
 export interface ResearchPrompt {
   question: string;

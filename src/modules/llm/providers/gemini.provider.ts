@@ -19,7 +19,7 @@ export class GeminiProvider implements ILlmProvider {
     deep: 'gemini-3-pro-preview',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
-    extraction: 'gemini-2.5-flash-lite',
+    extraction: 'gemini-3.1-flash-lite',
   };
 
   constructor(private readonly configService: ConfigService) {
@@ -42,7 +42,11 @@ export class GeminiProvider implements ILlmProvider {
       modelName.includes('thinking') || modelName.includes('pro'); // simplified check
 
     // 1. Configure Tools (Google Search)
-    const tools: Tool[] = [{ googleSearch: {} }]; // Native Grounding
+    // Extraction is a pure JSON-from-text task; grounding adds latency
+    // and is rate-limited harder on flash-lite tiers (returns 429 even with
+    // budget left for the model itself).
+    const isExtraction = prompt.quality === 'extraction';
+    const tools: Tool[] = isExtraction ? [] : [{ googleSearch: {} }];
 
     // 2. Configure Thinking (per SDK types: use thinkingBudget for depth control)
     let thinkingConfig: ThinkingConfig | undefined;
@@ -55,12 +59,16 @@ export class GeminiProvider implements ILlmProvider {
       };
     }
 
-    const config: GenerateContentConfig = {
-      tools: tools,
-      thinkingConfig: thinkingConfig,
-      systemInstruction: `You are a financial analyst performing deep research. 
+    const systemInstruction = isExtraction
+      ? `You are a strict data extraction engine. Read the provided text and output ONLY the requested JSON. Do not search the web. Do not invent fields. Use null for anything not explicitly stated in the text.`
+      : `You are a financial analyst performing deep research.
       CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge. Gather all available information and resources including news, filings, and press releases, fundamentals, and market data.
-      Context: ${JSON.stringify(prompt.numericContext)}`,
+      Context: ${JSON.stringify(prompt.numericContext)}`;
+
+    const config: GenerateContentConfig = {
+      tools: tools.length ? tools : undefined,
+      thinkingConfig: thinkingConfig,
+      systemInstruction,
     };
 
     // Retry & Fallback Logic
@@ -132,7 +140,11 @@ export class GeminiProvider implements ILlmProvider {
     currentModel = modelName;
 
     // Models available on the Primary (Free) Key
-    const freeModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    const freeModels = [
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+    ];
 
     const triedOnCurrentKey = new Set<string>();
 

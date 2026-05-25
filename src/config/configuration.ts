@@ -43,7 +43,7 @@ export default () => {
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
         extraction:
-          process.env.GEMINI_MODEL_EXTRACTION || 'gemini-2.5-flash-lite',
+          process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
       },
     },
     riskReward: {
