@@ -21,6 +21,7 @@ import { Spinner, EmptyState } from '../components/Skeletons.tsx';
 import { API } from '../lib/api.ts';
 import { MOCK } from '../lib/data.ts';
 import { useApi, invalidateQueries } from '../lib/hooks.ts';
+import { useQuery } from '@tanstack/react-query';
 import {
   useTickerHistory,
   useTickerNews,
@@ -103,6 +104,28 @@ interface Composite {
   fundamentals?: FundamentalsRow;
   ratings?: Record<string, number | undefined>;
   market_data?: { history?: unknown[] };
+}
+
+// /tickers/:sym/snapshot — used to back-fill hero numbers when the caller
+// passed in a stub Ticker (price=0, change=0) e.g. from the Alerts page.
+interface SnapshotResponse {
+  latestPrice?: {
+    open?: number;
+    close?: number;
+    high?: number;
+    low?: number;
+    volume?: number;
+    prevClose?: number;
+  };
+  quote?: {
+    c?: number;
+    d?: number;
+    dp?: number;
+    o?: number;
+    h?: number;
+    l?: number;
+  };
+  fundamentals?: FundamentalsRow;
 }
 
 interface VerdictScenario {
@@ -376,6 +399,27 @@ export function TickerDetail({ t, onBack }: TickerDetailProps) {
   const [composite] = useTickerComposite(t._live ? t.sym : null);
   const comp: Composite = (composite as Composite | undefined) ?? {};
 
+  // Stub Tickers from Alerts / push notifications arrive with price=0; hit
+  // /snapshot to recover the live numbers for the hero.
+  const needsSnapshot = !!t._live && (!t.price || t.price === 0);
+  const snapshotQuery = useQuery<SnapshotResponse>({
+    queryKey: ['ticker-snapshot', t.sym],
+    queryFn: () => API.snapshot(t.sym) as Promise<SnapshotResponse>,
+    enabled: needsSnapshot,
+    staleTime: 30_000,
+  });
+  const snap = snapshotQuery.data;
+  const snapPrice = snap?.latestPrice?.close ?? snap?.quote?.c;
+  const snapChangePct = snap?.quote?.dp;
+  const snapOpen = snap?.latestPrice?.open ?? snap?.quote?.o;
+  const snapVolume = snap?.latestPrice?.volume;
+
+  // Hero display values: prefer live snapshot when the caller's Ticker stub
+  // is empty, otherwise trust what the upstream page already gave us.
+  const heroPrice = t.price && t.price > 0 ? t.price : (snapPrice ?? 0);
+  const heroChange = t.change || snapChangePct || 0;
+  const heroOpen = snapOpen ?? heroPrice - heroChange * 0.6;
+
   // Build the verdict view-model: prefer live composite.risk_analysis, fall
   // back to MOCK for the demo flow.
   const v: LiveVerdict | typeof m.aiVerdict = comp.risk_analysis
@@ -533,18 +577,23 @@ export function TickerDetail({ t, onBack }: TickerDetailProps) {
                 fontSize: bp.mobile ? 36 : 46, fontWeight: 700, letterSpacing: "-0.04em",
                 lineHeight: 1,
               }}>
-                ${t.price.toFixed(2)}
+                ${heroPrice.toFixed(2)}
               </span>
-              <PriceDelta pct={t.change} />
+              <PriceDelta pct={heroChange} />
+              {needsSnapshot && snapshotQuery.isLoading && <Spinner />}
             </div>
             <div className="row gap-3 t-xs faint" style={{ marginTop: 2 }}>
-              <span><span className="dim">OPEN</span>&nbsp;<span className="font-mono ink">${(t.price - t.change * 0.6).toFixed(2)}</span></span>
-              <span><span className="dim">VOL</span>&nbsp;<span className="font-mono ink">12.4M</span></span>
-              <span><span className="dim">AVG</span>&nbsp;<span className="font-mono ink">9.2M</span></span>
+              <span><span className="dim">OPEN</span>&nbsp;<span className="font-mono ink">${heroOpen.toFixed(2)}</span></span>
+              <span><span className="dim">VOL</span>&nbsp;<span className="font-mono ink">{snapVolume ? formatMC(snapVolume) ?? '—' : '—'}</span></span>
+              <span><span className="dim">AVG</span>&nbsp;<span className="font-mono ink">—</span></span>
             </div>
-            {/* 52W range tucked under price */}
+            {/* 52W range tucked under price — real values from fundamentals when available */}
             <div style={{ width: "100%", maxWidth: 320, marginTop: 4 }}>
-              <RangeBar low={low * 0.85} high={high * 1.15} current={t.price} />
+              <RangeBar
+                low={fundamentals?.fifty_two_week_low ?? low * 0.85}
+                high={fundamentals?.fifty_two_week_high ?? high * 1.15}
+                current={heroPrice}
+              />
             </div>
           </div>
 
@@ -583,8 +632,11 @@ export function TickerDetail({ t, onBack }: TickerDetailProps) {
             const mc = formatMC(f.market_cap) || t.mc;
             const pe = (f.pe_ttm ?? f.trailing_pe ?? t.pe);
             const peStr = (pe != null && isFinite(Number(pe))) ? Number(pe).toFixed(1) : "—";
+            // Backend stores Finnhub's `dividendYieldIndicatedAnnual`, which
+            // is already a percentage (e.g. 0.46 = 0.46%). Don't multiply by
+            // 100 — that's what caused NVDA to render as 45.56%.
             const divYld = (f.dividend_yield != null && isFinite(Number(f.dividend_yield)))
-              ? (Number(f.dividend_yield) * 100).toFixed(2) + "%"
+              ? Number(f.dividend_yield).toFixed(2) + "%"
               : "—";
             const beta = (f.beta != null && isFinite(Number(f.beta))) ? Number(f.beta).toFixed(2) : "—";
             const eps = (f.eps_ttm != null && isFinite(Number(f.eps_ttm))) ? "$" + Number(f.eps_ttm).toFixed(2) : "—";
