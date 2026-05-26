@@ -14,7 +14,7 @@ export class GeminiProvider implements ILlmProvider {
   private client: GoogleGenAI;
 
   private readonly defaultModels = {
-    deep: 'gemini-3.1-pro',
+    deep: 'gemini-3-pro-preview',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
@@ -54,7 +54,7 @@ export class GeminiProvider implements ILlmProvider {
     // and is rate-limited harder on flash-lite tiers (returns 429 even with
     // budget left for the model itself).
     const isExtraction = prompt.quality === 'extraction';
-    const tools: Tool[] = isExtraction ? [] : [{ googleSearch: {} }];
+    const tools: Tool[] = isExtraction || isGemma ? [] : [{ googleSearch: {} }];
 
     let thinkingConfig: ThinkingConfig | undefined;
     if (isThinkingModel) {
@@ -66,7 +66,10 @@ export class GeminiProvider implements ILlmProvider {
 
     const systemInstruction = isExtraction
       ? `You are a strict data extraction engine. Read the provided text and output ONLY the requested JSON. Do not search the web. Do not invent fields. Use null for anything not explicitly stated in the text.`
-      : `You are a financial analyst performing deep research.
+      : isGemma
+        ? `You are a concise financial analyst. Answer using only the provided context — do not invent facts.
+      Context: ${JSON.stringify(prompt.numericContext)}`
+        : `You are a financial analyst performing deep research.
       CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge. Gather all available information and resources including news, filings, and press releases, fundamentals, and market data.
       Context: ${JSON.stringify(prompt.numericContext)}`;
 
