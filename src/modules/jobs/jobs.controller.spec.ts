@@ -72,9 +72,7 @@ describe('JobsController', () => {
     });
 
     it('does not throw when background scan rejects', async () => {
-      mockJobsService.runRiskRewardScanner.mockRejectedValue(
-        new Error('boom'),
-      );
+      mockJobsService.runRiskRewardScanner.mockRejectedValue(new Error('boom'));
 
       const result = controller.runRiskRewardScanner();
       expect(result).toEqual({ message: 'Risk/Reward scanner queued' });

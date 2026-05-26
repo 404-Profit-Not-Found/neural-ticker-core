@@ -49,7 +49,10 @@ export class JobsController {
     summary:
       'Trigger risk/reward scanner (Cron) - queues research for tickers with stale (>14d) or missing analysis',
   })
-  @ApiResponse({ status: 202, description: 'Scanner queued (runs in background)' })
+  @ApiResponse({
+    status: 202,
+    description: 'Scanner queued (runs in background)',
+  })
   runRiskRewardScanner() {
     void this.jobsService.runRiskRewardScanner().catch((err) => {
       this.logger.error('Risk/Reward scanner failed in background', err);
