@@ -10,10 +10,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
   ) {
+    const jwtSecret = configService.get<string>('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error(
+        'JWT_SECRET is not configured. Refusing to start with a default/empty secret — set JWT_SECRET in the environment.',
+      );
+    }
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
-        ExtractJwt.fromUrlQueryParameter('token'), // For SSE/EventSource
+        // NOTE: Intentionally no `fromUrlQueryParameter('token')`.
+        // SSE consumers (notifications stream, deep research stream) authenticate
+        // via the `authentication` cookie below (EventSource is opened with
+        // `withCredentials: true`; the deep-research stream is POST + fetch with
+        // `credentials: 'include'`). Putting JWTs in URLs would leak them into
+        // access logs, browser history, and Referer headers.
         (req: any) => {
           if (
             req &&
@@ -27,9 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') ||
-        'dev_secret_do_not_use_in_prod',
+      secretOrKey: jwtSecret,
     });
   }
 

@@ -5,13 +5,14 @@ permissions:
 
 on:
   schedule:
-    # Daily at Midnight UTC (Sync Candles, Watchers)
+    # Daily at Midnight UTC (Sync Candles, Watchers, Moderation)
     - cron: '0 0 * * *'
-    # Hourly (Risk Scanner, Posts Sync)
+    # Hourly (Risk/Reward Scanner, Posts Sync, Cleanup, Research-stale-2w trigger)
     - cron: '0 * * * *'
-    # Every 5 mins during market hours (6 AM - 9 PM UTC covers both EU and US)
+    # Every 5 mins during market hours (6 AM - 9 PM UTC, Mon-Fri)
+    # Used by: snapshot-sync (price tick) + market-hours-refresh (top picks, portfolios)
     - cron: '*/5 6-21 * * 1-5'
-    # Every 5 minutes (Digest, Queue Processing)
+    # Every 5 minutes (24/7) - daily digest, queue processor
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -22,12 +23,22 @@ jobs:
     if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Daily Candle Sync
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
       - name: Trigger Daily Watchers Sync
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-watchers -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-watchers" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
       - name: Moderate Comments (LLM)
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/social/moderation/scan -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/social/moderation/scan" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
       - name: Cleanup Old Research (>30 days)
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-old-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
@@ -37,22 +48,57 @@ jobs:
     environment: prod
     if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
+      # Triggers research for tickers with risk/reward score missing or older than 14 days.
+      # Endpoint returns 202 immediately and runs the scan in the background.
+      - name: Trigger Risk/Reward Scanner (queues stale-research >14d)
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
       - name: Trigger Hourly Posts Sync
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-posts -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-posts" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
       - name: Trigger Research Cleanup (Zombie Tickets)
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-research" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
-  # Light snapshot sync every 30 mins during market hours (Mon-Fri, 6 AM - 9 PM UTC)
+  # Light snapshot sync every 5 mins during market hours (Mon-Fri, 6 AM - 9 PM UTC)
   snapshot-sync:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '*/30 6-21 * * 1-5'
+    if: github.event.schedule == '*/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Snapshot Sync
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-snapshots -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-snapshots" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
-  # Frequent jobs (Every 5 mins)
+  # Top Picks + Portfolios refresh - only during market hours (Mon-Fri, 6-21 UTC)
+  market-hours-refresh:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: github.event.schedule == '*/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Top Picks Refresh
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/refresh-top-picks" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
+      - name: Trigger Portfolio Refresh
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/refresh-portfolios" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
+  # Frequent jobs (Every 5 mins, 24/7) - digest + queue
   frequent-jobs:
     runs-on: ubuntu-latest
     environment: prod
@@ -62,13 +108,13 @@ jobs:
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
 
       - name: Trigger Daily Digest Generation
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
 
       - name: Trigger Process Request Queue
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/process-requests -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
-
-      - name: Trigger Top Picks Refresh
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/tickers/cron/refresh-top-picks -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
-
-      - name: Trigger Portfolio Refresh
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/tickers/cron/refresh-portfolios -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/process-requests" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"

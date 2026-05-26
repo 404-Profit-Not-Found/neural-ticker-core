@@ -824,9 +824,10 @@ Title:`;
   }
 
   async onModuleInit() {
-    // On startup, any ticket still "processing" is a zombie from a previous crash/restart.
-    // In a single-instance environment, we should fail them to clear the UI.
-    await this.failStuckTickets(0);
+    // On startup, fail tickets that have been "processing" for more than an hour.
+    // Cloud Run can scale-to-zero and cold-start mid-run; using threshold > 0
+    // protects legitimate in-flight work from a previous instance during rolling restarts.
+    await this.failStuckTickets(60);
   }
 
   async failStuckTickets(staleMinutes: number = 20): Promise<number> {

@@ -42,12 +42,8 @@ export default () => {
         low: process.env.GEMINI_MODEL_LOW || 'gemini-2.5-flash-lite',
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3-flash-preview',
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3-pro-preview',
-        extraction: process.env.GEMINI_MODEL_EXTRACTION || 'gemma-4-26b-a4b-it',
-        cron: process.env.GEMINI_MODEL_CRON || 'gemini-3.1-flash-lite',
-        summary: process.env.GEMINI_MODEL_SUMMARY || 'gemma-4-26b-a4b-it',
-        recommendation:
-          process.env.GEMINI_MODEL_RECOMMENDATION || 'gemma-4-31b-it',
-        scoring: process.env.GEMINI_MODEL_SCORING || 'gemma-4-26b-a4b-it',
+        extraction:
+          process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
       },
     },
     riskReward: {

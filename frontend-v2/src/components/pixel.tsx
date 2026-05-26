@@ -125,12 +125,14 @@ export function Sparkline({
   height = 32,
   color,
   fill = true,
+  responsive = true,
 }: {
   data: number[];
   width?: number;
   height?: number;
   color?: string;
   fill?: boolean;
+  responsive?: boolean;
 }) {
   const path = useMemo(() => {
     if (!data || data.length < 2) return { line: '', area: '' };
@@ -157,12 +159,20 @@ export function Sparkline({
   return (
     <svg
       className="pixel-svg"
-      width={width}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={responsive ? 'none' : 'xMidYMid meet'}
+      width={responsive ? '100%' : width}
       height={height}
       style={{ display: 'block' }}
     >
       {fill && <path d={path.area} fill={fillColor} />}
-      <path d={path.line} fill="none" stroke={stroke} strokeWidth="2" />
+      <path
+        d={path.line}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2"
+        vectorEffect={responsive ? 'non-scaling-stroke' : undefined}
+      />
     </svg>
   );
 }

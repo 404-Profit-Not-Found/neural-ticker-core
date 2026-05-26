@@ -5,10 +5,8 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
   Request,
   UseGuards,
-  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,12 +15,14 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiBody,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { SocialService } from './social.service';
 import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
 
 @ApiTags('Social')
 @ApiBearerAuth()
@@ -129,16 +129,12 @@ export class SocialController {
   // ── Cron: LLM moderation scan ────────────────────────────────────────────
 
   @ApiOperation({ summary: 'Cron: scan pending comments with LLM moderation' })
+  @ApiHeader({ name: 'X-Cron-Secret', required: true })
   @ApiResponse({ status: 200, description: 'Moderation results' })
+  @Public()
+  @UseGuards(CronSecretGuard)
   @Post('moderation/scan')
-  async runModerationScan(@Headers('x-cron-secret') secret: string) {
-    this.validateCronSecret(secret);
+  async runModerationScan() {
     return this.socialService.moderatePendingComments();
-  }
-
-  private validateCronSecret(secret: string) {
-    if (!secret || secret !== process.env.CRON_SECRET) {
-      throw new UnauthorizedException('Invalid Cron Secret');
-    }
   }
 }

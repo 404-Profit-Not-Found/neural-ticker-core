@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Post,
-  Body,
-  Query,
-  UnauthorizedException,
-  Headers,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -16,13 +7,11 @@ import {
   ApiParam,
   ApiBearerAuth,
   ApiQuery,
-  ApiHeader,
 } from '@nestjs/swagger';
 import { MarketDataService } from './market-data.service';
 import { MarketStatusService } from './market-status.service';
 
 import { Public } from '../auth/public.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
@@ -32,12 +21,6 @@ export class MarketDataController {
     private readonly service: MarketDataService,
     private readonly marketStatusService: MarketStatusService,
   ) {}
-
-  private validateSecret(secret: string) {
-    if (secret !== process.env.CRON_SECRET) {
-      throw new UnauthorizedException('Invalid Cron Secret');
-    }
-  }
 
   @ApiOperation({
     summary: 'Get latest snapshot (price + fundamentals)',
@@ -192,38 +175,6 @@ export class MarketDataController {
       // Return empty array if news fetch fails (ticker may not have news coverage)
       return [];
     });
-  }
-
-  @ApiOperation({
-    summary: 'Trigger Portfolio Refresh (Cron)',
-    description:
-      'Triggers the active portfolio refresh logic. Used by external schedulers (GitHub Actions).',
-  })
-  @ApiResponse({ status: 200, description: 'Refresh triggered.' })
-  @Post('cron/refresh-portfolios')
-  @Public()
-  @ApiHeader({ name: 'X-Cron-Secret', required: true })
-  @Roles('admin')
-  async triggerPortfolioRefresh(@Headers('X-Cron-Secret') secret: string) {
-    this.validateSecret(secret);
-    // Fire and forget or await? Await is safer for serverless timeouts.
-    await this.service.updateActivePortfolios();
-    return { status: 'ok', message: 'Portfolio refresh triggered' };
-  }
-
-  @ApiOperation({
-    summary: 'Trigger Top Picks Refresh (Cron)',
-    description:
-      'Triggers the top picks refresh logic. Used by external schedulers (GitHub Actions).',
-  })
-  @Post('cron/refresh-top-picks')
-  @Public()
-  @ApiHeader({ name: 'X-Cron-Secret', required: true })
-  @Roles('admin')
-  async triggerTopPicksRefresh(@Headers('X-Cron-Secret') secret: string) {
-    this.validateSecret(secret);
-    await this.service.refreshTopPicks();
-    return { status: 'ok', message: 'Top Picks refresh triggered' };
   }
 
   @ApiOperation({

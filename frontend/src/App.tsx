@@ -122,6 +122,9 @@ function App() {
 
             {/* Redirect Legacy Route */}
             <Route path="/dashboard/ticker/:symbol" element={<Navigate to="/ticker/:symbol" replace />} />
+
+            {/* Catch-all: unknown URLs go home (ProtectedRoute handles auth redirect) */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </ToastProvider>
         </CurrencyProvider>
