@@ -5,6 +5,8 @@ import {
   Query,
   Inject,
   forwardRef,
+  ServiceUnavailableException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CurrencyService } from './currency.service';
@@ -101,24 +103,24 @@ export class CurrencyController {
   ) {
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum)) {
-      return { error: 'Invalid amount' };
+      throw new BadRequestException('Invalid amount');
     }
 
-    const converted = await this.currencyService.convert(
-      amountNum,
-      from.toUpperCase(),
-      to.toUpperCase(),
-    );
-    const rate = await this.currencyService.getRate(
-      from.toUpperCase(),
-      to.toUpperCase(),
-    );
+    const fromCode = from.toUpperCase();
+    const toCode = to.toUpperCase();
+
+    const rate = await this.currencyService.getRate(fromCode, toCode);
+    if (rate === null) {
+      throw new ServiceUnavailableException(
+        `Exchange rate for ${fromCode}/${toCode} unavailable`,
+      );
+    }
 
     return {
-      from: from.toUpperCase(),
-      to: to.toUpperCase(),
+      from: fromCode,
+      to: toCode,
       amount: amountNum,
-      converted,
+      converted: amountNum * rate,
       rate,
     };
   }

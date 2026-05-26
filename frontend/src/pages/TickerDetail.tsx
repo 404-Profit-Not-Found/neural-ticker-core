@@ -795,6 +795,7 @@ export function TickerDetail() {
                 key={`${symbol}-${isAlertDialogOpen}`}
                 symbol={symbol || ''}
                 currentPrice={(tickerData as TickerData)?.market_data?.price ?? 0}
+                nativeCurrency={(tickerData as TickerData)?.profile?.currency || 'USD'}
                 open={isAlertDialogOpen}
                 onOpenChange={setIsAlertDialogOpen}
             />

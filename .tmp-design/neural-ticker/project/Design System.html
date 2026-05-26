@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07090f" />
+  <title>NEURAL//TICKER — Design System</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.png" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="src/data.js"></script>
+  <script type="text/babel" src="src/components.jsx"></script>
+  <script type="text/babel" src="src/skeletons.jsx"></script>
+  <script type="text/babel" src="src/design-system.jsx"></script>
+  <script type="text/babel">
+    const { useState: useStateDSApp, useEffect: useEffectDSApp } = React;
+
+    // Mini top-bar with palette switcher so DS can demo all themes
+    const PALETTE_LIST = [
+      ["neural",   "NEURAL"],
+      ["phosphor", "PHOSPHOR"],
+      ["amber",    "AMBER"],
+      ["cyber",    "CYBER"],
+      ["matrix",   "MATRIX"],
+      ["graphite", "GRAPHITE"],
+      ["paper",    "PAPER"]
+    ];
+
+    function applyPaletteDS(name) {
+      const p = window.PALETTES_DS_INLINE[name];
+      const root = document.documentElement;
+      Object.entries(p).forEach(([k, v]) => root.style.setProperty(k, v));
+      document.body.setAttribute("data-light", name === "paper" ? "1" : "0");
+      document.body.setAttribute("data-palette", name);
+    }
+
+    function DSApp() {
+      const [palette, setPalette] = useStateDSApp("neural");
+      useEffectDSApp(() => { applyPaletteDS(palette); }, [palette]);
+
+      return (
+        <div className="app-root">
+          <header style={{
+            background: "var(--bg-1)",
+            borderBottom: "2px solid var(--line)",
+            padding: "0 20px",
+            position: "sticky",
+            top: 0,
+            zIndex: 50
+          }}>
+            <div className="row" style={{ alignItems: "center", gap: 12, height: 52, flexWrap: "wrap" }}>
+              <div className="row gap-2" style={{ alignItems: "center" }}>
+                <div style={{
+                  width: 24, height: 24,
+                  background: "var(--amber)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 0 0 2px var(--amber-dark), inset 0 -2px 0 0 rgba(0,0,0,0.25)"
+                }}>
+                  <span style={{ fontFamily: "Silkscreen", fontSize: 13, color: "#1a1200", fontWeight: 700 }}>N</span>
+                </div>
+                <span style={{ fontFamily: "Silkscreen", fontSize: 12, letterSpacing: "0.04em" }}>
+                  DESIGN SYSTEM
+                </span>
+              </div>
+              <a href="Neural Ticker.html" className="pxl-btn sm" style={{ textDecoration: "none" }}>◀ BACK TO APP</a>
+              <div style={{ flex: 1 }} />
+              <div className="row gap-1" style={{ flexWrap: "wrap" }}>
+                {PALETTE_LIST.map(([k, lbl]) => (
+                  <button
+                    key={k}
+                    className="pxl-btn sm"
+                    onClick={() => setPalette(k)}
+                    style={{
+                      color: palette === k ? "var(--amber)" : "var(--ink-dim)",
+                      borderColor: palette === k ? "var(--amber)" : "var(--line)"
+                    }}
+                  >{lbl}</button>
+                ))}
+              </div>
+            </div>
+          </header>
+          <DesignSystem />
+          <div className="crt-bg" />
+          <div className="crt-vignette" />
+        </div>
+      );
+    }
+
+    // Cache palette table on window for top-bar access
+    window.PALETTES_DS_INLINE = window.PALETTES_DS_INLINE || PALETTES_DS;
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<DSApp />);
+  </script>
+</body>
+</html>

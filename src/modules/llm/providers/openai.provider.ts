@@ -50,10 +50,9 @@ export class OpenAiProvider implements ILlmProvider {
     }
   }
 
-  private resolveModel(
-    quality: 'low' | 'medium' | 'high' | 'deep' = 'medium',
-  ): string {
+  private resolveModel(quality?: string): string {
     const models = this.configService.get('openai.models');
-    return models[quality] || 'gpt-4o';
+    const key = quality && models[quality] ? quality : 'medium';
+    return models[key] || 'gpt-4o';
   }
 }

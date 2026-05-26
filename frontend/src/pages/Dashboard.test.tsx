@@ -27,6 +27,7 @@ vi.mock('../context/CurrencyContext', () => ({
     useCurrency: () => ({
         displayCurrency: 'USD',
         formatCurrency: (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val),
+        formatNative: (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val),
         convert: (amount: number) => amount,
         rates: {},
         loading: false,

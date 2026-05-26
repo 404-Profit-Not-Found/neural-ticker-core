@@ -40,6 +40,9 @@ jobs:
             -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
             -H "Content-Type:application/json"
 
+      - name: Cleanup Old Research (>30 days)
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-old-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
   hourly-jobs:
     runs-on: ubuntu-latest
     environment: prod
@@ -101,6 +104,9 @@ jobs:
     environment: prod
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
+      - name: Trigger Risk/Reward Scanner (5 tickers per run)
+        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
+
       - name: Trigger Daily Digest Generation
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest" \

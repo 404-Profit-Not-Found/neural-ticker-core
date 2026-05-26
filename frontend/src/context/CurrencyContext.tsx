@@ -13,7 +13,14 @@ interface CurrencyContextType {
   availableCurrencies: AvailableCurrency[];
   rates: Record<string, number>;
   convert: (amount: number, from: string, to?: string) => number;
+  /** Formats `amount` using the supplied currency code (no conversion). */
   formatCurrency: (amount: number, currency?: string) => string;
+  /**
+   * Converts `amount` from `fromCurrency` to displayCurrency and formats it.
+   * Falls back to formatting in the native currency if a rate is missing,
+   * so the displayed number is never misleading.
+   */
+  formatNative: (amount: number, fromCurrency?: string) => string;
   loading: boolean;
 }
 
@@ -77,19 +84,25 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const convert = useCallback((amount: number, from: string, to?: string): number => {
-    const targetCurrency = to || displayCurrency;
-    if (from === targetCurrency) return amount;
+  const tryConvert = useCallback(
+    (amount: number, from: string, to: string): number | null => {
+      if (from === to) return amount;
+      const fromRate = from === 'USD' ? 1 : rates[from];
+      const toRate = to === 'USD' ? 1 : rates[to];
+      if (!fromRate || !toRate) return null;
+      return amount * (toRate / fromRate);
+    },
+    [rates],
+  );
 
-    // Rates are relative to USD
-    const fromRate = from === 'USD' ? 1 : rates[from];
-    const toRate = targetCurrency === 'USD' ? 1 : rates[targetCurrency];
-
-    if (!fromRate || !toRate) return amount;
-
-    // Convert: amount in 'from' to USD, then to 'to'
-    return amount * (toRate / fromRate);
-  }, [displayCurrency, rates]);
+  const convert = useCallback(
+    (amount: number, from: string, to?: string): number => {
+      const target = to || displayCurrency;
+      const result = tryConvert(amount, from, target);
+      return result ?? amount;
+    },
+    [displayCurrency, tryConvert],
+  );
 
   const formatCurrency = useCallback((amount: number, currency?: string): string => {
     const curr = currency || displayCurrency;
@@ -101,6 +114,21 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }).format(amount);
   }, [displayCurrency]);
 
+  const formatNative = useCallback(
+    (amount: number, fromCurrency?: string): string => {
+      const native = (fromCurrency || displayCurrency).toUpperCase();
+      if (native === displayCurrency) {
+        return formatCurrency(amount, displayCurrency);
+      }
+      const converted = tryConvert(amount, native, displayCurrency);
+      if (converted === null) {
+        return formatCurrency(amount, native);
+      }
+      return formatCurrency(converted, displayCurrency);
+    },
+    [displayCurrency, tryConvert, formatCurrency],
+  );
+
   return (
     <CurrencyContext.Provider
       value={{
@@ -110,6 +138,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         rates,
         convert,
         formatCurrency,
+        formatNative,
         loading,
       }}
     >

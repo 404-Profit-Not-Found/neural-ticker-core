@@ -49,7 +49,7 @@ export default () => {
     riskReward: {
       enabled: process.env.RRSCORE_ENABLED !== 'false',
       cron: process.env.RRSCORE_CRON_EXPRESSION || '0 * * * *',
-      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '168', 10),
+      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '24', 10),
       batchSize: parseInt(process.env.RRSCORE_BATCH_SIZE || '50', 10),
       provider: process.env.RRSCORE_PROVIDER || 'gemini',
     },

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { JobsService } from './jobs.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { TickersService } from '../tickers/tickers.service';
@@ -73,6 +74,10 @@ describe('JobsService', () => {
           useValue: {
             updateActivePortfolios: jest.fn().mockResolvedValue(undefined),
           },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue(24) },
         },
       ],
     }).compile();

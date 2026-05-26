@@ -61,7 +61,7 @@ export class QualityScoringService {
     try {
       const result = await this.llmService.generateResearch({
         question: prompt,
-        quality: 'low', // Reverted to 'low' (Flash-Lite) per user request for cost efficiency
+        quality: 'scoring', // Gemma 4 26B: 1500 RPD free, unlimited TPM, no search needed
         provider: 'gemini',
         tickers: [],
         numericContext: {},

@@ -685,7 +685,7 @@ Title:`;
         question: titlePrompt,
         tickers: [],
         numericContext: {},
-        quality: 'low' as QualityTier, // Fast, cheap call
+        quality: 'scoring' as QualityTier, // Gemma 4 26B: 1500 RPD free
         provider: 'gemini',
         maxTokens: 50,
       });
@@ -854,6 +854,74 @@ Title:`;
 
     this.logger.warn(`Cleaned up ${stuckNotes.length} stuck research tickets.`);
     return stuckNotes.length;
+  }
+
+  async getNewsSummary(symbol: string): Promise<{
+    symbol: string;
+    summary: string;
+    sources: any[];
+    cachedAt: Date;
+  }> {
+    // Step 1: Gemini Flash with googleSearch fetches fresh news
+    const searchPrompt = `Find the 5 most important news items, earnings, analyst actions, or filings from the past 7 days for ${symbol}. Include source URLs.`;
+    const searchResult = await this.llmService.generateResearch({
+      question: searchPrompt,
+      tickers: [symbol],
+      numericContext: {},
+      quality: 'medium', // Gemini Flash with search grounding (1.5K/day)
+      provider: 'gemini',
+      maxTokens: 2000,
+    });
+
+    // Step 2: Gemma 26B summarizes the gathered content (no search needed)
+    const summaryPrompt = `Based on the news items below, produce a tight 4-bullet summary for ${symbol} investors. Each bullet: one fact + 1-line implication.
+
+NEWS:
+${searchResult.answerMarkdown}
+
+OUTPUT (strict Markdown):
+- **[Headline]**: [implication]
+- **[Headline]**: [implication]
+- **[Headline]**: [implication]
+- **[Headline]**: [implication]`;
+
+    const summaryResult = await this.llmService.generateResearch({
+      question: summaryPrompt,
+      tickers: [symbol],
+      numericContext: {},
+      quality: 'summary', // Gemma 4 26B (1500 RPD free)
+      provider: 'gemini',
+      maxTokens: 600,
+    });
+
+    return {
+      symbol,
+      summary: summaryResult.answerMarkdown,
+      sources: searchResult.groundingMetadata?.groundingChunks || [],
+      cachedAt: new Date(),
+    };
+  }
+
+  async deleteOldResearch(maxAgeDays: number = 30): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+
+    const result = await this.noteRepo
+      .createQueryBuilder()
+      .delete()
+      .from(ResearchNote)
+      .where('status IN (:...statuses)', {
+        statuses: [ResearchStatus.COMPLETED, ResearchStatus.FAILED],
+      })
+      .andWhere('created_at < :cutoff', { cutoff })
+      .execute();
+
+    const deleted = result.affected || 0;
+    if (deleted > 0) {
+      this.logger.log(
+        `Purged ${deleted} research notes older than ${maxAgeDays} days.`,
+      );
+    }
+    return deleted;
   }
 
   // --- STREAMING & DEEP RESEARCH IMPLEMENTATION ---

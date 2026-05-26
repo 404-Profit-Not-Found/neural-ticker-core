@@ -13,14 +13,18 @@ export class GeminiProvider implements ILlmProvider {
   private readonly logger = new Logger(GeminiProvider.name);
   private client: GoogleGenAI;
 
-  // Cost-effective models with Google Search grounding (no Gemini 3 Pro costs)
-  // Cost-effective models with Google Search grounding
   private readonly defaultModels = {
-    deep: 'gemini-3-pro-preview',
+    deep: 'gemini-3.1-pro',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
   };
+
+  // Gemma models don't support Google Search grounding or thinking
+  private readonly gemmaModels = new Set([
+    'gemma-4-26b-a4b-it',
+    'gemma-4-31b-it',
+  ]);
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
@@ -34,12 +38,12 @@ export class GeminiProvider implements ILlmProvider {
       prompt.apiKey || this.configService.get<string>('gemini.apiKey');
     if (!apiKey) throw new Error('Gemini API Key not configured');
 
-    // Re-initialize client if a custom key is provided (or rely on singleton)
     const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
 
     const modelName = this.resolveModel(prompt.quality);
+    const isGemma = this.gemmaModels.has(modelName);
     const isThinkingModel =
-      modelName.includes('thinking') || modelName.includes('pro'); // simplified check
+      !isGemma && (modelName.includes('thinking') || modelName.includes('pro'));
 
     // 1. Configure Tools (Google Search)
     // Extraction is a pure JSON-from-text task; grounding adds latency
@@ -48,11 +52,8 @@ export class GeminiProvider implements ILlmProvider {
     const isExtraction = prompt.quality === 'extraction';
     const tools: Tool[] = isExtraction ? [] : [{ googleSearch: {} }];
 
-    // 2. Configure Thinking (per SDK types: use thinkingBudget for depth control)
     let thinkingConfig: ThinkingConfig | undefined;
-
     if (isThinkingModel) {
-      // Default thinking budget for pro/flash models
       thinkingConfig = {
         includeThoughts: true,
         thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
@@ -272,17 +273,23 @@ export class GeminiProvider implements ILlmProvider {
     // Default to 'medium' if quality is not specified
     if (!quality) return models.medium;
 
-    // Map quality to config key
     switch (quality) {
       case 'deep':
         return models.deep;
       case 'high':
-        // Fallback for 'high' if code still uses it, map to deep or medium? Map to deep as it was previously.
         return models.deep;
       case 'low':
         return models.low;
       case 'extraction':
         return models.extraction;
+      case 'cron':
+        return models.cron;
+      case 'summary':
+        return models.summary;
+      case 'recommendation':
+        return models.recommendation;
+      case 'scoring':
+        return models.scoring;
       case 'medium':
       default:
         return models.medium;

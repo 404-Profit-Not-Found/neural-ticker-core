@@ -155,9 +155,16 @@ export class PortfolioService implements OnModuleInit {
             displayCurrency,
           );
 
+          if (rate === null) {
+            return {
+              ...pos,
+              display_currency: displayCurrency,
+              conversion_unavailable: true,
+            };
+          }
+
           return {
             ...pos,
-            // Preserve original native values
             original_currency: pos.currency,
             original_current_price: pos.current_price,
             original_current_value: pos.current_value,
@@ -165,7 +172,6 @@ export class PortfolioService implements OnModuleInit {
             original_gain_loss: pos.gain_loss,
             original_buy_price: pos.buy_price,
 
-            // Overwrite with converted values for consistent aggregation
             currency: displayCurrency,
             current_price: pos.current_price * rate,
             current_value: pos.current_value * rate,
@@ -337,6 +343,63 @@ export class PortfolioService implements OnModuleInit {
       order: { createdAt: 'DESC' },
       take: 20,
     });
+  }
+
+  async getQuickRecommendation(userId: string): Promise<{
+    recommendation: string;
+    model: string;
+    positions: number;
+  }> {
+    const portfolio = await this.findAll(userId);
+    if (portfolio.length === 0) {
+      return {
+        recommendation:
+          'No positions yet. Add stocks to your portfolio to get recommendations.',
+        model: 'none',
+        positions: 0,
+      };
+    }
+
+    const portfolioSummary = portfolio
+      .map(
+        (p) =>
+          `- ${p.symbol}: ${p.shares} shares @ $${p.buy_price} (Now: $${p.current_price.toFixed(2)}, G/L: ${p.gain_loss_percent.toFixed(2)}%)`,
+      )
+      .join('\n');
+
+    const prompt = `Analyze this portfolio and give 3 concise, actionable recommendations.
+
+PORTFOLIO:
+${portfolioSummary}
+
+OUTPUT FORMAT (strict Markdown):
+### Diversification
+[1 sentence assessment]
+
+### Risk Flags
+[1-2 sentences on concentration / drawdown risks]
+
+### Next Moves
+1. [Specific action: Trim/Add/Hold + ticker + 1-line rationale]
+2. [Specific action: Trim/Add/Hold + ticker + 1-line rationale]
+3. [Specific action: Trim/Add/Hold + ticker + 1-line rationale]
+
+Keep total under 150 words. Be direct, no boilerplate.`;
+
+    const result = await this.llmService.generateResearch({
+      question: prompt,
+      tickers: portfolio.map((p) => p.symbol),
+      numericContext: {},
+      quality: 'recommendation',
+      provider: 'gemini',
+      maxTokens: 400,
+    });
+
+    return {
+      recommendation: result.answerMarkdown,
+      model: result.models[0] || 'gemma-4-31b-it',
+      positions: portfolio.length,
+    };
   }
 
   private getRiskInstructions(riskAppetite: string) {

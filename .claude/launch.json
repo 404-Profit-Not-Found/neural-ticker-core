@@ -14,6 +14,21 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5173,
       "cwd": "frontend"
+    },
+    {
+      "name": "frontend-v2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5273,
+      "cwd": "frontend-v2"
+    },
+    {
+      "name": "backend-v2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/main"],
+      "env": { "PORT": "8082" },
+      "port": 8082,
+      "autoPort": false
     }
   ]
 }

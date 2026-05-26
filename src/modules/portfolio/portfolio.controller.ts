@@ -105,4 +105,12 @@ export class PortfolioController {
   getAnalyses(@Req() req: AuthenticatedRequest) {
     return this.portfolioService.getAnalyses(req.user.id);
   }
+
+  @Get('quick-recommendation')
+  @ApiOperation({
+    summary: 'Free Gemma-powered quick portfolio recommendation (no credits)',
+  })
+  getQuickRecommendation(@Req() req: AuthenticatedRequest) {
+    return this.portfolioService.getQuickRecommendation(req.user.id);
+  }
 }

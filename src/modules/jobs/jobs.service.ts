@@ -13,8 +13,9 @@ import {
   RequestStatus,
   RequestType,
 } from './entities/request-queue.entity'; // Added
-import { InjectRepository } from '@nestjs/typeorm'; // Added
-import { Repository, LessThanOrEqual } from 'typeorm'; // Added
+import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
+import { Repository, LessThanOrEqual } from 'typeorm';
 
 @Injectable()
 export class JobsService {
@@ -34,6 +35,7 @@ export class JobsService {
     private readonly requestQueueRepo: Repository<RequestQueue>,
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
+    private readonly configService: ConfigService,
   ) {}
 
   async cleanupStuckResearch() {
@@ -245,18 +247,25 @@ export class JobsService {
       throw e;
     }
   }
-  @Cron(CronExpression.EVERY_WEEK)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   private async runRiskRewardScannerCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
     await this.runRiskRewardScanner();
   }
 
   async runRiskRewardScanner() {
-    this.logger.log('Starting sequential batch risk/reward scanner...');
+    const maxAgeHours =
+      this.configService.get<number>('riskReward.maxAgeHours') || 24;
+    this.logger.log(
+      `Starting risk/reward scanner (cron tier, staleness: ${maxAgeHours}h)...`,
+    );
     try {
       const tickers = await this.tickersService.getAllTickers();
-      const BATCH_SIZE = 15;
-      const MAX_BATCHES = 3; // Process 3 batches per run (45 tickers max)
+      // Frequent + small: 5 tickers per run × every 5 min
+      // = ~25s work per run, completes 150 stocks in ~2.5h
+      const BATCH_SIZE = 5;
+      const MAX_BATCHES = 1;
+      const DELAY_MS = 4500; // ~13 RPM to stay safely under 15 RPM
 
       const totalBatches = Math.min(
         Math.ceil(tickers.length / BATCH_SIZE),
@@ -269,7 +278,7 @@ export class JobsService {
 
       let totalProcessed = 0;
       let totalSkipped = 0;
-      const interval14Days = 14 * 24 * 60 * 60 * 1000;
+      const stalenessMs = maxAgeHours * 60 * 60 * 1000;
 
       for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
         const startIdx = batchNum * BATCH_SIZE;
@@ -292,23 +301,22 @@ export class JobsService {
 
             const isStale =
               !existingAnalysis ||
-              Date.now() - existingAnalysis.created_at.getTime() >
-                interval14Days;
+              Date.now() - existingAnalysis.created_at.getTime() > stalenessMs;
 
             if (!isStale) {
               batchSkipped++;
               continue;
             }
 
-            this.logger.log(`Queueing Low-Tier Scan for ${symbol}...`);
+            this.logger.log(`Queueing Cron-Tier Scan for ${symbol}...`);
 
             const note = await this.researchService.createResearchTicket(
               null,
               [symbol],
               `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
-      
+
       CRITICAL INSTRUCTION:
-      You MUST act as a data gatherer. 
+      You MUST act as a data gatherer.
       Check for and explicitly mention the following in your analysis if available or estimate/search for them:
       - Company Description (2-3 sentences, about the business model and key products)
       - Revenue Growth (YoY)
@@ -321,11 +329,14 @@ export class JobsService {
       Then provide a Risk/Reward Score (0-10) and a succinct summary.
       `,
               'gemini',
-              'low',
+              'cron',
             );
 
             await this.researchService.processTicket(note.id);
             batchProcessed++;
+
+            // Rate limit: 15 RPM on free tier = ~4.5s between calls
+            await new Promise((r) => setTimeout(r, DELAY_MS));
           } catch (err) {
             this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
           }
@@ -509,6 +520,26 @@ export class JobsService {
       return result;
     } catch (e) {
       this.logger.error('Currency backfill failed', e);
+      throw e;
+    }
+  }
+
+  // --- RESEARCH RETENTION CLEANUP (30 days) ---
+
+  @Cron(CronExpression.EVERY_DAY_AT_4AM)
+  private async cleanupOldResearchCron() {
+    if (!this.isDevMode) return;
+    await this.cleanupOldResearch();
+  }
+
+  async cleanupOldResearch() {
+    this.logger.log('Starting old research cleanup (>30 days)...');
+    try {
+      const deleted = await this.researchService.deleteOldResearch(30);
+      this.logger.log(`Research cleanup complete. Deleted: ${deleted}`);
+      return { deleted };
+    } catch (e) {
+      this.logger.error('Research cleanup failed', e);
       throw e;
     }
   }
