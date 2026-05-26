@@ -53,7 +53,7 @@ async function main() {
       : process.env.GEMINI_API_KEY;
   if (!key) throw new Error(`No key for ${which}`);
   const client = new GoogleGenAI({ apiKey: key });
-  console.log(`Testing on ${which.toUpperCase()} key (suffix ...${key.slice(-4)})\n`);
+  console.log(`Testing on ${which.toUpperCase()} key\n`);
 
   console.log('Model'.padEnd(34), 'grounded'.padEnd(40), 'baseline (no tools)');
   console.log('-'.repeat(108));
