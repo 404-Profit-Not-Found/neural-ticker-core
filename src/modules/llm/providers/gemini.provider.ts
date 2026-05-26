@@ -14,7 +14,7 @@ export class GeminiProvider implements ILlmProvider {
   private client: GoogleGenAI;
 
   private readonly defaultModels = {
-    deep: 'gemini-3-pro-preview',
+    deep: 'gemini-3.1-pro',
     medium: 'gemini-2.5-flash',
     low: 'gemini-2.5-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
