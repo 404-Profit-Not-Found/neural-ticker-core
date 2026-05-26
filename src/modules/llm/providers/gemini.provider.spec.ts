@@ -91,7 +91,7 @@ describe('GeminiProvider', () => {
       expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'user-key' });
     });
 
-    it('should use gemini-3.1-pro for "deep" quality', async () => {
+    it('should use gemini-3.1-pro-preview for "deep" quality', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Deep Response',
         candidates: [],
@@ -101,7 +101,7 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.1-pro',
+          model: 'gemini-3.1-pro-preview',
           config: expect.objectContaining({
             tools: expect.arrayContaining([{ googleSearch: {} }]),
           }),
