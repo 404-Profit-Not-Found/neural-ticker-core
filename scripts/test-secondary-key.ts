@@ -24,8 +24,7 @@ async function main() {
     console.log('No GEMINI_API_KEY_SECONDARY set');
     return;
   }
-  console.log('Secondary key length:', key.length);
-  console.log('Secondary key prefix:', key.slice(0, 6) + '...' + key.slice(-3));
+  console.log('GEMINI_API_KEY_SECONDARY is set; running endpoint checks.');
 
   await call(
     'listModels',
