@@ -1,5 +1,6 @@
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/api';
+import { useCurrency } from '../../context/CurrencyContext';
 
 interface MiniTickerTileProps {
     symbol: string;
@@ -13,7 +14,8 @@ interface MiniTickerTileProps {
 }
 
 export function MiniTickerTile({ symbol, company, price, change, changeAmount, riskScore, href, currency = 'USD' }: MiniTickerTileProps) {
-    const fmt = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(val);
+    const { formatNative } = useCurrency();
+    const fmt = (val: number) => formatNative(val, currency);
     return (
         <a
             href={href}

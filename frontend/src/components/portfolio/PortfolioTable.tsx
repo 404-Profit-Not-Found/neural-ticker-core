@@ -80,7 +80,7 @@ const formatPct = (val: number) =>
 
 export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
-    const { displayCurrency } = useCurrency();
+    const { displayCurrency, formatNative } = useCurrency();
     const columnHelper = createColumnHelper<Position>();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,23 +183,19 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: () => <span className="hidden md:inline">Position</span>,
             cell: (info) => {
                 const row = info.row.original;
-                const buyPrice = Number(row.original_current_price ? Number(row.original_cost_basis) / Number(row.shares) : row.buy_price); 
-                // Note: buy_price might not have an original_buy_price field, but cost_basis does. 
-                // Simpler: Just use buy_price unless we want to be super precise about cost basis currency.
-                // Actually, buy_price is usually stored in native currency. Check PortfolioService.
-                // create() stores it. findAll returns it.
-                // The conversion logic converts cost_basis.
-                // If we want to show 'Avg: $X', X should be in the same currency as Value.
-                // Since Value is Native, Avg should be Native.
-                // 'pos.buy_price' IS native in the DB.
-                // So plain 'buy_price' is correct!
-                
-                const currency = row.original_currency || 'USD';
+                // buy_price is stored native; if backend converted the row, native lives in
+                // original_currency. Convert to displayCurrency so Avg matches the rest of the row.
+                const nativeCurrency = row.original_currency || row.currency || 'USD';
+                const nativeBuyPrice = Number(
+                    row.original_current_price
+                        ? Number(row.original_cost_basis) / Number(row.shares)
+                        : row.buy_price,
+                );
 
                 return (
                     <div className="hidden md:flex flex-col min-w-[80px]">
                         <span className="text-sm font-bold">{Number(info.getValue()).toFixed(2)} sh</span>
-                        <span className="text-xs text-muted-foreground">Avg: {formatCurrency(buyPrice, currency)}</span>
+                        <span className="text-xs text-muted-foreground">Avg: {formatNative(nativeBuyPrice, nativeCurrency)}</span>
                     </div>
                 );
             }

@@ -4,6 +4,7 @@ import { MarketDataController } from './market-data.controller';
 import { MarketStatusController } from './market-status.controller';
 import { MarketDataBulkController } from './market-data-bulk.controller';
 import { StatsController } from './stats.controller';
+import { IndicesController } from './indices.controller';
 import { MarketDataService } from './market-data.service';
 import { MarketStatusService } from './market-status.service';
 import { PriceOhlcv } from './entities/price-ohlcv.entity';
@@ -51,6 +52,7 @@ import { PriceAlertsModule } from '../price-alerts/price-alerts.module';
     MarketDataBulkController,
     NewsController,
     StatsController,
+    IndicesController,
   ],
   providers: [MarketDataService, MarketStatusService],
   exports: [MarketDataService, MarketStatusService],

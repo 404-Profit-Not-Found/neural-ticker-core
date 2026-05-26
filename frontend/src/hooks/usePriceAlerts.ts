@@ -18,6 +18,7 @@ export interface PriceAlert {
     symbol: string;
     name: string;
     logo_url?: string;
+    currency?: string;
   };
 }
 

@@ -15,14 +15,12 @@ import {
     ArrowUp,
     ArrowDown,
     Brain,
-    ShieldCheck,
-    AlertTriangle,
-    Flame,
     Newspaper,
     Search,
     MessageCircle,
     Trash2
 } from 'lucide-react';
+import { RiskBar } from '../ui/RiskBar';
 import {
     Tooltip,
     TooltipContent,
@@ -40,6 +38,7 @@ import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from "./FiftyTwoWeekRange";
 import { Sparkline } from "../ui/Sparkline";
 import { FavoriteStar } from '../watchlist/FavoriteStar';
+import { useCurrency } from '../../context/CurrencyContext';
 
 // --- Types (Matched from WatchlistTable.tsx) ---
 export interface TickerData {
@@ -94,6 +93,7 @@ export function WatchlistTableView({
     tableRef
 }: WatchlistTableViewProps) {
     const navigate = useNavigate();
+    const { formatNative } = useCurrency();
 
     const columns = useMemo(() => {
         const columnHelper = createColumnHelper<TickerData>();
@@ -189,11 +189,7 @@ export function WatchlistTableView({
                     if (!price) return '-';
 
                     const isPositive = (change || 0) >= 0;
-                    const formattedPrice = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: currency || 'USD',
-                        minimumFractionDigits: 2
-                    }).format(price);
+                    const formattedPrice = formatNative(price, currency || 'USD');
 
                     return (
                         <div className="flex flex-col items-end">
@@ -263,25 +259,9 @@ export function WatchlistTableView({
 
             // 5. Financial Risk
             columnHelper.accessor((row) => row.riskScore, {
-                id: 'financial_risk', // Sort key matching
+                id: 'financial_risk',
                 header: 'Risk',
-                cell: (info) => {
-                    const val = info.getValue();
-                    if (val === undefined || val === null) return '-';
-
-                    let colorClass = 'text-muted-foreground';
-                    let Icon = ShieldCheck;
-                    if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
-                    else if (val <= 6.5) { colorClass = 'text-yellow-500'; Icon = AlertTriangle; }
-                    else { colorClass = 'text-red-500'; Icon = Flame; }
-
-                    return (
-                        <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
-                            <Icon size={14} />
-                            {Number(val).toFixed(1)}
-                        </span>
-                    );
-                },
+                cell: (info) => <RiskBar value={info.getValue()} />,
             }),
 
             // 5.5 Risk/Reward (Overall Score)

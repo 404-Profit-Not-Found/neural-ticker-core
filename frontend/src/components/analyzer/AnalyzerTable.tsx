@@ -32,6 +32,7 @@ import { Sparkline } from "../ui/Sparkline";
 import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 import { FilterBar, type AnalyzerFilters } from './FilterBar';
+import { useCurrency } from '../../context/CurrencyContext';
 
 export interface AnalyzerTableProps {
   filters?: AnalyzerFilters;
@@ -52,6 +53,7 @@ export function AnalyzerTable({
   onViewModeChange,
 }: AnalyzerTableProps) {
   const navigate = useNavigate();
+  const { formatNative } = useCurrency();
 
   // UI State
   const [page, setPage] = useState(1);
@@ -178,7 +180,7 @@ export function AnalyzerTable({
         return (
           <div className="flex flex-col items-end">
             <span className="text-sm font-mono font-medium text-foreground/70">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(price)}
+              {formatNative(price, currency)}
             </span>
             {change !== undefined && change !== null ? (
               <div className={cn("flex items-center text-xs font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>

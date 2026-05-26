@@ -86,9 +86,12 @@ describe('PortfolioPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useAuth as Mock).mockReturnValue({ user: { uid: '1', credits_balance: 10 } });
-    (useCurrency as Mock).mockReturnValue({ 
+    (useCurrency as Mock).mockReturnValue({
       displayCurrency: 'USD',
-      formatCurrency: (val: number) => `$${val.toLocaleString()}`
+      formatCurrency: (val: number) => `$${val.toLocaleString()}`,
+      formatNative: (val: number) => `$${val.toLocaleString()}`,
+      convert: (amount: number) => amount,
+      rates: {},
     });
     (useQuery as Mock).mockReturnValue({ data: mockPositions, isLoading: false, refetch: vi.fn() });
     (useMarketSnapshots as Mock).mockReturnValue({ data: [], isLoading: false });

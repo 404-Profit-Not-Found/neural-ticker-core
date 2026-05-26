@@ -8,6 +8,13 @@ import { Bell, TrendingUp, TrendingDown, Percent } from 'lucide-react';
 interface CreateAlertDialogProps {
   symbol: string;
   currentPrice: number;
+  /**
+   * The native currency the ticker prices in (e.g. "USD" for AAPL, "GBP" for
+   * BARC.L). Alerts are evaluated against the OHLCV close in the same currency,
+   * so target prices must be entered in this currency, not the user's display
+   * currency.
+   */
+  nativeCurrency?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -27,13 +34,16 @@ const COOLDOWN_OPTIONS = [
   { value: 1440, label: '24 hours' },
 ];
 
-export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: CreateAlertDialogProps) {
+export function CreateAlertDialog({ symbol, currentPrice, nativeCurrency = 'USD', open, onOpenChange }: CreateAlertDialogProps) {
   const [alertType, setAlertType] = useState<typeof ALERT_TYPES[number]['value']>('price_above');
   const [targetValue, setTargetValue] = useState<string>(currentPrice.toFixed(2));
   const [cooldown, setCooldown] = useState(60);
   const createAlert = useCreatePriceAlert();
-  const { formatCurrency, displayCurrency } = useCurrency();
-  const currencySymbol = new Intl.NumberFormat('en-US', { style: 'currency', currency: displayCurrency }).formatToParts(0).find(p => p.type === 'currency')?.value ?? displayCurrency;
+  const { formatCurrency, formatNative } = useCurrency();
+  // Alerts evaluate against native-currency OHLCV, so the target input is in
+  // native currency. Show the native symbol next to the input to avoid users
+  // entering a value as if it were in their displayCurrency.
+  const nativeSymbol = new Intl.NumberFormat('en-US', { style: 'currency', currency: nativeCurrency }).formatToParts(0).find(p => p.type === 'currency')?.value ?? nativeCurrency;
 
   const isPercentType = alertType === 'percent_change_up' || alertType === 'percent_change_down';
 
@@ -79,7 +89,12 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
           Set Price Alert for {symbol}
         </DialogTitle>
         <DialogDescription>
-          Current price: {formatCurrency(currentPrice)}
+          Current price: {formatNative(currentPrice, nativeCurrency)}
+          {nativeCurrency !== 'USD' && (
+            <span className="text-xs text-muted-foreground ml-1">
+              (target in {nativeCurrency})
+            </span>
+          )}
         </DialogDescription>
       </DialogHeader>
 
@@ -111,11 +126,11 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
         {/* Target Value */}
         <div>
           <label className="text-sm font-medium text-muted-foreground mb-2 block">
-            {isPercentType ? 'Target Percentage (%)' : `Target Price (${currencySymbol})`}
+            {isPercentType ? 'Target Percentage (%)' : `Target Price (${nativeSymbol} ${nativeCurrency})`}
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-              {isPercentType ? '%' : currencySymbol}
+              {isPercentType ? '%' : nativeSymbol}
             </span>
             <input
               type="number"
@@ -137,8 +152,8 @@ export function CreateAlertDialog({ symbol, currentPrice, open, onOpenChange }: 
           {isPercentType && (
             <p className="text-xs text-muted-foreground mt-1">
               {alertType === 'percent_change_up'
-                ? `Alert when ${symbol} rises ${targetValue}% from ${formatCurrency(currentPrice)}`
-                : `Alert when ${symbol} drops ${targetValue}% from ${formatCurrency(currentPrice)}`}
+                ? `Alert when ${symbol} rises ${targetValue}% from ${formatCurrency(currentPrice, nativeCurrency)}`
+                : `Alert when ${symbol} drops ${targetValue}% from ${formatCurrency(currentPrice, nativeCurrency)}`}
             </p>
           )}
         </div>
