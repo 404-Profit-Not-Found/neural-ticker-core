@@ -10,7 +10,12 @@ import { useActiveResearchCount } from '../../hooks/useTicker';
 import { GlobalSearch } from './GlobalSearch';
 import { SuperLoading } from '../ui/SuperLoading';
 import { useLocalAnalysisCount } from '../../store/analysisStore';
-import { CurrencySelector } from '../ui/CurrencySelector';
+// CurrencySelector was previously rendered in the Header to set a global
+// "convert everything to this currency" preference. That model was removed:
+// every ticker now displays in its native trading currency app-wide, and
+// the only place that converts is the Portfolio page (with its own local
+// selector). The CurrencySelector component still exists for the Portfolio
+// page; we just don't mount it here.
 
 interface Notification {
   id: string;
@@ -424,10 +429,6 @@ export function Header() {
                     <Brain size={16} />
                     About NeuralTicker
                   </button>
-                </div>
-
-                <div className="border-t border-border">
-                  <CurrencySelector />
                 </div>
 
                 <div className="p-2 border-t border-border">

@@ -14,6 +14,7 @@ import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity'; // Added
 import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
+import { inferCurrencyFromExchange } from './utils/exchange-currency.util';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { JobsService } from '../jobs/jobs.service'; // Added
@@ -174,7 +175,13 @@ export class TickersService {
       symbol: upperSymbol,
       name: profile.name || upperSymbol,
       exchange: profile.exchange || 'Unknown',
-      currency: profile.currency || 'USD',
+      // Native trading currency: trust the data provider first; fall back to
+      // exchange/symbol inference only when both Finnhub and Yahoo returned
+      // nothing (avoids defaulting EU stocks to USD during degraded windows).
+      currency:
+        profile.currency ||
+        inferCurrencyFromExchange(profile.exchange, upperSymbol) ||
+        'USD',
       country: profile.country || 'Unknown',
       ipo_date: profile.ipo,
       market_capitalization: profile.marketCapitalization,
@@ -268,7 +275,9 @@ export class TickersService {
 
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
-      select: ['symbol', 'name', 'exchange'],
+      // Include `currency` so callers (cron syncs, frontend list views) can
+      // render prices in their native currency without an extra round-trip.
+      select: ['symbol', 'name', 'exchange', 'currency'],
       where: { is_hidden: false },
       order: { symbol: 'ASC' },
     });
@@ -302,6 +311,7 @@ export class TickersService {
             'ticker.symbol',
             'ticker.name',
             'ticker.exchange',
+            'ticker.currency',
             'ticker.logo_url',
             'ticker.sector',
             'ticker.finnhub_industry',
@@ -643,7 +653,7 @@ export class TickersService {
 
   async getHiddenTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
-      select: ['id', 'symbol', 'name', 'exchange', 'is_hidden'],
+      select: ['id', 'symbol', 'name', 'exchange', 'currency', 'is_hidden'],
       where: { is_hidden: true },
       order: { symbol: 'ASC' },
     });
@@ -660,6 +670,7 @@ export class TickersService {
         'ticker.symbol',
         'ticker.name',
         'ticker.exchange',
+        'ticker.currency',
         'ticker.is_hidden',
         'ticker.logo_url',
       ])
@@ -790,6 +801,21 @@ export class TickersService {
           currency = 'USD';
         }
 
+        // Yahoo returned nothing — try exchange/symbol inference before
+        // giving up. Better than leaving an EU ticker on its USD default.
+        if (!currency) {
+          const inferred = inferCurrencyFromExchange(
+            ticker.exchange,
+            ticker.symbol,
+          );
+          if (inferred) {
+            this.logger.debug(
+              `Inferred currency ${inferred} for ${ticker.symbol} from exchange/suffix`,
+            );
+            currency = inferred;
+          }
+        }
+
         if (currency && currency !== ticker.currency) {
           await this.tickerRepo.update(ticker.id, { currency });
           this.logger.log(
@@ -879,7 +905,15 @@ export class TickersService {
           summary?.summaryProfile?.longName ||
           symbol,
         exchange: quote?.fullExchangeName || quote?.exchange || 'External',
-        currency: quote?.currency || 'USD',
+        // Same fallback chain as ensureTicker: provider first, then exchange
+        // inference, then USD default.
+        currency:
+          quote?.currency ||
+          inferCurrencyFromExchange(
+            quote?.fullExchangeName || quote?.exchange,
+            symbol,
+          ) ||
+          'USD',
         country: summary?.summaryProfile?.country || 'Unknown',
         ipo: null,
         marketCapitalization:

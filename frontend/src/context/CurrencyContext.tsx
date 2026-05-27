@@ -8,17 +8,31 @@ interface AvailableCurrency {
 }
 
 interface CurrencyContextType {
+  /**
+   * The user's saved *Portfolio default* display currency. NOT a global
+   * "convert everything to this" preference. Outside the Portfolio page,
+   * monetary values are always rendered in their native currency.
+   */
   displayCurrency: string;
   setDisplayCurrency: (currency: string) => Promise<void>;
   availableCurrencies: AvailableCurrency[];
   rates: Record<string, number>;
+  /**
+   * Convert `amount` from `from` to `to` (defaults to `displayCurrency`).
+   * Used exclusively by the Portfolio page when the backend response
+   * doesn't already include a converted value. Returns the original
+   * amount unchanged when a rate is missing.
+   */
   convert: (amount: number, from: string, to?: string) => number;
   /** Formats `amount` using the supplied currency code (no conversion). */
   formatCurrency: (amount: number, currency?: string) => string;
   /**
-   * Converts `amount` from `fromCurrency` to displayCurrency and formats it.
-   * Falls back to formatting in the native currency if a rate is missing,
-   * so the displayed number is never misleading.
+   * Formats `amount` in its native `fromCurrency` with NO conversion.
+   *
+   * This is the canonical app-wide formatter for ticker prices, market caps,
+   * targets, etc. — every stock displays in the currency it trades in. The
+   * Portfolio page is the sole exception: it converts via the backend and
+   * uses {@link formatCurrency} with the chosen display currency directly.
    */
   formatNative: (amount: number, fromCurrency?: string) => string;
   loading: boolean;
@@ -116,17 +130,13 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
   const formatNative = useCallback(
     (amount: number, fromCurrency?: string): string => {
-      const native = (fromCurrency || displayCurrency).toUpperCase();
-      if (native === displayCurrency) {
-        return formatCurrency(amount, displayCurrency);
-      }
-      const converted = tryConvert(amount, native, displayCurrency);
-      if (converted === null) {
-        return formatCurrency(amount, native);
-      }
-      return formatCurrency(converted, displayCurrency);
+      // Native-only render. We deliberately do NOT convert to
+      // `displayCurrency` — that concept is now Portfolio-scoped. Show every
+      // ticker in the currency it actually trades in.
+      const native = (fromCurrency || 'USD').toUpperCase();
+      return formatCurrency(amount, native);
     },
-    [displayCurrency, tryConvert, formatCurrency],
+    [formatCurrency],
   );
 
   return (

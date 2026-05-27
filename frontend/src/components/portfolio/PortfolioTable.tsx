@@ -30,6 +30,11 @@ export interface Position {
     original_cost_basis?: number;
     original_gain_loss?: number;
 
+    // Set by the backend when the user requested a displayCurrency but the FX
+    // rate from this row's native currency to displayCurrency was unavailable.
+    // The values above stay in the native currency in that case.
+    conversion_unavailable?: boolean;
+
     // Sparkline & Range
     sparkline?: number[];
     fiftyTwoWeekHigh?: number;
@@ -94,6 +99,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 const counts = info.row.original.counts;
                 const row = info.row.original;
                 const currency = row.original_currency || row.ticker?.currency || 'USD';
+                const conversionUnavailable = row.conversion_unavailable;
                 const showCounts = (counts?.research || 0) + (counts?.news || 0) + (counts?.social || 0) > 0;
 
                 return (
@@ -114,6 +120,14 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                                 <span className="text-[10px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground font-mono">
                                     {currency}
                                 </span>
+                                {conversionUnavailable && (
+                                    <span
+                                        className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider"
+                                        title={`FX rate unavailable — this row is shown in its native ${currency}, not the selected display currency.`}
+                                    >
+                                        FX UNAVAILABLE
+                                    </span>
+                                )}
 
                                 {showCounts && (
                                     <div className="flex items-center gap-2">

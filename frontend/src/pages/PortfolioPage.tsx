@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -9,6 +9,10 @@ import { PortfolioStats } from '../components/portfolio/PortfolioStats';
 import { AddPositionDialog } from '../components/portfolio/AddPositionDialog';
 import { EditPositionDialog } from '../components/portfolio/EditPositionDialog';
 import { PortfolioAiAnalyzer } from '../components/portfolio/PortfolioAiAnalyzer';
+import {
+  PortfolioCurrencySelector,
+  PORTFOLIO_DISPLAY_NATIVE,
+} from '../components/portfolio/PortfolioCurrencySelector';
 import { FilterBar, type AnalyzerFilters } from '../components/analyzer/FilterBar';
 import { Toaster, toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -80,17 +84,44 @@ export function PortfolioPage() {
     region: [],
   });
 
-  const { displayCurrency } = useCurrency();
+  // `displayCurrency` from the context is the user's *saved* default for the
+  // Portfolio view (legacy localStorage key, no longer applied globally).
+  // We mirror it into a Portfolio-local state that also supports a NATIVE
+  // mode (= empty string), which the global context cannot represent.
+  const { displayCurrency, setDisplayCurrency } = useCurrency();
+  const [portfolioCurrency, setPortfolioCurrency] = useState<string>(
+    () => displayCurrency || 'USD',
+  );
+
+  // Keep the local pick in sync if the saved default changes (e.g. user logs
+  // in and their server-side preference loads asynchronously).
+  useEffect(() => {
+    setPortfolioCurrency((current) =>
+      current === '' ? current : displayCurrency || current,
+    );
+  }, [displayCurrency]);
+
+  const isNativeMode = portfolioCurrency === PORTFOLIO_DISPLAY_NATIVE;
 
   const { data: positions = [], isLoading, refetch } = useQuery({
-    queryKey: ['portfolio', displayCurrency],
+    queryKey: ['portfolio', portfolioCurrency],
     queryFn: async () => {
       const { data } = await api.get('/portfolio/positions', {
-        params: { displayCurrency },
+        // Omit param entirely in NATIVE mode so the backend returns each
+        // position in its own native currency without conversion.
+        params: isNativeMode ? {} : { displayCurrency: portfolioCurrency },
       });
       return data;
     },
   });
+
+  const handlePortfolioCurrencyChange = (next: string) => {
+    setPortfolioCurrency(next);
+    // Persist non-NATIVE selections as the user's default for next visit.
+    if (next !== PORTFOLIO_DISPLAY_NATIVE) {
+      void setDisplayCurrency(next);
+    }
+  };
 
 
 
@@ -129,8 +160,9 @@ export function PortfolioPage() {
     let totalRisk = 0;
     let riskCount = 0;
     let todayGain = 0;
+    let conversionUnavailable = 0;
 
-    enrichedPositions.forEach((p: PortfolioPosition & { quote?: { d?: number } }) => {
+    enrichedPositions.forEach((p: PortfolioPosition & { quote?: { d?: number }; conversion_unavailable?: boolean }) => {
       totalValue += p.current_value;
       totalCost += p.cost_basis;
 
@@ -143,6 +175,8 @@ export function PortfolioPage() {
         totalRisk += risk;
         riskCount++;
       }
+
+      if (p.conversion_unavailable) conversionUnavailable++;
     });
 
     totalGain = totalValue - totalCost;
@@ -153,7 +187,16 @@ export function PortfolioPage() {
     const previousValue = totalValue - todayGain;
     const todayGainPct = previousValue > 0 ? (todayGain / previousValue) * 100 : 0;
 
-    return { totalValue, totalGain, totalGainPct, count: positions.length, avgRisk, todayGain, todayGainPct };
+    return {
+      totalValue,
+      totalGain,
+      totalGainPct,
+      count: positions.length,
+      avgRisk,
+      todayGain,
+      todayGainPct,
+      conversionUnavailable,
+    };
   }, [enrichedPositions, positions.length]);
   const filteredPositions = useMemo(() => {
     return enrichedPositions.filter((item: unknown) => {
@@ -257,6 +300,9 @@ export function PortfolioPage() {
           positions={enrichedPositions as any[]}
           onAnalyze={() => setIsAiOpen(true)}
           credits={user?.credits_balance}
+          displayCurrency={portfolioCurrency}
+          isNativeMode={isNativeMode}
+          conversionUnavailable={stats.conversionUnavailable}
         />
 
         {/* TOOLBAR: SEARCH & FILTERS */}
@@ -285,6 +331,10 @@ export function PortfolioPage() {
 
             {/* Actions */}
             <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
+              <PortfolioCurrencySelector
+                value={portfolioCurrency}
+                onChange={handlePortfolioCurrencyChange}
+              />
               <Button
                 onClick={() => setIsAddOpen(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-8 shadow-sm flex-1 sm:flex-initial"
