@@ -148,6 +148,31 @@ describe('MarketDataService', () => {
     }),
   };
 
+  // Fresh ticker repo mock factory — exposed so individual tests can override
+  // `getRawMany` (used by pickStaleSnapshotTickers).
+  const mockTickerQb: any = {
+    where: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    leftJoinAndMapOne: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    offset: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+    getCount: jest.fn().mockResolvedValue(0),
+    getMany: jest.fn().mockResolvedValue([]),
+    getRawMany: jest.fn().mockResolvedValue([]),
+  };
+  const mockTickerRepo = {
+    createQueryBuilder: jest.fn(() => mockTickerQb),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue(15), // Return default number
   };
@@ -217,26 +242,7 @@ describe('MarketDataService', () => {
         },
         {
           provide: getRepositoryToken(TickerEntity),
-          useValue: {
-            createQueryBuilder: jest.fn(() => ({
-              where: jest.fn().mockReturnThis(),
-              leftJoin: jest.fn().mockReturnThis(),
-              leftJoinAndMapOne: jest.fn().mockReturnThis(),
-              leftJoinAndSelect: jest.fn().mockReturnThis(),
-              orderBy: jest.fn().mockReturnThis(),
-              addOrderBy: jest.fn().mockReturnThis(),
-              addSelect: jest.fn().mockReturnThis(),
-              skip: jest.fn().mockReturnThis(),
-              take: jest.fn().mockReturnThis(),
-              offset: jest.fn().mockReturnThis(),
-              limit: jest.fn().mockReturnThis(),
-              getRawAndEntities: jest
-                .fn()
-                .mockResolvedValue({ entities: [], raw: [] }),
-              getCount: jest.fn().mockResolvedValue(0),
-              getMany: jest.fn().mockResolvedValue([]),
-            })),
-          },
+          useValue: mockTickerRepo,
         },
       ],
     }).compile();
@@ -1014,6 +1020,69 @@ describe('MarketDataService', () => {
       await service.refreshMarketData('MSFT');
 
       expect(mockTickerRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pickStaleSnapshotTickers', () => {
+    it('returns empty when no candidates are passed', async () => {
+      const result = await service.pickStaleSnapshotTickers([], 10);
+      expect(result).toEqual([]);
+      expect(mockTickerQb.getRawMany).not.toHaveBeenCalled();
+    });
+
+    it('returns empty when limit is 0', async () => {
+      const result = await service.pickStaleSnapshotTickers(['AAPL'], 0);
+      expect(result).toEqual([]);
+    });
+
+    it('orders never-synced first, then by oldest MAX(ts), and applies the limit', async () => {
+      const now = Date.now();
+      const oneHourAgo = new Date(now - 3600 * 1000).toISOString();
+      const oneDayAgo = new Date(now - 24 * 3600 * 1000).toISOString();
+      const oneWeekAgo = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
+
+      // NVDA never synced (no row). AAPL fresh-ish, TSLA day-old, MSFT week-old.
+      mockTickerQb.getRawMany.mockResolvedValueOnce([
+        { symbol: 'AAPL', last_ts: oneHourAgo },
+        { symbol: 'TSLA', last_ts: oneDayAgo },
+        { symbol: 'MSFT', last_ts: oneWeekAgo },
+      ]);
+
+      const result = await service.pickStaleSnapshotTickers(
+        ['AAPL', 'TSLA', 'MSFT', 'NVDA'],
+        3,
+      );
+
+      expect(result).toEqual(['NVDA', 'MSFT', 'TSLA']);
+    });
+
+    it('falls back to alphabetical when all candidates are unsynced', async () => {
+      mockTickerQb.getRawMany.mockResolvedValueOnce([]);
+      const result = await service.pickStaleSnapshotTickers(
+        ['TSLA', 'AAPL', 'MSFT'],
+        2,
+      );
+      expect(result).toEqual(['AAPL', 'MSFT']);
+    });
+
+    it('treats a NULL aggregate as never-synced and sorts it ahead', async () => {
+      mockTickerQb.getRawMany.mockResolvedValueOnce([
+        { symbol: 'AAPL', last_ts: null },
+        {
+          symbol: 'TSLA',
+          last_ts: new Date(Date.now() - 3600 * 1000).toISOString(),
+        },
+      ]);
+      const result = await service.pickStaleSnapshotTickers(
+        ['AAPL', 'TSLA'],
+        2,
+      );
+      expect(result).toEqual(['AAPL', 'TSLA']);
+    });
+
+    it('returns empty when limit is negative', async () => {
+      const result = await service.pickStaleSnapshotTickers(['AAPL'], -3);
+      expect(result).toEqual([]);
     });
   });
 });

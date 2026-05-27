@@ -301,34 +301,171 @@ export class StockTwitsService {
   // --- Scanners / Cron Jobs ---
 
   /**
-   * Hourly: Sync posts for all tickers
+   * Batch size defaults — sized so a single cron run finishes well inside the
+   * Cloud Run 5-min request timeout. Posts is the heavy path (up to 20 pages
+   * each × HTTP latency), watchers is light (1 GET per ticker).
    */
+  static readonly POSTS_BATCH_SIZE = 10;
+  static readonly WATCHERS_BATCH_SIZE = 25;
 
-  async handleHourlyPostsSync() {
-    this.logger.log('Starting Hourly StockTwits Post Sync...');
-    const tickers = await this.tickersService.getAllTickers();
-    for (const ticker of tickers) {
-      if (ticker.symbol) {
-        await this.fetchAndStorePosts(ticker.symbol, 20); // Limit 20 pages for cron
+  /**
+   * Pick the N tickers whose latest post is oldest (or that have never been
+   * synced). Used by the hourly batch cron so each run advances coverage
+   * without blowing the request budget.
+   */
+  async pickStaleTickersForPostsSync(limit: number): Promise<string[]> {
+    const allTickers = await this.tickersService.getAllTickers();
+    const symbols = allTickers
+      .map((t) => t.symbol)
+      .filter((s): s is string => !!s);
+
+    if (symbols.length === 0) return [];
+
+    const rows: { symbol: string; last_sync: string | null }[] =
+      await this.postsRepository
+        .createQueryBuilder('p')
+        .select('p.symbol', 'symbol')
+        .addSelect('MAX(p.inserted_at)', 'last_sync')
+        .where('p.symbol IN (:...symbols)', { symbols })
+        .groupBy('p.symbol')
+        .getRawMany();
+
+    const lastSyncBySymbol = new Map<string, number>();
+    for (const r of rows) {
+      if (r.last_sync) {
+        lastSyncBySymbol.set(r.symbol, new Date(r.last_sync).getTime());
       }
     }
-    this.logger.log('Hourly Post Sync Complete.');
+
+    // Sort: never-synced first, then oldest-synced. Stable alphabetical tiebreak.
+    return [...symbols]
+      .sort((a, b) => {
+        const aTs = lastSyncBySymbol.get(a);
+        const bTs = lastSyncBySymbol.get(b);
+        if (aTs === undefined && bTs === undefined) return a.localeCompare(b);
+        if (aTs === undefined) return -1;
+        if (bTs === undefined) return 1;
+        return aTs - bTs;
+      })
+      .slice(0, limit);
   }
 
   /**
-   * Daily: Sync watcher counts for all tickers
-   * Runs at midnight.
+   * Pick the N tickers whose latest watcher record is oldest (or missing).
    */
+  async pickStaleTickersForWatchersSync(limit: number): Promise<string[]> {
+    const allTickers = await this.tickersService.getAllTickers();
+    const symbols = allTickers
+      .map((t) => t.symbol)
+      .filter((s): s is string => !!s);
 
-  async handleDailyWatchersSync() {
-    this.logger.log('Starting Daily StockTwits Watcher Sync...');
-    const tickers = await this.tickersService.getAllTickers();
-    for (const ticker of tickers) {
-      if (ticker.symbol) {
-        await this.trackWatchers(ticker.symbol);
+    if (symbols.length === 0) return [];
+
+    const rows: { symbol: string; last_sync: string | null }[] =
+      await this.watchersRepository
+        .createQueryBuilder('w')
+        .select('w.symbol', 'symbol')
+        .addSelect('MAX(w.timestamp)', 'last_sync')
+        .where('w.symbol IN (:...symbols)', { symbols })
+        .groupBy('w.symbol')
+        .getRawMany();
+
+    const lastSyncBySymbol = new Map<string, number>();
+    for (const r of rows) {
+      if (r.last_sync) {
+        lastSyncBySymbol.set(r.symbol, new Date(r.last_sync).getTime());
       }
     }
-    this.logger.log('Daily Watcher Sync Complete.');
+
+    return [...symbols]
+      .sort((a, b) => {
+        const aTs = lastSyncBySymbol.get(a);
+        const bTs = lastSyncBySymbol.get(b);
+        if (aTs === undefined && bTs === undefined) return a.localeCompare(b);
+        if (aTs === undefined) return -1;
+        if (bTs === undefined) return 1;
+        return aTs - bTs;
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * Hourly batch: sync posts for the N most-stale tickers. Each run processes
+   * a small slice; the hourly cron rotates through the universe over multiple
+   * runs. Returns stats so the cron caller can log progress.
+   *
+   * fetchAndStorePosts already catches its own errors, so a single bad ticker
+   * cannot abort the batch.
+   */
+  async handleHourlyPostsSync(
+    batchSize = StockTwitsService.POSTS_BATCH_SIZE,
+  ): Promise<{ batchSize: number; processed: number; failed: number }> {
+    this.logger.log(
+      `Starting StockTwits posts batch sync (size: ${batchSize})...`,
+    );
+    const symbols = await this.pickStaleTickersForPostsSync(batchSize);
+    if (symbols.length === 0) {
+      this.logger.log('No tickers to sync.');
+      return { batchSize: 0, processed: 0, failed: 0 };
+    }
+    this.logger.log(`Batch tickers: ${symbols.join(', ')}`);
+
+    let processed = 0;
+    let failed = 0;
+    for (const symbol of symbols) {
+      try {
+        await this.fetchAndStorePosts(symbol, 20); // 20 pages cap for cron
+        processed++;
+      } catch (e: any) {
+        // Defensive: fetchAndStorePosts has its own try/catch, but never let
+        // a leaked error abort the rest of the batch.
+        this.logger.error(
+          `Posts batch failed for ${symbol}: ${e?.message || e}`,
+        );
+        failed++;
+      }
+    }
+
+    this.logger.log(
+      `Posts batch complete. Processed: ${processed}, Failed: ${failed} of ${symbols.length}.`,
+    );
+    return { batchSize: symbols.length, processed, failed };
+  }
+
+  /**
+   * Daily batch: sync watcher counts for the N most-stale tickers.
+   */
+  async handleDailyWatchersSync(
+    batchSize = StockTwitsService.WATCHERS_BATCH_SIZE,
+  ): Promise<{ batchSize: number; processed: number; failed: number }> {
+    this.logger.log(
+      `Starting StockTwits watchers batch sync (size: ${batchSize})...`,
+    );
+    const symbols = await this.pickStaleTickersForWatchersSync(batchSize);
+    if (symbols.length === 0) {
+      this.logger.log('No tickers to sync.');
+      return { batchSize: 0, processed: 0, failed: 0 };
+    }
+    this.logger.log(`Batch tickers: ${symbols.join(', ')}`);
+
+    let processed = 0;
+    let failed = 0;
+    for (const symbol of symbols) {
+      try {
+        await this.trackWatchers(symbol);
+        processed++;
+      } catch (e: any) {
+        this.logger.error(
+          `Watchers batch failed for ${symbol}: ${e?.message || e}`,
+        );
+        failed++;
+      }
+    }
+
+    this.logger.log(
+      `Watchers batch complete. Processed: ${processed}, Failed: ${failed} of ${symbols.length}.`,
+    );
+    return { batchSize: symbols.length, processed, failed };
   }
 
   async getPosts(symbol: string, page = 1, limit = 50) {

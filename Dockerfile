@@ -30,6 +30,11 @@ ENV PORT=8080
 
 WORKDIR /app
 
+# Install curl — required by stocktwits.service.ts execFileSync fallback when
+# Cloudflare blocks Axios (403). Alpine ships without curl by default, so
+# without this the fallback silently fails with ENOENT in prod.
+RUN apk add --no-cache curl
+
 # Copy backend package files
 COPY package*.json ./
 

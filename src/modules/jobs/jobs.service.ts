@@ -177,7 +177,14 @@ export class JobsService {
   }
 
   /**
-   * Light sync - only fetches current price snapshots for all tickers.
+   * Batch size for the snapshot sync — sized so a single cron run finishes
+   * well inside the Cloud Run 5-min request timeout. The every-5-min cron
+   * rotates through all tickers across multiple runs via DB-driven staleness.
+   */
+  static readonly SNAPSHOTS_BATCH_SIZE = 25;
+
+  /**
+   * Light sync - fetches a batch of the most-stale price snapshots.
    * Much faster than syncDailyCandles since it skips history.
    * Syncs tickers only when their respective market is open.
    */
@@ -200,22 +207,38 @@ export class JobsService {
       }
     }
 
-    this.logger.log('Starting light snapshot sync (prices only)...');
+    this.logger.log('Starting light snapshot sync batch (prices only)...');
     try {
-      const tickers = await this.tickersService.getAllTickers();
-      this.logger.log(`Found ${tickers.length} tickers total.`);
+      const allTickers = await this.tickersService.getAllTickers();
+      const candidates = allTickers.filter(
+        (t): t is typeof t & { symbol: string } => !!t.symbol,
+      );
+      this.logger.log(`Found ${candidates.length} candidate tickers.`);
+
+      // Pick the N most-stale tickers (oldest MAX(ohlcv.ts) first, NULLs first).
+      const batchSize = JobsService.SNAPSHOTS_BATCH_SIZE;
+      const staleSymbols =
+        await this.marketDataService.pickStaleSnapshotTickers(
+          candidates.map((t) => t.symbol),
+          batchSize,
+        );
+      const exchangeBySymbol = new Map(
+        candidates.map((t) => [t.symbol, (t as any).exchange || 'US']),
+      );
+
+      this.logger.log(
+        `Batch tickers (${staleSymbols.length}/${candidates.length}): ${staleSymbols.join(', ')}`,
+      );
 
       let success = 0;
       let failed = 0;
       let skippedMarketClosed = 0;
 
-      for (const ticker of tickers) {
-        if (!ticker.symbol) continue;
-
+      for (const symbol of staleSymbols) {
         // Check if this ticker's market is open
-        const exchange = (ticker as any).exchange || 'US';
+        const exchange = exchangeBySymbol.get(symbol) || 'US';
         const status = await this.marketStatusService.getMarketStatus(
-          ticker.symbol,
+          symbol,
           exchange,
         );
 
@@ -226,22 +249,26 @@ export class JobsService {
 
         try {
           // getSnapshot already uses Finnhub with Yahoo fallback internally
-          await this.marketDataService.getSnapshot(ticker.symbol);
+          await this.marketDataService.getSnapshot(symbol);
           success++;
         } catch (err: any) {
           failed++;
-          this.logger.warn(
-            `Snapshot failed for ${ticker.symbol}: ${err.message}`,
-          );
+          this.logger.warn(`Snapshot failed for ${symbol}: ${err.message}`);
         }
         // Shorter delay since it's just snapshots (500ms)
         await new Promise((r) => setTimeout(r, 500));
       }
 
       this.logger.log(
-        `Snapshot sync complete. Success: ${success}, Failed: ${failed}, Skipped (market closed): ${skippedMarketClosed}`,
+        `Snapshot batch complete. Success: ${success}, Failed: ${failed}, Skipped (market closed): ${skippedMarketClosed}, Batch size: ${staleSymbols.length}`,
       );
-      return { success, failed, skipped: false };
+      return {
+        success,
+        failed,
+        skipped: false,
+        batchSize: staleSymbols.length,
+        skippedMarketClosed,
+      };
     } catch (e) {
       this.logger.error('Snapshot sync failed globally', e);
       throw e;

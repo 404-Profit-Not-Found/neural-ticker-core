@@ -14,6 +14,8 @@ describe('StockTwitsController', () => {
     analyzeComments: jest.fn(),
     getLatestAnalysis: jest.fn(),
     getFutureEvents: jest.fn(),
+    handleHourlyPostsSync: jest.fn(),
+    handleDailyWatchersSync: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -56,6 +58,34 @@ describe('StockTwitsController', () => {
         {},
       );
       expect(result).toEqual({ message: 'Not enough data to analyze' });
+    });
+  });
+
+  describe('cron endpoints', () => {
+    it('handleHourlyPostsSync returns batch stats from service', async () => {
+      const stats = { batchSize: 10, processed: 9, failed: 1 };
+      mockService.handleHourlyPostsSync.mockResolvedValue(stats);
+
+      const result = await controller.handleHourlyPostsSync();
+
+      expect(mockService.handleHourlyPostsSync).toHaveBeenCalled();
+      expect(result).toEqual({
+        message: 'Hourly posts sync batch completed',
+        stats,
+      });
+    });
+
+    it('handleDailyWatchersSync returns batch stats from service', async () => {
+      const stats = { batchSize: 25, processed: 25, failed: 0 };
+      mockService.handleDailyWatchersSync.mockResolvedValue(stats);
+
+      const result = await controller.handleDailyWatchersSync();
+
+      expect(mockService.handleDailyWatchersSync).toHaveBeenCalled();
+      expect(result).toEqual({
+        message: 'Daily watchers sync batch completed',
+        stats,
+      });
     });
   });
 });
