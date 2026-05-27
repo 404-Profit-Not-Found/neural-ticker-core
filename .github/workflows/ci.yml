@@ -2,7 +2,11 @@ name: CI
 permissions:
   contents: read
 
-
+# Cancel obsolete in-flight runs for the same branch/PR so a fast `git push`
+# doesn't burn CI minutes on stale commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   push:
@@ -27,8 +31,9 @@ jobs:
     needs: secrets-scan
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [20.x, 22.x]
     steps:
     - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
@@ -53,7 +58,11 @@ jobs:
   test:
     needs: secrets-scan
     runs-on: ubuntu-latest
+    # fail-fast:false so a Node 20 failure doesn't cancel the Node 22 leg
+    # mid-`docker pull` — that's what produced the confusing
+    # "Error: The operation was canceled." messages on the surviving leg.
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20.x, 22.x]
     services:
@@ -82,12 +91,16 @@ jobs:
     - name: Run Unit Tests with Coverage
       run: npm run test -- --coverage --coverageThreshold='{"global":{"branches":50,"functions":45,"lines":50,"statements":50}}'
       env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          DB_SYNCHRONIZE: ${{ secrets.DB_SYNCHRONIZE }}
+          # DB env is hardcoded to match the `postgres` service container above.
+          # IMPORTANT: do NOT use ${{ secrets.DB_HOST }} here — combined with
+          # DB_SYNCHRONIZE=true (TypeORM auto-schema-sync) it would rewrite
+          # the schema of whatever DB the secret points to, including prod.
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: neural
+          DB_PASSWORD: password
+          DB_DATABASE: neural_db
+          DB_SYNCHRONIZE: 'true'
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -117,6 +130,7 @@ jobs:
     needs: secrets-scan
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20.x, 22.x]
     steps:

@@ -193,6 +193,51 @@ export class MarketDataService {
     return promise;
   }
 
+  /**
+   * Return the N tickers with the oldest (or missing) snapshot data, ordered
+   * stale-first. Used by the snapshot cron to keep each batch inside the
+   * Cloud Run request budget — full coverage happens across multiple cron runs.
+   *
+   * Joins price_ohlcv → tickers via symbol_id and picks MAX(ts) per symbol.
+   * Tickers with no candles at all sort first (never-synced).
+   */
+  async pickStaleSnapshotTickers(
+    candidateSymbols: string[],
+    limit: number,
+  ): Promise<string[]> {
+    if (candidateSymbols.length === 0 || limit <= 0) return [];
+
+    const rows: { symbol: string; last_ts: string | null }[] =
+      await this.tickerRepo
+        .createQueryBuilder('t')
+        .leftJoin(PriceOhlcv, 'o', 'o.symbol_id = t.id AND o.timeframe = :tf', {
+          tf: '1d',
+        })
+        .select('t.symbol', 'symbol')
+        .addSelect('MAX(o.ts)', 'last_ts')
+        .where('t.symbol IN (:...symbols)', { symbols: candidateSymbols })
+        .groupBy('t.symbol')
+        .getRawMany();
+
+    const lastTsBySymbol = new Map<string, number>();
+    for (const r of rows) {
+      if (r.last_ts) {
+        lastTsBySymbol.set(r.symbol, new Date(r.last_ts).getTime());
+      }
+    }
+
+    return [...candidateSymbols]
+      .sort((a, b) => {
+        const aTs = lastTsBySymbol.get(a);
+        const bTs = lastTsBySymbol.get(b);
+        if (aTs === undefined && bTs === undefined) return a.localeCompare(b);
+        if (aTs === undefined) return -1;
+        if (bTs === undefined) return 1;
+        return aTs - bTs;
+      })
+      .slice(0, limit);
+  }
+
   async refreshMarketData(symbol: string) {
     return this.performGetSnapshot(symbol.toUpperCase(), {
       force: true,

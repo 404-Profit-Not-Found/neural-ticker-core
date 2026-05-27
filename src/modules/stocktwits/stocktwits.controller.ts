@@ -112,23 +112,31 @@ export class StockTwitsController {
   @Post('jobs/sync-posts')
   @Public()
   @UseGuards(CronSecretGuard)
-  @ApiOperation({ summary: 'Trigger hourly posts sync (Cron)' })
+  @ApiOperation({
+    summary: 'Trigger hourly posts sync batch (Cron)',
+    description:
+      'Processes a batch of the most-stale tickers. Hourly cron rotates through all tickers over multiple runs to stay inside the Cloud Run request timeout.',
+  })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
-  @ApiResponse({ status: 200, description: 'Job started' })
+  @ApiResponse({ status: 200, description: 'Batch completed' })
   async handleHourlyPostsSync() {
-    await this.stockTwitsService.handleHourlyPostsSync();
-    return { message: 'Hourly posts sync completed' };
+    const stats = await this.stockTwitsService.handleHourlyPostsSync();
+    return { message: 'Hourly posts sync batch completed', stats };
   }
 
   @Post('jobs/sync-watchers')
   @Public()
   @UseGuards(CronSecretGuard)
-  @ApiOperation({ summary: 'Trigger daily watchers sync (Cron)' })
+  @ApiOperation({
+    summary: 'Trigger daily watchers sync batch (Cron)',
+    description:
+      'Processes a batch of the most-stale tickers. Daily cron rotates through all tickers over multiple runs.',
+  })
   @ApiHeader({ name: 'X-Cron-Secret', required: true })
-  @ApiResponse({ status: 200, description: 'Job started' })
+  @ApiResponse({ status: 200, description: 'Batch completed' })
   async handleDailyWatchersSync() {
-    await this.stockTwitsService.handleDailyWatchersSync();
-    return { message: 'Daily watchers sync completed' };
+    const stats = await this.stockTwitsService.handleDailyWatchersSync();
+    return { message: 'Daily watchers sync batch completed', stats };
   }
 
   // --- AI Analysis Endpoints ---

@@ -29,6 +29,7 @@ describe('JobsService', () => {
     getHistory: jest.fn().mockResolvedValue([]),
     syncTickerHistory: jest.fn().mockResolvedValue(undefined),
     dedupeAnalystRatings: jest.fn().mockResolvedValue({ removed: 0 }),
+    pickStaleSnapshotTickers: jest.fn(),
   };
 
   const mockResearchService = {
@@ -48,10 +49,12 @@ describe('JobsService', () => {
 
   const mockMarketStatusService = {
     getAllMarketsStatus: jest.fn().mockResolvedValue({
-      us: { isOpen: true },
-      eu: { isOpen: true },
+      us: { isOpen: true, session: 'regular' },
+      eu: { isOpen: true, session: 'regular' },
     }),
-    getMarketStatus: jest.fn().mockResolvedValue({ isOpen: true }),
+    getMarketStatus: jest
+      .fn()
+      .mockResolvedValue({ isOpen: true, session: 'regular' }),
   };
 
   beforeEach(async () => {
@@ -133,6 +136,121 @@ describe('JobsService', () => {
       mockTickersService.getAllTickers.mockResolvedValue(tickers);
       await service.syncDailyCandles();
       expect(mockMarketDataService.getSnapshot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('syncSnapshots (batched)', () => {
+    let sleepSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        // Resolve immediately to keep the test fast
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+    });
+
+    afterEach(() => {
+      sleepSpy.mockRestore();
+    });
+
+    it('returns skipped:true when all markets are closed', async () => {
+      mockMarketStatusService.getAllMarketsStatus.mockResolvedValueOnce({
+        us: { isOpen: false, session: 'closed' },
+        eu: { isOpen: false, session: 'closed' },
+      });
+
+      const result = await service.syncSnapshots();
+
+      expect(result).toMatchObject({ skipped: true });
+      expect(
+        mockMarketDataService.pickStaleSnapshotTickers,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('asks market-data for the stale-first batch and syncs only those', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'TSLA' },
+        { symbol: 'MSFT' },
+      ]);
+      // Picker returns just two of the three — the batch limit in effect.
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([
+        'MSFT',
+        'AAPL',
+      ]);
+      mockMarketDataService.getSnapshot.mockResolvedValue({});
+
+      const result = await service.syncSnapshots();
+
+      expect(
+        mockMarketDataService.pickStaleSnapshotTickers,
+      ).toHaveBeenCalledWith(
+        ['AAPL', 'TSLA', 'MSFT'],
+        JobsService.SNAPSHOTS_BATCH_SIZE,
+      );
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(2);
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('MSFT');
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(mockMarketDataService.getSnapshot).not.toHaveBeenCalledWith(
+        'TSLA',
+      );
+      expect(result).toMatchObject({
+        success: 2,
+        failed: 0,
+        batchSize: 2,
+        skipped: false,
+      });
+    });
+
+    it('skips a batch ticker whose own market is closed without failing the batch', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL', exchange: 'US' },
+        { symbol: 'SAP', exchange: 'EU' },
+      ]);
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([
+        'AAPL',
+        'SAP',
+      ]);
+      mockMarketStatusService.getMarketStatus
+        .mockResolvedValueOnce({ isOpen: true, session: 'regular' })
+        .mockResolvedValueOnce({ isOpen: false, session: 'closed' });
+      mockMarketDataService.getSnapshot.mockResolvedValue({});
+
+      const result = await service.syncSnapshots();
+
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(1);
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
+      expect(result).toMatchObject({
+        success: 1,
+        failed: 0,
+        skippedMarketClosed: 1,
+        batchSize: 2,
+      });
+    });
+
+    it('counts per-ticker errors without aborting the rest of the batch', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'BAD' },
+      ]);
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([
+        'AAPL',
+        'BAD',
+      ]);
+      mockMarketDataService.getSnapshot
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error('finnhub 500'));
+
+      const result = await service.syncSnapshots();
+
+      expect(result).toMatchObject({
+        success: 1,
+        failed: 1,
+        batchSize: 2,
+      });
     });
   });
 
