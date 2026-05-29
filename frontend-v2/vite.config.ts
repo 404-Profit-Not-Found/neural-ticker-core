@@ -8,6 +8,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: '/v2/',
   plugins: [react()],
+  resolve: {
+    // The monorepo root also installs `react`/`react-dom` (used by the v1
+    // frontend), so without dedupe Vite can resolve a second copy via the
+    // hoisted tree, causing "Invalid hook call / multiple copies of React".
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     port: 5273,
     strictPort: false,

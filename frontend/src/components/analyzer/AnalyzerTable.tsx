@@ -10,9 +10,6 @@ import {
   ArrowDown,
   Brain,
   Newspaper,
-  ShieldCheck,
-  AlertTriangle,
-  Flame,
   MessageCircle
 } from 'lucide-react';
 import {
@@ -29,6 +26,7 @@ import { calculateLiveUpside, type RatingVariant } from '../../lib/rating-utils'
 import { VerdictBadge } from "../ticker/VerdictBadge";
 import { FiftyTwoWeekRange } from '../dashboard/FiftyTwoWeekRange';
 import { Sparkline } from "../ui/Sparkline";
+import { RiskBar } from '../ui/RiskBar';
 import { FavoriteStar } from '../watchlist/FavoriteStar';
 
 import { FilterBar, type AnalyzerFilters } from './FilterBar';
@@ -242,27 +240,11 @@ export function AnalyzerTable({
     // 3. P/E
 
 
-    // 5. Financial Risk
+    // 5. Financial Risk — segmented gauge to match Watchlist
     columnHelper.accessor((row) => row.aiAnalysis?.financial_risk, {
       id: 'financial_risk',
       header: 'Risk',
-      cell: (info) => {
-        const val = info.getValue();
-        if (val === undefined || val === null) return '-';
-
-        let colorClass = 'text-muted-foreground';
-        let Icon = ShieldCheck;
-        if (val <= 3.5) { colorClass = 'text-emerald-500'; Icon = ShieldCheck; }
-        else if (val <= 6.5) { colorClass = 'text-yellow-500'; Icon = AlertTriangle; }
-        else { colorClass = 'text-red-500'; Icon = Flame; }
-
-        return (
-          <span className={cn('flex items-center gap-1.5 font-bold', colorClass)}>
-            <Icon size={14} />
-            {Number(val).toFixed(1)}
-          </span>
-        );
-      },
+      cell: (info) => <RiskBar value={info.getValue()} />,
     }),
 
     // 5.5 Risk/Reward (Overall Score)
