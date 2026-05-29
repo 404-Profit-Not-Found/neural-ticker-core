@@ -32,6 +32,12 @@ interface PortfolioStatsProps {
   credits?: number;
   todayGain?: number;
   todayGainPct?: number;
+  /** Currency code the totals are denominated in (empty string when NATIVE). */
+  displayCurrency?: string;
+  /** True when the Portfolio is showing each row in its own native currency. */
+  isNativeMode?: boolean;
+  /** Count of rows the backend could not convert (FX rate missing). */
+  conversionUnavailable?: number;
 }
 
 // Professional Palette - Carbon/Minimalist
@@ -104,10 +110,25 @@ export function PortfolioStats({
   positions,
   onAnalyze,
   credits = 0,
+  displayCurrency: portfolioCurrency,
+  isNativeMode = false,
+  conversionUnavailable = 0,
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
-  const { formatCurrency, displayCurrency } = useCurrency(); // Use context formatter
+  const { formatCurrency: ctxFormatCurrency, displayCurrency: ctxDisplayCurrency } = useCurrency();
+
+  // Prefer the Portfolio-local currency (passed in from the page) over the
+  // context default — the page owns the truth now that the global selector
+  // has been removed.
+  const effectiveCurrency = portfolioCurrency || ctxDisplayCurrency;
+  // In NATIVE mode the totals are a mathematically meaningless sum of values
+  // across different currencies; we render "MIXED" instead.
+  const formatTotal = (val: number): string =>
+    isNativeMode ? 'MIXED' : ctxFormatCurrency(val, effectiveCurrency);
+  const formatCurrency = (val: number): string =>
+    ctxFormatCurrency(val, effectiveCurrency);
+  const displayCurrency = effectiveCurrency;
 
 
   // --- Data Preparation ---
@@ -316,26 +337,49 @@ export function PortfolioStats({
         <div className="lg:col-span-2 rounded-xl border border-border/50 bg-card flex flex-col h-72 lg:h-80">
           <div className="p-6 pb-2 flex justify-between items-start">
             <div>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Net Worth</p>
+              <p
+                className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1"
+                title={
+                  isNativeMode
+                    ? 'Pick a single currency to see totals — summing across currencies is not meaningful.'
+                    : undefined
+                }
+              >
+                Total Net Worth
+              </p>
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                {formatCurrency(totalValue)}
+                {formatTotal(totalValue)}
               </h2>
-              <div className={cn(
-                "inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-semibold",
-                isProfit
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-              )}>
-                {isProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                {formatCurrency(Math.abs(totalGainLoss))} ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%) <span className="text-muted-foreground ml-1">All Time</span>
-              </div>
+              {isNativeMode ? (
+                <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-muted/60 text-muted-foreground">
+                  Switch from NATIVE to a single currency for totals
+                </div>
+              ) : (
+                <div className={cn(
+                  "inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-semibold",
+                  isProfit
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                )}>
+                  {isProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  {formatCurrency(Math.abs(totalGainLoss))} ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%) <span className="text-muted-foreground ml-1">All Time</span>
+                </div>
+              )}
+              {conversionUnavailable > 0 && !isNativeMode && (
+                <div
+                  className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                  title={`FX rate unavailable for ${conversionUnavailable} position(s). Those rows render in their native currency.`}
+                >
+                  {conversionUnavailable} of {positions.length} not converted
+                </div>
+              )}
             </div>
 
             {/* Middle: Invested Amount */}
              <div className="hidden sm:flex flex-col items-center justify-center pt-1">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Invested</span>
               <span className="text-xl font-bold text-foreground/80">
-                {formatCurrency(totalValue - totalGainLoss)}
+                {formatTotal(totalValue - totalGainLoss)}
               </span>
             </div>
 

@@ -2250,6 +2250,9 @@ export class MarketDataService {
               symbol: t.symbol,
               name: t.name,
               exchange: t.exchange,
+              // Native trading currency — required for native-currency price
+              // rendering on analyzer rows.
+              currency: t.currency,
               logo_url: t.logo_url,
               news_sentiment: t.news_sentiment,
               news_impact_score: t.news_impact_score,

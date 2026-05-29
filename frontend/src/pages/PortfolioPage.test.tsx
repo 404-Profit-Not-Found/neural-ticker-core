@@ -67,14 +67,17 @@ vi.mock('../components/portfolio/EditPositionDialog', () => ({ EditPositionDialo
 vi.mock('../components/portfolio/PortfolioAiAnalyzer', () => ({ PortfolioAiAnalyzer: ({ open }: { open: boolean }) => open ? <div>AiDialog</div> : null }));
 vi.mock('../components/analyzer/FilterBar', () => ({ FilterBar: () => <div>Filter</div> }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('lucide-react', () => ({ 
-  Search: () => <div>Search</div>, 
-  LayoutGrid: () => <div>LayoutGrid</div>, 
-  List: () => <div>List</div>, 
-  Plus: () => <div>PlusIcon</div>, 
-  X: () => <div>XIcon</div>, 
-  Bot: () => <div>Bot</div>, 
-  PieChart: () => <div>Pie</div> 
+vi.mock('lucide-react', () => ({
+  Search: () => <div>Search</div>,
+  LayoutGrid: () => <div>LayoutGrid</div>,
+  List: () => <div>List</div>,
+  Plus: () => <div>PlusIcon</div>,
+  X: () => <div>XIcon</div>,
+  Bot: () => <div>Bot</div>,
+  PieChart: () => <div>Pie</div>,
+  // Used by PortfolioCurrencySelector (mounted in the page toolbar).
+  Coins: () => <div>Coins</div>,
+  ChevronDown: () => <div>ChevronDown</div>,
 }));
 
 describe('PortfolioPage', () => {
@@ -88,10 +91,17 @@ describe('PortfolioPage', () => {
     (useAuth as Mock).mockReturnValue({ user: { uid: '1', credits_balance: 10 } });
     (useCurrency as Mock).mockReturnValue({
       displayCurrency: 'USD',
+      setDisplayCurrency: vi.fn(),
       formatCurrency: (val: number) => `$${val.toLocaleString()}`,
       formatNative: (val: number) => `$${val.toLocaleString()}`,
       convert: (amount: number) => amount,
       rates: {},
+      // Used by PortfolioCurrencySelector (mounted in the page toolbar).
+      availableCurrencies: [
+        { code: 'USD', flag: '🇺🇸' },
+        { code: 'EUR', flag: '🇪🇺' },
+      ],
+      loading: false,
     });
     (useQuery as Mock).mockReturnValue({ data: mockPositions, isLoading: false, refetch: vi.fn() });
     (useMarketSnapshots as Mock).mockReturnValue({ data: [], isLoading: false });
