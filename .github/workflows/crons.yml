@@ -7,7 +7,7 @@ on:
   schedule:
     # Daily at Midnight UTC (Sync Candles, Watchers, Moderation)
     - cron: '0 0 * * *'
-    # Hourly (Risk/Reward Scanner, Posts Sync, Cleanup, Research-stale-2w trigger)
+    # Hourly (Posts Sync, Research Cleanup)
     - cron: '0 * * * *'
     # Every 5 mins during market hours (6 AM - 9 PM UTC, Mon-Fri)
     # Used by: snapshot-sync (price tick) + market-hours-refresh (top picks, portfolios)
@@ -48,14 +48,10 @@ jobs:
     environment: prod
     if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      # Triggers research for tickers with risk/reward score missing or older than 14 days.
-      # Endpoint returns 202 immediately and runs the scan in the background.
-      - name: Trigger Risk/Reward Scanner (queues stale-research >14d)
-        run: |
-          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
-            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type:application/json"
-
+      # NOTE: the Risk/Reward Scanner is NOT triggered here. The frequent-jobs
+      # schedule (*/5) already runs it every 5 min; firing it again on the hour
+      # collided at minute 0 (both 0 * * * * and */5 * * * * match) and produced
+      # concurrent LLM scans → 429 bursts.
       - name: Trigger Hourly Posts Sync
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-posts" \
@@ -104,7 +100,7 @@ jobs:
     environment: prod
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Trigger Risk/Reward Scanner (5 tickers per run)
+      - name: Trigger Risk/Reward Scanner (3 tickers per run)
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
 
       - name: Trigger Daily Digest Generation

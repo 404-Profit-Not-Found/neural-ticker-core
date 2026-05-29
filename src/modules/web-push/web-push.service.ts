@@ -135,6 +135,21 @@ export class WebPushService {
   }
 
   /**
+   * Send a push notification to every admin user.
+   * Each admin's own notification preferences are still honored via sendToUser.
+   */
+  async sendToAdmins(payload: PushPayload): Promise<void> {
+    if (!this.isConfigured) return;
+
+    const admins = await this.usersService.findAdmins();
+    if (admins.length === 0) return;
+
+    await Promise.allSettled(
+      admins.map((admin) => this.sendToUser(admin.id, payload)),
+    );
+  }
+
+  /**
    * Get the VAPID public key for frontend subscription.
    */
   getPublicKey(): string {

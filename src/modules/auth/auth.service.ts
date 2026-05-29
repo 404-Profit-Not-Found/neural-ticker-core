@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
 import { FirebaseService } from '../firebase/firebase.service';
+import { WebPushService } from '../web-push/web-push.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthLog } from './entities/auth-log.entity';
@@ -23,6 +24,8 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly firebaseService: FirebaseService,
+    @Inject(forwardRef(() => WebPushService))
+    private readonly webPushService: WebPushService,
     @InjectRepository(AuthLog)
     private readonly authLogRepo: Repository<AuthLog>,
   ) {}
@@ -61,6 +64,21 @@ export class AuthService {
 
         // Attach a transient property to the user object for the controller to read.
         (user as any).isNewWaitlist = true;
+
+        // Notify admins — only on a genuinely new signup, not on returning
+        // waitlist users re-authenticating (userEntity was fetched above).
+        if (!userEntity) {
+          this.webPushService
+            .sendToAdmins({
+              title: 'New Waitlist Signup',
+              body: `${email} joined the waitlist.`,
+              icon: '/favicon.svg',
+              data: { url: '/admin' },
+            })
+            .catch((err) =>
+              this.logger.warn(`Admin waitlist push failed: ${err.message}`),
+            );
+        }
 
         return user;
       }

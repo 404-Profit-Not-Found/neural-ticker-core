@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TickerRequestEntity } from './entities/ticker-request.entity';
 import { TickersService } from '../tickers/tickers.service';
+import { WebPushService } from '../web-push/web-push.service';
 
 @Injectable()
 export class TickerRequestsService {
@@ -17,6 +18,7 @@ export class TickerRequestsService {
     @InjectRepository(TickerRequestEntity)
     private readonly requestRepo: Repository<TickerRequestEntity>,
     private readonly tickersService: TickersService,
+    private readonly webPushService: WebPushService,
   ) {}
 
   async createRequest(userId: string, symbol: string) {
@@ -74,7 +76,21 @@ export class TickerRequestsService {
         status: 'PENDING',
       });
 
-      return await this.requestRepo.save(request);
+      const saved = await this.requestRepo.save(request);
+
+      // Notify admins that a new ticker is awaiting approval.
+      this.webPushService
+        .sendToAdmins({
+          title: 'New Stock Request',
+          body: `${startSymbol} was requested and is awaiting approval.`,
+          icon: '/favicon.svg',
+          data: { url: '/admin' },
+        })
+        .catch((err) =>
+          this.logger.warn(`Admin ticker-request push failed: ${err.message}`),
+        );
+
+      return saved;
     } catch (error) {
       this.logger.error(
         `Failed to create request for ${startSymbol}: ${error.message}`,

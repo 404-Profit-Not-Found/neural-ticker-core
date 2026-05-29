@@ -261,11 +261,13 @@ export class JobsService {
     );
     try {
       const tickers = await this.tickersService.getAllTickers();
-      // Frequent + small: 5 tickers per run × every 5 min
-      // = ~25s work per run, completes 150 stocks in ~2.5h
-      const BATCH_SIZE = 5;
+      // Frequent + small: 3 tickers per run × every 5 min.
+      // Each ticker fans out ~5 Gemini calls (research + title + quality +
+      // risk + extraction), so a tiny batch + wide spacing keeps us under the
+      // shared free-tier limit (~15 RPM) and avoids the 429 bursts we saw.
+      const BATCH_SIZE = 3;
       const MAX_BATCHES = 1;
-      const DELAY_MS = 4500; // ~13 RPM to stay safely under 15 RPM
+      const DELAY_MS = 8000; // ~8s between tickers to flatten the LLM burst
 
       const totalBatches = Math.min(
         Math.ceil(tickers.length / BATCH_SIZE),
@@ -335,7 +337,7 @@ export class JobsService {
             await this.researchService.processTicket(note.id);
             batchProcessed++;
 
-            // Rate limit: 15 RPM on free tier = ~4.5s between calls
+            // Space tickers out so the ~5 calls each fans out don't burst
             await new Promise((r) => setTimeout(r, DELAY_MS));
           } catch (err) {
             this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);

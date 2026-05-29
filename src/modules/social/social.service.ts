@@ -473,6 +473,11 @@ export class SocialService {
         );
         // Continue with next batch even if one fails
       }
+
+      // Space batches out so the back-to-back LLM calls don't trigger 429s
+      if (i + BATCH_SIZE < pending.length) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
     }
 
     this.logger.log(

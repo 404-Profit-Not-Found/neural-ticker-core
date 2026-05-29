@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FirebaseModule } from '../firebase/firebase.module';
 import { UsersModule } from '../users/users.module';
+import { WebPushModule } from '../web-push/web-push.module';
 
 import { AuthLog } from './entities/auth-log.entity';
 import { User } from '../users/entities/user.entity';
@@ -16,6 +17,7 @@ import { User } from '../users/entities/user.entity';
 @Module({
   imports: [
     forwardRef(() => UsersModule),
+    forwardRef(() => WebPushModule),
     TypeOrmModule.forFeature([User, AuthLog]), // Registered User and AuthLog entities
     FirebaseModule,
     PassportModule,

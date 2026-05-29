@@ -377,6 +377,14 @@ export class UsersService {
   }
 
   /**
+   * Find all admin users. Used to broadcast admin-only push notifications
+   * (e.g. new waitlist signups, new ticker requests awaiting approval).
+   */
+  async findAdmins(): Promise<User[]> {
+    return this.userRepo.find({ where: { role: 'admin' } });
+  }
+
+  /**
    * Find users by IDs (batch lookup for mention resolution).
    */
   async findByIds(ids: string[]): Promise<User[]> {
