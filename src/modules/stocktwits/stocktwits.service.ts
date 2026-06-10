@@ -543,7 +543,7 @@ export class StockTwitsService {
   }
 
   async getPosts(symbol: string, page = 1, limit = 50) {
-    const take = limit;
+    const take = Math.min(Math.max(1, Number(limit) || 50), 100);
     const skip = (page - 1) * take;
 
     const [data, total] = await this.postsRepository.findAndCount({

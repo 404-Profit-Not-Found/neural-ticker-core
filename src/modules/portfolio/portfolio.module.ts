@@ -9,6 +9,7 @@ import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { UsersModule } from '../users/users.module';
 import { CurrencyModule } from '../currency/currency.module';
+import { QuotaModule } from '../../common/quota/quota.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CurrencyModule } from '../currency/currency.module';
     forwardRef(() => TickersModule),
     forwardRef(() => UsersModule),
     CurrencyModule,
+    QuotaModule,
   ],
   controllers: [PortfolioController],
   providers: [PortfolioService],

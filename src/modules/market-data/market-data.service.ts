@@ -723,10 +723,22 @@ export class MarketDataService {
     };
   }
 
+  static readonly MAX_SNAPSHOT_SYMBOLS = 100;
+
   async getSnapshots(symbols: string[]) {
     // Limit concurrency to avoid overwhelming external APIs if we have many misses
     const validSymbols = symbols.filter((s) => s && s.trim().length > 0);
-    const uniqueSymbols = [...new Set(validSymbols)];
+    const deduped = [...new Set(validSymbols)];
+    // Cap so a single request can't fan out into thousands of external calls.
+    const uniqueSymbols = deduped.slice(
+      0,
+      MarketDataService.MAX_SNAPSHOT_SYMBOLS,
+    );
+    if (deduped.length > MarketDataService.MAX_SNAPSHOT_SYMBOLS) {
+      this.logger.warn(
+        `getSnapshots: capped ${deduped.length} symbols to ${MarketDataService.MAX_SNAPSHOT_SYMBOLS}`,
+      );
+    }
 
     // Fetch in chunks of 5 to respect API rate limits and avoid connection spikes
     // Each getSnapshot can trigger up to 3 API calls (quote, profile, financials)
@@ -1775,7 +1787,8 @@ export class MarketDataService {
    */
   async getAnalyzerTickers(options: GetAnalyzerTickersOptions) {
     const page = options.page || 1;
-    const limit = options.limit || 50;
+    // Clamp so a client can't request an unbounded page size.
+    const limit = Math.min(Math.max(1, Number(options.limit) || 50), 100);
     const skip = (page - 1) * limit;
     const sortBy = options.sortBy || 'market_cap';
     const sortDir = options.sortDir || 'DESC';

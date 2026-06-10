@@ -7,6 +7,7 @@ import {
   Body,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,7 +35,7 @@ export class TickerRequestsController {
   @ApiResponse({ status: 201, description: 'Request created.' })
   @Post()
   create(@Req() req: any, @Body('symbol') symbol: string) {
-    if (!symbol) throw new Error('Symbol is required');
+    if (!symbol) throw new BadRequestException('Symbol is required');
     return this.requestsService.createRequest(req.user.id, symbol);
   }
 

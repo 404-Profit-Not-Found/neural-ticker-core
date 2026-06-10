@@ -8,6 +8,7 @@ import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
 import { CurrencyService } from '../currency/currency.service';
+import { QuotaService } from '../../common/quota/quota.service';
 
 const mockPosition = {
   id: 'uuid-1',
@@ -31,7 +32,10 @@ const mockPositionRepo = {
   find: jest.fn().mockResolvedValue([mockPosition]),
   findOne: jest.fn().mockResolvedValue(mockPosition),
   remove: jest.fn().mockResolvedValue(true),
+  count: jest.fn().mockResolvedValue(0),
 };
+
+const mockQuotaService = { assertWithinLimit: jest.fn() };
 
 const mockAnalysisRepo = {
   create: jest.fn().mockReturnValue(mockAnalysis),
@@ -102,6 +106,10 @@ describe('PortfolioService', () => {
         {
           provide: CurrencyService,
           useValue: mockCurrencyService,
+        },
+        {
+          provide: QuotaService,
+          useValue: mockQuotaService,
         },
       ],
     }).compile();

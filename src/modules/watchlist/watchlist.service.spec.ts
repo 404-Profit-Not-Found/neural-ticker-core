@@ -5,6 +5,7 @@ import { WatchlistService } from './watchlist.service';
 import { Watchlist } from './entities/watchlist.entity';
 import { WatchlistItem } from './entities/watchlist-item.entity';
 import { TickersService } from '../tickers/tickers.service';
+import { QuotaService } from '../../common/quota/quota.service';
 
 describe('WatchlistService', () => {
   let service: WatchlistService;
@@ -15,6 +16,7 @@ describe('WatchlistService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     softRemove: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
   };
 
   const mockItemRepo = {
@@ -23,11 +25,14 @@ describe('WatchlistService', () => {
     delete: jest.fn(),
     findOne: jest.fn(),
     remove: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
   };
 
   const mockTickersService = {
     awaitEnsureTicker: jest.fn(),
   };
+
+  const mockQuotaService = { assertWithinLimit: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -36,6 +41,7 @@ describe('WatchlistService', () => {
         { provide: getRepositoryToken(Watchlist), useValue: mockWatchlistRepo },
         { provide: getRepositoryToken(WatchlistItem), useValue: mockItemRepo },
         { provide: TickersService, useValue: mockTickersService },
+        { provide: QuotaService, useValue: mockQuotaService },
       ],
     }).compile();
 

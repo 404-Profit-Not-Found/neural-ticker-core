@@ -15,6 +15,7 @@ import {
   CreatePriceAlertDto,
   UpdatePriceAlertDto,
 } from './dto/create-price-alert.dto';
+import { QuotaService } from '../../common/quota/quota.service';
 
 @Injectable()
 export class PriceAlertsService {
@@ -27,12 +28,16 @@ export class PriceAlertsService {
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
     private readonly webPushService: WebPushService,
+    private readonly quota: QuotaService,
   ) {}
 
   /**
    * Create a new price alert for a user.
    */
   async create(userId: string, dto: CreatePriceAlertDto): Promise<PriceAlert> {
+    const count = await this.alertRepo.count({ where: { user_id: userId } });
+    await this.quota.assertWithinLimit(userId, 'priceAlerts', count);
+
     const ticker = await this.tickersService.findOneBySymbol(dto.symbol);
     if (!ticker) {
       throw new NotFoundException(`Ticker ${dto.symbol} not found`);

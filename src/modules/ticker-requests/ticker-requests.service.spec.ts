@@ -15,6 +15,7 @@ describe('TickerRequestsService', () => {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
   };
 
   const mockTickersService = {

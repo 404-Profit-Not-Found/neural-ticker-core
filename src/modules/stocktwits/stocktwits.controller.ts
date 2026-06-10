@@ -10,6 +10,7 @@ import {
   Body,
   Delete,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { StockTwitsService } from './stocktwits.service';
 import {
   ApiTags,
@@ -141,6 +142,10 @@ export class StockTwitsController {
 
   // --- AI Analysis Endpoints ---
 
+  // Expensive: up to a 50-page external sync + LLM. CreditGuard gates balance
+  // up front; this per-IP cap stops a credit-holding user from looping the
+  // external-quota-heavy sync.
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post(':symbol/analyze')
   @UseGuards(JwtAuthGuard, CreditGuard)
   @ApiOperation({ summary: 'Trigger AI Analysis for comments (Costs Credits)' })

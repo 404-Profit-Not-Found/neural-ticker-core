@@ -141,16 +141,34 @@ export class ResearchService implements OnModuleInit {
 
       const reward = rewardMap[judgment.rarity] || 0;
       if (reward > 0) {
-        await this.creditService.addCredits(
+        // Anti-farming: cap credits earned from contributions per rolling 24h.
+        const DAILY_CONTRIBUTION_CAP = 50;
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const earnedToday = await this.creditService.getEarnedSince(
           userId,
-          reward,
           'manual_contribution',
-          {
-            noteId: note.request_id,
-            rarity: judgment.rarity,
-            score: judgment.score,
-          },
+          since,
         );
+        const grantable = Math.min(
+          reward,
+          DAILY_CONTRIBUTION_CAP - earnedToday,
+        );
+        if (grantable > 0) {
+          await this.creditService.addCredits(
+            userId,
+            grantable,
+            'manual_contribution',
+            {
+              noteId: note.request_id,
+              rarity: judgment.rarity,
+              score: judgment.score,
+            },
+          );
+        } else {
+          this.logger.warn(
+            `User ${userId} hit the daily contribution credit cap; reward skipped.`,
+          );
+        }
       }
     } catch (e) {
       this.logger.warn('Failed to judge manual note', e);
@@ -809,9 +827,11 @@ Title:`;
       query.andWhere('note.created_at >= :threshold', { threshold });
     }
 
+    // Clamp page size so a client can't request an unbounded result set.
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 50);
     query.orderBy('note.created_at', 'DESC');
-    query.skip((page - 1) * limit);
-    query.take(limit);
+    query.skip((page - 1) * safeLimit);
+    query.take(safeLimit);
 
     const [data, total] = await query.getManyAndCount();
 
@@ -819,7 +839,7 @@ Title:`;
       data,
       total,
       page,
-      limit,
+      limit: safeLimit,
     };
   }
 

@@ -17,6 +17,7 @@ import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
 import { CurrencyService } from '../currency/currency.service';
+import { QuotaService } from '../../common/quota/quota.service';
 
 @Injectable()
 export class PortfolioService implements OnModuleInit {
@@ -35,6 +36,7 @@ export class PortfolioService implements OnModuleInit {
     @Inject(forwardRef(() => CreditService))
     private readonly creditService: CreditService,
     private readonly currencyService: CurrencyService,
+    private readonly quota: QuotaService,
   ) {}
 
   async onModuleInit() {
@@ -50,6 +52,11 @@ export class PortfolioService implements OnModuleInit {
     userId: string,
     dto: CreatePortfolioPositionDto,
   ): Promise<PortfolioPosition> {
+    const count = await this.positionRepo.count({
+      where: { user_id: userId },
+    });
+    await this.quota.assertWithinLimit(userId, 'portfolioPositions', count);
+
     // Auto-detect currency from ticker if not explicitly provided
     let currency = dto.currency;
     if (!currency) {
