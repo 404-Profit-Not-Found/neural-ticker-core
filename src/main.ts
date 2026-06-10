@@ -13,13 +13,23 @@ async function bootstrap() {
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
 
-  // Security headers. CSP is left off for now because the Swagger UI and the
-  // served SPA rely on inline scripts/styles — enable a tailored policy later.
-  // CORP is cross-origin so the /proxy/image logos can still be embedded by the
-  // frontend (which is served from a different origin).
+  // Security headers. Keep CORP cross-origin so /proxy/image logos can still
+  // be embedded by the frontend (served from a different origin). Enable a
+  // tailored CSP that preserves current Swagger UI / SPA inline behavior.
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+          baseUri: ["'self'"],
+        },
+      },
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
