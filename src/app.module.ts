@@ -57,11 +57,14 @@ import configuration from './config/configuration';
       rootPath: join(__dirname, '..', 'client'),
     }),
 
-    // Global Rate Limiting: 100 requests per minute per IP
+    // Global Rate Limiting: 300 requests per minute per IP. Effective only now
+    // that `trust proxy` is set (see main.ts) — otherwise every client shares
+    // the proxy's single IP bucket. Generous enough for SPA bursts; expensive
+    // LLM routes should add a stricter per-route @Throttle on top.
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 1000,
+        limit: 300,
       },
     ]),
     ScheduleModule.forRoot(),

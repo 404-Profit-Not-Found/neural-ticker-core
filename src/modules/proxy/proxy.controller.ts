@@ -65,8 +65,11 @@ export class ProxyController {
         }),
       );
 
-      // Forward content type header
-      const contentType = response.headers['content-type'];
+      // Forward content type header. axios now types header values as a broad
+      // union; content-type is a string at runtime.
+      const contentType = response.headers['content-type'] as
+        | string
+        | undefined;
       if (contentType) {
         res.set('Content-Type', contentType);
       }

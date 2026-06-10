@@ -13,18 +13,18 @@ export interface ModelOption {
 
 export const MODEL_OPTIONS: ModelOption[] = [
     {
-        key: 'gemini-2.5-flash-lite',
-        label: 'Gemini 2.5 Flash Lite',
+        key: 'gemini-3.1-flash-lite',
+        label: 'Gemini 3.1 Flash Lite',
         provider: 'gemini',
         quality: 'low',
         speed: '≈3s',
         accuracy: 'Efficient',
-        description: 'Ultra-fast and cost-effective for quick summaries.',
+        description: 'Ultra-fast and cost-effective for quick summaries. Generous free tier (500/day).',
         defaultQuestion: 'Give me a quick summary for {ticker}',
     },
     {
-        key: 'gemini-3-flash-preview',
-        label: 'Gemini 3 Flash',
+        key: 'gemini-3.5-flash',
+        label: 'Gemini 3.5 Flash',
         provider: 'gemini',
         quality: 'medium',
         speed: '≈6s',
@@ -45,8 +45,8 @@ export const MODEL_OPTIONS: ModelOption[] = [
     },
     */
     {
-        key: 'gemini-3-pro-preview',
-        label: 'Gemini 3 Pro',
+        key: 'gemini-3.1-pro-preview',
+        label: 'Gemini 3.1 Pro',
         provider: 'gemini',
         quality: 'deep',
         speed: '≈18s',

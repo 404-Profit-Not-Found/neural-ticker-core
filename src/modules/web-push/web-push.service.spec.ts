@@ -106,7 +106,7 @@ describe('WebPushService', () => {
       const newSub = {
         id: '1',
         user_id: 'user1',
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
       };
       mockSubRepo.create.mockReturnValue(newSub);
       mockSubRepo.save.mockResolvedValue(newSub);
@@ -114,7 +114,7 @@ describe('WebPushService', () => {
       const result = await service.subscribe(
         'user1',
         {
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           keys: { p256dh: 'p256', auth: 'auth' },
         },
         'Mozilla/5.0',
@@ -122,7 +122,7 @@ describe('WebPushService', () => {
 
       expect(mockSubRepo.create).toHaveBeenCalledWith({
         user_id: 'user1',
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         p256dh: 'p256',
         auth: 'auth',
         user_agent: 'Mozilla/5.0',
@@ -130,11 +130,25 @@ describe('WebPushService', () => {
       expect(result).toEqual(newSub);
     });
 
+    it('rejects a subscription with a non-push-service endpoint (SSRF guard)', async () => {
+      await expect(
+        service.subscribe(
+          'user1',
+          {
+            endpoint: 'https://attacker.example.com/internal',
+            keys: { p256dh: 'p256', auth: 'auth' },
+          },
+          'Mozilla/5.0',
+        ),
+      ).rejects.toThrow('Unrecognized push service host');
+      expect(mockSubRepo.create).not.toHaveBeenCalled();
+    });
+
     it('should update an existing subscription', async () => {
       const existing = {
         id: '1',
         user_id: 'old-user',
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         p256dh: 'old-p256',
         auth: 'old-auth',
         user_agent: 'OldBrowser',
@@ -149,7 +163,7 @@ describe('WebPushService', () => {
       const result = await service.subscribe(
         'user1',
         {
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           keys: { p256dh: 'new-p256', auth: 'new-auth' },
         },
         'NewBrowser',
@@ -170,7 +184,7 @@ describe('WebPushService', () => {
       const existing = {
         id: '1',
         user_id: 'user1',
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         p256dh: 'p256',
         auth: 'auth',
         user_agent: 'OriginalBrowser',
@@ -179,7 +193,7 @@ describe('WebPushService', () => {
       mockSubRepo.save.mockResolvedValue(existing);
 
       await service.subscribe('user1', {
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         keys: { p256dh: 'p256', auth: 'auth' },
       });
 
@@ -200,11 +214,14 @@ describe('WebPushService', () => {
     it('should delete the subscription', async () => {
       mockSubRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.unsubscribe('user1', 'https://push.example.com');
+      await service.unsubscribe(
+        'user1',
+        'https://fcm.googleapis.com/fcm/send/abc123',
+      );
 
       expect(mockSubRepo.delete).toHaveBeenCalledWith({
         user_id: 'user1',
-        endpoint: 'https://push.example.com',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
       });
     });
   });
@@ -262,7 +279,7 @@ describe('WebPushService', () => {
         {
           id: '1',
           user_id: 'user1',
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           p256dh: 'p1',
           auth: 'a1',
         },
@@ -282,7 +299,7 @@ describe('WebPushService', () => {
         {
           id: '2',
           user_id: 'user1',
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           p256dh: 'p1',
           auth: 'a1',
         },
@@ -306,7 +323,7 @@ describe('WebPushService', () => {
         {
           id: '1',
           user_id: 'user1',
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           p256dh: 'p1',
           auth: 'a1',
         },
@@ -323,7 +340,7 @@ describe('WebPushService', () => {
       mockSubRepo.find.mockResolvedValue([
         {
           id: '1',
-          endpoint: 'https://push.example.com',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
           p256dh: 'p',
           auth: 'a',
         },

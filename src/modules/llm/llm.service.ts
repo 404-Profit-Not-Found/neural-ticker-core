@@ -94,10 +94,16 @@ export class LlmService {
     if (
       k === 'gemini-2.5-flash' ||
       k === 'gemini-3-flash-preview' ||
+      k === 'gemini-3.5-flash' ||
       k === 'gemini'
     )
       return { provider: 'gemini', quality: 'medium' };
-    if (k === 'gemini-3-pro-preview' || k === 'gemini-3-pro')
+    if (
+      k === 'gemini-3-pro-preview' ||
+      k === 'gemini-3-pro' ||
+      k === 'gemini-3.1-pro-preview' ||
+      k === 'gemini-3.1-pro'
+    )
       return { provider: 'gemini', quality: 'deep' };
     if (k === 'gemini-3.1-flash-lite')
       return { provider: 'gemini', quality: 'cron' };

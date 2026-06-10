@@ -240,7 +240,9 @@ export class TickersService {
       );
 
       const buffer = Buffer.from(response.data);
-      const mimeType = response.headers['content-type'] || 'image/png';
+      // axios now types header values as a broad union; content-type is a string.
+      const mimeType =
+        (response.headers['content-type'] as string) || 'image/png';
 
       const logo = this.logoRepo.create({
         symbol_id: symbolId,

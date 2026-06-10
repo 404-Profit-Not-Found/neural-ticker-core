@@ -159,6 +159,15 @@ describe('AuthController', () => {
   });
 
   describe('devLogin', () => {
+    const originalFlag = process.env.ENABLE_DEV_LOGIN;
+    beforeEach(() => {
+      process.env.ENABLE_DEV_LOGIN = 'true';
+    });
+    afterEach(() => {
+      if (originalFlag === undefined) delete process.env.ENABLE_DEV_LOGIN;
+      else process.env.ENABLE_DEV_LOGIN = originalFlag;
+    });
+
     it('should return token for valid email', async () => {
       const mockResult = { access_token: 'dev-token' };
       mockAuthService.localDevLogin.mockResolvedValue(mockResult);
@@ -191,6 +200,18 @@ describe('AuthController', () => {
       await expect(controller.devLogin(body, res as any)).rejects.toThrow(
         'Email required',
       );
+    });
+
+    it('should be disabled when ENABLE_DEV_LOGIN is not set', async () => {
+      delete process.env.ENABLE_DEV_LOGIN;
+      const body = { email: 'dev@test.com' };
+      const res = {
+        cookie: jest.fn().mockReturnThis(),
+      };
+      await expect(controller.devLogin(body, res as any)).rejects.toThrow(
+        'Dev login is disabled',
+      );
+      expect(mockAuthService.localDevLogin).not.toHaveBeenCalled();
     });
   });
 

@@ -123,13 +123,17 @@ export class AuthController {
     @Body() body: CreateUserTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // SECURITY: Disable in production
+    // SECURITY: dev login is OFF by default and must be explicitly enabled via
+    // ENABLE_DEV_LOGIN=true. Gating on the flag (not just "NODE_ENV !==
+    // production") closes the auth bypass on staging/preview environments where
+    // NODE_ENV may not be exactly 'production'.
     const isProd =
       this.configService.get<string>('nodeEnv') === 'production' ||
       process.env.NODE_ENV === 'production';
+    const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === 'true';
 
-    if (isProd) {
-      throw new UnauthorizedException('Dev login is disabled in production');
+    if (isProd || !devLoginEnabled) {
+      throw new UnauthorizedException('Dev login is disabled');
     }
 
     if (!body.email) throw new UnauthorizedException('Email required');

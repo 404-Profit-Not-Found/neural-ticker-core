@@ -20,10 +20,31 @@ export class CreditService {
 
     // Exact mapping matches shown in UI image
     if (m.includes('pro') || m.includes('gpt-5')) return 5;
-    if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash') return 2;
+    if (
+      m === 'gemini-3-flash-preview' ||
+      m === 'gemini-3-flash' ||
+      m === 'gemini-3.5-flash'
+    )
+      return 2;
     if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite'))
       return 1;
 
+    return 1;
+  }
+
+  /**
+   * Cost of a /research/ask run, derived from the SAME execution parameters the
+   * pipeline actually uses (provider + quality). The previous code priced this
+   * off a non-existent `model` body field, so every request resolved to cost 1
+   * and the Pro gate never fired. `deep` (slow web-search model) and `ensemble`
+   * (runs multiple providers) are the premium paths → cost 5, which also gates
+   * free-tier users via CreditGuard (`cost > 1`).
+   */
+  getResearchCost(provider?: string, quality?: string): number {
+    const q = (quality || '').toLowerCase();
+    const p = (provider || '').toLowerCase();
+
+    if (p === 'ensemble' || q === 'deep') return 5;
     return 1;
   }
 
@@ -33,6 +54,12 @@ export class CreditService {
     reason: 'manual_contribution' | 'monthly_reset' | 'admin_gift',
     metadata?: Record<string, any>,
   ): Promise<User> {
+    // Reject non-positive/NaN amounts so a bad caller can never silently
+    // subtract credits (negative add) or write a zero-value transaction.
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Credit amount must be a positive number');
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -74,6 +101,14 @@ export class CreditService {
       | 'social_analysis_spend',
     metadata?: Record<string, any>,
   ): Promise<User> {
+    // A negative amount would INCREASE the balance and write a positive "spend"
+    // transaction — reject it (and NaN/zero) so cost can only ever debit.
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException(
+        'Deduction amount must be a positive number',
+      );
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();

@@ -7,11 +7,15 @@ import {
   forwardRef,
   ServiceUnavailableException,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CurrencyService } from './currency.service';
 import { TickersService } from '../tickers/tickers.service';
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 // Common currency flags for display
 const CURRENCY_FLAGS: Record<string, string> = {
@@ -68,9 +72,10 @@ export class CurrencyController {
   }
 
   @Post('backfill-tickers')
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @ApiOperation({
-    summary: 'Backfill currency on existing tickers from Yahoo Finance',
+    summary: 'Backfill currency on existing tickers from Yahoo Finance (admin)',
   })
   async backfillTickerCurrencies() {
     const result = await this.tickersService.backfillTickerCurrencies();

@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   NotFoundException,
+  ForbiddenException,
   Request,
   Query,
   Delete,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { Throttle } from '@nestjs/throttler';
 import { CreditGuard } from './guards/credit.guard'; // Added
 import { CreditService } from '../users/credit.service'; // Added
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -241,6 +243,10 @@ export class ResearchController {
     const userId = req.user.id;
     // Handle dynamic API key from body if present
 
+    // Cost is derived from the SAME params the pipeline uses (provider +
+    // quality) and matches CreditGuard's computation.
+    const cost = this.creditService.getResearchCost(dto.provider, dto.quality);
+
     const ticket = await this.researchService.createResearchTicket(
       userId,
       dto.tickers,
@@ -249,29 +255,27 @@ export class ResearchController {
       dto.quality as QualityTier,
     );
 
-    // DEDUCT CREDITS HERE - AFTER TICKET CREATION TO GET ID
-    const cost = this.creditService.getModelCost(dto.provider); // Or dto.quality logic if more complex
-
-    // Only deduct if not admin? Or deduction logic handles it. Guard already checked balance.
-    // We should safely try/catch deduction? If deduction fails, we might technically have a "free" ticket.
-    // Given the Guard checked balance, it should succeed unless specific race condition.
-    try {
-      if (req.user.role !== 'admin') {
+    // Deduct atomically BEFORE dispatching the expensive LLM work. The ticket
+    // row is cheap; deductCredits locks the user row and throws on insufficient
+    // balance. If it fails, roll back the ticket and abort — fail closed so a
+    // deduction failure can never yield free LLM usage.
+    if (req.user.role !== 'admin') {
+      try {
         await this.creditService.deductCredits(userId, cost, 'research_spend', {
           research_id: ticket.id,
           model: dto.provider,
           quality: dto.quality,
           ticker: dto.tickers[0],
         });
+      } catch (e) {
+        await this.researchService
+          .deleteResearchNote(ticket.id, userId)
+          .catch(() => undefined);
+        throw e;
       }
-    } catch (e) {
-      console.error('Failed to deduct credits for ticket ' + ticket.id, e);
-      // We could fail the request here, but ticket is already created.
-      // Ideally we wrap all in transaction, but across services is hard without UnitOfWork/QueryRunner sharing.
-      // For now, allow it but log error.
     }
 
-    // Fire and forget background processing
+    // Fire and forget background processing (only reached once paid).
     this.researchService
       .processTicket(ticket.id)
       .catch((err) => console.error('Background processing failed', err));
@@ -434,6 +438,9 @@ export class ResearchController {
     description:
       'SSE stream of research events (status, thought, source, content)',
   })
+  // Expensive deep-research pipeline with no credit deduction — cap per-IP to
+  // prevent a logged-in user from running it in a loop for free.
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('stream')
   @Sse() // Content-Type: text/event-stream
   startResearch(
@@ -481,6 +488,8 @@ export class ResearchController {
       'Two-step pipeline: Gemini Flash searches latest news, Gemma 26B summarizes',
   })
   @ApiResponse({ status: 200, description: '4-bullet summary with sources' })
+  // Two-step Gemini+Gemma pipeline with no credit deduction — cap per-IP.
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Get('news-summary/:symbol')
   async getNewsSummary(@Param('symbol') symbol: string) {
     return this.researchService.getNewsSummary(symbol.toUpperCase());
@@ -492,18 +501,19 @@ export class ResearchController {
     description: 'Returns the signed URL',
   })
   @Get(':id/share-link')
-  async getShareLink(@Request() _req: any, @Param('id') id: string) {
-    // Ensure user owns the note? Or just admin?
-    // For now allow owner or admin
+  async getShareLink(@Request() req: any, @Param('id') id: string) {
     const note = await this.researchService.getResearchNote(id);
     if (!note) throw new NotFoundException('Research note not found');
 
-    // Relaxed check: If the user can VIEW the note (getResearchNote has no auth checks beyond JWT),
-    // they can generate a share link.
-    // This aligns with the 'Get :id' endpoint behavior.
-
-    // Original strict check removed:
-    // if (note.user_id !== userId && req.user.role !== 'admin') { ... }
+    // A share link exposes the note to the UNAUTHENTICATED public, so it must
+    // be restricted to the owner (or an admin) even though authenticated read
+    // of `GET :id` is intentionally open to all logged-in users. Without this,
+    // any user could mint a public link for someone else's private research.
+    if (note.user_id !== req.user.id && req.user.role !== 'admin') {
+      throw new ForbiddenException(
+        'You can only generate a share link for your own research.',
+      );
+    }
 
     const signature = this.researchService.generatePublicSignature(id);
     // Use env var for base URL or construct from request?

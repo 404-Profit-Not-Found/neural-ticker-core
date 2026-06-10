@@ -82,7 +82,30 @@ describe('CreditService', () => {
     });
   });
 
+  describe('getResearchCost', () => {
+    it('charges 5 for the premium deep / ensemble paths', () => {
+      expect(service.getResearchCost('gemini', 'deep')).toBe(5);
+      expect(service.getResearchCost('ensemble', 'medium')).toBe(5);
+      expect(service.getResearchCost('ENSEMBLE', 'DEEP')).toBe(5);
+    });
+
+    it('charges 1 for standard paths and missing params', () => {
+      expect(service.getResearchCost('gemini', 'medium')).toBe(1);
+      expect(service.getResearchCost('openai', 'low')).toBe(1);
+      expect(service.getResearchCost(undefined, undefined)).toBe(1);
+    });
+  });
+
   describe('addCredits', () => {
+    it('rejects non-positive amounts', async () => {
+      await expect(
+        service.addCredits('user-1', 0, 'admin_gift'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addCredits('user-1', -5, 'admin_gift'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should add credits transactionally', async () => {
       mockQueryRunner.manager.getRepository.mockImplementation((entity) => {
         if (entity === User) return mockUserRepo;
@@ -106,6 +129,15 @@ describe('CreditService', () => {
   });
 
   describe('deductCredits', () => {
+    it('rejects non-positive amounts (prevents negative-amount credit minting)', async () => {
+      await expect(
+        service.deductCredits('user-1', -5, 'research_spend'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.deductCredits('user-1', 0, 'research_spend'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should deduct credits if sufficient balance', async () => {
       mockQueryRunner.manager.getRepository.mockImplementation((entity) => {
         if (entity === User) return mockUserRepo;

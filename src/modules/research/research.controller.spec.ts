@@ -28,6 +28,7 @@ describe('ResearchController', () => {
   };
   const mockCreditService = {
     getModelCost: jest.fn(),
+    getResearchCost: jest.fn(),
     deductCredits: jest.fn(),
   };
 
@@ -132,7 +133,7 @@ describe('ResearchController', () => {
       const ticket = { id: 'ticket-1', status: 'pending' };
       mockResearchService.createResearchTicket.mockResolvedValue(ticket);
       mockResearchService.processTicket.mockResolvedValue(undefined);
-      mockCreditService.getModelCost.mockReturnValue(5);
+      mockCreditService.getResearchCost.mockReturnValue(5);
       mockCreditService.deductCredits.mockResolvedValue(undefined); // Success
 
       const req = { user: { id: 'user1', role: 'user' } };
@@ -152,7 +153,65 @@ describe('ResearchController', () => {
         'gemini',
         'medium',
       );
+      // Cost derives from provider + quality (not a non-existent `model` field).
+      expect(mockCreditService.getResearchCost).toHaveBeenCalledWith(
+        'gemini',
+        'medium',
+      );
       expect(mockCreditService.deductCredits).toHaveBeenCalled();
+      expect(mockResearchService.processTicket).toHaveBeenCalledWith(
+        'ticket-1',
+      );
+    });
+
+    it('fails closed: rolls back the ticket and does not process when deduction fails', async () => {
+      const ticket = { id: 'ticket-1', status: 'pending' };
+      mockResearchService.createResearchTicket.mockResolvedValue(ticket);
+      mockResearchService.deleteResearchNote.mockResolvedValue(undefined);
+      mockCreditService.getResearchCost.mockReturnValue(5);
+      mockCreditService.deductCredits.mockRejectedValue(
+        new Error('Insufficient credits'),
+      );
+
+      const req = { user: { id: 'user1', role: 'user' } };
+
+      await expect(
+        controller.ask(req, {
+          tickers: ['AAPL'],
+          question: 'Should I buy?',
+          provider: 'ensemble',
+          quality: 'deep',
+        }),
+      ).rejects.toThrow('Insufficient credits');
+
+      // Ticket rolled back, expensive LLM work never dispatched.
+      expect(mockResearchService.deleteResearchNote).toHaveBeenCalledWith(
+        'ticket-1',
+        'user1',
+      );
+      expect(mockResearchService.processTicket).not.toHaveBeenCalled();
+    });
+
+    it('skips deduction for admins but still processes', async () => {
+      const ticket = { id: 'ticket-2', status: 'pending' };
+      mockResearchService.createResearchTicket.mockResolvedValue(ticket);
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+      mockCreditService.getResearchCost.mockReturnValue(5);
+
+      const req = { user: { id: 'admin1', role: 'admin' } };
+
+      const result = await controller.ask(req, {
+        tickers: ['AAPL'],
+        question: 'Should I buy?',
+        provider: 'ensemble',
+        quality: 'deep',
+      });
+
+      expect(result).toEqual({ id: 'ticket-2', status: 'pending' });
+      expect(mockCreditService.deductCredits).not.toHaveBeenCalled();
+      expect(mockResearchService.processTicket).toHaveBeenCalledWith(
+        'ticket-2',
+      );
     });
   });
 

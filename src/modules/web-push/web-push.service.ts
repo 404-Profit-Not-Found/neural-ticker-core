@@ -1,4 +1,10 @@
-import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  forwardRef,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -47,11 +53,43 @@ export class WebPushService {
   /**
    * Register or update a push subscription for a user.
    */
+  // Real push-service hosts. The endpoint is later POSTed to by the server, so
+  // restrict it to known providers — otherwise a forged subscription turns this
+  // into an SSRF / arbitrary outbound-request primitive.
+  private static readonly ALLOWED_PUSH_HOSTS = [
+    'fcm.googleapis.com',
+    'android.googleapis.com',
+    'push.services.mozilla.com',
+    'notify.windows.com',
+    'push.apple.com',
+  ];
+
+  private assertValidEndpoint(endpoint: string): void {
+    let url: URL;
+    try {
+      url = new URL(endpoint);
+    } catch {
+      throw new BadRequestException('Invalid push endpoint URL');
+    }
+    if (url.protocol !== 'https:') {
+      throw new BadRequestException('Push endpoint must use https');
+    }
+    const host = url.hostname.toLowerCase();
+    const allowed = WebPushService.ALLOWED_PUSH_HOSTS.some(
+      (h) => host === h || host.endsWith('.' + h),
+    );
+    if (!allowed) {
+      throw new BadRequestException('Unrecognized push service host');
+    }
+  }
+
   async subscribe(
     userId: string,
     subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
     userAgent?: string,
   ): Promise<PushSubscriptionEntity> {
+    this.assertValidEndpoint(subscription.endpoint);
+
     // Upsert by endpoint to prevent duplicates
     const existing = await this.subRepo.findOne({
       where: { endpoint: subscription.endpoint },

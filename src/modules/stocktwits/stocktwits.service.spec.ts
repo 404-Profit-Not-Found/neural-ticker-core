@@ -386,9 +386,20 @@ describe('StockTwitsService', () => {
       const stats = await service.handleHourlyPostsSync(2);
 
       expect(fetchSpy).toHaveBeenCalledTimes(2);
-      expect(fetchSpy).toHaveBeenCalledWith('AAPL', 20);
-      expect(fetchSpy).toHaveBeenCalledWith('TSLA', 20);
-      expect(stats).toEqual({ batchSize: 2, processed: 2, failed: 0 });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'AAPL',
+        StockTwitsService.POSTS_PAGES_CAP,
+      );
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'TSLA',
+        StockTwitsService.POSTS_PAGES_CAP,
+      );
+      expect(stats).toEqual({
+        batchSize: 2,
+        processed: 2,
+        failed: 0,
+        skipped: 0,
+      });
     });
 
     it('isolates per-ticker errors so a bad ticker cannot abort the batch', async () => {
@@ -406,7 +417,12 @@ describe('StockTwitsService', () => {
       const stats = await service.handleHourlyPostsSync(3);
 
       expect(fetchSpy).toHaveBeenCalledTimes(3);
-      expect(stats).toEqual({ batchSize: 3, processed: 2, failed: 1 });
+      expect(stats).toEqual({
+        batchSize: 3,
+        processed: 2,
+        failed: 1,
+        skipped: 0,
+      });
     });
 
     it('returns zero-stats when there are no tickers to sync', async () => {
@@ -416,7 +432,12 @@ describe('StockTwitsService', () => {
       const stats = await service.handleHourlyPostsSync(10);
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(stats).toEqual({ batchSize: 0, processed: 0, failed: 0 });
+      expect(stats).toEqual({
+        batchSize: 0,
+        processed: 0,
+        failed: 0,
+        skipped: 0,
+      });
     });
   });
 
@@ -434,7 +455,12 @@ describe('StockTwitsService', () => {
       expect(trackSpy).toHaveBeenCalledTimes(2);
       expect(trackSpy).toHaveBeenCalledWith('AAPL');
       expect(trackSpy).toHaveBeenCalledWith('TSLA');
-      expect(stats).toEqual({ batchSize: 2, processed: 2, failed: 0 });
+      expect(stats).toEqual({
+        batchSize: 2,
+        processed: 2,
+        failed: 0,
+        skipped: 0,
+      });
     });
 
     it('isolates per-ticker errors', async () => {
@@ -451,7 +477,12 @@ describe('StockTwitsService', () => {
 
       const stats = await service.handleDailyWatchersSync(2);
 
-      expect(stats).toEqual({ batchSize: 2, processed: 1, failed: 1 });
+      expect(stats).toEqual({
+        batchSize: 2,
+        processed: 1,
+        failed: 1,
+        skipped: 0,
+      });
     });
   });
 });

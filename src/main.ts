@@ -6,15 +6,43 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
 
-  // Increase Payload Limit
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ limit: '50mb', extended: true }));
+  // Security headers. Keep CORP cross-origin so /proxy/image logos can still
+  // be embedded by the frontend (served from a different origin). Enable a
+  // tailored CSP that preserves current Swagger UI / SPA inline behavior.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+          baseUri: ["'self'"],
+        },
+      },
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+  // Trust the Cloud Run / proxy hop so req.ip reflects the real client
+  // (X-Forwarded-For). Without this, per-IP rate limiting buckets every client
+  // behind the proxy's single IP into one shared limit.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  // Payload limit — ample for markdown/JSON research uploads, far below the
+  // previous 50mb that let a single request pin server memory.
+  app.use(json({ limit: '2mb' }));
+  app.use(urlencoded({ limit: '2mb', extended: true }));
 
   // Global Validation Pipe
   app.useGlobalPipes(

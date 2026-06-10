@@ -3,8 +3,19 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const DEV_DB_URL = 'postgresql://neondb_owner:npg_iAFeH38yMBkW@ep-quiet-fire-ag2vydfm-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
-const PROD_DB_URL = 'postgresql://neondb_owner:npg_iAFeH38yMBkW@ep-red-sun-agranmzh-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    console.error(
+      `Missing ${name}. Set it in your environment (e.g. .env) before running.`,
+    );
+    process.exit(1);
+  }
+  return value;
+}
+
+const DEV_DB_URL = requireEnv('DEV_DATABASE_URL');
+const PROD_DB_URL = requireEnv('PROD_DATABASE_URL');
 
 async function getSchema(connectionString: string, label: string) {
   const client = new Client({ connectionString });
