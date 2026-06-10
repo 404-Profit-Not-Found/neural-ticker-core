@@ -159,7 +159,6 @@ export class TickersController {
     type: TickerEntity,
   })
   @ApiResponse({ status: 404, description: 'Ticker not found in Finnhub.' })
-  @Public()
   @ApiOperation({
     summary: 'Ensure ticker exists (Body Payload)',
     description: 'Safe alternative for symbols with special chars (dots).',

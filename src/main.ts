@@ -6,15 +6,33 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
   console.log('--- CREATING NEST APP ---');
   const app = await NestFactory.create(AppModule);
 
-  // Increase Payload Limit
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ limit: '50mb', extended: true }));
+  // Security headers. CSP is left off for now because the Swagger UI and the
+  // served SPA rely on inline scripts/styles — enable a tailored policy later.
+  // CORP is cross-origin so the /proxy/image logos can still be embedded by the
+  // frontend (which is served from a different origin).
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+  // Trust the Cloud Run / proxy hop so req.ip reflects the real client
+  // (X-Forwarded-For). Without this, per-IP rate limiting buckets every client
+  // behind the proxy's single IP into one shared limit.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  // Payload limit — ample for markdown/JSON research uploads, far below the
+  // previous 50mb that let a single request pin server memory.
+  app.use(json({ limit: '2mb' }));
+  app.use(urlencoded({ limit: '2mb', extended: true }));
 
   // Global Validation Pipe
   app.useGlobalPipes(

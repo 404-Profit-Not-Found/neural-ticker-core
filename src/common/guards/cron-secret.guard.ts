@@ -5,6 +5,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class CronSecretGuard implements CanActivate {
@@ -12,9 +13,11 @@ export class CronSecretGuard implements CanActivate {
 
   canActivate(ctx: ExecutionContext): boolean {
     const req = ctx.switchToHttp().getRequest();
-    const secret = req.headers['x-cron-secret'];
+    const header = req.headers['x-cron-secret'];
+    const provided = Array.isArray(header) ? header[0] : header;
+    const expected = process.env.CRON_SECRET;
 
-    if (!secret || secret !== process.env.CRON_SECRET) {
+    if (!expected || !provided || !this.safeEqual(provided, expected)) {
       this.logger.warn(
         `Unauthorized cron attempt to ${req.method} ${req.originalUrl ?? req.url}`,
       );
@@ -22,5 +25,13 @@ export class CronSecretGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  /** Length-checked constant-time comparison to avoid a timing side-channel. */
+  private safeEqual(a: string, b: string): boolean {
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    if (ab.length !== bb.length) return false;
+    return timingSafeEqual(ab, bb);
   }
 }

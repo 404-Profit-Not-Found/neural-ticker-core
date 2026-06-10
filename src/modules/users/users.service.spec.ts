@@ -280,8 +280,26 @@ describe('UsersService', () => {
       mockUserRepo.findOne.mockResolvedValue(user);
       mockUserRepo.save.mockImplementation((u) => Promise.resolve(u));
 
-      const result = await service.updatePreferences('1', { language: 'en' });
-      expect(result.preferences).toEqual({ theme: 'light', language: 'en' });
+      const result = await service.updatePreferences('1', {
+        displayCurrency: 'EUR',
+      });
+      expect(result.preferences).toEqual({
+        theme: 'light',
+        displayCurrency: 'EUR',
+      });
+    });
+
+    it('ignores non-whitelisted keys (mass-assignment guard)', async () => {
+      const user = { id: '1', preferences: {} };
+      mockUserRepo.findOne.mockResolvedValue(user);
+      mockUserRepo.save.mockImplementation((u) => Promise.resolve(u));
+
+      const result = await service.updatePreferences('1', {
+        role: 'admin',
+        credits_balance: 9999,
+        displayCurrency: 'USD',
+      });
+      expect(result.preferences).toEqual({ displayCurrency: 'USD' });
     });
 
     it('should throw NotFoundException if user not found', async () => {

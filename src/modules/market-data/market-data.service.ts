@@ -2149,8 +2149,13 @@ export class MarketDataService {
       );
     }
 
-    // Sort Mapping
-    let sortField = `fund.${sortBy}`; // Default to fundamentals
+    // Sort Mapping.
+    // SECURITY: the fallback interpolates `sortBy` straight into the ORDER BY
+    // column expression, so it MUST be a bare SQL identifier. Reject anything
+    // else (subqueries, quotes, parens, whitespace) to prevent ORDER BY
+    // injection — an unknown value falls back to a safe constant column.
+    const isSafeSortColumn = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sortBy);
+    let sortField = isSafeSortColumn ? `fund.${sortBy}` : 'fund.market_cap';
 
     if (sortBy === 'change' || sortBy === 'price_change') {
       sortField = '"price_change_pct"';
@@ -2174,7 +2179,11 @@ export class MarketDataService {
       sortField = 'fund.consensus_rating';
     }
 
-    qb.orderBy(sortField, sortDir);
+    // Normalize direction to a strict literal — TypeORM does NOT parameterize
+    // the ORDER BY direction, so never pass the raw user value through.
+    const sortDirection: 'ASC' | 'DESC' =
+      String(sortDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    qb.orderBy(sortField, sortDirection);
 
     // Add secondary sort for stability
     qb.addOrderBy('ticker.symbol', 'ASC');

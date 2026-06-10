@@ -22,10 +22,15 @@ export class CreditGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Determine cost based on model
+    // Determine cost from the SAME params the pipeline uses (provider +
+    // quality). The DTO has no `model` field, so the old `body.model` read was
+    // always undefined → cost 1 → Pro gate never fired. Guard and controller
+    // must compute the cost identically.
     const body = request.body;
-    const model = body?.model;
-    const cost = this.creditService.getModelCost(model);
+    const cost = this.creditService.getResearchCost(
+      body?.provider,
+      body?.quality,
+    );
 
     // Fetch fresh user to check tier/balance
     const freshUser = await this.usersService.findById(user.id);

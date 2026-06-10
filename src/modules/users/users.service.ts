@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -229,6 +230,14 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  // Only these top-level preference keys may be written by the client. Prevents
+  // mass-assignment of arbitrary keys / large blobs into the JSON column.
+  private static readonly ALLOWED_PREFERENCE_KEYS = [
+    'displayCurrency',
+    'notifications',
+    'gemini_api_key',
+  ];
+
   async updatePreferences(
     id: string,
     preferences: Record<string, any>,
@@ -237,7 +246,25 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    user.preferences = { ...user.preferences, ...preferences };
+
+    if (
+      !preferences ||
+      typeof preferences !== 'object' ||
+      Array.isArray(preferences)
+    ) {
+      throw new BadRequestException('Invalid preferences payload');
+    }
+
+    // Whitelist: silently ignore unknown keys so a client cannot inject
+    // arbitrary fields into the preferences JSON.
+    const sanitized: Record<string, any> = {};
+    for (const key of UsersService.ALLOWED_PREFERENCE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(preferences, key)) {
+        sanitized[key] = preferences[key];
+      }
+    }
+
+    user.preferences = { ...user.preferences, ...sanitized };
     return this.userRepo.save(user);
   }
 

@@ -106,6 +106,12 @@ export class StockTwitsService {
               const curlArgs = [
                 '-s',
                 '-i',
+                // Hard ceiling so a hung connection cannot block the event
+                // loop indefinitely (execFileSync is synchronous).
+                '--max-time',
+                '8',
+                '--connect-timeout',
+                '4',
                 '-A',
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                 '-H',
@@ -115,6 +121,10 @@ export class StockTwitsService {
               try {
                 const output = execFileSync('curl', curlArgs, {
                   encoding: 'utf8',
+                  // execFileSync's own kill switch in case curl ignores
+                  // --max-time for some reason (DNS hang, etc.).
+                  timeout: 10_000,
+                  maxBuffer: 8 * 1024 * 1024,
                 });
 
                 // Check for 403 in headers
@@ -262,6 +272,11 @@ export class StockTwitsService {
         const curlArgs = [
           '-s',
           '-i',
+          // Hard ceiling so a hung connection cannot block the event loop.
+          '--max-time',
+          '6',
+          '--connect-timeout',
+          '4',
           '-A',
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
           '-H',
@@ -269,7 +284,11 @@ export class StockTwitsService {
           url,
         ];
         try {
-          const output = execFileSync('curl', curlArgs, { encoding: 'utf8' });
+          const output = execFileSync('curl', curlArgs, {
+            encoding: 'utf8',
+            timeout: 8_000,
+            maxBuffer: 2 * 1024 * 1024,
+          });
           const bodyStart = output.indexOf('\r\n\r\n');
           const body =
             bodyStart !== -1 ? output.substring(bodyStart + 4) : output;
@@ -302,11 +321,26 @@ export class StockTwitsService {
 
   /**
    * Batch size defaults — sized so a single cron run finishes well inside the
-   * Cloud Run 5-min request timeout. Posts is the heavy path (up to 20 pages
-   * each × HTTP latency), watchers is light (1 GET per ticker).
+   * Cloud Run 5-min request timeout. Posts is the heavy path (up to PAGES_CAP
+   * pages × HTTP latency with curl fallback), watchers is light (1 GET per
+   * ticker).
+   *
+   * Empirically the previous values (10 / 25) produced 504s when the batch
+   * happened to pick several never-synced tickers (each walks ~PAGES_CAP
+   * pages with the slow curl fallback). Cut the posts batch hard and rely on
+   * a wall-clock guard inside the loop to bail before the timeout.
    */
-  static readonly POSTS_BATCH_SIZE = 10;
+  static readonly POSTS_BATCH_SIZE = 5;
+  static readonly POSTS_PAGES_CAP = 10;
   static readonly WATCHERS_BATCH_SIZE = 25;
+
+  /**
+   * Hard wall-clock budget for an entire batch run, in milliseconds. Sized
+   * below the Cloud Run 5-min request timeout so the controller can finish
+   * its response even when running synchronously. Background path also
+   * honors this so a runaway loop cannot accumulate forever.
+   */
+  static readonly BATCH_WALL_CLOCK_MS = 4 * 60 * 1000;
 
   /**
    * Pick the N tickers whose latest post is oldest (or that have never been
@@ -399,22 +433,44 @@ export class StockTwitsService {
    */
   async handleHourlyPostsSync(
     batchSize = StockTwitsService.POSTS_BATCH_SIZE,
-  ): Promise<{ batchSize: number; processed: number; failed: number }> {
+  ): Promise<{
+    batchSize: number;
+    processed: number;
+    failed: number;
+    skipped: number;
+  }> {
     this.logger.log(
       `Starting StockTwits posts batch sync (size: ${batchSize})...`,
     );
     const symbols = await this.pickStaleTickersForPostsSync(batchSize);
     if (symbols.length === 0) {
       this.logger.log('No tickers to sync.');
-      return { batchSize: 0, processed: 0, failed: 0 };
+      return { batchSize: 0, processed: 0, failed: 0, skipped: 0 };
     }
     this.logger.log(`Batch tickers: ${symbols.join(', ')}`);
 
+    const startedAt = Date.now();
+    const deadline = startedAt + StockTwitsService.BATCH_WALL_CLOCK_MS;
     let processed = 0;
     let failed = 0;
+    let skipped = 0;
+
     for (const symbol of symbols) {
+      // Wall-clock guard: leave headroom inside the Cloud Run 5-min budget so
+      // the response can be returned. Remaining tickers wait for the next run
+      // — they'll be picked again by the staleness query.
+      if (Date.now() >= deadline) {
+        skipped = symbols.length - (processed + failed);
+        this.logger.warn(
+          `Posts batch hit wall-clock budget (${StockTwitsService.BATCH_WALL_CLOCK_MS}ms), skipping ${skipped} remaining tickers.`,
+        );
+        break;
+      }
       try {
-        await this.fetchAndStorePosts(symbol, 20); // 20 pages cap for cron
+        await this.fetchAndStorePosts(
+          symbol,
+          StockTwitsService.POSTS_PAGES_CAP,
+        );
         processed++;
       } catch (e: any) {
         // Defensive: fetchAndStorePosts has its own try/catch, but never let
@@ -426,10 +482,11 @@ export class StockTwitsService {
       }
     }
 
+    const elapsedMs = Date.now() - startedAt;
     this.logger.log(
-      `Posts batch complete. Processed: ${processed}, Failed: ${failed} of ${symbols.length}.`,
+      `Posts batch complete in ${elapsedMs}ms. Processed: ${processed}, Failed: ${failed}, Skipped: ${skipped} of ${symbols.length}.`,
     );
-    return { batchSize: symbols.length, processed, failed };
+    return { batchSize: symbols.length, processed, failed, skipped };
   }
 
   /**
@@ -437,20 +494,36 @@ export class StockTwitsService {
    */
   async handleDailyWatchersSync(
     batchSize = StockTwitsService.WATCHERS_BATCH_SIZE,
-  ): Promise<{ batchSize: number; processed: number; failed: number }> {
+  ): Promise<{
+    batchSize: number;
+    processed: number;
+    failed: number;
+    skipped: number;
+  }> {
     this.logger.log(
       `Starting StockTwits watchers batch sync (size: ${batchSize})...`,
     );
     const symbols = await this.pickStaleTickersForWatchersSync(batchSize);
     if (symbols.length === 0) {
       this.logger.log('No tickers to sync.');
-      return { batchSize: 0, processed: 0, failed: 0 };
+      return { batchSize: 0, processed: 0, failed: 0, skipped: 0 };
     }
     this.logger.log(`Batch tickers: ${symbols.join(', ')}`);
 
+    const startedAt = Date.now();
+    const deadline = startedAt + StockTwitsService.BATCH_WALL_CLOCK_MS;
     let processed = 0;
     let failed = 0;
+    let skipped = 0;
+
     for (const symbol of symbols) {
+      if (Date.now() >= deadline) {
+        skipped = symbols.length - (processed + failed);
+        this.logger.warn(
+          `Watchers batch hit wall-clock budget (${StockTwitsService.BATCH_WALL_CLOCK_MS}ms), skipping ${skipped} remaining tickers.`,
+        );
+        break;
+      }
       try {
         await this.trackWatchers(symbol);
         processed++;
@@ -462,10 +535,11 @@ export class StockTwitsService {
       }
     }
 
+    const elapsedMs = Date.now() - startedAt;
     this.logger.log(
-      `Watchers batch complete. Processed: ${processed}, Failed: ${failed} of ${symbols.length}.`,
+      `Watchers batch complete in ${elapsedMs}ms. Processed: ${processed}, Failed: ${failed}, Skipped: ${skipped} of ${symbols.length}.`,
     );
-    return { batchSize: symbols.length, processed, failed };
+    return { batchSize: symbols.length, processed, failed, skipped };
   }
 
   async getPosts(symbol: string, page = 1, limit = 50) {
