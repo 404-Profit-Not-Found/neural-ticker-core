@@ -177,6 +177,8 @@ export class ResearchController {
 
   @ApiOperation({ summary: 'Upload manual research note (Legacy)' })
   @ApiResponse({ status: 201, description: 'Note created.' })
+  // Mints credits via an LLM judge — cap per-IP to stop scripted credit farming.
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('upload')
   async upload(@Request() req: any, @Body() dto: UploadResearchDto) {
     const userId = req.user.id;
@@ -194,6 +196,8 @@ export class ResearchController {
     status: 201,
     description: 'Contribution accepted and scored.',
   })
+  // Mints credits via an LLM judge — cap per-IP to stop scripted credit farming.
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('contribute')
   async contribute(@Request() req: any, @Body() dto: ContributeDto) {
     const userId = req.user.id;

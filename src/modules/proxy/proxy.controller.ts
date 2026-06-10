@@ -48,6 +48,9 @@ export class ProxyController {
     try {
       const parsedUrl = new URL(url);
       const hostname = parsedUrl.hostname;
+      if (parsedUrl.protocol !== 'https:') {
+        throw new BadRequestException('Only https URLs are allowed');
+      }
       if (hostname !== 'finnhub.io' && !hostname.endsWith('.finnhub.io')) {
         throw new BadRequestException('Only finnhub.io images are allowed');
       }
@@ -57,6 +60,9 @@ export class ProxyController {
       const response = await firstValueFrom(
         this.httpService.get(url, {
           responseType: 'stream',
+          // Only the initial host is validated, so do NOT follow redirects —
+          // otherwise a finnhub open-redirect could reach an internal target.
+          maxRedirects: 0,
           headers: {
             'User-Agent': 'Neural-Ticker-Backend/1.0',
             // Forwarding strict headers might cause issues if Finnhub checks them,
