@@ -252,6 +252,7 @@ describe('TickersService', () => {
         'https://logo.com/test.png',
         {
           responseType: 'arraybuffer',
+          maxRedirects: 0,
         },
       );
       expect(mockLogoRepo.create).toHaveBeenCalled();
@@ -267,6 +268,18 @@ describe('TickersService', () => {
       await expect(
         service.downloadAndSaveLogo('ticker-1', 'https://bad.com'),
       ).resolves.toBeUndefined();
+    });
+
+    it('refuses an unsafe (SSRF) URL without fetching', async () => {
+      mockHttpService.get.mockClear();
+
+      await service.downloadAndSaveLogo(
+        'ticker-1',
+        'http://169.254.169.254/latest/meta-data/',
+      );
+
+      expect(mockHttpService.get).not.toHaveBeenCalled();
+      expect(mockLogoRepo.save).not.toHaveBeenCalled();
     });
 
     it('should return early if no URL provided', async () => {

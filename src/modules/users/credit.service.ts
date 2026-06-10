@@ -29,7 +29,9 @@ export class CreditService {
     if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite'))
       return 1;
 
-    return 1;
+    // Unknown/unrecognized model → fail-expensive so a crafted model string
+    // can't route to an expensive provider while being charged the minimum.
+    return 5;
   }
 
   /**
@@ -46,6 +48,27 @@ export class CreditService {
 
     if (p === 'ensemble' || q === 'deep') return 5;
     return 1;
+  }
+
+  /**
+   * Sum of positive credits a user has earned for a given reason since a
+   * timestamp. Used to enforce daily anti-farming caps.
+   */
+  async getEarnedSince(
+    userId: string,
+    reason: string,
+    since: Date,
+  ): Promise<number> {
+    const row = await this.dataSource
+      .getRepository(CreditTransaction)
+      .createQueryBuilder('t')
+      .select('COALESCE(SUM(t.amount), 0)', 'sum')
+      .where('t.user_id = :userId', { userId })
+      .andWhere('t.reason = :reason', { reason })
+      .andWhere('t.amount > 0')
+      .andWhere('t.created_at >= :since', { since })
+      .getRawOne<{ sum: string }>();
+    return Number(row?.sum) || 0;
   }
 
   async addCredits(

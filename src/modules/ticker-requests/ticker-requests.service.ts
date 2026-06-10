@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { TickerRequestEntity } from './entities/ticker-request.entity';
 import { TickersService } from '../tickers/tickers.service';
 
@@ -19,9 +19,26 @@ export class TickerRequestsService {
     private readonly tickersService: TickersService,
   ) {}
 
+  static readonly DAILY_REQUEST_LIMIT = 20;
+
   async createRequest(userId: string, symbol: string) {
-    const startSymbol = symbol.trim().toUpperCase();
+    const startSymbol = (symbol || '').trim().toUpperCase();
+    if (!/^[A-Z0-9.-]{1,10}$/.test(startSymbol)) {
+      throw new BadRequestException('Invalid ticker symbol format');
+    }
     this.logger.log(`Received request for ${startSymbol} from user ${userId}`);
+
+    // Per-user daily cap (anti-spam). Distinct arbitrary symbols would otherwise
+    // let one user create unbounded request rows.
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const dailyCount = await this.requestRepo.count({
+      where: { user_id: userId, created_at: MoreThanOrEqual(since) },
+    });
+    if (dailyCount >= TickerRequestsService.DAILY_REQUEST_LIMIT) {
+      throw new BadRequestException(
+        `Daily ticker-request limit reached (${TickerRequestsService.DAILY_REQUEST_LIMIT}). Try again tomorrow.`,
+      );
+    }
 
     try {
       // 1. Check if already tracked

@@ -229,14 +229,71 @@ export class TickersService {
     }
   }
 
+  /**
+   * SSRF guard for server-fetched image URLs (logos). Requires https and
+   * rejects localhost / internal hostnames / private/reserved IP literals
+   * (incl. cloud metadata 169.254.169.254). Pair with maxRedirects:0 so a
+   * redirect can't escape the check.
+   */
+  static isSafeRemoteImageUrl(rawUrl: string): boolean {
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.internal') ||
+      host.endsWith('.local')
+    ) {
+      return false;
+    }
+    return !TickersService.isPrivateOrReservedHost(host);
+  }
+
+  private static isPrivateOrReservedHost(host: string): boolean {
+    // IPv6 loopback / link-local (fe80::/10) / unique-local (fc00::/7)
+    if (
+      host === '::1' ||
+      /^fe[89ab]/.test(host) ||
+      host.startsWith('fc') ||
+      host.startsWith('fd')
+    ) {
+      return true;
+    }
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return false;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 10 || a === 127 || a === 0) return true; // private / loopback
+    if (a === 169 && b === 254) return true; // link-local + cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
+    return false;
+  }
+
   async downloadAndSaveLogo(symbolId: string, url: string) {
     if (!url) return;
+    if (!TickersService.isSafeRemoteImageUrl(url)) {
+      this.logger.warn(
+        `Refusing logo download for ticker ID ${symbolId}: unsafe URL ${url}`,
+      );
+      return;
+    }
     try {
       this.logger.debug(
         `Downloading logo for ticker ID ${symbolId} from ${url}`,
       );
       const response = await firstValueFrom(
-        this.httpService.get(url, { responseType: 'arraybuffer' }),
+        this.httpService.get(url, {
+          responseType: 'arraybuffer',
+          maxRedirects: 0,
+        }),
       );
 
       const buffer = Buffer.from(response.data);

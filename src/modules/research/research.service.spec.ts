@@ -75,6 +75,7 @@ describe('ResearchService', () => {
 
   const mockCreditService = {
     addCredits: jest.fn(),
+    getEarnedSince: jest.fn().mockResolvedValue(0),
   };
 
   const mockQualityScoringService = {

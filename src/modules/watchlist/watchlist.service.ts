@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Watchlist } from './entities/watchlist.entity';
 import { WatchlistItem } from './entities/watchlist-item.entity';
 import { TickersService } from '../tickers/tickers.service';
+import { QuotaService } from '../../common/quota/quota.service';
 
 @Injectable()
 export class WatchlistService {
@@ -20,6 +21,7 @@ export class WatchlistService {
     private readonly itemRepo: Repository<WatchlistItem>,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
+    private readonly quota: QuotaService,
   ) {}
 
   async createWatchlist(userId: string, name: string): Promise<Watchlist> {
@@ -33,6 +35,11 @@ export class WatchlistService {
       // User can create new lists with DIFFERENT names.
       return existing;
     }
+
+    const count = await this.watchlistRepo.count({
+      where: { user_id: userId },
+    });
+    await this.quota.assertWithinLimit(userId, 'watchlists', count);
 
     const list = this.watchlistRepo.create({
       user_id: userId,
@@ -105,6 +112,12 @@ export class WatchlistService {
     if (existing) {
       throw new ConflictException(`${symbol} is already in this watchlist`);
     }
+
+    // 3.5 Enforce per-list item cap (tier-aware)
+    const itemCount = await this.itemRepo.count({
+      where: { watchlist_id: watchlistId },
+    });
+    await this.quota.assertWithinLimit(userId, 'watchlistItems', itemCount);
 
     // 4. Create Item
     const item = this.itemRepo.create({

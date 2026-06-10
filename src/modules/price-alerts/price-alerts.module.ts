@@ -6,6 +6,7 @@ import { PriceAlertsController } from './price-alerts.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TickersModule } from '../tickers/tickers.module';
 import { WebPushModule } from '../web-push/web-push.module';
+import { QuotaModule } from '../../common/quota/quota.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { WebPushModule } from '../web-push/web-push.module';
     NotificationsModule,
     forwardRef(() => TickersModule),
     WebPushModule,
+    QuotaModule,
   ],
   controllers: [PriceAlertsController],
   providers: [PriceAlertsService],
