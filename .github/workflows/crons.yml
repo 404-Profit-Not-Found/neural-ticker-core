@@ -5,9 +5,9 @@ permissions:
 
 on:
   schedule:
-    # Daily at Midnight UTC (Sync Candles, Watchers, Moderation)
+    # Daily at Midnight UTC (Watchers Sync, Moderation, Research cleanup)
     - cron: '0 0 * * *'
-    # Hourly (Risk/Reward Scanner, Posts Sync, Cleanup, Research-stale-2w trigger)
+    # Hourly (Candle Sync batch, Risk/Reward Scanner, Posts Sync, Cleanup)
     - cron: '0 * * * *'
     # Every 5 mins during market hours (6 AM - 9 PM UTC, Mon-Fri)
     # Used by: snapshot-sync (price tick) + market-hours-refresh (top picks, portfolios)
@@ -22,12 +22,6 @@ jobs:
     environment: prod
     if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Trigger Daily Candle Sync
-        run: |
-          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles" \
-            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type:application/json"
-
       - name: Trigger Daily Watchers Sync
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/stocktwits/jobs/sync-watchers" \
@@ -40,7 +34,7 @@ jobs:
             -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
             -H "Content-Type:application/json"
 
-      - name: Cleanup Old Research (>30 days)
+      - name: Cleanup Old Research (>90 days + orphaned analyses)
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/cleanup-old-research -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
 
   hourly-jobs:
@@ -48,9 +42,21 @@ jobs:
     environment: prod
     if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      # Triggers research for tickers with risk/reward score missing or older than 14 days.
+      # Daily (1d) candle sync, split into a small stale-first batch per hour so
+      # each run stays well under the Cloud Run 5-min request timeout. Full
+      # universe coverage is reached over the course of the day (oldest 1d
+      # candle first). Previously ran once at midnight and timed out (504).
+      - name: Trigger Candle Sync (hourly stale-first batch)
+        run: |
+          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
+      # Queues research for the most-stale tickers (never-analysed first, then
+      # oldest), rotating through the whole universe on a ~weekly cadence. Hard
+      # daily free-LLM budget caps total calls so it never hits the billed key.
       # Endpoint returns 202 immediately and runs the scan in the background.
-      - name: Trigger Risk/Reward Scanner (queues stale-research >14d)
+      - name: Trigger Risk/Reward Scanner (stale-first rotation, budget-gated)
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
             -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
@@ -104,7 +110,7 @@ jobs:
     environment: prod
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Trigger Risk/Reward Scanner (5 tickers per run)
+      - name: Trigger Risk/Reward Scanner (stale-first batch, budget-gated)
         run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
 
       - name: Trigger Daily Digest Generation

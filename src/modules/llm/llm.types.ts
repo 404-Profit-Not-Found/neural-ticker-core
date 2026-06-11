@@ -18,6 +18,13 @@ export interface ResearchPrompt {
   quality?: QualityTier;
   provider?: 'openai' | 'gemini' | 'ensemble';
   apiKey?: string;
+  /**
+   * When true (implied for `quality: 'cron'`), the call must stay on the free
+   * primary key: on a 429 it falls back across free models but NEVER escalates
+   * to the billed secondary key. Used by background/cron research to protect
+   * the free quota and guarantee zero billed spend.
+   */
+  freeOnly?: boolean;
 }
 
 export interface ResearchResult {

@@ -54,10 +54,20 @@ export default () => {
           process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
       },
     },
+    llm: {
+      // Hard daily cap on free-tier (primary-key) flash-lite calls. Kept below
+      // Google's 500/day free quota so background/cron research stops on its
+      // own and never escalates to the billed secondary key. DB-backed counter
+      // (llm_daily_usage) survives Cloud Run instance restarts.
+      dailyFreeLimit: parseInt(process.env.LLM_DAILY_FREE_LIMIT || '450', 10),
+    },
     riskReward: {
       enabled: process.env.RRSCORE_ENABLED !== 'false',
       cron: process.env.RRSCORE_CRON_EXPRESSION || '0 * * * *',
-      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '24', 10),
+      // Re-research cadence for the universe scan: a ticker is "due" once its
+      // latest analysis is older than this (or it has never been analysed).
+      // Defaults to 7 days ("raz za tyzden").
+      maxAgeHours: parseInt(process.env.RRSCORE_MAX_AGE_HOURS || '168', 10),
       batchSize: parseInt(process.env.RRSCORE_BATCH_SIZE || '50', 10),
       provider: process.env.RRSCORE_PROVIDER || 'gemini',
     },

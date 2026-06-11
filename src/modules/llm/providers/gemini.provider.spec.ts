@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { GeminiProvider } from './gemini.provider';
+import { LlmBudgetService } from '../llm-budget.service';
 import { ResearchPrompt } from '../llm.types';
 import { GoogleGenAI } from '@google/genai';
 
@@ -44,6 +45,10 @@ describe('GeminiProvider', () => {
               return null;
             }),
           },
+        },
+        {
+          provide: LlmBudgetService,
+          useValue: { record: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

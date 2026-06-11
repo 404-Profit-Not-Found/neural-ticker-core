@@ -8,6 +8,7 @@ import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
 import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { LlmBudgetService } from '../llm/llm-budget.service';
 import {
   RequestQueue,
   RequestStatus,
@@ -36,6 +37,7 @@ export class JobsService {
     @Inject(forwardRef(() => PortfolioService))
     private readonly portfolioService: PortfolioService,
     private readonly configService: ConfigService,
+    private readonly llmBudgetService: LlmBudgetService,
   ) {}
 
   async cleanupStuckResearch() {
@@ -99,72 +101,68 @@ export class JobsService {
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @Cron(CronExpression.EVERY_HOUR)
   private async syncDailyCandlesCron() {
-    if (!this.isDevMode) return; // Production uses GitHub Actions
+    if (!this.isDevMode) return; // Production uses GitHub Actions (hourly)
     await this.syncDailyCandles();
   }
 
-  async syncDailyCandles() {
-    this.logger.log('Starting sequential batch candle sync...');
-    try {
-      const tickers = await this.tickersService.getAllTickers();
-      const BATCH_SIZE = 25;
-      const MAX_BATCHES = 5; // Process 5 batches per run (125 tickers max)
+  /**
+   * Batch size for the hourly candle sync. Sized so a single run finishes well
+   * inside the Cloud Run 5-min request timeout. The hourly cron rotates through
+   * all tickers across multiple runs via DB-driven staleness (oldest 1d candle
+   * first), so full universe coverage is reached over the course of the day.
+   */
+  static readonly DAILY_CANDLES_BATCH_SIZE = 20;
 
-      const totalBatches = Math.min(
-        Math.ceil(tickers.length / BATCH_SIZE),
-        MAX_BATCHES,
+  /**
+   * Syncs daily (1d) candles for a small, stale-first batch of tickers.
+   *
+   * Runs hourly: each run picks the N tickers whose latest 1d candle is oldest
+   * (or missing), refreshes their snapshot and backfills history. Keeping the
+   * batch small means a single run stays far under the Cloud Run request budget
+   * (the previous full-universe sync exceeded the 5-min timeout → 504), while
+   * stale-first ordering rotates coverage across the whole universe over a day.
+   */
+  async syncDailyCandles() {
+    this.logger.log('Starting hourly stale-first candle sync...');
+    try {
+      const allTickers = await this.tickersService.getAllTickers();
+      const candidates = allTickers.filter(
+        (t): t is typeof t & { symbol: string } => !!t.symbol,
       );
+
+      const batchSize = JobsService.DAILY_CANDLES_BATCH_SIZE;
+      const staleSymbols =
+        await this.marketDataService.pickStaleSnapshotTickers(
+          candidates.map((t) => t.symbol),
+          batchSize,
+        );
 
       this.logger.log(
-        `Processing ${totalBatches} batches of ${BATCH_SIZE} tickers (${totalBatches * BATCH_SIZE} total)`,
+        `Candle sync batch (${staleSymbols.length}/${candidates.length}, stale-first): ${staleSymbols.join(', ')}`,
       );
 
-      let totalProcessed = 0;
-      let totalFailed = 0;
+      let processed = 0;
+      let failed = 0;
 
-      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-        const startIdx = batchNum * BATCH_SIZE;
-        const batch = tickers.slice(startIdx, startIdx + BATCH_SIZE);
-
-        this.logger.log(
-          `Processing batch ${batchNum + 1}/${totalBatches} (tickers ${startIdx}-${startIdx + batch.length - 1})`,
-        );
-
-        let batchProcessed = 0;
-        let batchFailed = 0;
-
-        for (const ticker of batch) {
-          if (!ticker.symbol) continue;
-          try {
-            await this.marketDataService.getSnapshot(ticker.symbol);
-            await this.marketDataService.syncTickerHistory(ticker.symbol, 5);
-            batchProcessed++;
-          } catch (err: any) {
-            batchFailed++;
-            this.logger.error(`Failed ${ticker.symbol}: ${err.message}`);
-          }
+      for (const symbol of staleSymbols) {
+        try {
+          await this.marketDataService.getSnapshot(symbol);
+          await this.marketDataService.syncTickerHistory(symbol, 5);
+          processed++;
+        } catch (err: any) {
+          failed++;
+          this.logger.error(`Failed ${symbol}: ${err.message}`);
         }
-
-        totalProcessed += batchProcessed;
-        totalFailed += batchFailed;
-
-        this.logger.log(
-          `Batch ${batchNum + 1} complete. Processed: ${batchProcessed}, Failed: ${batchFailed}`,
-        );
       }
 
       this.logger.log(
-        `All batches complete. Total Processed: ${totalProcessed}, Total Failed: ${totalFailed}`,
+        `Candle sync complete. Processed: ${processed}, Failed: ${failed}, Batch: ${staleSymbols.length}`,
       );
-      return {
-        processed: totalProcessed,
-        failed: totalFailed,
-        batches: totalBatches,
-      };
+      return { processed, failed, batchSize: staleSymbols.length };
     } catch (e) {
-      this.logger.error('Daily candle sync failed globally', e);
+      this.logger.error('Candle sync failed globally', e);
       throw e;
     }
   }
@@ -280,67 +278,86 @@ export class JobsService {
     await this.runRiskRewardScanner();
   }
 
+  /**
+   * Max tickers queued per scanner run. Small so each run stays light; the
+   * stale-first rotation + frequent cron schedule cover the whole universe
+   * over time, and the daily LLM budget is the hard ceiling on total work.
+   */
+  static readonly RISK_SCANNER_BATCH_SIZE = 5;
+
+  /**
+   * Approx. free-tier flash-lite calls one research ticket consumes (the main
+   * cron-tier research call + the financial-extraction call). Used to size the
+   * batch against the remaining daily budget so a run never starts work it
+   * can't finish on the free key.
+   */
+  static readonly RISK_SCANNER_CALLS_PER_TICKET = 2;
+
   async runRiskRewardScanner() {
     const maxAgeHours =
-      this.configService.get<number>('riskReward.maxAgeHours') || 24;
+      this.configService.get<number>('riskReward.maxAgeHours') || 168;
+    const stalenessMs = maxAgeHours * 60 * 60 * 1000;
+    const perTicket = JobsService.RISK_SCANNER_CALLS_PER_TICKET;
+
     this.logger.log(
       `Starting risk/reward scanner (cron tier, staleness: ${maxAgeHours}h)...`,
     );
     try {
-      const tickers = await this.tickersService.getAllTickers();
-      // Frequent + small: 5 tickers per run × every 5 min
-      // = ~25s work per run, completes 150 stocks in ~2.5h
-      const BATCH_SIZE = 5;
-      const MAX_BATCHES = 1;
-      const DELAY_MS = 4500; // ~13 RPM to stay safely under 15 RPM
+      // Hard daily budget gate: protect the free flash-lite quota and never
+      // let cron research escalate to the billed key.
+      const remaining = await this.llmBudgetService.getRemaining();
+      if (remaining < perTicket) {
+        this.logger.warn(
+          `Daily free LLM budget exhausted (remaining: ${remaining}). Skipping scan.`,
+        );
+        return { processed: 0, errors: 0, due: 0, budgetExhausted: true };
+      }
 
-      const totalBatches = Math.min(
-        Math.ceil(tickers.length / BATCH_SIZE),
-        MAX_BATCHES,
+      const allTickers = await this.tickersService.getAllTickers();
+      const symbols = allTickers
+        .map((t) => t.symbol)
+        .filter((s): s is string => !!s);
+
+      // Size this run to the smaller of the fixed batch and what the remaining
+      // budget can afford.
+      const budgetCap = Math.floor(remaining / perTicket);
+      const limit = Math.min(JobsService.RISK_SCANNER_BATCH_SIZE, budgetCap);
+
+      // Stale-first rotation (never-analysed first, then oldest). Replaces the
+      // old slice(0, 5) window that only ever touched the first few tickers
+      // alphabetically and never rotated, so unwatched tickers never got
+      // scanned. Now coverage advances every run.
+      const dueSymbols = await this.riskRewardService.pickStaleAnalysisTickers(
+        symbols,
+        limit,
+        stalenessMs,
       );
 
       this.logger.log(
-        `Processing ${totalBatches} batches of ${BATCH_SIZE} tickers (${totalBatches * BATCH_SIZE} max)`,
+        `Scanner batch (${dueSymbols.length} due / ${symbols.length} total, budget remaining: ${remaining}): ${dueSymbols.join(', ')}`,
       );
 
-      let totalProcessed = 0;
-      let totalSkipped = 0;
-      const stalenessMs = maxAgeHours * 60 * 60 * 1000;
+      const DELAY_MS = 4500; // ~13 RPM, safely under the 15 RPM free limit
+      let processed = 0;
+      let errors = 0;
 
-      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-        const startIdx = batchNum * BATCH_SIZE;
-        const batch = tickers.slice(startIdx, startIdx + BATCH_SIZE);
+      for (const symbol of dueSymbols) {
+        // Re-check before each ticket — the free pool is shared with other
+        // jobs and interactive users, so it can drain mid-run.
+        if (!(await this.llmBudgetService.hasBudget(perTicket))) {
+          this.logger.warn(
+            'Daily free LLM budget reached mid-scan. Stopping early.',
+          );
+          break;
+        }
 
-        this.logger.log(
-          `Processing batch ${batchNum + 1}/${totalBatches} (tickers ${startIdx}-${startIdx + batch.length - 1})`,
-        );
+        try {
+          this.logger.log(`Queueing Cron-Tier Scan for ${symbol}...`);
 
-        let batchProcessed = 0;
-        let batchSkipped = 0;
-
-        for (const ticker of batch) {
-          if (!ticker.symbol) continue;
-          const symbol = ticker.symbol;
-
-          try {
-            const existingAnalysis =
-              await this.riskRewardService.getLatestScore(symbol);
-
-            const isStale =
-              !existingAnalysis ||
-              Date.now() - existingAnalysis.created_at.getTime() > stalenessMs;
-
-            if (!isStale) {
-              batchSkipped++;
-              continue;
-            }
-
-            this.logger.log(`Queueing Cron-Tier Scan for ${symbol}...`);
-
-            const note = await this.researchService.createResearchTicket(
-              null,
-              [symbol],
-              `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
+          const note = await this.researchService.createResearchTicket(
+            null,
+            [symbol],
+            `Analyze the risk/reward profile for ${symbol} based on recent price action (OHLCV) and key fundamentals.
 
       CRITICAL INSTRUCTION:
       You MUST act as a data gatherer.
@@ -355,36 +372,25 @@ export class JobsService {
 
       Then provide a Risk/Reward Score (0-10) and a succinct summary.
       `,
-              'gemini',
-              'cron',
-            );
+            'gemini',
+            'cron',
+          );
 
-            await this.researchService.processTicket(note.id);
-            batchProcessed++;
+          await this.researchService.processTicket(note.id);
+          processed++;
 
-            // Rate limit: 15 RPM on free tier = ~4.5s between calls
-            await new Promise((r) => setTimeout(r, DELAY_MS));
-          } catch (err) {
-            this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
-          }
+          // Rate limit: 15 RPM on free tier = ~4.5s between calls
+          await new Promise((r) => setTimeout(r, DELAY_MS));
+        } catch (err) {
+          errors++;
+          this.logger.error(`Scanner failed for ${symbol}: ${err.message}`);
         }
-
-        totalProcessed += batchProcessed;
-        totalSkipped += batchSkipped;
-
-        this.logger.log(
-          `Batch ${batchNum + 1} complete. Processed: ${batchProcessed}, Skipped: ${batchSkipped}`,
-        );
       }
 
       this.logger.log(
-        `All batches complete. Total Processed: ${totalProcessed}, Total Skipped: ${totalSkipped}`,
+        `Scan complete. Processed: ${processed}, Errors: ${errors}, Due this run: ${dueSymbols.length}`,
       );
-      return {
-        processed: totalProcessed,
-        skipped: totalSkipped,
-        batches: totalBatches,
-      };
+      return { processed, errors, due: dueSymbols.length };
     } catch (e) {
       this.logger.error('Risk/Reward Scanner failed globally', e);
       throw e;
@@ -551,7 +557,10 @@ export class JobsService {
     }
   }
 
-  // --- RESEARCH RETENTION CLEANUP (30 days) ---
+  // --- RESEARCH RETENTION CLEANUP (90 days) ---
+
+  /** Research notes older than this are purged. */
+  static readonly RESEARCH_RETENTION_DAYS = 90;
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
   private async cleanupOldResearchCron() {
@@ -560,11 +569,19 @@ export class JobsService {
   }
 
   async cleanupOldResearch() {
-    this.logger.log('Starting old research cleanup (>30 days)...');
+    const retentionDays = JobsService.RESEARCH_RETENTION_DAYS;
+    this.logger.log(`Starting old research cleanup (>${retentionDays} days)...`);
     try {
-      const deleted = await this.researchService.deleteOldResearch(30);
-      this.logger.log(`Research cleanup complete. Deleted: ${deleted}`);
-      return { deleted };
+      const deleted =
+        await this.researchService.deleteOldResearch(retentionDays);
+      // Purging notes can leave risk analyses pointing at deleted notes —
+      // sweep those orphans after the notes are gone.
+      const orphansDeleted =
+        await this.riskRewardService.deleteOrphanedAnalyses();
+      this.logger.log(
+        `Research cleanup complete. Notes deleted: ${deleted}, orphaned analyses deleted: ${orphansDeleted}`,
+      );
+      return { deleted, orphansDeleted };
     } catch (e) {
       this.logger.error('Research cleanup failed', e);
       throw e;
