@@ -7,6 +7,7 @@ import {
   GenerateContentConfig,
 } from '@google/genai'; // NEW SDK
 import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
+import { LlmBudgetService } from '../llm-budget.service';
 
 @Injectable()
 export class GeminiProvider implements ILlmProvider {
@@ -30,7 +31,10 @@ export class GeminiProvider implements ILlmProvider {
     'gemma-4-31b-it',
   ]);
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly budgetService: LlmBudgetService,
+  ) {
     const apiKey = this.configService.get<string>('gemini.apiKey');
     if (apiKey) {
       this.client = new GoogleGenAI({ apiKey });
@@ -142,6 +146,9 @@ export class GeminiProvider implements ILlmProvider {
     const secondaryApiKey = this.configService.get<string>(
       'gemini.secondaryApiKey',
     );
+    // Cron / background research must stay on the free key: never escalate to
+    // the billed secondary key on a 429.
+    const freeOnly = prompt.freeOnly === true || prompt.quality === 'cron';
     let hasSwitchedToSecondary = false;
     let activeApiKey = apiKey;
     let activeClient = client;
@@ -193,6 +200,13 @@ export class GeminiProvider implements ILlmProvider {
           (p) => p.thought,
         );
 
+        // Count successful free-tier (primary key) flash-lite calls against
+        // the hard daily budget. Gemma (separate quota) and billed secondary
+        // calls are intentionally excluded.
+        if (!hasSwitchedToSecondary && freeModels.includes(currentModel)) {
+          await this.budgetService.record(1);
+        }
+
         return {
           provider: 'gemini',
           models: [currentModel],
@@ -226,6 +240,16 @@ export class GeminiProvider implements ILlmProvider {
             );
             currentModel = nextFreeModel;
             continue;
+          }
+
+          // Free-only (cron/background) work must NEVER touch the billed
+          // secondary key. Once free models are exhausted, fail fast and let
+          // the daily budget gate hold the cron back until quota resets.
+          if (freeOnly && !hasSwitchedToSecondary) {
+            this.logger.warn(
+              `Gemini 429 for ${currentModel} (free-only). Free models exhausted — not escalating to the billed key.`,
+            );
+            throw err;
           }
 
           // 2. If no more free models or already on secondary, check if we can switch from Primary -> Secondary

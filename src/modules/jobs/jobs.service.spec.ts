@@ -10,6 +10,7 @@ import { ResearchService } from '../research/research.service';
 import { StockTwitsService } from '../stocktwits/stocktwits.service';
 import { RequestQueue } from './entities/request-queue.entity';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { LlmBudgetService } from '../llm/llm-budget.service';
 
 describe('JobsService', () => {
   let service: JobsService;
@@ -17,6 +18,15 @@ describe('JobsService', () => {
   const mockRiskRewardService = {
     evaluateSymbol: jest.fn(),
     getLatestScore: jest.fn(),
+    pickStaleAnalysisTickers: jest.fn(),
+    deleteOrphanedAnalyses: jest.fn(),
+  };
+
+  const mockLlmBudgetService = {
+    getRemaining: jest.fn().mockResolvedValue(450),
+    hasBudget: jest.fn().mockResolvedValue(true),
+    record: jest.fn().mockResolvedValue(undefined),
+    getUsageToday: jest.fn().mockResolvedValue(0),
   };
 
   const mockTickersService = {
@@ -82,6 +92,7 @@ describe('JobsService', () => {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(24) },
         },
+        { provide: LlmBudgetService, useValue: mockLlmBudgetService },
       ],
     }).compile();
 
@@ -96,32 +107,55 @@ describe('JobsService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('syncDailyCandles', () => {
-    it('should iterate tickers and sync candles', async () => {
-      const tickers = [{ symbol: 'AAPL' }, { symbol: 'TSLA' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
+  describe('syncDailyCandles (hourly stale-first batch)', () => {
+    it('asks market-data for the stale-first batch and syncs only those', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'TSLA' },
+        { symbol: 'MSFT' },
+      ]);
+      // Picker returns just two of the three — the batch limit in effect.
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([
+        'MSFT',
+        'AAPL',
+      ]);
       mockMarketDataService.getSnapshot.mockResolvedValue({});
 
-      await service.syncDailyCandles();
+      const result = await service.syncDailyCandles();
 
-      expect(mockTickersService.getAllTickers).toHaveBeenCalled();
+      expect(
+        mockMarketDataService.pickStaleSnapshotTickers,
+      ).toHaveBeenCalledWith(
+        ['AAPL', 'TSLA', 'MSFT'],
+        JobsService.DAILY_CANDLES_BATCH_SIZE,
+      );
       expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(2);
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('MSFT');
       expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('AAPL');
-      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('TSLA');
+      expect(mockMarketDataService.getSnapshot).not.toHaveBeenCalledWith(
+        'TSLA',
+      );
+      expect(mockMarketDataService.syncTickerHistory).toHaveBeenCalledTimes(2);
+      expect(result).toMatchObject({ processed: 2, failed: 0, batchSize: 2 });
     });
 
-    it('should handle errors gracefully for individual symbols', async () => {
-      const tickers = [{ symbol: 'AAPL' }, { symbol: 'FAIL' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
-      mockMarketDataService.getSnapshot.mockResolvedValueOnce({});
-      mockMarketDataService.getSnapshot.mockRejectedValueOnce(
-        new Error('Sync failed'),
-      );
+    it('counts per-ticker errors without aborting the rest of the batch', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'FAIL' },
+      ]);
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([
+        'AAPL',
+        'FAIL',
+      ]);
+      mockMarketDataService.getSnapshot
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error('Sync failed'));
 
-      await service.syncDailyCandles();
+      const result = await service.syncDailyCandles();
 
       expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(2);
-      // Should not throw
+      expect(result).toMatchObject({ processed: 1, failed: 1, batchSize: 2 });
     });
 
     it('should handle global errors', async () => {
@@ -131,10 +165,15 @@ describe('JobsService', () => {
       await expect(service.syncDailyCandles()).rejects.toThrow('Global fail');
     });
 
-    it('should skip tickers without symbol', async () => {
-      const tickers = [{ no_symbol: '?' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
+    it('drops tickers without a symbol before picking the batch', async () => {
+      mockTickersService.getAllTickers.mockResolvedValue([{ no_symbol: '?' }]);
+      mockMarketDataService.pickStaleSnapshotTickers.mockResolvedValue([]);
+
       await service.syncDailyCandles();
+
+      expect(
+        mockMarketDataService.pickStaleSnapshotTickers,
+      ).toHaveBeenCalledWith([], JobsService.DAILY_CANDLES_BATCH_SIZE);
       expect(mockMarketDataService.getSnapshot).not.toHaveBeenCalled();
     });
   });
@@ -255,7 +294,7 @@ describe('JobsService', () => {
   });
 
   describe('runRiskRewardScanner', () => {
-    it('should queue research for tickers with stale or missing analysis', async () => {
+    it('queues a cron-tier ticket for each due (stale-first) ticker within budget', async () => {
       const sleepSpy = jest
         .spyOn(global, 'setTimeout')
         // Resolve immediately to keep the test fast
@@ -264,20 +303,81 @@ describe('JobsService', () => {
           return {} as NodeJS.Timeout;
         });
 
-      const tickers = [{ symbol: 'AAPL' }];
-      mockTickersService.getAllTickers.mockResolvedValue(tickers);
-      mockRiskRewardService.getLatestScore.mockResolvedValue(null);
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'TSLA' },
+      ]);
+      // Picker decides who is due (oldest/never-analysed first).
+      mockRiskRewardService.pickStaleAnalysisTickers.mockResolvedValue(['AAPL']);
       mockResearchService.createResearchTicket.mockResolvedValue({
         id: 'note-1',
       });
       mockResearchService.processTicket.mockResolvedValue(undefined);
 
-      await service.runRiskRewardScanner();
+      const result = await service.runRiskRewardScanner();
 
       expect(mockTickersService.getAllTickers).toHaveBeenCalled();
-      expect(mockRiskRewardService.getLatestScore).toHaveBeenCalledWith('AAPL');
-      expect(mockResearchService.createResearchTicket).toHaveBeenCalled();
+      expect(
+        mockRiskRewardService.pickStaleAnalysisTickers,
+      ).toHaveBeenCalledWith(['AAPL', 'TSLA'], expect.any(Number), expect.any(Number));
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
+        null,
+        ['AAPL'],
+        expect.any(String),
+        'gemini',
+        'cron',
+      );
       expect(mockResearchService.processTicket).toHaveBeenCalledWith('note-1');
+      expect(result).toMatchObject({ processed: 1, errors: 0, due: 1 });
+
+      sleepSpy.mockRestore();
+    });
+
+    it('skips the whole scan when the daily LLM budget is exhausted', async () => {
+      mockLlmBudgetService.getRemaining.mockResolvedValue(0);
+      mockTickersService.getAllTickers.mockResolvedValue([{ symbol: 'AAPL' }]);
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(result).toMatchObject({ budgetExhausted: true, processed: 0 });
+      expect(
+        mockRiskRewardService.pickStaleAnalysisTickers,
+      ).not.toHaveBeenCalled();
+      expect(mockResearchService.createResearchTicket).not.toHaveBeenCalled();
+    });
+
+    it('stops early when the budget drains mid-scan', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      // Budget available for the first ticket, gone before the second.
+      mockLlmBudgetService.hasBudget
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { symbol: 'AAPL' },
+        { symbol: 'MSFT' },
+      ]);
+      mockRiskRewardService.pickStaleAnalysisTickers.mockResolvedValue([
+        'AAPL',
+        'MSFT',
+      ]);
+      mockResearchService.createResearchTicket.mockResolvedValue({
+        id: 'note-1',
+      });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ processed: 1, due: 2 });
 
       sleepSpy.mockRestore();
     });

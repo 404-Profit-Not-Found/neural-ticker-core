@@ -10,6 +10,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { ResearchModule } from '../research/research.module';
 import { StockTwitsModule } from '../stocktwits/stocktwits.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
+import { LlmModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PortfolioModule } from '../portfolio/portfolio.module';
     RiskRewardModule,
     ResearchModule,
     StockTwitsModule,
+    LlmModule,
     TypeOrmModule.forFeature([RequestQueue]),
     forwardRef(() => TickersModule),
     forwardRef(() => PortfolioModule),

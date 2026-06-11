@@ -68,6 +68,17 @@ export class JobsController {
     return { message: 'Cleanup completed', stats: result };
   }
 
+  @Post('cleanup-old-research')
+  @ApiOperation({
+    summary:
+      'Purge research notes older than the retention window and sweep orphaned risk analyses (Cron)',
+  })
+  @ApiResponse({ status: 200, description: 'Old research cleanup completed' })
+  async cleanupOldResearch() {
+    const result = await this.jobsService.cleanupOldResearch();
+    return { message: 'Old research cleanup completed', stats: result };
+  }
+
   @Post('sync-research/:symbol')
   @ApiOperation({
     summary: 'Reprocess research + dedupe analyst ratings for a ticker',

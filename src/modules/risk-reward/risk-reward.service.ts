@@ -304,6 +304,100 @@ export class RiskRewardService {
     });
   }
 
+  /**
+   * Picks the `limit` most-stale tickers that are "due" for (re)analysis,
+   * never-researched first, then oldest analysis first. A ticker is due when
+   * it has no analysis at all, or its latest analysis is older than `maxAgeMs`.
+   *
+   * This drives the universe scanner's stale-first rotation: instead of always
+   * scanning the same alphabetical window, every run advances to whatever is
+   * most overdue, so every ticker (watchlisted or not) gets covered on a
+   * rolling cadence. The whole decision is a single DB query — no per-ticker
+   * snapshot fetches.
+   */
+  async pickStaleAnalysisTickers(
+    candidateSymbols: string[],
+    limit: number,
+    maxAgeMs: number,
+  ): Promise<string[]> {
+    if (candidateSymbols.length === 0 || limit <= 0) return [];
+
+    const rows: { symbol: string; last_at: string | null }[] =
+      await this.analysisRepo
+        .createQueryBuilder('a')
+        .innerJoin('a.ticker', 't')
+        .select('t.symbol', 'symbol')
+        .addSelect('MAX(a.created_at)', 'last_at')
+        .where('t.symbol IN (:...symbols)', { symbols: candidateSymbols })
+        .groupBy('t.symbol')
+        .getRawMany();
+
+    const lastAtBySymbol = new Map<string, number>();
+    for (const r of rows) {
+      if (r.last_at) {
+        lastAtBySymbol.set(r.symbol, new Date(r.last_at).getTime());
+      }
+    }
+
+    const now = Date.now();
+    const due = candidateSymbols.filter((s) => {
+      const ts = lastAtBySymbol.get(s);
+      return ts === undefined || now - ts > maxAgeMs; // never analysed or stale
+    });
+
+    return due
+      .sort((a, b) => {
+        const aTs = lastAtBySymbol.get(a);
+        const bTs = lastAtBySymbol.get(b);
+        if (aTs === undefined && bTs === undefined) return a.localeCompare(b);
+        if (aTs === undefined) return -1; // never researched → highest priority
+        if (bTs === undefined) return 1;
+        return aTs - bTs; // oldest analysis first
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * Deletes risk analyses whose linked research note no longer exists
+   * (`research_note_id` is set but points to a purged note). Run after the
+   * research-retention cleanup so the scores left dangling by deleted notes
+   * don't accumulate.
+   *
+   * `risk_analyses.research_note_id` stores `research_notes.id` (a bigint) as
+   * text. Child rows (scenarios / qualitative factors / catalysts) are deleted
+   * explicitly inside a transaction rather than relying on a DB-level
+   * ON DELETE CASCADE, since those tables were created via schema sync (no
+   * migration) and their cascade behaviour can't be assumed.
+   */
+  async deleteOrphanedAnalyses(): Promise<number> {
+    const orphanWhere = `research_note_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM research_notes rn WHERE CAST(rn.id AS TEXT) = risk_analyses.research_note_id)`;
+
+    return this.analysisRepo.manager.transaction(async (mgr) => {
+      const countRows: { count: string }[] = await mgr.query(
+        `SELECT COUNT(*)::int AS count FROM risk_analyses WHERE ${orphanWhere}`,
+      );
+      const count = countRows[0]?.count ? Number(countRows[0].count) : 0;
+      if (count === 0) return 0;
+
+      const childSelect = `SELECT id FROM risk_analyses WHERE ${orphanWhere}`;
+      await mgr.query(
+        `DELETE FROM risk_scenarios WHERE analysis_id IN (${childSelect})`,
+      );
+      await mgr.query(
+        `DELETE FROM risk_qualitative_factors WHERE analysis_id IN (${childSelect})`,
+      );
+      await mgr.query(
+        `DELETE FROM risk_catalysts WHERE analysis_id IN (${childSelect})`,
+      );
+      await mgr.query(`DELETE FROM risk_analyses WHERE ${orphanWhere}`);
+
+      this.logger.log(
+        `Deleted ${count} orphaned risk analyses (and their child rows).`,
+      );
+      return count;
+    });
+  }
+
   // Called by ResearchService after a Deep Research Note is generated
   async evaluateFromResearch(note: any): Promise<RiskAnalysis | null> {
     if (!note || !note.answer_markdown) return null;
