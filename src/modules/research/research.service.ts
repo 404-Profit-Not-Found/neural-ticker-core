@@ -121,55 +121,59 @@ export class ResearchService implements OnModuleInit {
     // 2. Judge Quality (Universal Judge)
     try {
       const judgment = await this.qualityScoringService.score(content);
-      note.quality_score = Math.round(judgment.score);
-      note.rarity = judgment.rarity;
-      note.grounding_metadata = {
-        judgment_reasoning: judgment.details.reasoning,
-      };
+      if (judgment.ok) {
+        note.quality_score = Math.round(judgment.score);
+        note.rarity = judgment.rarity;
+        note.grounding_metadata = {
+          judgment_reasoning: judgment.details.reasoning,
+        };
 
-      // 3. Reward Credits if applicable
-      const rewardMap: Record<string, number> = {
-        Common: 1,
-        Uncommon: 3,
-        Rare: 5,
-        Epic: 10,
-        Legendary: 25,
-      };
+        // 3. Reward Credits if applicable
+        const rewardMap: Record<string, number> = {
+          Common: 1,
+          Uncommon: 3,
+          Rare: 5,
+          Epic: 10,
+          Legendary: 25,
+        };
 
-      // Store the actual tier name (e.g. "Rare") not the color "Blue"
-      // Frontend expects: Common, Uncommon, Rare, Epic, Legendary
-      note.rarity = judgment.rarity;
-
-      const reward = rewardMap[judgment.rarity] || 0;
-      if (reward > 0) {
-        // Anti-farming: cap credits earned from contributions per rolling 24h.
-        const DAILY_CONTRIBUTION_CAP = 50;
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const earnedToday = await this.creditService.getEarnedSince(
-          userId,
-          'manual_contribution',
-          since,
-        );
-        const grantable = Math.min(
-          reward,
-          DAILY_CONTRIBUTION_CAP - earnedToday,
-        );
-        if (grantable > 0) {
-          await this.creditService.addCredits(
+        const reward = rewardMap[judgment.rarity] || 0;
+        if (reward > 0) {
+          // Anti-farming: cap credits earned from contributions per rolling 24h.
+          const DAILY_CONTRIBUTION_CAP = 50;
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const earnedToday = await this.creditService.getEarnedSince(
             userId,
-            grantable,
             'manual_contribution',
-            {
-              noteId: note.request_id,
-              rarity: judgment.rarity,
-              score: judgment.score,
-            },
+            since,
           );
-        } else {
-          this.logger.warn(
-            `User ${userId} hit the daily contribution credit cap; reward skipped.`,
+          const grantable = Math.min(
+            reward,
+            DAILY_CONTRIBUTION_CAP - earnedToday,
           );
+          if (grantable > 0) {
+            await this.creditService.addCredits(
+              userId,
+              grantable,
+              'manual_contribution',
+              {
+                noteId: note.request_id,
+                rarity: judgment.rarity,
+                score: judgment.score,
+              },
+            );
+          } else {
+            this.logger.warn(
+              `User ${userId} hit the daily contribution credit cap; reward skipped.`,
+            );
+          }
         }
+      } else {
+        // Scoring failed (e.g. transient 429). Leave quality_score / rarity
+        // NULL so a later re-score can fill them — do NOT persist 0 / Common.
+        this.logger.warn(
+          `Quality scoring failed for manual note by ${userId}; left unscored for retry.`,
+        );
       }
     } catch (e) {
       this.logger.warn('Failed to judge manual note', e);
@@ -426,6 +430,14 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         this.qualityScoringService
           .score(result.answerMarkdown)
           .then(async (judgment) => {
+            if (!judgment.ok) {
+              // Transient scoring failure — leave quality_score / rarity NULL
+              // so a later re-score can fill them instead of persisting 0.
+              this.logger.warn(
+                `Quality scoring unavailable for ticket ${id}; left unscored: ${judgment.error}`,
+              );
+              return;
+            }
             const groundingWithJudgment = {
               ...(note.grounding_metadata || {}),
               judgment_reasoning: judgment.details.reasoning,

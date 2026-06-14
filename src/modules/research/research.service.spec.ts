@@ -168,6 +168,7 @@ describe('ResearchService', () => {
 
       // Mock Judge result
       mockQualityScoringService.score.mockResolvedValueOnce({
+        ok: true,
         score: 85,
         rarity: 'Epic',
         details: { reasoning: 'Great' },
@@ -201,15 +202,22 @@ describe('ResearchService', () => {
       expect(mockRepo.save).toHaveBeenCalled();
     });
 
-    it('should not reward credits for Gray quality', async () => {
+    it('leaves a manual note unscored and grants no credits when scoring fails', async () => {
       const userId = 'user-1';
-      mockLlmService.generateResearch.mockResolvedValueOnce({
-        answerMarkdown: '{"score": 10, "rarity": "Gray", "reasoning": "Bad"}',
+      // Transient scoring failure (e.g. a 429) must NOT persist 0/Common, and
+      // must NOT reward credits — the columns stay NULL for a later re-score.
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        ok: false,
+        error: 'LLM 429',
       });
 
       await service.createManualNote(userId, ['AAPL'], 'Title', 'Content');
 
       expect(mockCreditService.addCredits).not.toHaveBeenCalled();
+      // The saved note must not carry a fabricated score/rarity.
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.not.objectContaining({ rarity: expect.anything() }),
+      );
     });
   });
 
