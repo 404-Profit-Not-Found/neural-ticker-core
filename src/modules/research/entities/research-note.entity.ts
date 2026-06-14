@@ -3,6 +3,7 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -130,12 +131,6 @@ export class ResearchNote {
   created_at: Date;
 
   @ApiProperty()
-  @CreateDateColumn({ type: 'timestamptz', onUpdate: 'CURRENT_TIMESTAMP' }) // Using CreateDateColumn logic or UpdateDateColumn
-  // TypeORM has @UpdateDateColumn
-  @Column({
-    type: 'timestamptz',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 }

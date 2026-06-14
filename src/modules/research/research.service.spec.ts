@@ -50,6 +50,9 @@ describe('ResearchService', () => {
   const mockMarketDataService = {
     getSnapshot: jest.fn(),
     upsertFundamentals: jest.fn(),
+    updateTickerDescription: jest.fn(),
+    upsertAnalystRatings: jest.fn(),
+    dedupeAnalystRatings: jest.fn(),
   };
 
   const mockUsersService = {
@@ -437,6 +440,187 @@ describe('ResearchService', () => {
 
       expect(result.has('NEW.PA')).toBe(false);
       expect(result.size).toBe(0);
+    });
+  });
+
+  describe('sanitizeFinancials', () => {
+    const sanitize = (raw: any) =>
+      (service as any).sanitizeFinancials(raw) as {
+        cleaned: Record<string, any>;
+        hasValue: boolean;
+      };
+
+    it('returns hasValue=false for null / non-object / array input', () => {
+      expect(sanitize(null).hasValue).toBe(false);
+      expect(sanitize(undefined).hasValue).toBe(false);
+      expect(sanitize('nope').hasValue).toBe(false);
+      expect(sanitize([1, 2, 3]).hasValue).toBe(false);
+    });
+
+    it('treats an all-null financials object as empty (no real values)', () => {
+      const { cleaned, hasValue } = sanitize({
+        pe_ttm: null,
+        eps_ttm: null,
+        beta: undefined,
+      });
+      expect(hasValue).toBe(false);
+      expect(cleaned).toEqual({});
+    });
+
+    it('coerces numeric strings and suffix notation to numbers', () => {
+      const { cleaned, hasValue } = sanitize({
+        pe_ttm: '28.5',
+        revenue_ttm: '2.5B',
+        beta: 1.2,
+        eps_ttm: 'not-a-number',
+      });
+      expect(hasValue).toBe(true);
+      expect(cleaned.pe_ttm).toBe(28.5);
+      expect(cleaned.revenue_ttm).toBe(2_500_000_000);
+      expect(cleaned.beta).toBe(1.2);
+      // unparseable numeric field is dropped, not stored as NaN
+      expect('eps_ttm' in cleaned).toBe(false);
+    });
+
+    it('keeps known text fields as trimmed strings, bypassing numeric coercion', () => {
+      const { cleaned, hasValue } = sanitize({
+        consensus_rating: '  Strong Buy  ',
+        next_earnings_date: '2026-03-18',
+        sector: 'Technology',
+        pe_ttm: null,
+      });
+      expect(hasValue).toBe(true);
+      expect(cleaned.consensus_rating).toBe('Strong Buy');
+      expect(cleaned.next_earnings_date).toBe('2026-03-18');
+      expect(cleaned.sector).toBe('Technology');
+    });
+
+    it('drops the literal string "null" for text fields', () => {
+      const { cleaned, hasValue } = sanitize({ consensus_rating: 'null' });
+      expect(hasValue).toBe(false);
+      expect('consensus_rating' in cleaned).toBe(false);
+    });
+  });
+
+  describe('extractFinancialsFromResearch', () => {
+    // jest.clearAllMocks() (outer beforeEach) does NOT drain the
+    // mockResolvedValueOnce queue. An earlier test leaves an unconsumed Once
+    // value on generateResearch; reset it so each ticker here gets our value.
+    beforeEach(() => {
+      mockLlmService.generateResearch.mockReset();
+    });
+
+    const extract = (tickers: string[], text: string, options?: any) =>
+      (service as any).extractFinancialsFromResearch(
+        tickers,
+        text,
+        options,
+      ) as Promise<{
+        description: boolean;
+        financials: boolean;
+        ratings: boolean;
+      }>;
+
+    it('returns all-false without calling the LLM for empty input', async () => {
+      const result = await extract([], 'some text');
+      expect(result).toEqual({
+        description: false,
+        financials: false,
+        ratings: false,
+      });
+      expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+    });
+
+    it('processes EVERY ticker, not just the first (regression: H1)', async () => {
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: JSON.stringify({
+          description: 'A company.',
+          financials: { pe_ttm: 10 },
+          ratings: [{ firm: 'X', rating: 'Buy' }],
+        }),
+      });
+
+      const result = await extract(['AAPL', 'MSFT'], 'text');
+
+      // The LLM (and the upserts) must run once per ticker.
+      expect(mockLlmService.generateResearch).toHaveBeenCalledTimes(2);
+      expect(mockMarketDataService.upsertFundamentals).toHaveBeenCalledTimes(2);
+      expect(mockMarketDataService.upsertFundamentals).toHaveBeenCalledWith(
+        'AAPL',
+        { pe_ttm: 10 },
+      );
+      expect(mockMarketDataService.upsertFundamentals).toHaveBeenCalledWith(
+        'MSFT',
+        { pe_ttm: 10 },
+      );
+      expect(result).toEqual({
+        description: true,
+        financials: true,
+        ratings: true,
+      });
+    });
+
+    it('does NOT upsert when financials are all-null (regression: H7)', async () => {
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: JSON.stringify({
+          description: null,
+          financials: { pe_ttm: null, eps_ttm: null },
+          ratings: [],
+        }),
+      });
+
+      const result = await extract(['AAPL'], 'text');
+
+      expect(mockMarketDataService.upsertFundamentals).not.toHaveBeenCalled();
+      expect(mockMarketDataService.upsertAnalystRatings).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        description: false,
+        financials: false,
+        ratings: false,
+      });
+    });
+
+    it('coerces extracted financial values before upserting (regression: H8)', async () => {
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: JSON.stringify({
+          financials: { revenue_ttm: '2.5B', pe_ttm: '28.5' },
+        }),
+      });
+
+      await extract(['AAPL'], 'text');
+
+      expect(mockMarketDataService.upsertFundamentals).toHaveBeenCalledWith(
+        'AAPL',
+        { revenue_ttm: 2_500_000_000, pe_ttm: 28.5 },
+      );
+    });
+
+    it('honours save flags (gap-fill: skips DB writes when disabled)', async () => {
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: JSON.stringify({
+          description: 'A company.',
+          financials: { pe_ttm: 10 },
+          ratings: [{ firm: 'X', rating: 'Buy' }],
+        }),
+      });
+
+      const result = await extract(['AAPL'], 'text', {
+        saveDescription: false,
+        saveFinancials: false,
+        saveRatings: false,
+      });
+
+      expect(mockMarketDataService.upsertFundamentals).not.toHaveBeenCalled();
+      expect(
+        mockMarketDataService.updateTickerDescription,
+      ).not.toHaveBeenCalled();
+      expect(mockMarketDataService.upsertAnalystRatings).not.toHaveBeenCalled();
+      // Still reports what it *found*, so the caller can stop gap-filling.
+      expect(result).toEqual({
+        description: true,
+        financials: true,
+        ratings: true,
+      });
     });
   });
 });
