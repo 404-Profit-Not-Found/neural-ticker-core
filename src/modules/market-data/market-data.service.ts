@@ -1524,13 +1524,13 @@ export class MarketDataService {
     const entity =
       existing || this.fundamentalsRepo.create({ symbol_id: tickerEntity.id });
 
-    // Merge data
-    Object.assign(entity, data);
-
-    // Explicitly set sector if provided
-    if (data.sector) {
-      entity.sector = data.sector;
-    }
+    // Merge data, but NEVER overwrite an existing value with null/undefined.
+    // LLM extraction emits null for missing metrics; a blind Object.assign would
+    // wipe previously-good fundamentals on every partial re-extraction.
+    const sanitized = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value != null),
+    );
+    Object.assign(entity, sanitized);
 
     await this.fundamentalsRepo.save(entity);
   }

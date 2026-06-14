@@ -29,6 +29,7 @@ import { GoogleGenAI } from '@google/genai';
 import { Observable, Subject } from 'rxjs';
 import * as crypto from 'crypto';
 import { TickersService } from '../tickers/tickers.service';
+import { NumberUtil } from '../../utils/number.util';
 
 export interface ResearchEvent {
   type: 'status' | 'thought' | 'source' | 'content' | 'error';
@@ -597,6 +598,12 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
     if (tickers.length === 0 || !text)
       return { description: false, financials: false, ratings: false };
 
+    // Accumulate across ALL tickers — never return from inside the loop, or
+    // only the first ticker would ever be processed.
+    let anyDescription = false;
+    let anyFinancials = false;
+    let anyRatings = false;
+
     // We process each ticker individually for safety
     for (const ticker of tickers) {
       try {
@@ -655,18 +662,21 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
             continue;
           }
 
-          let descriptionFound = false;
-          let financialsFound = false;
-          let ratingsFound = false;
+          // Coerce raw extracted values to numbers and drop nulls. The prompt
+          // tells the model to emit null for missing metrics, so an empty or
+          // all-null `financials` object must NOT count as "found" (otherwise
+          // reprocessFinancials stops gap-filling on a hollow result).
+          const { cleaned: cleanedFinancials, hasValue: hasFinancialValue } =
+            this.sanitizeFinancials(data.financials);
 
-          if (data.financials) {
+          if (hasFinancialValue) {
             if (saveFinancials) {
               await this.marketDataService.upsertFundamentals(
                 ticker,
-                data.financials,
+                cleanedFinancials,
               );
             }
-            financialsFound = true;
+            anyFinancials = true;
           }
 
           if (data.description) {
@@ -679,14 +689,15 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
                 data.description,
               );
             }
-            descriptionFound = true;
+            anyDescription = true;
           } else {
             this.logger.warn(
               `No description found in extraction for ${ticker}`,
             );
           }
 
-          if (data.ratings && Array.isArray(data.ratings)) {
+          // Require a non-empty array — an empty `ratings: []` is not a hit.
+          if (Array.isArray(data.ratings) && data.ratings.length > 0) {
             if (saveRatings) {
               await this.marketDataService.upsertAnalystRatings(
                 ticker,
@@ -694,15 +705,10 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
               );
               await this.marketDataService.dedupeAnalystRatings(ticker);
             }
-            ratingsFound = true;
+            anyRatings = true;
           }
 
           this.logger.log(`Extracted financials & ratings for ${ticker}`);
-          return {
-            description: descriptionFound,
-            financials: financialsFound,
-            ratings: ratingsFound,
-          };
         } catch (e) {
           this.logger.warn(`Failed to parse extracted data for ${ticker}`, e);
         }
@@ -710,7 +716,59 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         this.logger.warn(`Failed to extract financials for ${ticker}`, e);
       }
     }
-    return { description: false, financials: false, ratings: false }; // placeholder
+
+    return {
+      description: anyDescription,
+      financials: anyFinancials,
+      ratings: anyRatings,
+    };
+  }
+
+  // Keys in the extracted `financials` object that are stored as text, not
+  // numeric — they must bypass numeric coercion.
+  private static readonly STRING_FINANCIAL_KEYS = new Set([
+    'next_earnings_date',
+    'consensus_rating',
+    'sector',
+  ]);
+
+  /**
+   * Normalise an LLM-extracted `financials` object before it reaches the DB:
+   * coerce numeric strings/suffixes (e.g. "2.5B") to numbers, keep known text
+   * fields as trimmed strings, and drop every null/undefined/unparseable value.
+   * `hasValue` is true only when at least one real value survived.
+   */
+  private sanitizeFinancials(raw: any): {
+    cleaned: Record<string, any>;
+    hasValue: boolean;
+  } {
+    const cleaned: Record<string, any> = {};
+    let hasValue = false;
+
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { cleaned, hasValue };
+    }
+
+    for (const [key, value] of Object.entries(raw)) {
+      if (value === null || value === undefined) continue;
+
+      if (ResearchService.STRING_FINANCIAL_KEYS.has(key)) {
+        // Text fields only accept primitives — an object/array here is garbage.
+        if (typeof value !== 'string' && typeof value !== 'number') continue;
+        const str = String(value).trim();
+        if (!str || str.toLowerCase() === 'null') continue;
+        cleaned[key] = str;
+        hasValue = true;
+        continue;
+      }
+
+      const num = NumberUtil.parseMarketCap(value as string | number);
+      if (num === null) continue;
+      cleaned[key] = num;
+      hasValue = true;
+    }
+
+    return { cleaned, hasValue };
   }
 
   /**

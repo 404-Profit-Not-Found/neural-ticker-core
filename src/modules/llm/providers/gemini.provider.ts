@@ -154,8 +154,11 @@ export class GeminiProvider implements ILlmProvider {
     let activeClient = client;
     currentModel = modelName;
 
-    // Models available on the Primary (Free) Key
+    // Models available on the Primary (Free) Key. These run on the free quota
+    // and MUST be metered against the daily budget. Keep in sync with the
+    // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.5-flash`).
     const freeModels = [
+      'gemini-3.5-flash',
       'gemini-3.1-flash-lite',
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',

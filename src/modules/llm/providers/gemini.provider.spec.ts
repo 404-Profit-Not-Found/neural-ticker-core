@@ -229,5 +229,25 @@ describe('GeminiProvider', () => {
       expect(result.models).toContain('gemini-3.5-flash');
       expect(result.groundingMetadata).toBeDefined();
     });
+
+    it('meters successful medium-quality (gemini-3.5-flash) calls against the daily budget (regression: H6)', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
+      const budget = (provider as any).budgetService;
+
+      // 'medium' resolves to gemini-3.5-flash, which runs on the free key and
+      // MUST be counted — it was previously absent from `freeModels`.
+      await provider.generate({ ...validPrompt, quality: 'medium' });
+
+      expect(budget.record).toHaveBeenCalledWith(1);
+    });
+
+    it('does NOT meter Gemma calls against the gemini budget (separate quota)', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
+      const budget = (provider as any).budgetService;
+
+      await provider.generate({ ...validPrompt, quality: 'summary' });
+
+      expect(budget.record).not.toHaveBeenCalled();
+    });
   });
 });

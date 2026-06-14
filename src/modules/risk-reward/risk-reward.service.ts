@@ -262,6 +262,9 @@ export class RiskRewardService {
     if (scenarios.bear) scenarios.bear.key_drivers = extractKeyDrivers('bear');
 
     return {
+      // Surface the salvaged overall as the top-level rating so the consumer
+      // (which reads `neural_investment_rating`) does not fall back to a flat 5.
+      neural_investment_rating: overall,
       risk_score: {
         overall,
         financial_risk: getNum('financial_risk') ?? overall,
@@ -668,7 +671,10 @@ export class RiskRewardService {
 
     // Scores
     const rs = parsed.risk_score || {};
-    let overall = parsed.neural_investment_rating ?? 5;
+    // Fall back to the risk_score.overall produced by the raw-text salvage path
+    // before defaulting to the neutral 5 — otherwise every salvaged analysis
+    // (which never sets neural_investment_rating) collapses to a flat 5.
+    let overall = parsed.neural_investment_rating ?? rs.overall ?? 5;
 
     // Expected Value extraction
     const ev = parsed.expected_value || {};

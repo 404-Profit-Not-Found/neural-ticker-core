@@ -415,6 +415,15 @@ describe('RiskRewardService', () => {
       expect(result.risk_score.competitive_risk).toBe(7);
       expect(result.risk_score.regulatory_risk).toBe(4);
     });
+
+    it('surfaces the salvaged overall as neural_investment_rating (regression: H3)', () => {
+      // The consumer reads `parsed.neural_investment_rating` first. If salvage
+      // never sets it, every salvaged analysis silently collapses to a flat 5.
+      const raw = `{ risk_score: { overall: 8 } }`;
+      const result = salvageFromRaw(raw);
+      expect(result.neural_investment_rating).toBe(8);
+      expect(result.risk_score.overall).toBe(8);
+    });
   });
 
   describe('getLastAnalysisAtByTickerId', () => {

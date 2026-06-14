@@ -424,6 +424,49 @@ describe('MarketDataService', () => {
     });
   });
 
+  describe('upsertFundamentals', () => {
+    it('does not overwrite existing values with null/undefined (regression: H2)', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 1 });
+      const existing = {
+        symbol_id: 1,
+        pe_ttm: 28.5,
+        market_cap: 100,
+        beta: 1.1,
+      } as unknown as Fundamentals;
+      mockFundamentalsRepo.findOne.mockResolvedValue(existing);
+
+      await service.upsertFundamentals('AAPL', {
+        pe_ttm: null,
+        market_cap: undefined,
+        beta: 1.2,
+      } as any);
+
+      const saved = mockFundamentalsRepo.save.mock.calls[0][0];
+      // Existing good values survive the null/undefined incoming fields...
+      expect(saved.pe_ttm).toBe(28.5);
+      expect(saved.market_cap).toBe(100);
+      // ...while a real incoming value is applied.
+      expect(saved.beta).toBe(1.2);
+    });
+
+    it('still applies non-null values onto a freshly created entity', async () => {
+      mockTickersService.awaitEnsureTicker.mockResolvedValue({ id: 2 });
+      mockFundamentalsRepo.findOne.mockResolvedValue(null);
+
+      await service.upsertFundamentals('MSFT', {
+        pe_ttm: 30,
+        eps_ttm: null,
+        sector: 'Technology',
+      } as any);
+
+      const saved = mockFundamentalsRepo.save.mock.calls[0][0];
+      expect(saved.symbol_id).toBe(2);
+      expect(saved.pe_ttm).toBe(30);
+      expect(saved.sector).toBe('Technology');
+      expect('eps_ttm' in saved).toBe(false);
+    });
+  });
+
   describe('getAnalyzerTickers', () => {
     it('should return paginated data with correct structure', async () => {
       const mockQueryBuilder = {
