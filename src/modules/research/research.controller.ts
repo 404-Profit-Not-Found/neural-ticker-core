@@ -32,6 +32,7 @@ import {
 } from '@nestjs/swagger';
 import { ResearchService } from './research.service';
 import { MarketDataService } from '../market-data/market-data.service';
+import { TickersService } from '../tickers/tickers.service';
 import { QualityTier } from '../llm/llm.types';
 import {
   IsArray,
@@ -39,10 +40,22 @@ import {
   IsEnum,
   IsOptional,
   IsNumber,
+  MaxLength,
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  Matches,
 } from 'class-validator';
 
+// Ticker symbols are uppercase alphanumerics plus dot/hyphen (e.g. BRK.B,
+// RDS-A), max 10 chars. Mirrors ticker-requests.service.ts. Symbols that pass
+// this format check are still validated against the ticker universe in the
+// service layer before being used as DB upsert keys.
+const TICKER_SYMBOL_REGEX = /^[A-Z0-9.-]{1,10}$/;
+const MAX_TICKERS_PER_REQUEST = 10;
+const MAX_QUESTION_LENGTH = 2000;
+
 // ... DTO stays same ...
-class AskResearchDto {
+export class AskResearchDto {
   @ApiProperty({
     example: ['AAPL', 'MSFT'],
     description:
@@ -50,7 +63,13 @@ class AskResearchDto {
     isArray: true,
   })
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_TICKERS_PER_REQUEST)
   @IsString({ each: true })
+  @Matches(TICKER_SYMBOL_REGEX, {
+    each: true,
+    message: 'Each ticker must be 1-10 chars of A-Z, 0-9, dot or hyphen.',
+  })
   tickers: string[];
 
   @ApiProperty({
@@ -60,6 +79,7 @@ class AskResearchDto {
       'The specific research question or hypothesis you want the AI to investigate.',
   })
   @IsString()
+  @MaxLength(MAX_QUESTION_LENGTH)
   question: string;
 
   @ApiProperty({
@@ -164,6 +184,28 @@ class ContributeDto {
   content: string;
 }
 
+export class StreamResearchDto {
+  @ApiProperty({
+    example: 'AAPL',
+    description: 'Ticker symbol to deep-research (must exist in the universe).',
+  })
+  @IsString()
+  @Matches(TICKER_SYMBOL_REGEX, {
+    message: 'ticker must be 1-10 chars of A-Z, 0-9, dot or hyphen.',
+  })
+  ticker: string;
+
+  @ApiProperty({
+    required: false,
+    example: 'Focus on the moat and 2025 guidance.',
+    description: 'Optional free-text focus areas for the agent.',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(MAX_QUESTION_LENGTH)
+  questions?: string;
+}
+
 @ApiTags('Research')
 @ApiBearerAuth()
 @Controller('v1/research')
@@ -173,6 +215,7 @@ export class ResearchController {
     private readonly researchService: ResearchService,
     private readonly marketDataService: MarketDataService,
     private readonly creditService: CreditService,
+    private readonly tickersService: TickersService,
   ) {}
 
   @ApiOperation({ summary: 'Upload manual research note (Legacy)' })
@@ -442,22 +485,45 @@ export class ResearchController {
     description:
       'SSE stream of research events (status, thought, source, content)',
   })
-  // Expensive deep-research pipeline with no credit deduction — cap per-IP to
-  // prevent a logged-in user from running it in a loop for free.
+  // Expensive grounded deep-research pipeline — cap per-IP AND charge a flat
+  // upfront credit fee (admins exempt), mirroring POST /ask. The inline body
+  // type previously skipped the global ValidationPipe entirely; bind a real DTO
+  // so ticker/questions are length- and charset-validated, and reject symbols
+  // that aren't in our universe before running the agent (M13).
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('stream')
   @Sse() // Content-Type: text/event-stream
-  startResearch(
-    @Body() body: { ticker: string; questions?: string },
-  ): Observable<MessageEvent> {
-    return this.researchService
-      .streamResearch(body.ticker, body.questions)
-      .pipe(
-        map((event: any) => ({
-          data: event, // Automatically JSON serialized
-          type: event.type, // Allows frontend to verify event listeners
-        })),
+  async startResearch(
+    @Request() req: any,
+    @Body() dto: StreamResearchDto,
+  ): Promise<Observable<MessageEvent>> {
+    const symbol = dto.ticker.toUpperCase();
+    const known = await this.tickersService.findOneBySymbol(symbol);
+    if (!known) {
+      throw new NotFoundException(`Ticker ${symbol} not found`);
+    }
+
+    // Fail closed: deduct before streaming so a deduction failure (insufficient
+    // balance) can never yield a free run of the expensive grounded agent.
+    if (req.user.role !== 'admin') {
+      const cost = this.creditService.getResearchCost('gemini', 'deep');
+      await this.creditService.deductCredits(
+        req.user.id,
+        cost,
+        'research_spend',
+        {
+          ticker: symbol,
+          pipeline: 'stream',
+        },
       );
+    }
+
+    return this.researchService.streamResearch(symbol, dto.questions).pipe(
+      map((event: any) => ({
+        data: event, // Automatically JSON serialized
+        type: event.type, // Allows frontend to verify event listeners
+      })),
+    );
   }
   @ApiOperation({
     summary: 'Manually trigger financial extraction from latest research',
