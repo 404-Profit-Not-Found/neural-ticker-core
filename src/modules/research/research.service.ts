@@ -118,7 +118,31 @@ export class ResearchService implements OnModuleInit {
       models_used: model ? [model] : [],
     });
 
+    // 1a. Content fingerprint for dedup (H10/M11). A user re-uploading the
+    // same text (modulo whitespace/case) must NOT be re-scored or re-rewarded,
+    // so we look for an earlier note of theirs with the same hash first.
+    note.content_hash = this.hashContent(content);
+    const priorNote = await this.noteRepo.findOne({
+      where: { user_id: userId, content_hash: note.content_hash },
+      order: { created_at: 'ASC' },
+    });
+    if (priorNote) {
+      // Copy the existing grade so the duplicate still renders consistently in
+      // the feed, but grant NO new credits and skip the (expensive) re-scoring.
+      note.quality_score = priorNote.quality_score;
+      note.rarity = priorNote.rarity;
+      note.grounding_metadata = priorNote.grounding_metadata;
+      this.logger.warn(
+        `Duplicate manual note by ${userId} (hash ${note.content_hash.slice(
+          0,
+          12,
+        )}…); copied grade, no reward.`,
+      );
+      return this.noteRepo.save(note);
+    }
+
     // 2. Judge Quality (Universal Judge)
+    let reward = 0;
     try {
       const judgment = await this.qualityScoringService.score(content);
       if (judgment.ok) {
@@ -128,7 +152,9 @@ export class ResearchService implements OnModuleInit {
           judgment_reasoning: judgment.details.reasoning,
         };
 
-        // 3. Reward Credits if applicable
+        // Reward is keyed off the SERVER-derived rarity (already re-derived
+        // from the clamped score in QualityScoringService), never a raw model
+        // claim — so a model can't mint Legendary by lying about its rarity.
         const rewardMap: Record<string, number> = {
           Common: 1,
           Uncommon: 3,
@@ -136,38 +162,7 @@ export class ResearchService implements OnModuleInit {
           Epic: 10,
           Legendary: 25,
         };
-
-        const reward = rewardMap[judgment.rarity] || 0;
-        if (reward > 0) {
-          // Anti-farming: cap credits earned from contributions per rolling 24h.
-          const DAILY_CONTRIBUTION_CAP = 50;
-          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          const earnedToday = await this.creditService.getEarnedSince(
-            userId,
-            'manual_contribution',
-            since,
-          );
-          const grantable = Math.min(
-            reward,
-            DAILY_CONTRIBUTION_CAP - earnedToday,
-          );
-          if (grantable > 0) {
-            await this.creditService.addCredits(
-              userId,
-              grantable,
-              'manual_contribution',
-              {
-                noteId: note.request_id,
-                rarity: judgment.rarity,
-                score: judgment.score,
-              },
-            );
-          } else {
-            this.logger.warn(
-              `User ${userId} hit the daily contribution credit cap; reward skipped.`,
-            );
-          }
-        }
+        reward = rewardMap[judgment.rarity] || 0;
       } else {
         // Scoring failed (e.g. transient 429). Leave quality_score / rarity
         // NULL so a later re-score can fill them — do NOT persist 0 / Common.
@@ -180,7 +175,54 @@ export class ResearchService implements OnModuleInit {
       // Don't fail the upload just because judging failed
     }
 
-    return this.noteRepo.save(note);
+    // 3. Persist the note BEFORE granting credits (L1). The note is the durable
+    // artifact the user expects to keep; if the grant throws we must not 500
+    // the upload and lose their content. Save first, reward second.
+    const saved = await this.noteRepo.save(note);
+
+    // 4. Reward credits. The daily anti-farming cap is enforced atomically and
+    // row-locked inside the credit service (M8), and a grant failure must never
+    // fail the upload — the note is already safely persisted above.
+    if (reward > 0) {
+      const DAILY_CONTRIBUTION_CAP = 50;
+      try {
+        const granted = await this.creditService.addContributionCredits(
+          userId,
+          reward,
+          DAILY_CONTRIBUTION_CAP,
+          {
+            noteId: saved.request_id,
+            rarity: saved.rarity,
+            score: saved.quality_score,
+          },
+        );
+        if (granted < reward) {
+          this.logger.warn(
+            `User ${userId} contribution reward clamped by daily cap (${granted}/${reward}).`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn(
+          `Failed to grant contribution credits for note ${saved.request_id}`,
+          e,
+        );
+      }
+    }
+
+    return saved;
+  }
+
+  /**
+   * Stable content fingerprint for contribution dedup (H10/M11). Normalizes
+   * case and collapses runs of whitespace so cosmetic edits map to the same
+   * hash, preventing trivial-variation farming of contribution credits.
+   */
+  private hashContent(content: string): string {
+    const normalized = (content || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    return crypto.createHash('sha256').update(normalized).digest('hex');
   }
 
   // REMOVED: judgeResearchQuality - replaced by QualityScoringService

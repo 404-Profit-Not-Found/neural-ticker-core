@@ -39,6 +39,7 @@ const mockUserRepo = {
 const mockTxRepo = {
   create: jest.fn(),
   save: jest.fn(),
+  createQueryBuilder: jest.fn(),
 };
 
 describe('CreditService', () => {
@@ -125,6 +126,114 @@ describe('CreditService', () => {
       expect(mockTxRepo.save).toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+  });
+
+  describe('addContributionCredits', () => {
+    // Wire the locked-user read + the in-transaction 24h SUM query.
+    const setup = (opts: { earned: number; user: any }) => {
+      mockQueryRunner.manager.getRepository.mockImplementation((entity) => {
+        if (entity === User) return mockUserRepo;
+        if (entity === CreditTransaction) return mockTxRepo;
+        return null;
+      });
+      const userQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(opts.user),
+      };
+      mockUserRepo.createQueryBuilder.mockReturnValue(userQb);
+      const txQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({ sum: String(opts.earned) }),
+      };
+      mockTxRepo.createQueryBuilder.mockReturnValue(txQb);
+      mockTxRepo.create.mockReturnValue({});
+      return { userQb, txQb };
+    };
+
+    it('rejects non-positive / non-finite amounts before opening a transaction', async () => {
+      await expect(
+        service.addContributionCredits('user-1', 0, 50),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addContributionCredits('user-1', -5, 50),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addContributionCredits('user-1', NaN, 50),
+      ).rejects.toThrow(BadRequestException);
+      // Guard runs before any DB work.
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+
+    it('grants the full reward when well under the cap, and locks the row', async () => {
+      const { userQb } = setup({ earned: 0, user: { ...mockUser } });
+
+      const granted = await service.addContributionCredits('user-1', 10, 50);
+
+      expect(granted).toBe(10);
+      // The user row must be locked FOR UPDATE so the cap check is atomic.
+      expect(userQb.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(mockUserRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ credits_balance: 20 }),
+      );
+      expect(mockTxRepo.save).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('clamps the grant to the remaining daily-cap headroom (M8)', async () => {
+      setup({ earned: 48, user: { ...mockUser } });
+
+      // Reward is 10 but only 2 of the 50/day cap remain.
+      const granted = await service.addContributionCredits('user-1', 10, 50);
+
+      expect(granted).toBe(2);
+      expect(mockTxRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2, reason: 'manual_contribution' }),
+      );
+      expect(mockUserRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ credits_balance: 12 }),
+      );
+    });
+
+    it('grants nothing once the cap is reached but still commits (no writes)', async () => {
+      setup({ earned: 50, user: { ...mockUser } });
+
+      const granted = await service.addContributionCredits('user-1', 10, 50);
+
+      expect(granted).toBe(0);
+      expect(mockUserRepo.save).not.toHaveBeenCalled();
+      expect(mockTxRepo.save).not.toHaveBeenCalled();
+      // Commit (not rollback) so the row lock releases cleanly.
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back and throws when the user is not found', async () => {
+      setup({ earned: 0, user: null });
+
+      await expect(
+        service.addContributionCredits('ghost', 10, 50),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockUserRepo.save).not.toHaveBeenCalled();
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('rolls back on a downstream write failure', async () => {
+      setup({ earned: 0, user: { ...mockUser } });
+      mockTxRepo.save.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(
+        service.addContributionCredits('user-1', 10, 50),
+      ).rejects.toThrow('db down');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
     });
   });
 

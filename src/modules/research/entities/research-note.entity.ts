@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -23,6 +24,7 @@ export enum ResearchStatus {
   FAILED = 'failed',
 }
 
+@Index('idx_research_notes_user_content_hash', ['user_id', 'content_hash'])
 @Entity('research_notes')
 export class ResearchNote {
   @ApiProperty({ example: '1' })
@@ -117,6 +119,15 @@ export class ResearchNote {
   @ApiProperty({ example: 'Purple', description: 'Rarity Tier based on score' })
   @Column({ type: 'text', nullable: true })
   rarity: string | null;
+
+  @ApiProperty({
+    description:
+      'SHA-256 of the normalized note content; used to dedup re-uploads ' +
+      'and block contribution-credit farming (H10/M11).',
+    required: false,
+  })
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  content_hash: string | null;
 
   @ManyToOne('User', 'research_notes', {
     eager: true,

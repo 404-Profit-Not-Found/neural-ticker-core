@@ -115,6 +115,87 @@ export class CreditService {
     }
   }
 
+  /**
+   * Grant contribution-reward credits with the daily anti-farming cap enforced
+   * ATOMICALLY inside a row-locked transaction (M8). Unlike {@link addCredits},
+   * the cap check (sum of the last 24h `manual_contribution` credits) is
+   * re-read while holding a `pessimistic_write` lock on the user row, so two
+   * concurrent uploads can't both observe "under cap" and over-grant past it
+   * (the TOCTOU the previous read-then-add pattern allowed). Returns the amount
+   * actually granted — 0 when the cap is already reached (still commits so the
+   * lock releases). `requestedAmount` is the rarity reward; it is clamped down
+   * to whatever headroom remains under `dailyCap`.
+   */
+  async addContributionCredits(
+    userId: string,
+    requestedAmount: number,
+    dailyCap: number,
+    metadata?: Record<string, any>,
+  ): Promise<number> {
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      throw new BadRequestException('Credit amount must be a positive number');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const userRepo = queryRunner.manager.getRepository(User);
+      const txRepo = queryRunner.manager.getRepository(CreditTransaction);
+
+      // Lock the user row FIRST. Under READ COMMITTED this serializes
+      // concurrent contributions by the same user: the second caller blocks
+      // here until the first commits, then re-reads a snapshot that includes
+      // the first grant — so the cap can never be exceeded by a race.
+      const user = await userRepo
+        .createQueryBuilder('user')
+        .setLock('pessimistic_write')
+        .where('user.id = :id', { id: userId })
+        .getOne();
+
+      if (!user) throw new BadRequestException('User not found');
+
+      // Re-read the rolling-24h earned total INSIDE the locked transaction.
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const row = await txRepo
+        .createQueryBuilder('t')
+        .select('COALESCE(SUM(t.amount), 0)', 'sum')
+        .where('t.user_id = :userId', { userId })
+        .andWhere('t.reason = :reason', { reason: 'manual_contribution' })
+        .andWhere('t.amount > 0')
+        .andWhere('t.created_at >= :since', { since })
+        .getRawOne<{ sum: string }>();
+      const earnedToday = Number(row?.sum) || 0;
+
+      const grantable = Math.min(requestedAmount, dailyCap - earnedToday);
+      if (grantable <= 0) {
+        // Cap already reached — commit the (no-op) tx so the lock releases.
+        await queryRunner.commitTransaction();
+        return 0;
+      }
+
+      user.credits_balance += grantable;
+      await userRepo.save(user);
+
+      const tx = txRepo.create({
+        user_id: userId,
+        amount: grantable,
+        reason: 'manual_contribution',
+        metadata,
+      });
+      await txRepo.save(tx);
+
+      await queryRunner.commitTransaction();
+      return grantable;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async deductCredits(
     userId: string,
     amount: number,

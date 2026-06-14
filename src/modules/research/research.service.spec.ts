@@ -80,6 +80,8 @@ describe('ResearchService', () => {
   const mockCreditService = {
     addCredits: jest.fn(),
     getEarnedSince: jest.fn().mockResolvedValue(0),
+    // Returns the amount actually granted; default to granting the full reward.
+    addContributionCredits: jest.fn().mockImplementation((_u, amt) => amt),
   };
 
   const mockQualityScoringService = {
@@ -166,6 +168,8 @@ describe('ResearchService', () => {
       const title = 'My Research';
       const content = '# Analysis';
 
+      // No prior note with this hash → not a duplicate.
+      mockRepo.findOne.mockResolvedValue(null);
       // Mock Judge result
       mockQualityScoringService.score.mockResolvedValueOnce({
         ok: true,
@@ -191,19 +195,23 @@ describe('ResearchService', () => {
         }),
       );
 
-      // Verify Credit Reward for Purple (10 credits)
-      expect(mockCreditService.addCredits).toHaveBeenCalledWith(
+      // Reward goes through the atomic, row-locked cap path (M8) keyed off the
+      // server-derived rarity — Epic = 10, cap 50.
+      expect(mockCreditService.addContributionCredits).toHaveBeenCalledWith(
         userId,
-        10, // Purple reward
-        'manual_contribution',
+        10, // Epic reward
+        50, // daily contribution cap
         expect.anything(),
       );
+      // The legacy un-capped addCredits path must no longer be used here.
+      expect(mockCreditService.addCredits).not.toHaveBeenCalled();
 
       expect(mockRepo.save).toHaveBeenCalled();
     });
 
     it('leaves a manual note unscored and grants no credits when scoring fails', async () => {
       const userId = 'user-1';
+      mockRepo.findOne.mockResolvedValue(null);
       // Transient scoring failure (e.g. a 429) must NOT persist 0/Common, and
       // must NOT reward credits — the columns stay NULL for a later re-score.
       mockQualityScoringService.score.mockResolvedValueOnce({
@@ -213,11 +221,85 @@ describe('ResearchService', () => {
 
       await service.createManualNote(userId, ['AAPL'], 'Title', 'Content');
 
+      expect(mockCreditService.addContributionCredits).not.toHaveBeenCalled();
       expect(mockCreditService.addCredits).not.toHaveBeenCalled();
       // The saved note must not carry a fabricated score/rarity.
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.not.objectContaining({ rarity: expect.anything() }),
       );
+    });
+
+    it('dedups a re-upload: copies the prior grade and grants NO credits (H10/M11)', async () => {
+      const userId = 'user-1';
+      const priorNote = {
+        id: '7',
+        quality_score: 90,
+        rarity: 'Epic',
+        grounding_metadata: { judgment_reasoning: 'prior' },
+      };
+      // findOne(by user_id + content_hash) returns an earlier identical note.
+      mockRepo.findOne.mockResolvedValue(priorNote);
+
+      const saved = await service.createManualNote(
+        userId,
+        ['AAPL'],
+        'Title',
+        'Same content',
+      );
+
+      // Must NOT re-score and must NOT grant any credits.
+      expect(mockQualityScoringService.score).not.toHaveBeenCalled();
+      expect(mockCreditService.addContributionCredits).not.toHaveBeenCalled();
+      // The duplicate copies the prior grade for consistent rendering.
+      expect(saved).toEqual(
+        expect.objectContaining({ quality_score: 90, rarity: 'Epic' }),
+      );
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ quality_score: 90, rarity: 'Epic' }),
+      );
+    });
+
+    it('normalizes content for the dedup hash (case + whitespace insensitive)', () => {
+      const hash = (c: string) => (service as any).hashContent(c) as string;
+      // Same words, different case/spacing → identical fingerprint.
+      expect(hash('Hello   World')).toBe(hash('hello world'));
+      expect(hash('  A\n\nB  ')).toBe(hash('a b'));
+      // Genuinely different content → different fingerprint.
+      expect(hash('alpha')).not.toBe(hash('beta'));
+      // Always a 64-char hex SHA-256 digest.
+      expect(hash('x')).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('persists the note BEFORE granting credits, and survives a grant failure (L1)', async () => {
+      const userId = 'user-1';
+      mockRepo.findOne.mockResolvedValue(null);
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        ok: true,
+        score: 88,
+        rarity: 'Epic',
+        details: { reasoning: 'ok' },
+      });
+      // The grant blows up — the upload must still succeed and return the note.
+      mockCreditService.addContributionCredits.mockRejectedValueOnce(
+        new Error('credit ledger down'),
+      );
+
+      const saved = await service.createManualNote(
+        userId,
+        ['AAPL'],
+        'Title',
+        'Content',
+      );
+
+      // Note was saved (not lost) despite the grant failure.
+      expect(saved).toEqual(
+        expect.objectContaining({ quality_score: 88, rarity: 'Epic' }),
+      );
+      // Ordering: the note save was invoked before the credit grant.
+      const saveOrder = mockRepo.save.mock.invocationCallOrder[0];
+      const grantOrder =
+        mockCreditService.addContributionCredits.mock.invocationCallOrder[0];
+      expect(saveOrder).toBeLessThan(grantOrder);
     });
   });
 
