@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResearchService } from './research.service';
 import { ResearchNote, ResearchStatus } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
+import { LlmBudgetService } from '../llm/llm-budget.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
@@ -21,6 +22,15 @@ describe('ResearchService - Digest', () => {
   let llmService: any;
   let portfolioService: any;
 
+  // Transactional EntityManager used by getOrGenerateDailyDigest's per-user
+  // advisory lock (M1). query() is the pg_advisory_xact_lock call; getRepository
+  // routes back to mockRepo so the existence findOne / pending create+save
+  // inside the transaction hit the same mock the assertions watch.
+  const mockTxManager = {
+    query: jest.fn().mockResolvedValue(undefined),
+    getRepository: jest.fn(),
+  };
+
   const mockRepo = {
     create: jest.fn().mockImplementation((dto) => dto),
     save: jest
@@ -29,8 +39,13 @@ describe('ResearchService - Digest', () => {
         Promise.resolve({ ...entity, id: 'saved-id' }),
       ),
     findOne: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     delete: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: any) => cb(mockTxManager)),
+    },
   };
+  mockTxManager.getRepository.mockReturnValue(mockRepo);
 
   const mockLlmService = {
     generateResearch: jest.fn().mockResolvedValue({
@@ -68,6 +83,10 @@ describe('ResearchService - Digest', () => {
         ResearchService,
         { provide: getRepositoryToken(ResearchNote), useValue: mockRepo },
         { provide: LlmService, useValue: mockLlmService },
+        {
+          provide: LlmBudgetService,
+          useValue: { hasBudget: jest.fn().mockResolvedValue(true) },
+        },
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
