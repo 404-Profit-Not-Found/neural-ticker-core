@@ -4,18 +4,36 @@ import { OpenAiProvider } from './openai.provider';
 import { ResearchPrompt } from '../llm.types';
 import OpenAI from 'openai';
 
-// Mock OpenAI SDK
+// Mock OpenAI SDK. The provider references OpenAI.APIError at runtime in its
+// catch branch, so the mock must expose that class as a static on the default
+// export — otherwise any test exercising the error path throws
+// "Cannot read properties of undefined (reading 'APIError')".
 jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: jest.fn(),
-        },
+  class MockAPIError extends Error {
+    status?: number;
+    type?: string;
+    code?: string;
+    constructor(
+      message: string,
+      status?: number,
+      type?: string,
+      code?: string,
+    ) {
+      super(message);
+      this.status = status;
+      this.type = type;
+      this.code = code;
+    }
+  }
+  const MockOpenAI = jest.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: jest.fn(),
       },
-    })),
-  };
+    },
+  })) as jest.Mock & { APIError: typeof MockAPIError };
+  MockOpenAI.APIError = MockAPIError;
+  return { __esModule: true, default: MockOpenAI };
 });
 
 describe('OpenAiProvider', () => {
@@ -123,5 +141,63 @@ describe('OpenAiProvider', () => {
         'Rate limit exceeded',
       );
     });
+
+    it('throws a descriptive error when choices is empty', async () => {
+      // OpenAI can legitimately return zero choices (content filter, certain
+      // finish_reason paths, a misbehaving proxy via a custom baseURL).
+      mockCreate.mockResolvedValue({
+        choices: [],
+        usage: { prompt_tokens: 5, completion_tokens: 0 },
+      });
+
+      await expect(provider.generate(validPrompt)).rejects.toThrow(
+        /no choices/i,
+      );
+    });
+
+    it('throws when choices is undefined (malformed response)', async () => {
+      mockCreate.mockResolvedValue({});
+
+      await expect(provider.generate(validPrompt)).rejects.toThrow(
+        /no choices/i,
+      );
+    });
+
+    it('falls back to empty markdown when message.content is null', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: null } }],
+        usage: { prompt_tokens: 10, completion_tokens: 0 },
+      });
+
+      const result = await provider.generate(validPrompt);
+      expect(result.answerMarkdown).toBe('');
+      expect(result.tokensIn).toBe(10);
+    });
+
+    it('maps OpenAI.APIError and rethrows', async () => {
+      const apiError = new (OpenAI as any).APIError(
+        'rate limited',
+        429,
+        'rate_limit_error',
+        'rate_limit_exceeded',
+      );
+      mockCreate.mockRejectedValue(apiError);
+
+      const logSpy = jest.spyOn((provider as any).logger, 'error');
+      await expect(provider.generate(validPrompt)).rejects.toBe(apiError);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('status=429'),
+      );
+    });
+  });
+
+  it('configures the SDK with timeout and maxRetries', () => {
+    const ctorCall = (OpenAI as unknown as jest.Mock).mock.calls.at(-1)?.[0];
+    expect(ctorCall).toEqual(
+      expect.objectContaining({
+        maxRetries: expect.any(Number),
+        timeout: expect.any(Number),
+      }),
+    );
   });
 });

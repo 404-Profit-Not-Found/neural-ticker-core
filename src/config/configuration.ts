@@ -23,6 +23,11 @@ export default () => {
     openai: {
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,
+      // Per-request guardrails consumed by OpenAiProvider's SDK client: bound
+      // retry budget and single-attempt timeout so a hung upstream can't stall
+      // the research pipeline. Provider falls back to 2 / 60000 if unset.
+      maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || '2', 10),
+      timeoutMs: parseInt(process.env.OPENAI_TIMEOUT_MS || '60000', 10),
       models: {
         low: process.env.OPENAI_MODEL_LOW || 'gpt-4.1-mini', // Default to mini for extraction
         medium: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4.1-mini',

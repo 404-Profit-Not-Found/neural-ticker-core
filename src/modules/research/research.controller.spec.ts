@@ -1,9 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { ResearchController } from './research.controller';
+import { of } from 'rxjs';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import {
+  ResearchController,
+  AskResearchDto,
+  StreamResearchDto,
+} from './research.controller';
 import { ResearchService } from './research.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { CreditService } from '../users/credit.service';
+import { TickersService } from '../tickers/tickers.service';
 import { CreditGuard } from './guards/credit.guard';
 
 describe('ResearchController', () => {
@@ -31,6 +39,9 @@ describe('ResearchController', () => {
     getResearchCost: jest.fn(),
     deductCredits: jest.fn(),
   };
+  const mockTickersService = {
+    findOneBySymbol: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -47,6 +58,10 @@ describe('ResearchController', () => {
         {
           provide: CreditService,
           useValue: mockCreditService,
+        },
+        {
+          provide: TickersService,
+          useValue: mockTickersService,
         },
       ],
     })
@@ -341,6 +356,148 @@ describe('ResearchController', () => {
       await expect(controller.updateTitle(req, '1', 'Title')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('startResearch (stream)', () => {
+    it('404s for a ticker not in the universe and never streams', async () => {
+      mockTickersService.findOneBySymbol.mockResolvedValue(null);
+      const req = { user: { id: 'user1', role: 'user' } };
+
+      await expect(
+        controller.startResearch(req, { ticker: 'BOGUS' } as StreamResearchDto),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockResearchService.streamResearch).not.toHaveBeenCalled();
+      expect(mockCreditService.deductCredits).not.toHaveBeenCalled();
+    });
+
+    it('uppercases the symbol, charges a non-admin, then streams', async () => {
+      mockTickersService.findOneBySymbol.mockResolvedValue({ symbol: 'AAPL' });
+      mockCreditService.getResearchCost.mockReturnValue(5);
+      mockCreditService.deductCredits.mockResolvedValue(undefined);
+      mockResearchService.streamResearch.mockReturnValue(
+        of({ type: 'status', data: 'x' }),
+      );
+      const req = { user: { id: 'user1', role: 'user' } };
+
+      const obs = await controller.startResearch(req, {
+        ticker: 'aapl',
+        questions: 'moat?',
+      } as StreamResearchDto);
+
+      expect(mockTickersService.findOneBySymbol).toHaveBeenCalledWith('AAPL');
+      expect(mockCreditService.deductCredits).toHaveBeenCalledWith(
+        'user1',
+        5,
+        'research_spend',
+        expect.objectContaining({ ticker: 'AAPL', pipeline: 'stream' }),
+      );
+      expect(mockResearchService.streamResearch).toHaveBeenCalledWith(
+        'AAPL',
+        'moat?',
+      );
+      // The SSE mapper wraps each event as { data, type }.
+      const event = await new Promise((resolve) => obs.subscribe(resolve));
+      expect(event).toEqual({
+        data: { type: 'status', data: 'x' },
+        type: 'status',
+      });
+    });
+
+    it('exempts admins from the credit charge but still streams', async () => {
+      mockTickersService.findOneBySymbol.mockResolvedValue({ symbol: 'AAPL' });
+      mockResearchService.streamResearch.mockReturnValue(
+        of({ type: 'status', data: 'x' }),
+      );
+      const req = { user: { id: 'admin1', role: 'admin' } };
+
+      await controller.startResearch(req, {
+        ticker: 'AAPL',
+      } as StreamResearchDto);
+
+      expect(mockCreditService.deductCredits).not.toHaveBeenCalled();
+      expect(mockResearchService.streamResearch).toHaveBeenCalledWith(
+        'AAPL',
+        undefined,
+      );
+    });
+
+    it('fails closed: a deduction failure aborts before streaming', async () => {
+      mockTickersService.findOneBySymbol.mockResolvedValue({ symbol: 'AAPL' });
+      mockCreditService.getResearchCost.mockReturnValue(5);
+      mockCreditService.deductCredits.mockRejectedValue(
+        new Error('Insufficient credits'),
+      );
+      const req = { user: { id: 'user1', role: 'user' } };
+
+      await expect(
+        controller.startResearch(req, { ticker: 'AAPL' } as StreamResearchDto),
+      ).rejects.toThrow('Insufficient credits');
+
+      expect(mockResearchService.streamResearch).not.toHaveBeenCalled();
+    });
+  });
+
+  // class-validator does not run inside Test.createTestingModule (the global
+  // ValidationPipe is not wired), so exercise the DTO decorators directly.
+  describe('AskResearchDto validation', () => {
+    const make = (overrides: Record<string, unknown>) =>
+      plainToInstance(AskResearchDto, {
+        tickers: ['AAPL'],
+        question: 'Analyze',
+        ...overrides,
+      });
+
+    it('accepts a valid payload', async () => {
+      const errors = await validate(make({ tickers: ['AAPL', 'BRK.B'] }));
+      expect(errors.length).toBe(0);
+    });
+
+    it('rejects an empty tickers array', async () => {
+      const errors = await validate(make({ tickers: [] }));
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects more than 10 tickers', async () => {
+      const errors = await validate(make({ tickers: Array(11).fill('AAPL') }));
+      expect(errors.some((e) => e.property === 'tickers')).toBe(true);
+    });
+
+    it('rejects a non-symbol ticker', async () => {
+      const errors = await validate(make({ tickers: ['NOT A TICKER!'] }));
+      expect(errors.some((e) => e.property === 'tickers')).toBe(true);
+    });
+
+    it('rejects a question longer than 2000 chars', async () => {
+      const errors = await validate(make({ question: 'x'.repeat(2001) }));
+      expect(errors.some((e) => e.property === 'question')).toBe(true);
+    });
+  });
+
+  describe('StreamResearchDto validation', () => {
+    it('accepts a valid payload (optional questions omitted)', async () => {
+      const errors = await validate(
+        plainToInstance(StreamResearchDto, { ticker: 'AAPL' }),
+      );
+      expect(errors.length).toBe(0);
+    });
+
+    it('rejects a non-symbol ticker', async () => {
+      const errors = await validate(
+        plainToInstance(StreamResearchDto, { ticker: 'bad symbol!!' }),
+      );
+      expect(errors.some((e) => e.property === 'ticker')).toBe(true);
+    });
+
+    it('rejects questions longer than 2000 chars', async () => {
+      const errors = await validate(
+        plainToInstance(StreamResearchDto, {
+          ticker: 'AAPL',
+          questions: 'x'.repeat(2001),
+        }),
+      );
+      expect(errors.some((e) => e.property === 'questions')).toBe(true);
     });
   });
 });

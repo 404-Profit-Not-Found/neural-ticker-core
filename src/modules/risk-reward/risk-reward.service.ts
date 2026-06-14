@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { RiskRewardScore } from './entities/risk-reward-score.entity'; // Legacy
 import { RiskAnalysis } from './entities/risk-analysis.entity';
 import { RiskScenario, ScenarioType } from './entities/risk-scenario.entity';
@@ -31,6 +31,25 @@ export class RiskRewardService {
     private readonly marketDataService: MarketDataService,
     private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Clamps an LLM-produced 0-10 score into the storable range. The score
+   * columns are numeric(4,2) (max 99.99), so an unbounded value >= 100 throws
+   * "numeric field overflow" on save and the swallowing caller
+   * (evaluateFromResearch) loses the whole analysis. Non-finite / missing
+   * values (NaN, Infinity, null, undefined, non-numeric strings) collapse to
+   * the neutral midpoint 5. A legitimate 0 ("NO RISK") is preserved — unlike
+   * the old `value || 5`, which coerced a falsy 0 up to 5.
+   */
+  private clampScore(value: unknown): number {
+    // Treat "no data" sentinels (null / undefined / empty string) as the neutral
+    // midpoint, NOT as 0 — `Number(null)` and `Number('')` both coerce to 0,
+    // which would silently mean "NO RISK" for a field the model simply omitted.
+    if (value === null || value === undefined || value === '') return 5;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return 5;
+    return Math.max(0, Math.min(10, n));
+  }
 
   // Heuristic salvage to keep processing when TOON/JSON is malformed but key numbers exist.
   private salvageFromRaw(raw: string) {
@@ -383,6 +402,52 @@ export class RiskRewardService {
     });
   }
 
+  /**
+   * Deletes every risk analysis linked to a single research note (and its child
+   * rows: scenarios / qualitative factors / catalysts) using the supplied
+   * EntityManager, so the caller can run it inside the same transaction that
+   * deletes the note itself. Returns the number of analyses removed.
+   *
+   * `risk_analyses.research_note_id` stores `research_notes.id` (a bigint) as
+   * text, so the note id is bound as a string. Child rows are deleted
+   * explicitly rather than relying on a DB-level ON DELETE CASCADE, since the
+   * risk_* tables were created via schema sync (no migration) and their cascade
+   * behaviour can't be assumed — the same rationale as deleteOrphanedAnalyses.
+   */
+  async deleteAnalysesForResearchNote(
+    noteId: string,
+    mgr: EntityManager,
+  ): Promise<number> {
+    const noteWhere = `research_note_id = $1`;
+
+    const countRows: { count: string }[] = await mgr.query(
+      `SELECT COUNT(*)::int AS count FROM risk_analyses WHERE ${noteWhere}`,
+      [noteId],
+    );
+    const count = countRows[0]?.count ? Number(countRows[0].count) : 0;
+    if (count === 0) return 0;
+
+    const childSelect = `SELECT id FROM risk_analyses WHERE ${noteWhere}`;
+    await mgr.query(
+      `DELETE FROM risk_scenarios WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(
+      `DELETE FROM risk_qualitative_factors WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(
+      `DELETE FROM risk_catalysts WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(`DELETE FROM risk_analyses WHERE ${noteWhere}`, [noteId]);
+
+    this.logger.log(
+      `Deleted ${count} risk analyses (and child rows) for research note ${noteId}.`,
+    );
+    return count;
+  }
+
   // Called by ResearchService after a Deep Research Note is generated
   async evaluateFromResearch(note: any): Promise<RiskAnalysis | null> {
     if (!note || !note.answer_markdown) return null;
@@ -394,6 +459,25 @@ export class RiskRewardService {
     // Let's iterate over tickers in the note.
 
     const results: RiskAnalysis[] = [];
+
+    // Cross-contamination guard: a note's answer_markdown is ONE combined
+    // document. Feeding the whole document to the per-ticker extractor for each
+    // symbol lets one ticker's prices/scenarios/risk scores bleed into another's
+    // analysis. There is no reliable way to slice free-form markdown into
+    // per-ticker sections, so for multi-ticker notes we skip the automatic risk
+    // extraction entirely rather than persist contaminated scores. Single-ticker
+    // notes are unambiguous and processed as before.
+    if (!Array.isArray(note.tickers) || note.tickers.length === 0) {
+      return null;
+    }
+    if (note.tickers.length > 1) {
+      this.logger.warn(
+        `Skipping auto risk-analysis for multi-ticker note ${note.id} ` +
+          `(${note.tickers.length} tickers: ${note.tickers.join(', ')}) to avoid ` +
+          `cross-ticker contamination. Run per-ticker research for individual scores.`,
+      );
+      return null;
+    }
 
     for (const tickerSymbol of note.tickers) {
       try {
@@ -689,12 +773,12 @@ export class RiskRewardService {
       overall = Math.min(overall, 1.0);
     }
 
-    analysis.overall_score = overall;
-    analysis.financial_risk = rs.financial_risk || 5;
-    analysis.execution_risk = rs.execution_risk || 5;
-    analysis.dilution_risk = rs.dilution_risk || 5;
-    analysis.competitive_risk = rs.competitive_risk || 5;
-    analysis.regulatory_risk = rs.regulatory_risk || 5;
+    analysis.overall_score = this.clampScore(overall);
+    analysis.financial_risk = this.clampScore(rs.financial_risk);
+    analysis.execution_risk = this.clampScore(rs.execution_risk);
+    analysis.dilution_risk = this.clampScore(rs.dilution_risk);
+    analysis.competitive_risk = this.clampScore(rs.competitive_risk);
+    analysis.regulatory_risk = this.clampScore(rs.regulatory_risk);
 
     // Expected Value (using already declared ev)
     analysis.price_target_weighted = ev.price_target_weighted || 0;
@@ -764,12 +848,29 @@ export class RiskRewardService {
       ? scenarios
       : buildFallbackScenarios();
 
+    // Normalize the three scenario probabilities to sum to 1 before persisting.
+    // The LLM can return values that don't sum to 1 (e.g. 0.3/0.6/0.4), which
+    // corrupts probability-weighted expected-value math downstream. If the total
+    // is non-positive / non-finite (all zero or garbage), fall back to an even
+    // split across the scenarios actually present.
+    const probTotal = scenarioTypes.reduce((sum, t) => {
+      const p = Number(scenarioSource[t]?.probability);
+      return sum + (Number.isFinite(p) && p > 0 ? p : 0);
+    }, 0);
+    const presentCount = scenarioTypes.filter((t) => scenarioSource[t]).length;
+
     scenarioTypes.forEach((type) => {
       const data = scenarioSource[type];
       if (data) {
         const scenario = new RiskScenario();
         scenario.scenario_type = type;
-        scenario.probability = data.probability;
+        const rawProb = Number(data.probability);
+        scenario.probability =
+          probTotal > 0 && Number.isFinite(rawProb) && rawProb > 0
+            ? rawProb / probTotal
+            : presentCount > 0
+              ? 1 / presentCount
+              : 0;
         scenario.description = data.description || '';
         scenario.price_low = data.price_target_low || 0;
         scenario.price_high = data.price_target_high || 0;

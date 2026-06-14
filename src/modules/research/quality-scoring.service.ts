@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
 
+export type Rarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic' | 'Legendary';
+
 export interface QualityScore {
   score: number;
-  rarity: 'Common' | 'Uncommon' | 'Rare' | 'Epic' | 'Legendary';
+  rarity: Rarity;
   details: {
     riskRewardAnalysis: number; // 0-10
     hallucinationCheck: number; // 0-10
@@ -13,13 +15,23 @@ export interface QualityScore {
   };
 }
 
+/**
+ * Discriminated result of {@link QualityScoringService.score}. A failure
+ * (LLM error, bad JSON, schema mismatch) returns `{ ok: false }` so callers
+ * can leave quality_score / rarity NULL and retry later — never persisting a
+ * bogus 0 / 'Common' from a transient 429.
+ */
+export type QualityScoreResult =
+  | ({ ok: true } & QualityScore)
+  | { ok: false; error: string };
+
 @Injectable()
 export class QualityScoringService {
   private readonly logger = new Logger(QualityScoringService.name);
 
   constructor(private readonly llmService: LlmService) {}
 
-  async score(noteContent: string): Promise<QualityScore> {
+  async score(noteContent: string): Promise<QualityScoreResult> {
     const prompt = `
       You are an expert Senior Lead Analyst at a top-tier hedge fund. Your job is to grade investment research notes with extreme precision and nuance.
 
@@ -102,21 +114,57 @@ export class QualityScoringService {
         throw new Error('Invalid JSON schema from scoring service');
       }
 
-      return scoreData as QualityScore;
-    } catch (error) {
-      this.logger.error(`Failed to score note: ${error.message}`);
-      // Fallback for failure
+      const score = this.clampScore(scoreData.score);
       return {
-        score: 0,
-        rarity: 'Common',
+        ok: true,
+        score,
+        rarity: this.deriveRarity(score),
         details: {
-          riskRewardAnalysis: 0,
-          hallucinationCheck: 0,
-          insightDensity: 0,
-          comprehensive: 0,
-          reasoning: 'Scoring failed.',
+          riskRewardAnalysis:
+            Number(scoreData.details?.riskRewardAnalysis) || 0,
+          hallucinationCheck:
+            Number(scoreData.details?.hallucinationCheck) || 0,
+          insightDensity: Number(scoreData.details?.insightDensity) || 0,
+          comprehensive: Number(scoreData.details?.comprehensive) || 0,
+          reasoning:
+            typeof scoreData.details?.reasoning === 'string'
+              ? scoreData.details.reasoning
+              : '',
         },
       };
+    } catch (error) {
+      // Do NOT fabricate a 0 / 'Common' result — that would be persisted by
+      // callers and permanently mislabel a good note on a transient failure
+      // (e.g. a 429). Signal failure so callers leave the columns NULL and
+      // a later run can re-score.
+      this.logger.error(`Failed to score note: ${error.message}`);
+      return { ok: false, error: error.message };
     }
+  }
+
+  /**
+   * Coerce an LLM-provided score into the documented [0, 100] range. The
+   * rubric prompt mixes 0-10 (per-criterion) and 0-100 (overall) scales, and
+   * the model occasionally emits an out-of-range or non-finite value. We never
+   * persist anything outside [0, 100]; a NaN/non-finite value clamps to 0.
+   */
+  private clampScore(value: unknown): number {
+    const num = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(num)) return 0;
+    return Math.min(100, Math.max(0, num));
+  }
+
+  /**
+   * Re-derive the rarity tier from the (clamped) score so persisted rarity is
+   * always internally consistent with the score, regardless of what the model
+   * claimed. Bands mirror the rubric prompt:
+   *   Common 0-40, Uncommon 41-70, Rare 71-85, Epic 86-95, Legendary 96-100.
+   */
+  private deriveRarity(score: number): Rarity {
+    if (score <= 40) return 'Common';
+    if (score <= 70) return 'Uncommon';
+    if (score <= 85) return 'Rare';
+    if (score <= 95) return 'Epic';
+    return 'Legendary';
   }
 }

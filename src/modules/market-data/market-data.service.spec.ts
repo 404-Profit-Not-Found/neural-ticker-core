@@ -467,6 +467,79 @@ describe('MarketDataService', () => {
     });
   });
 
+  describe('updateTickerDescription (L5)', () => {
+    it('writes the description when none exists yet', async () => {
+      const ticker = { id: 1, symbol: 'AAPL', description: null } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(ticker);
+      const repo = { save: jest.fn().mockResolvedValue(ticker) };
+      (service as any).tickerRepo = repo;
+
+      await service.updateTickerDescription('AAPL', 'A solid company.');
+
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(repo.save.mock.calls[0][0].description).toBe('A solid company.');
+    });
+
+    it('does NOT overwrite an existing description with a shorter one', async () => {
+      const longExisting =
+        'Apple Inc. designs, manufactures and markets smartphones.';
+      const ticker = {
+        id: 1,
+        symbol: 'AAPL',
+        description: longExisting,
+      } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(ticker);
+      const repo = { save: jest.fn() };
+      (service as any).tickerRepo = repo;
+
+      await service.updateTickerDescription('AAPL', 'Apple makes phones.');
+
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(ticker.description).toBe(longExisting);
+    });
+
+    it('upgrades an existing description when the new one is materially longer', async () => {
+      const shortExisting = 'Apple makes phones.';
+      const richer =
+        'Apple Inc. designs, manufactures and markets smartphones, computers and wearables worldwide.';
+      const ticker = {
+        id: 1,
+        symbol: 'AAPL',
+        description: shortExisting,
+      } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(ticker);
+      const repo = { save: jest.fn().mockResolvedValue(ticker) };
+      (service as any).tickerRepo = repo;
+
+      await service.updateTickerDescription('AAPL', richer);
+
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(repo.save.mock.calls[0][0].description).toBe(richer);
+    });
+
+    it('ignores empty / whitespace-only descriptions without touching the DB', async () => {
+      const ticker = { id: 1, symbol: 'AAPL', description: 'Existing.' } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(ticker);
+      const repo = { save: jest.fn() };
+      (service as any).tickerRepo = repo;
+
+      await service.updateTickerDescription('AAPL', '   ');
+
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('treats a whitespace-only stored description as empty and writes', async () => {
+      const ticker = { id: 1, symbol: 'AAPL', description: '   ' } as any;
+      mockTickersService.awaitEnsureTicker.mockResolvedValue(ticker);
+      const repo = { save: jest.fn().mockResolvedValue(ticker) };
+      (service as any).tickerRepo = repo;
+
+      await service.updateTickerDescription('AAPL', 'Now has content.');
+
+      expect(repo.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('getAnalyzerTickers', () => {
     it('should return paginated data with correct structure', async () => {
       const mockQueryBuilder = {

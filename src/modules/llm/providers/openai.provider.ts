@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
+import { getErrorMessage } from '../../../utils/error.util';
 
 @Injectable()
 export class OpenAiProvider implements ILlmProvider {
@@ -12,6 +13,12 @@ export class OpenAiProvider implements ILlmProvider {
     this.client = new OpenAI({
       apiKey: this.configService.get<string>('openai.apiKey'),
       baseURL: this.configService.get<string>('openai.baseUrl'),
+      // Bound every request: the SDK retries transient failures (429/5xx/
+      // connection errors) with exponential backoff up to maxRetries, and
+      // aborts any single attempt that exceeds timeout. Without these a hung
+      // upstream stalls the whole research pipeline indefinitely.
+      maxRetries: this.configService.get<number>('openai.maxRetries') ?? 2,
+      timeout: this.configService.get<number>('openai.timeoutMs') ?? 60_000,
     });
   }
 
@@ -36,16 +43,31 @@ export class OpenAiProvider implements ILlmProvider {
         max_completion_tokens: prompt.maxTokens || 1000,
       });
 
-      const choice = response.choices[0];
+      const choice = response.choices?.[0];
+      if (!choice) {
+        throw new Error(
+          `OpenAI returned no choices for model ${tieredModel}` +
+            (response.usage ? '' : ' (empty response)'),
+        );
+      }
+
       return {
         provider: 'openai',
         models: [tieredModel],
-        answerMarkdown: choice.message.content || '',
+        answerMarkdown: choice.message?.content || '',
         tokensIn: response.usage?.prompt_tokens,
         tokensOut: response.usage?.completion_tokens,
       };
     } catch (err) {
-      this.logger.error(`OpenAI call failed: ${err.message}`);
+      if (err instanceof OpenAI.APIError) {
+        this.logger.error(
+          `OpenAI API error (status=${err.status ?? 'n/a'}, type=${
+            err.type ?? 'n/a'
+          }, code=${err.code ?? 'n/a'}): ${err.message}`,
+        );
+      } else {
+        this.logger.error(`OpenAI call failed: ${getErrorMessage(err)}`);
+      }
       throw err;
     }
   }
