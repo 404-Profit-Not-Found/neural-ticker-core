@@ -305,56 +305,38 @@ export class RiskRewardService {
   }
 
   /**
-   * Picks the `limit` most-stale tickers that are "due" for (re)analysis,
-   * never-researched first, then oldest analysis first. A ticker is due when
-   * it has no analysis at all, or its latest analysis is older than `maxAgeMs`.
+   * Returns the timestamp (epoch ms) of the most recent risk analysis for each
+   * of the given internal ticker ids, keyed by `ticker_id`. Ids absent from the
+   * map have no analysis on record.
    *
-   * This drives the universe scanner's stale-first rotation: instead of always
-   * scanning the same alphabetical window, every run advances to whatever is
-   * most overdue, so every ticker (watchlisted or not) gets covered on a
-   * rolling cadence. The whole decision is a single DB query — no per-ticker
-   * snapshot fetches.
+   * Matching is done on the internal `ticker_id` primary key — never on the
+   * symbol string. The old symbol join silently failed for suffixed/foreign
+   * tickers (e.g. FRVIA.PA), so a ticker that had been analysed still looked
+   * "never analysed" and got re-scanned on every cron run. The universe
+   * scanner consumes this (merged with research-note recency) to decide which
+   * tickers are due, never-researched first then oldest first.
    */
-  async pickStaleAnalysisTickers(
-    candidateSymbols: string[],
-    limit: number,
-    maxAgeMs: number,
-  ): Promise<string[]> {
-    if (candidateSymbols.length === 0 || limit <= 0) return [];
+  async getLastAnalysisAtByTickerId(
+    tickerIds: string[],
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (tickerIds.length === 0) return map;
 
-    const rows: { symbol: string; last_at: string | null }[] =
+    const rows: { ticker_id: string; last_at: string | null }[] =
       await this.analysisRepo
         .createQueryBuilder('a')
-        .innerJoin('a.ticker', 't')
-        .select('t.symbol', 'symbol')
+        .select('a.ticker_id', 'ticker_id')
         .addSelect('MAX(a.created_at)', 'last_at')
-        .where('t.symbol IN (:...symbols)', { symbols: candidateSymbols })
-        .groupBy('t.symbol')
+        .where('a.ticker_id IN (:...ids)', { ids: tickerIds })
+        .groupBy('a.ticker_id')
         .getRawMany();
 
-    const lastAtBySymbol = new Map<string, number>();
     for (const r of rows) {
       if (r.last_at) {
-        lastAtBySymbol.set(r.symbol, new Date(r.last_at).getTime());
+        map.set(String(r.ticker_id), new Date(r.last_at).getTime());
       }
     }
-
-    const now = Date.now();
-    const due = candidateSymbols.filter((s) => {
-      const ts = lastAtBySymbol.get(s);
-      return ts === undefined || now - ts > maxAgeMs; // never analysed or stale
-    });
-
-    return due
-      .sort((a, b) => {
-        const aTs = lastAtBySymbol.get(a);
-        const bTs = lastAtBySymbol.get(b);
-        if (aTs === undefined && bTs === undefined) return a.localeCompare(b);
-        if (aTs === undefined) return -1; // never researched → highest priority
-        if (bTs === undefined) return 1;
-        return aTs - bTs; // oldest analysis first
-      })
-      .slice(0, limit);
+    return map;
   }
 
   /**

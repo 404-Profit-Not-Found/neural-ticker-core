@@ -334,9 +334,12 @@ export class TickersService {
 
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
     return this.tickerRepo.find({
-      // Include `currency` so callers (cron syncs, frontend list views) can
-      // render prices in their native currency without an extra round-trip.
-      select: ['symbol', 'name', 'exchange', 'currency'],
+      // Include `id` so callers can match on the internal primary key instead of
+      // the symbol string (symbols drift for suffixed/foreign tickers and are an
+      // unreliable join key). Include `currency` so callers (cron syncs,
+      // frontend list views) can render prices in their native currency without
+      // an extra round-trip.
+      select: ['id', 'symbol', 'name', 'exchange', 'currency'],
       where: { is_hidden: false },
       order: { symbol: 'ASC' },
     });

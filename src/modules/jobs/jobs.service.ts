@@ -293,6 +293,44 @@ export class JobsService {
    */
   static readonly RISK_SCANNER_CALLS_PER_TICKET = 2;
 
+  /**
+   * Pure selection for the universe scanner: from `candidates`, return up to
+   * `limit` tickers that are "due" for (re)research — never-researched first,
+   * then oldest first. A ticker is due when it has no recorded research/analysis
+   * at all, or its most recent one is older than `maxAgeMs`.
+   *
+   * Keyed entirely on the internal ticker `id`, so a ticker that was researched
+   * within the window is never re-queued, regardless of how its symbol is
+   * spelled. This is the gate that stops the same company being researched
+   * ~10x/day instead of once per staleness window.
+   */
+  static selectDueTickers(
+    candidates: { id: string; symbol: string }[],
+    lastResearchedAtById: Map<string, number>,
+    now: number,
+    maxAgeMs: number,
+    limit: number,
+  ): { id: string; symbol: string }[] {
+    if (candidates.length === 0 || limit <= 0) return [];
+
+    const due = candidates.filter((c) => {
+      const ts = lastResearchedAtById.get(c.id);
+      return ts === undefined || now - ts > maxAgeMs; // never researched or stale
+    });
+
+    return due
+      .sort((a, b) => {
+        const aTs = lastResearchedAtById.get(a.id);
+        const bTs = lastResearchedAtById.get(b.id);
+        if (aTs === undefined && bTs === undefined)
+          return a.symbol.localeCompare(b.symbol);
+        if (aTs === undefined) return -1; // never researched → highest priority
+        if (bTs === undefined) return 1;
+        return aTs - bTs; // oldest first
+      })
+      .slice(0, limit);
+  }
+
   async runRiskRewardScanner() {
     const maxAgeHours =
       this.configService.get<number>('riskReward.maxAgeHours') || 168;
@@ -314,27 +352,59 @@ export class JobsService {
       }
 
       const allTickers = await this.tickersService.getAllTickers();
-      const symbols = allTickers
-        .map((t) => t.symbol)
-        .filter((s): s is string => !!s);
+      // Carry the internal ticker id alongside the symbol: the staleness gate
+      // matches on id, never on the symbol string (symbols drift for
+      // suffixed/foreign tickers like FRVIA.PA and silently broke the old gate).
+      const candidates = allTickers
+        .filter((t) => !!t.symbol && t.id != null)
+        .map((t) => ({ id: String(t.id), symbol: t.symbol as string }));
 
       // Size this run to the smaller of the fixed batch and what the remaining
       // budget can afford.
       const budgetCap = Math.floor(remaining / perTicket);
       const limit = Math.min(JobsService.RISK_SCANNER_BATCH_SIZE, budgetCap);
 
-      // Stale-first rotation (never-analysed first, then oldest). Replaces the
-      // old slice(0, 5) window that only ever touched the first few tickers
-      // alphabetically and never rotated, so unwatched tickers never got
-      // scanned. Now coverage advances every run.
-      const dueSymbols = await this.riskRewardService.pickStaleAnalysisTickers(
-        symbols,
-        limit,
+      // Build one id-keyed "last researched" signal from two sources, taking the
+      // most recent of each:
+      //   - research_notes: the authoritative throttle. A note row exists for
+      //     every scan from the moment it starts, so it reliably reflects "we
+      //     researched this ticker" even when the downstream risk-analysis write
+      //     (a best-effort, error-swallowing enrichment) never lands.
+      //   - risk_analyses: keeps a ticker that already has a fresh score from
+      //     being re-scanned.
+      // Gating on risk_analyses alone is what let the same ticker be queued on
+      // every run (its analysis row was never written) and researched ~10x/day
+      // instead of once per staleness window.
+      const tickerIds = candidates.map((c) => c.id);
+      const symbols = candidates.map((c) => c.symbol);
+      const [lastAnalysisById, lastResearchBySymbol] = await Promise.all([
+        this.riskRewardService.getLastAnalysisAtByTickerId(tickerIds),
+        this.researchService.getLastResearchedAtBySymbol(symbols),
+      ]);
+
+      const lastResearchedAtById = new Map<string, number>();
+      for (const c of candidates) {
+        const latest = Math.max(
+          lastAnalysisById.get(c.id) ?? 0,
+          lastResearchBySymbol.get(c.symbol) ?? 0,
+        );
+        if (latest > 0) lastResearchedAtById.set(c.id, latest);
+      }
+
+      // Stale-first rotation (never-researched first, then oldest). Coverage
+      // advances every run; a freshly-researched ticker is excluded until its
+      // research is older than the staleness window.
+      const dueCandidates = JobsService.selectDueTickers(
+        candidates,
+        lastResearchedAtById,
+        Date.now(),
         stalenessMs,
+        limit,
       );
+      const dueSymbols = dueCandidates.map((c) => c.symbol);
 
       this.logger.log(
-        `Scanner batch (${dueSymbols.length} due / ${symbols.length} total, budget remaining: ${remaining}): ${dueSymbols.join(', ')}`,
+        `Scanner batch (${dueSymbols.length} due / ${candidates.length} total, budget remaining: ${remaining}): ${dueSymbols.join(', ')}`,
       );
 
       const DELAY_MS = 4500; // ~13 RPM, safely under the 15 RPM free limit

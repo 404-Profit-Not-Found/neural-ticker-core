@@ -486,6 +486,45 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
   }
 
   /**
+   * Returns the timestamp (epoch ms) of the most recent research note that
+   * covered each of the given symbols, keyed by symbol. Symbols absent from the
+   * map have never been researched.
+   *
+   * This is the authoritative throttle for the universe scanner: a research
+   * note row is written the moment a scan starts (well before the best-effort
+   * risk-analysis enrichment runs), so it reliably records "we researched this
+   * ticker" even when the downstream analysis write fails. All statuses count —
+   * a ticker we just attempted (even one that failed) must not be re-queued
+   * every few minutes; it waits out the staleness window like any other.
+   *
+   * `research_notes.tickers` is a `text[]` of symbols (no FK), so the array is
+   * unnested and the latest note per symbol is taken in a single query.
+   */
+  async getLastResearchedAtBySymbol(
+    symbols: string[],
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (symbols.length === 0) return map;
+
+    const rows: { symbol: string; last_at: string | Date | null }[] =
+      await this.noteRepo.query(
+        `SELECT s AS symbol, MAX(n.created_at) AS last_at
+           FROM research_notes n
+           CROSS JOIN LATERAL unnest(n.tickers) AS s
+          WHERE s = ANY($1)
+          GROUP BY s`,
+        [symbols],
+      );
+
+    for (const r of rows) {
+      if (r.last_at) {
+        map.set(r.symbol, new Date(r.last_at).getTime());
+      }
+    }
+    return map;
+  }
+
+  /**
    * Manually trigger financial extraction from the latest research note.
    */
   async reprocessFinancials(ticker: string): Promise<void> {
