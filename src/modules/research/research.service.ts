@@ -9,7 +9,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not } from 'typeorm';
+import { Repository, Like, LessThan, Not, MoreThanOrEqual } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -17,6 +17,7 @@ import {
   ResearchStatus,
 } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
+import { LlmBudgetService } from '../llm/llm-budget.service';
 import { MarketDataService } from '../market-data/market-data.service'; // Added
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { QualityTier } from '../llm/llm.types';
@@ -52,6 +53,7 @@ export class ResearchService implements OnModuleInit {
     @InjectRepository(ResearchNote)
     private readonly noteRepo: Repository<ResearchNote>,
     private readonly llmService: LlmService,
+    private readonly llmBudgetService: LlmBudgetService,
     private readonly usersService: UsersService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
@@ -1247,6 +1249,16 @@ OUTPUT (strict Markdown):
 
   // --- DAILY DIGEST PERSISTENCE (PERSONALIZED) ---
 
+  /**
+   * Human-readable date label for digest titles/prompts. UTC-based; this is a
+   * DISPLAY label only — digest dedup keys off a rolling 24h `created_at`
+   * window, not this string, so the UTC-midnight rollover no longer forces a
+   * regeneration for every user at 00:00 UTC (L8).
+   */
+  private digestDateKey(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
   async getOrGenerateDailyDigest(userId: string): Promise<ResearchNote | null> {
     if (!userId || userId === 'system-trigger') {
       this.logger.warn(
@@ -1255,62 +1267,98 @@ OUTPUT (strict Markdown):
       return null;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const titlePattern = `Smart News Briefing (${today}%`;
+    // Display label only (see digestDateKey): dedup keys off the rolling window.
+    const today = this.digestDateKey();
 
-    // 1. Check DB for today's digest for THIS user (Completed OR Pending)
-    const existing = await this.noteRepo.findOne({
-      where: {
-        user_id: userId,
-        title: Like(titlePattern),
-        status: Not(ResearchStatus.FAILED),
-      },
-      order: { created_at: 'DESC' },
-    });
-
-    if (existing) {
-      return existing;
-    }
-
-    // 2. Not found? Generate it.
-
-    // CHECK TUTORIAL COMPLETION (Implied by Portfolio Existence)
-    // User Requirement: "digest runs daily for users who have completed tutorial"
-    try {
-      const portfolio = await this.portfolioService.findAll(userId);
-      if (!portfolio || portfolio.length === 0) {
-        // Double check specifically for "Tutorial" preference if we want to be strict,
-        // but explicit user request implies preventing it if they just added favorites.
-        // So we strictly enforce Portfolio presence.
-        this.logger.log(
-          `Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`,
+    // Serialise the check-then-create against concurrent callers for THIS user.
+    // Two simultaneous GET /v1/news/digest calls would otherwise both miss the
+    // existence check and both run a billed medium-quality generation (M1). A
+    // transaction-scoped advisory lock is held ONLY across the existence check
+    // + pending insert, never the slow LLM call: the first caller commits a
+    // PENDING row and releases the lock; the second then wakes, sees that
+    // PENDING row, and returns it without generating. The lock auto-releases at
+    // transaction end (even on error), so there is no manual unlock to leak.
+    const gate = await this.noteRepo.manager.transaction(
+      async (
+        manager,
+      ): Promise<{
+        existing: ResearchNote | null;
+        pending: ResearchNote | null;
+      }> => {
+        const txRepo = manager.getRepository(ResearchNote);
+        // hashtextextended(text, seed) -> bigint feeds the 1-arg advisory lock.
+        await manager.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [`digest:${userId}`],
         );
-        return null;
-      }
-    } catch (e) {
-      this.logger.warn(
-        `Failed to check portfolio for digest eligibility: ${e.message}`,
-      );
-      // Fail safe: If we can't check, maybe we shouldn't block? Or should we?
-      // Let's assume safe to proceed if check fails, or maybe safe to block.
-      // Blocking is safer to prevent spam.
+
+        // 1. Dedup on a rolling 24h window rather than the UTC calendar date: a
+        // calendar-date key regenerates for EVERY user at UTC midnight (double
+        // spend at the boundary) and mislabels the day for non-UTC users (L8).
+        const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const existing = await txRepo.findOne({
+          where: {
+            user_id: userId,
+            title: Like('Smart News Briefing%'),
+            status: Not(ResearchStatus.FAILED),
+            created_at: MoreThanOrEqual(windowStart),
+          },
+          order: { created_at: 'DESC' },
+        });
+
+        if (existing) {
+          return { existing, pending: null };
+        }
+
+        // 2. Not found? CHECK TUTORIAL COMPLETION (Implied by Portfolio).
+        // User Requirement: "digest runs daily for users who completed tutorial"
+        try {
+          const portfolio = await this.portfolioService.findAll(userId);
+          if (!portfolio || portfolio.length === 0) {
+            // Strictly enforce Portfolio presence — a user who only added
+            // favorites has not completed the tutorial.
+            this.logger.log(
+              `Skipping digest for ${userId} - No portfolio positions (Tutorial incomplete).`,
+            );
+            return { existing: null, pending: null };
+          }
+        } catch (e) {
+          this.logger.warn(
+            `Failed to check portfolio for digest eligibility: ${e.message}`,
+          );
+          // Blocking is safer than spamming a billed generation on an
+          // indeterminate eligibility check.
+          return { existing: null, pending: null };
+        }
+
+        // PROTECTION: Create a "Pending" record IMMEDIATELY to block other
+        // concurrent requests. Committed inside the lock so the next caller
+        // (blocked on the same lock) sees it on wake and returns it.
+        const pendingNote = txRepo.create({
+          user_id: userId,
+          request_id: crypto.randomUUID(),
+          question: 'Smart News Briefing', // Placeholder
+          title: `Smart News Briefing (${today}) - Generating...`,
+          provider: LlmProvider.GEMINI, // Required field
+          tickers: [],
+          status: ResearchStatus.PENDING,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+
+        const pending = await txRepo.save(pendingNote);
+        return { existing: null, pending };
+      },
+    );
+
+    if (gate.existing) {
+      return gate.existing;
+    }
+    if (!gate.pending) {
       return null;
     }
 
-    // PROTECTION: Create a "Pending" record IMMEDIATELY to block other concurrent requests (race condition fix)
-    const pendingNote = this.noteRepo.create({
-      user_id: userId,
-      request_id: crypto.randomUUID(),
-      question: 'Smart News Briefing', // Placeholder
-      title: `Smart News Briefing (${today}) - Generating...`,
-      provider: LlmProvider.GEMINI, // Required field
-      tickers: [],
-      status: ResearchStatus.PENDING,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-
-    const savedPending = await this.noteRepo.save(pendingNote);
+    const savedPending = gate.pending;
 
     // 3. Generate content and update the pending record
     const now = new Date();
@@ -1404,6 +1452,22 @@ OUTPUT (strict Markdown):
       return null;
     }
 
+    // Hard daily budget gate: the digest runs a billed-eligible medium-quality
+    // generation. If the free pool is exhausted, do NOT escalate to the billed
+    // key — clear the pending lock and report "not ready" so the client retries
+    // after the quota resets (M2). `freeOnly: true` on the call below is the
+    // belt to this gate's suspenders.
+    if (!(await this.llmBudgetService.hasBudget(1))) {
+      this.logger.warn(
+        `Daily free LLM budget exhausted; skipping digest generation for ${userId}.`,
+      );
+      savedPending.status = ResearchStatus.FAILED;
+      savedPending.answer_markdown =
+        'Daily news budget reached. Please check back later.';
+      await this.noteRepo.save(savedPending);
+      return null;
+    }
+
     try {
       // 2. Generate Prompt
       const prompt = `
@@ -1450,13 +1514,16 @@ OUTPUT (strict Markdown):
             \`\`\`
         `;
 
-      // 3. Call LLM
+      // 3. Call LLM (free-only: a 429 must never escalate the digest to the
+      // billed secondary key — fail fast and let the budget gate above own the
+      // "not ready" outcome).
       const result = await this.llmService.generateResearch({
         question: prompt,
         tickers: symbols,
         numericContext: {},
         quality: 'medium',
         provider: 'gemini',
+        freeOnly: true,
       });
 
       // 4. Update Pending Note
@@ -1491,28 +1558,51 @@ OUTPUT (strict Markdown):
             this.logger.log(
               `Found ${parsed.items.length} news items to sync to DB for digest ${saved.id}...`,
             );
-            for (const item of parsed.items) {
-              if (item.symbol && item.impact_score !== undefined) {
-                // HANDLE SPLIT SYMBOLS (e.g. "NVO / LLY")
-                const symbols: string[] = item.symbol
-                  .split(/[/, &]+/) // Split by slash, comma, space, ampersand
-                  .map((s: string) => s.trim())
-                  .filter(
-                    (s: string) => s.length > 0 && s !== 'AND' && s !== '&',
-                  );
 
-                for (const sym of symbols) {
-                  try {
-                    await this.marketDataService.updateTickerNews(sym, {
-                      sentiment: item.sentiment || 'NEUTRAL',
-                      score: Number(item.impact_score),
-                      summary: item.summary || '',
-                    });
-                  } catch (err) {
-                    this.logger.warn(
-                      `Failed to update ticker news for ${sym}: ${err.message}`,
-                    );
-                  }
+            // Only ever write news for symbols we actually requested in this
+            // digest. The LLM can hallucinate or merge tickers ("NVO / LLY"),
+            // and updateTickerNews overwrites a ticker's news columns with no
+            // ownership check — so an off-list symbol must never be written (L7).
+            const allowedSymbols = new Set(symbols.map((s) => s.toUpperCase()));
+
+            for (const item of parsed.items) {
+              // Validate impact_score is a finite 0–10 number before it reaches
+              // the integer column (a hallucinated "high"/999 would corrupt it).
+              const rawScore = Number(item.impact_score);
+              if (
+                !item.symbol ||
+                !Number.isFinite(rawScore) ||
+                rawScore < 0 ||
+                rawScore > 10
+              ) {
+                continue;
+              }
+
+              // HANDLE SPLIT SYMBOLS (e.g. "NVO / LLY")
+              const itemSymbols: string[] = String(item.symbol)
+                .split(/[/, &]+/) // Split by slash, comma, space, ampersand
+                .map((s: string) => s.trim().toUpperCase())
+                .filter(
+                  (s: string) => s.length > 0 && s !== 'AND' && s !== '&',
+                );
+
+              for (const sym of itemSymbols) {
+                if (!allowedSymbols.has(sym)) {
+                  this.logger.debug(
+                    `Skipping off-digest symbol from LLM news sync: ${sym}`,
+                  );
+                  continue;
+                }
+                try {
+                  await this.marketDataService.updateTickerNews(sym, {
+                    sentiment: item.sentiment || 'NEUTRAL',
+                    score: rawScore,
+                    summary: item.summary || '',
+                  });
+                } catch (err) {
+                  this.logger.warn(
+                    `Failed to update ticker news for ${sym}: ${err.message}`,
+                  );
                 }
               }
             }

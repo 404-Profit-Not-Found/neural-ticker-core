@@ -7,6 +7,7 @@ import {
   LlmProvider,
 } from './entities/research-note.entity';
 import { LlmService } from '../llm/llm.service';
+import { LlmBudgetService } from '../llm/llm-budget.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { UsersService } from '../users/users.service';
@@ -24,11 +25,21 @@ console.log('NotificationsService:', NotificationsService);
 describe('ResearchService', () => {
   let service: ResearchService;
 
+  // Transactional EntityManager used by getOrGenerateDailyDigest's advisory
+  // lock. `query` is the pg_advisory_xact_lock call; getRepository routes back
+  // to mockRepo so every existing assertion on mockRepo.* still holds inside
+  // the transaction.
+  const mockTxManager = {
+    query: jest.fn().mockResolvedValue(undefined),
+    getRepository: jest.fn(),
+  };
+
   const mockRepo = {
     create: jest.fn().mockImplementation((dto) => dto),
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
     findOne: jest.fn(),
     find: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     delete: jest.fn(),
     query: jest.fn(),
     createQueryBuilder: jest.fn(() => ({
@@ -41,7 +52,11 @@ describe('ResearchService', () => {
       getOne: jest.fn(),
       getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
     })),
+    manager: {
+      transaction: jest.fn((cb: any) => cb(mockTxManager)),
+    },
   };
+  mockTxManager.getRepository.mockReturnValue(mockRepo);
 
   const mockLlmService = {
     generateResearch: jest.fn(),
@@ -53,6 +68,14 @@ describe('ResearchService', () => {
     updateTickerDescription: jest.fn(),
     upsertAnalystRatings: jest.fn(),
     dedupeAnalystRatings: jest.fn(),
+    getAnalyzerTickers: jest.fn(),
+    updateTickerNews: jest.fn(),
+  };
+
+  const mockLlmBudgetService = {
+    hasBudget: jest.fn().mockResolvedValue(true),
+    getRemaining: jest.fn().mockResolvedValue(450),
+    record: jest.fn(),
   };
 
   const mockUsersService = {
@@ -75,6 +98,7 @@ describe('ResearchService', () => {
   const mockWatchlistService = {
     // Add any methods used by ResearchService, likely related to notifying watchlist users
     findAll: jest.fn().mockResolvedValue([]),
+    getUserWatchlists: jest.fn().mockResolvedValue([]),
   };
 
   const mockCreditService = {
@@ -103,6 +127,7 @@ describe('ResearchService', () => {
         ResearchService,
         { provide: getRepositoryToken(ResearchNote), useValue: mockRepo },
         { provide: LlmService, useValue: mockLlmService },
+        { provide: LlmBudgetService, useValue: mockLlmBudgetService },
         { provide: MarketDataService, useValue: mockMarketDataService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: RiskRewardService, useValue: mockRiskRewardService },
@@ -481,7 +506,40 @@ describe('ResearchService', () => {
   });
 
   describe('getOrGenerateDailyDigest', () => {
+    // Arrange a full cache-miss happy path: no existing digest, a non-empty
+    // portfolio (tutorial complete), one analyzer candidate per requested
+    // symbol, budget available, and a generation result.
+    const arrangeHappyPath = (opts: {
+      universe: string[];
+      answerMarkdown: string;
+      hasBudget?: boolean;
+    }) => {
+      mockRepo.findOne.mockResolvedValue(null);
+      mockPortfolioService.findAll.mockResolvedValue(
+        opts.universe.map((symbol) => ({ symbol })),
+      );
+      mockWatchlistService.getUserWatchlists.mockResolvedValue([]);
+      mockMarketDataService.getAnalyzerTickers.mockResolvedValue({
+        items: opts.universe.map((symbol) => ({
+          ticker: { symbol },
+          latestPrice: { changePercent: 5 },
+          counts: { news: 1 },
+        })),
+      });
+      mockLlmBudgetService.hasBudget.mockResolvedValue(opts.hasBudget ?? true);
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown: opts.answerMarkdown,
+        models: [],
+      });
+    };
+
+    const jsonDigest = (items: any[]) =>
+      ['## Market Pulse', '```json', JSON.stringify({ items }), '```'].join(
+        '\n',
+      );
+
     it('should return null if user has no portfolio positions (tutorial gating)', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
       mockPortfolioService.findAll.mockResolvedValueOnce([]);
       const result = await service.getOrGenerateDailyDigest('user-1');
       expect(result).toBeNull();
@@ -492,6 +550,115 @@ describe('ResearchService', () => {
       const result = await service.getOrGenerateDailyDigest('system-trigger');
       expect(result).toBeNull();
       expect(mockPortfolioService.findAll).not.toHaveBeenCalled();
+      // Must short-circuit before opening the advisory-lock transaction.
+      expect(mockRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('takes a per-user advisory lock before generating (M1)', async () => {
+      arrangeHappyPath({ universe: ['AAPL'], answerMarkdown: '## Pulse' });
+      await service.getOrGenerateDailyDigest('user-1');
+      expect(mockRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(mockTxManager.query).toHaveBeenCalledWith(
+        expect.stringContaining('pg_advisory_xact_lock'),
+        ['digest:user-1'],
+      );
+    });
+
+    it('returns a recent (<24h) digest without regenerating (L8 window)', async () => {
+      const existing = { id: 'n1', status: ResearchStatus.COMPLETED } as any;
+      mockRepo.findOne.mockResolvedValue(existing);
+      const result = await service.getOrGenerateDailyDigest('user-1');
+      expect(result).toBe(existing);
+      expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+      // Dedup now keys off a created_at window, not a date-stamped title.
+      expect(mockRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            created_at: expect.anything(),
+            title: expect.anything(),
+          }),
+        }),
+      );
+    });
+
+    it('skips generation and fails the pending row when the free budget is exhausted (M2)', async () => {
+      arrangeHappyPath({
+        universe: ['AAPL'],
+        answerMarkdown: '## Pulse',
+        hasBudget: false,
+      });
+      const result = await service.getOrGenerateDailyDigest('user-1');
+      expect(result).toBeNull();
+      expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: ResearchStatus.FAILED }),
+      );
+    });
+
+    it('passes freeOnly:true to the digest generation (M2)', async () => {
+      arrangeHappyPath({ universe: ['AAPL'], answerMarkdown: '## Pulse only' });
+      await service.getOrGenerateDailyDigest('user-1');
+      expect(mockLlmService.generateResearch).toHaveBeenCalledWith(
+        expect.objectContaining({ quality: 'medium', freeOnly: true }),
+      );
+    });
+
+    it('only writes ticker news for symbols in the requested digest universe (L7)', async () => {
+      arrangeHappyPath({
+        universe: ['AAPL'],
+        answerMarkdown: jsonDigest([
+          {
+            symbol: 'AAPL',
+            sentiment: 'BULLISH',
+            impact_score: 8,
+            summary: 'x',
+          },
+          {
+            symbol: 'BYDDY',
+            sentiment: 'BULLISH',
+            impact_score: 9,
+            summary: 'y',
+          },
+        ]),
+      });
+      await service.getOrGenerateDailyDigest('user-1');
+      expect(mockMarketDataService.updateTickerNews).toHaveBeenCalledTimes(1);
+      expect(mockMarketDataService.updateTickerNews).toHaveBeenCalledWith(
+        'AAPL',
+        expect.objectContaining({ score: 8 }),
+      );
+      expect(mockMarketDataService.updateTickerNews).not.toHaveBeenCalledWith(
+        'BYDDY',
+        expect.anything(),
+      );
+    });
+
+    it('skips news items whose impact_score is non-numeric or out of range (L7)', async () => {
+      arrangeHappyPath({
+        universe: ['AAPL'],
+        answerMarkdown: jsonDigest([
+          { symbol: 'AAPL', impact_score: 'high', summary: 'x' },
+          { symbol: 'AAPL', impact_score: 42, summary: 'y' },
+        ]),
+      });
+      await service.getOrGenerateDailyDigest('user-1');
+      expect(mockMarketDataService.updateTickerNews).not.toHaveBeenCalled();
+    });
+
+    it('splits combined symbols but still filters by membership (L7)', async () => {
+      arrangeHappyPath({
+        universe: ['NVO', 'LLY'],
+        answerMarkdown: jsonDigest([
+          { symbol: 'NVO / LLY / TSLA', impact_score: 7, summary: 'z' },
+        ]),
+      });
+      await service.getOrGenerateDailyDigest('user-1');
+      const written = mockMarketDataService.updateTickerNews.mock.calls.map(
+        (c) => c[0],
+      );
+      expect(written).toEqual(expect.arrayContaining(['NVO', 'LLY']));
+      expect(written).not.toContain('TSLA');
+      expect(mockMarketDataService.updateTickerNews).toHaveBeenCalledTimes(2);
     });
   });
 

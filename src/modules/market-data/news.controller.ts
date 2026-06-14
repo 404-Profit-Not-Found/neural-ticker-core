@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -23,6 +24,8 @@ export class NewsController {
 
   @ApiOperation({ summary: 'Get Daily AI News Digest' })
   @ApiResponse({ status: 200, description: 'Personalized news digest' })
+  // Cache miss triggers a billed medium-quality LLM generation — cap per-IP (M2).
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Get('digest')
   async getDailyDigest(@Request() req?: any) {
@@ -80,6 +83,8 @@ export class NewsController {
   // Temporary: Force trigger digest generation
   @ApiOperation({ summary: 'Force trigger digest generation' })
   @ApiResponse({ status: 200, description: 'Digest object' })
+  // Same billed generation path as /digest — keep the per-IP cap tight (M2).
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Get('digest/trigger')
   async triggerDigest(@Request() req: any) {
