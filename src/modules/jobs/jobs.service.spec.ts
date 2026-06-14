@@ -18,7 +18,7 @@ describe('JobsService', () => {
   const mockRiskRewardService = {
     evaluateSymbol: jest.fn(),
     getLatestScore: jest.fn(),
-    pickStaleAnalysisTickers: jest.fn(),
+    getLastAnalysisAtByTickerId: jest.fn().mockResolvedValue(new Map()),
     deleteOrphanedAnalyses: jest.fn(),
   };
 
@@ -48,6 +48,7 @@ describe('JobsService', () => {
     processTicket: jest.fn(),
     getOrGenerateDailyDigest: jest.fn(),
     reprocessFinancials: jest.fn(),
+    getLastResearchedAtBySymbol: jest.fn().mockResolvedValue(new Map()),
   };
 
   const mockRequestQueueRepo = {
@@ -294,7 +295,7 @@ describe('JobsService', () => {
   });
 
   describe('runRiskRewardScanner', () => {
-    it('queues a cron-tier ticket for each due (stale-first) ticker within budget', async () => {
+    it('queues a cron-tier ticket only for tickers that are due (stale-first)', async () => {
       const sleepSpy = jest
         .spyOn(global, 'setTimeout')
         // Resolve immediately to keep the test fast
@@ -306,11 +307,17 @@ describe('JobsService', () => {
       mockLlmBudgetService.getRemaining.mockResolvedValue(450);
       mockLlmBudgetService.hasBudget.mockResolvedValue(true);
       mockTickersService.getAllTickers.mockResolvedValue([
-        { symbol: 'AAPL' },
-        { symbol: 'TSLA' },
+        { id: '1', symbol: 'AAPL' },
+        { id: '2', symbol: 'TSLA' },
       ]);
-      // Picker decides who is due (oldest/never-analysed first).
-      mockRiskRewardService.pickStaleAnalysisTickers.mockResolvedValue(['AAPL']);
+      // AAPL has never been researched; TSLA was researched moments ago, so only
+      // AAPL is due this run.
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map([['TSLA', Date.now()]]),
+      );
       mockResearchService.createResearchTicket.mockResolvedValue({
         id: 'note-1',
       });
@@ -319,9 +326,14 @@ describe('JobsService', () => {
       const result = await service.runRiskRewardScanner();
 
       expect(mockTickersService.getAllTickers).toHaveBeenCalled();
+      // Recency is looked up by internal id (analyses) and symbol (notes).
       expect(
-        mockRiskRewardService.pickStaleAnalysisTickers,
-      ).toHaveBeenCalledWith(['AAPL', 'TSLA'], expect.any(Number), expect.any(Number));
+        mockRiskRewardService.getLastAnalysisAtByTickerId,
+      ).toHaveBeenCalledWith(['1', '2']);
+      expect(
+        mockResearchService.getLastResearchedAtBySymbol,
+      ).toHaveBeenCalledWith(['AAPL', 'TSLA']);
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
       expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
         null,
         ['AAPL'],
@@ -335,15 +347,111 @@ describe('JobsService', () => {
       sleepSpy.mockRestore();
     });
 
+    // Regression: the reported bug. Forvia (FRVIA.PA) was researched ~12x/day
+    // because the gate only read risk_analyses, and that ticker's analysis row
+    // was never written (the enrichment that writes it is best-effort and
+    // swallows errors). The research_notes record IS written every run, so a
+    // ticker researched within the window must never be re-queued — even with
+    // zero risk_analyses rows.
+    it('does NOT re-queue a ticker researched within the window when it has no risk_analysis row', async () => {
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '10', symbol: 'FRVIA.PA' },
+      ]);
+      // No analysis row exists for this ticker (the silent-write-failure case)...
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      // ...but it was researched moments ago, so the note recency must gate it.
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map([['FRVIA.PA', Date.now()]]),
+      );
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(mockResearchService.createResearchTicket).not.toHaveBeenCalled();
+      expect(mockResearchService.processTicket).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ processed: 0, due: 0 });
+    });
+
+    it('re-queues a ticker once its last research is older than the window', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '10', symbol: 'FRVIA.PA' },
+      ]);
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      // Researched 30 days ago — comfortably past any staleness window.
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map([['FRVIA.PA', thirtyDaysAgo]]),
+      );
+      mockResearchService.createResearchTicket.mockResolvedValue({
+        id: 'note-9',
+      });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
+        null,
+        ['FRVIA.PA'],
+        expect.any(String),
+        'gemini',
+        'cron',
+      );
+      expect(result).toMatchObject({ processed: 1, due: 1 });
+
+      sleepSpy.mockRestore();
+    });
+
+    it('drops tickers without an id or symbol before selecting the batch', async () => {
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '1', symbol: 'AAPL' },
+        { symbol: 'NOID' }, // missing id
+        { id: '2' }, // missing symbol
+      ]);
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map(),
+      );
+
+      await service.runRiskRewardScanner();
+
+      // Only the fully-formed candidate's id/symbol reach the recency lookups.
+      expect(
+        mockRiskRewardService.getLastAnalysisAtByTickerId,
+      ).toHaveBeenCalledWith(['1']);
+      expect(
+        mockResearchService.getLastResearchedAtBySymbol,
+      ).toHaveBeenCalledWith(['AAPL']);
+    });
+
     it('skips the whole scan when the daily LLM budget is exhausted', async () => {
       mockLlmBudgetService.getRemaining.mockResolvedValue(0);
-      mockTickersService.getAllTickers.mockResolvedValue([{ symbol: 'AAPL' }]);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '1', symbol: 'AAPL' },
+      ]);
 
       const result = await service.runRiskRewardScanner();
 
       expect(result).toMatchObject({ budgetExhausted: true, processed: 0 });
       expect(
-        mockRiskRewardService.pickStaleAnalysisTickers,
+        mockRiskRewardService.getLastAnalysisAtByTickerId,
       ).not.toHaveBeenCalled();
       expect(mockResearchService.createResearchTicket).not.toHaveBeenCalled();
     });
@@ -362,13 +470,16 @@ describe('JobsService', () => {
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false);
       mockTickersService.getAllTickers.mockResolvedValue([
-        { symbol: 'AAPL' },
-        { symbol: 'MSFT' },
+        { id: '1', symbol: 'AAPL' },
+        { id: '2', symbol: 'MSFT' },
       ]);
-      mockRiskRewardService.pickStaleAnalysisTickers.mockResolvedValue([
-        'AAPL',
-        'MSFT',
-      ]);
+      // Both never researched → both due (alphabetical: AAPL, MSFT).
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map(),
+      );
       mockResearchService.createResearchTicket.mockResolvedValue({
         id: 'note-1',
       });
@@ -377,9 +488,94 @@ describe('JobsService', () => {
       const result = await service.runRiskRewardScanner();
 
       expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
+        null,
+        ['AAPL'],
+        expect.any(String),
+        'gemini',
+        'cron',
+      );
       expect(result).toMatchObject({ processed: 1, due: 2 });
 
       sleepSpy.mockRestore();
+    });
+  });
+
+  describe('selectDueTickers (pure staleness gate)', () => {
+    const HOUR = 60 * 60 * 1000;
+    const WINDOW = 168 * HOUR; // 7 days
+    const NOW = 1_700_000_000_000;
+
+    it('treats a never-researched ticker as due', () => {
+      const due = JobsService.selectDueTickers(
+        [{ id: '1', symbol: 'AAPL' }],
+        new Map(),
+        NOW,
+        WINDOW,
+        5,
+      );
+      expect(due.map((c) => c.symbol)).toEqual(['AAPL']);
+    });
+
+    it('excludes a ticker researched within the window (the core fix)', () => {
+      const due = JobsService.selectDueTickers(
+        [{ id: '1', symbol: 'FRVIA.PA' }],
+        new Map([['1', NOW - 1 * HOUR]]), // researched 1h ago
+        NOW,
+        WINDOW,
+        5,
+      );
+      expect(due).toEqual([]);
+    });
+
+    it('includes a ticker whose last research is older than the window', () => {
+      const due = JobsService.selectDueTickers(
+        [{ id: '1', symbol: 'FRVIA.PA' }],
+        new Map([['1', NOW - 200 * HOUR]]), // researched ~8.3 days ago
+        NOW,
+        WINDOW,
+        5,
+      );
+      expect(due.map((c) => c.symbol)).toEqual(['FRVIA.PA']);
+    });
+
+    it('orders never-researched first (alphabetical), then oldest first', () => {
+      const candidates = [
+        { id: '1', symbol: 'AAPL' }, // researched 10h ago
+        { id: '2', symbol: 'ZZZ' }, // never researched
+        { id: '3', symbol: 'MSFT' }, // researched 300h ago (most stale)
+        { id: '4', symbol: 'BBB' }, // never researched
+      ];
+      const map = new Map([
+        ['1', NOW - 10 * HOUR],
+        ['3', NOW - 300 * HOUR],
+      ]);
+      const due = JobsService.selectDueTickers(
+        candidates,
+        map,
+        NOW,
+        WINDOW,
+        10,
+      );
+      // never-researched (BBB, ZZZ alphabetical) then oldest-first (MSFT before
+      // AAPL — but AAPL is within the 7d window so it isn't due at all).
+      expect(due.map((c) => c.symbol)).toEqual(['BBB', 'ZZZ', 'MSFT']);
+    });
+
+    it('respects the limit', () => {
+      const candidates = [
+        { id: '1', symbol: 'AAA' },
+        { id: '2', symbol: 'BBB' },
+        { id: '3', symbol: 'CCC' },
+      ];
+      const due = JobsService.selectDueTickers(
+        candidates,
+        new Map(),
+        NOW,
+        WINDOW,
+        2,
+      );
+      expect(due.map((c) => c.symbol)).toEqual(['AAA', 'BBB']);
     });
   });
 });

@@ -16,6 +16,7 @@ describe('RiskRewardService', () => {
     find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   const mockOldScoreRepo = {};
@@ -413,6 +414,66 @@ describe('RiskRewardService', () => {
       expect(result.risk_score.dilution_risk).toBe(5);
       expect(result.risk_score.competitive_risk).toBe(7);
       expect(result.risk_score.regulatory_risk).toBe(4);
+    });
+  });
+
+  describe('getLastAnalysisAtByTickerId', () => {
+    const buildQb = (rows: any[]) => {
+      const qb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(rows),
+      };
+      return qb;
+    };
+
+    it('returns an empty map without hitting the DB when no ids are given', async () => {
+      const result = await service.getLastAnalysisAtByTickerId([]);
+
+      expect(result.size).toBe(0);
+      expect(mockAnalysisRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('keys the latest analysis time by internal ticker id', async () => {
+      const t1 = new Date('2026-06-01T00:00:00.000Z');
+      const t2 = new Date('2026-06-10T00:00:00.000Z');
+      const qb = buildQb([
+        { ticker_id: '101', last_at: t1.toISOString() },
+        { ticker_id: '202', last_at: t2.toISOString() },
+      ]);
+      mockAnalysisRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getLastAnalysisAtByTickerId(['101', '202']);
+
+      expect(qb.where).toHaveBeenCalledWith('a.ticker_id IN (:...ids)', {
+        ids: ['101', '202'],
+      });
+      expect(result.get('101')).toBe(t1.getTime());
+      expect(result.get('202')).toBe(t2.getTime());
+    });
+
+    it('coerces bigint ticker ids returned as numbers to string keys', async () => {
+      const t1 = new Date('2026-06-01T00:00:00.000Z');
+      const qb = buildQb([{ ticker_id: 101, last_at: t1.toISOString() }]);
+      mockAnalysisRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getLastAnalysisAtByTickerId(['101']);
+
+      // Decision layer keys on String(id); a numeric DB row must still match.
+      expect(result.get('101')).toBe(t1.getTime());
+      expect(result.has('101')).toBe(true);
+    });
+
+    it('skips rows whose last_at is null', async () => {
+      const qb = buildQb([{ ticker_id: '303', last_at: null }]);
+      mockAnalysisRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getLastAnalysisAtByTickerId(['303']);
+
+      expect(result.has('303')).toBe(false);
+      expect(result.size).toBe(0);
     });
   });
 });

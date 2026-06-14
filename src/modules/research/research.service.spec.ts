@@ -30,6 +30,7 @@ describe('ResearchService', () => {
     findOne: jest.fn(),
     find: jest.fn(),
     delete: jest.fn(),
+    query: jest.fn(),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -397,6 +398,45 @@ describe('ResearchService', () => {
       const result = await service.getOrGenerateDailyDigest('system-trigger');
       expect(result).toBeNull();
       expect(mockPortfolioService.findAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getLastResearchedAtBySymbol', () => {
+    it('returns an empty map without querying when no symbols are given', async () => {
+      const result = await service.getLastResearchedAtBySymbol([]);
+
+      expect(result.size).toBe(0);
+      expect(mockRepo.query).not.toHaveBeenCalled();
+    });
+
+    it('maps each symbol to the most recent research_note created_at', async () => {
+      const tForvia = new Date('2026-06-13T10:00:00.000Z');
+      const tApple = new Date('2026-05-01T08:00:00.000Z');
+      mockRepo.query.mockResolvedValue([
+        { symbol: 'FRVIA.PA', last_at: tForvia.toISOString() },
+        { symbol: 'AAPL', last_at: tApple },
+      ]);
+
+      const result = await service.getLastResearchedAtBySymbol([
+        'FRVIA.PA',
+        'AAPL',
+      ]);
+
+      // The symbol list is passed positionally as $1 to the unnest query.
+      expect(mockRepo.query).toHaveBeenCalledWith(expect.any(String), [
+        ['FRVIA.PA', 'AAPL'],
+      ]);
+      expect(result.get('FRVIA.PA')).toBe(tForvia.getTime());
+      expect(result.get('AAPL')).toBe(tApple.getTime());
+    });
+
+    it('skips rows whose last_at is null', async () => {
+      mockRepo.query.mockResolvedValue([{ symbol: 'NEW.PA', last_at: null }]);
+
+      const result = await service.getLastResearchedAtBySymbol(['NEW.PA']);
+
+      expect(result.has('NEW.PA')).toBe(false);
+      expect(result.size).toBe(0);
     });
   });
 });
