@@ -198,38 +198,277 @@ describe('RiskRewardService', () => {
       expect(mockAnalysisRepo.save).toHaveBeenCalled();
     });
 
-    it('should handle errors for individual tickers gracefully', async () => {
+    it('should skip auto risk-analysis for multi-ticker notes (M5)', async () => {
+      // A note's answer_markdown is ONE combined document; feeding it to the
+      // per-ticker extractor for each symbol bleeds one ticker's numbers into
+      // another's analysis. Multi-ticker notes are skipped, not contaminated.
       const mockNote = {
         id: 'note-1',
-        tickers: ['AAPL', 'INVALID'],
-        answer_markdown: 'Research content',
+        tickers: ['AAPL', 'MSFT'],
+        answer_markdown: 'Research content covering two companies',
       };
-
-      mockMarketDataService.getSnapshot
-        .mockResolvedValueOnce({
-          ticker: { id: 'ticker-1', symbol: 'AAPL' },
-          latestPrice: {},
-          fundamentals: {},
-        })
-        .mockRejectedValueOnce(new Error('Ticker not found'));
-
-      const detailedJson = JSON.stringify({
-        risk_score: { overall: 5 },
-        scenarios: {
-          bull: { probability: 0.3 },
-          base: { probability: 0.5 },
-          bear: { probability: 0.2 },
-        },
-      });
-
-      mockLlmService.generateResearch.mockResolvedValue({
-        answerMarkdown: '```json\n' + detailedJson + '\n```',
-      });
-      mockAnalysisRepo.save.mockResolvedValue(new RiskAnalysis());
 
       const result = await service.evaluateFromResearch(mockNote);
 
-      expect(result).toBeDefined(); // Should still return first successful result
+      expect(result).toBeNull();
+      // No extraction work should happen for a skipped multi-ticker note.
+      expect(mockMarketDataService.getSnapshot).not.toHaveBeenCalled();
+      expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+      expect(mockAnalysisRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should still process a single-ticker note (M5 regression)', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown: 'Research content',
+      };
+
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 'ticker-1', symbol: 'AAPL' },
+        latestPrice: { close: 150 },
+        fundamentals: {},
+      });
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown:
+          '```json\n' +
+          JSON.stringify({
+            risk_score: { overall: 6 },
+            scenarios: {
+              bull: { probability: 0.3, price_target_mid: 200 },
+              base: { probability: 0.5, price_target_mid: 150 },
+              bear: { probability: 0.2, price_target_mid: 100 },
+            },
+          }) +
+          '\n```',
+      });
+      mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+        Promise.resolve(a),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      expect(result).toBeDefined();
+      expect(mockLlmService.generateResearch).toHaveBeenCalledTimes(1);
+      expect(mockAnalysisRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null gracefully when single-ticker extraction throws', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown: 'Research content',
+      };
+      mockMarketDataService.getSnapshot.mockRejectedValue(
+        new Error('Ticker not found'),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      // The per-ticker try/catch swallows the failure; with no successful
+      // result the method resolves to null rather than rejecting.
+      expect(result).toBeNull();
+    });
+
+    it('clamps an overflowing overall score to the numeric(4,2) column max (M3)', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['NVDA'],
+        answer_markdown: 'Research content',
+      };
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 'ticker-1', symbol: 'NVDA' },
+        latestPrice: { close: 150 },
+        fundamentals: {},
+      });
+      // A hallucinated out-of-range rating (>10) would overflow numeric(4,2)
+      // (max 99.99 is fine, but the domain max is 10) and corrupt the DB write.
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown:
+          '```json\n' +
+          JSON.stringify({
+            neural_investment_rating: 999,
+            risk_score: {
+              financial_risk: 42,
+              execution_risk: -8,
+              dilution_risk: 7,
+            },
+            scenarios: {
+              bull: { probability: 0.3, price_target_mid: 200 },
+              base: { probability: 0.5, price_target_mid: 150 },
+              bear: { probability: 0.2, price_target_mid: 100 },
+            },
+          }) +
+          '\n```',
+      });
+      mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+        Promise.resolve(a),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      expect(result).not.toBeNull();
+      expect(result!.overall_score).toBe(10); // 999 clamped down
+      expect(result!.financial_risk).toBe(10); // 42 clamped down
+      expect(result!.execution_risk).toBe(0); // -8 clamped up
+      expect(result!.dilution_risk).toBe(7); // in range, untouched
+    });
+
+    it('preserves a legitimate 0 risk score and neutralizes missing ones (M4)', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown: 'Research content',
+      };
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 'ticker-1', symbol: 'AAPL' },
+        latestPrice: { close: 150 },
+        fundamentals: {},
+      });
+      // financial_risk is an explicit 0 ("NO RISK") — must survive, not be
+      // coerced to 5 by the old `value || 5`. competitive_risk is omitted —
+      // must fall back to the neutral 5, not 0.
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown:
+          '```json\n' +
+          JSON.stringify({
+            risk_score: { overall: 6, financial_risk: 0 },
+            scenarios: {
+              bull: { probability: 0.3, price_target_mid: 200 },
+              base: { probability: 0.5, price_target_mid: 150 },
+              bear: { probability: 0.2, price_target_mid: 100 },
+            },
+          }) +
+          '\n```',
+      });
+      mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+        Promise.resolve(a),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      expect(result).not.toBeNull();
+      expect(result!.financial_risk).toBe(0); // legitimate 0 preserved
+      expect(result!.competitive_risk).toBe(5); // missing -> neutral
+    });
+
+    it('normalizes scenario probabilities to sum to 1 (M6)', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown: 'Research content',
+      };
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 'ticker-1', symbol: 'AAPL' },
+        latestPrice: { close: 150 },
+        fundamentals: {},
+      });
+      // Probabilities deliberately do NOT sum to 1 (0.6 + 0.6 + 0.3 = 1.5).
+      // They must be renormalized so probability-weighted EV math is correct.
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown:
+          '```json\n' +
+          JSON.stringify({
+            risk_score: { overall: 6 },
+            scenarios: {
+              bull: { probability: 0.6, price_target_mid: 200 },
+              base: { probability: 0.6, price_target_mid: 150 },
+              bear: { probability: 0.3, price_target_mid: 100 },
+            },
+          }) +
+          '\n```',
+      });
+      mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+        Promise.resolve(a),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      expect(result).not.toBeNull();
+      const probs = result!.scenarios.map((s) => s.probability);
+      const total = probs.reduce((sum, p) => sum + p, 0);
+      expect(total).toBeCloseTo(1, 6);
+      // Proportions preserved: 0.6/1.5 = 0.4, 0.3/1.5 = 0.2.
+      expect(probs[0]).toBeCloseTo(0.4, 6);
+      expect(probs[1]).toBeCloseTo(0.4, 6);
+      expect(probs[2]).toBeCloseTo(0.2, 6);
+    });
+
+    it('falls back to an even probability split when totals are unusable (M6)', async () => {
+      const mockNote = {
+        id: 'note-1',
+        tickers: ['AAPL'],
+        answer_markdown: 'Research content',
+      };
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        ticker: { id: 'ticker-1', symbol: 'AAPL' },
+        latestPrice: { close: 150 },
+        fundamentals: {},
+      });
+      // All probabilities zero/garbage -> even split across the 3 present scenarios.
+      mockLlmService.generateResearch.mockResolvedValue({
+        answerMarkdown:
+          '```json\n' +
+          JSON.stringify({
+            risk_score: { overall: 6 },
+            scenarios: {
+              bull: { probability: 0, price_target_mid: 200 },
+              base: { probability: 0, price_target_mid: 150 },
+              bear: { probability: 0, price_target_mid: 100 },
+            },
+          }) +
+          '\n```',
+      });
+      mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+        Promise.resolve(a),
+      );
+
+      const result = await service.evaluateFromResearch(mockNote);
+
+      expect(result).not.toBeNull();
+      const probs = result!.scenarios.map((s) => s.probability);
+      probs.forEach((p) => expect(p).toBeCloseTo(1 / 3, 6));
+    });
+  });
+
+  describe('clampScore (M3/M4)', () => {
+    let clampScore: (value: unknown) => number;
+
+    beforeEach(() => {
+      clampScore = (service as any).clampScore.bind(service);
+    });
+
+    it('clamps an overflowing score down to the domain max of 10', () => {
+      expect(clampScore(999)).toBe(10);
+      expect(clampScore(10.01)).toBe(10);
+    });
+
+    it('clamps a negative score up to 0', () => {
+      expect(clampScore(-5)).toBe(0);
+    });
+
+    it('preserves a legitimate 0 (NO RISK) instead of coercing it to 5', () => {
+      expect(clampScore(0)).toBe(0);
+    });
+
+    it('passes an in-range score through unchanged', () => {
+      expect(clampScore(7)).toBe(7);
+      expect(clampScore(3.5)).toBe(3.5);
+    });
+
+    it('coerces in-range numeric strings', () => {
+      expect(clampScore('8')).toBe(8);
+      expect(clampScore('150')).toBe(10);
+    });
+
+    it('falls back to the neutral 5 for non-finite / no-data input', () => {
+      expect(clampScore(NaN)).toBe(5);
+      expect(clampScore(Infinity)).toBe(5);
+      expect(clampScore(-Infinity)).toBe(5);
+      expect(clampScore('not a number')).toBe(5);
+      expect(clampScore(null)).toBe(5);
+      expect(clampScore(undefined)).toBe(5);
+      expect(clampScore('')).toBe(5);
     });
   });
 
