@@ -324,7 +324,7 @@ describe('TickersService', () => {
       const result = await service.getAllTickers();
       expect(result).toEqual(tickers);
       expect(mockTickerRepo.find).toHaveBeenCalledWith({
-        select: ['symbol', 'name', 'exchange', 'currency'],
+        select: ['id', 'symbol', 'name', 'exchange', 'currency'],
         where: { is_hidden: false },
         order: { symbol: 'ASC' },
       });
