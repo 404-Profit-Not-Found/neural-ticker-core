@@ -951,7 +951,14 @@ Title:`;
       );
     }
 
-    await this.noteRepo.delete(id);
+    // Delete the note AND every risk analysis that references it (plus those
+    // analyses' child rows) atomically (M7). Leaving the analyses behind would
+    // let getLatestAnalysis serve an orphan whose source note no longer exists
+    // until the nightly orphan sweep eventually reaps it.
+    await this.noteRepo.manager.transaction(async (mgr) => {
+      await this.riskRewardService.deleteAnalysesForResearchNote(id, mgr);
+      await mgr.delete(ResearchNote, id);
+    });
   }
 
   async updateTitle(
@@ -1725,15 +1732,34 @@ OUTPUT (strict Markdown):
     // Grab profile, snapshot, news, ratings in parallel
     // (Risk and history require profile.id, so they are fetched waterfall style below)
     const [profile, snapshot, newsData, ratings] = await Promise.all([
-      this.tickersService.getTicker(mainTicker),
+      // A hidden/de-listed/unresolvable main ticker makes getTicker throw
+      // NotFoundException; un-caught it would reject the whole Promise.all and
+      // turn a valid, correctly-signed share link into a 500. Degrade to null
+      // and let the profile fall back to the bare symbol below.
+      this.tickersService.getTicker(mainTicker).catch((e: any) => {
+        this.logger.warn(
+          `Failed to resolve ticker profile for public view: ${e.message}`,
+        );
+        return null;
+      }),
       this.marketDataService.getSnapshot(mainTicker).catch((e: any) => {
         this.logger.warn(
           `Failed to get snapshot for public view: ${e.message}`,
         );
         return { latestPrice: { close: 0, prevClose: 0, ts: new Date() } };
       }),
-      this.marketDataService.getCompanyNews(mainTicker),
-      this.marketDataService.getAnalystRatings(mainTicker),
+      this.marketDataService.getCompanyNews(mainTicker).catch((e: any) => {
+        this.logger.warn(
+          `Failed to get company news for public view: ${e.message}`,
+        );
+        return null;
+      }),
+      this.marketDataService.getAnalystRatings(mainTicker).catch((e: any) => {
+        this.logger.warn(
+          `Failed to get analyst ratings for public view: ${e.message}`,
+        );
+        return null;
+      }),
       // Fetch fresh risk analysis for the live dashboard feel
       // We need the ticker ID for this, which we can get from Profile if we chain,
       // but getTicker fetches by symbol.
@@ -1782,15 +1808,20 @@ OUTPUT (strict Markdown):
         rarity: note.rarity,
         quality_score: note.quality_score,
       },
-      profile: {
-        symbol: profile.symbol,
-        name: profile.name,
-        logo_url: profile.logo_url,
-        industry: profile.finnhub_industry || profile.sector,
-        description: profile.description,
-        web_url: profile.web_url,
-        exchange: profile.exchange,
-      },
+      // Null-safe: when the main ticker can't be resolved (hidden/de-listed),
+      // fall back to the bare symbol so the frontend still has something to
+      // render — the rest of the payload is unaffected.
+      profile: profile
+        ? {
+            symbol: profile.symbol,
+            name: profile.name,
+            logo_url: profile.logo_url,
+            industry: profile.finnhub_industry || profile.sector,
+            description: profile.description,
+            web_url: profile.web_url,
+            exchange: profile.exchange,
+          }
+        : { symbol: mainTicker, name: mainTicker },
       market_context: {
         price: marketData.close,
         change_percent: marketData.prevClose

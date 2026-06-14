@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { ResearchService } from './research.service';
 import {
   ResearchNote,
@@ -32,6 +34,7 @@ describe('ResearchService', () => {
   const mockTxManager = {
     query: jest.fn().mockResolvedValue(undefined),
     getRepository: jest.fn(),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 
   const mockRepo = {
@@ -70,6 +73,9 @@ describe('ResearchService', () => {
     dedupeAnalystRatings: jest.fn(),
     getAnalyzerTickers: jest.fn(),
     updateTickerNews: jest.fn(),
+    getCompanyNews: jest.fn(),
+    getAnalystRatings: jest.fn(),
+    getHistory: jest.fn(),
   };
 
   const mockLlmBudgetService = {
@@ -85,6 +91,8 @@ describe('ResearchService', () => {
   const mockRiskRewardService = {
     getLatestScore: jest.fn(),
     evaluateFromResearch: jest.fn(),
+    getLatestAnalysis: jest.fn(),
+    deleteAnalysesForResearchNote: jest.fn().mockResolvedValue(0),
   };
 
   const mockNotificationsService = {
@@ -353,10 +361,9 @@ describe('ResearchService', () => {
   });
 
   describe('deleteResearchNote', () => {
-    it('should delete note by id', async () => {
+    it('deletes the note and its dependent risk analyses inside one transaction (M7)', async () => {
       const note = { id: '1', user_id: 'user-1' };
       mockRepo.findOne.mockResolvedValue(note);
-      mockRepo.delete.mockResolvedValue({ affected: 1 });
       mockUsersService.findById.mockResolvedValue({
         id: 'user-1',
         role: 'user',
@@ -364,7 +371,141 @@ describe('ResearchService', () => {
 
       await service.deleteResearchNote('1', 'user-1');
 
-      expect(mockRepo.delete).toHaveBeenCalledWith('1');
+      // Both the note delete and the cascade run through the same EntityManager
+      // so a failure in either rolls back the whole thing.
+      expect(mockRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(
+        mockRiskRewardService.deleteAnalysesForResearchNote,
+      ).toHaveBeenCalledWith('1', mockTxManager);
+      expect(mockTxManager.delete).toHaveBeenCalledWith(ResearchNote, '1');
+      // The legacy non-transactional repo.delete must no longer be used.
+      expect(mockRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin delete a note they do not own', async () => {
+      const note = { id: '1', user_id: 'owner-2' };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockUsersService.findById.mockResolvedValue({
+        id: 'admin-1',
+        role: 'admin',
+      });
+
+      await service.deleteResearchNote('1', 'admin-1');
+
+      expect(
+        mockRiskRewardService.deleteAnalysesForResearchNote,
+      ).toHaveBeenCalledWith('1', mockTxManager);
+      expect(mockTxManager.delete).toHaveBeenCalledWith(ResearchNote, '1');
+    });
+
+    it('throws NotFoundException and opens no transaction when the note is missing', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.deleteResearchNote('999', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(
+        mockRiskRewardService.deleteAnalysesForResearchNote,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('throws Unauthorized and deletes nothing when a non-owner non-admin requests deletion', async () => {
+      const note = { id: '1', user_id: 'owner-2' };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockUsersService.findById.mockResolvedValue({
+        id: 'user-1',
+        role: 'user',
+      });
+
+      await expect(service.deleteResearchNote('1', 'user-1')).rejects.toThrow(
+        'Unauthorized',
+      );
+
+      expect(mockRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockTxManager.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPublicReportData', () => {
+    const SECRET = 'test-secret';
+    const sigFor = (id: string) =>
+      crypto.createHmac('sha256', SECRET).update(id).digest('hex');
+
+    beforeEach(() => {
+      (service as any).config.get = jest.fn().mockReturnValue(SECRET);
+      mockMarketDataService.getSnapshot.mockResolvedValue({
+        latestPrice: { close: 10, prevClose: 8, ts: new Date() },
+        fundamentals: { pe_ttm: 15 },
+      });
+      mockMarketDataService.getCompanyNews.mockResolvedValue([]);
+      mockMarketDataService.getAnalystRatings.mockResolvedValue([]);
+      mockMarketDataService.getHistory.mockResolvedValue([]);
+      mockRiskRewardService.getLatestAnalysis.mockResolvedValue(null);
+    });
+
+    it('throws "Invalid signature" and never reads the note for a bad signature', async () => {
+      await expect(
+        service.getPublicReportData('1', 'deadbeef'),
+      ).rejects.toThrow('Invalid signature');
+
+      expect(mockRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('does NOT 500 when the main ticker is hidden/unresolvable (public-report-500)', async () => {
+      const note = {
+        id: '1',
+        title: 'T',
+        tickers: ['DEAD'],
+        answer_markdown: 'x',
+        created_at: new Date(),
+      };
+      mockRepo.findOne.mockResolvedValue(note);
+      // A hidden/de-listed symbol makes getTicker reject; un-caught this would
+      // reject the whole Promise.all and turn a valid share link into a 500.
+      mockTickersService.getTicker.mockRejectedValue(
+        new NotFoundException('Ticker not found'),
+      );
+
+      const result = (await service.getPublicReportData(
+        '1',
+        sigFor('1'),
+      )) as any;
+
+      expect(result.profile).toEqual({ symbol: 'DEAD', name: 'DEAD' });
+      expect(result.risk_analysis).toBeNull();
+      // The id-dependent risk waterfall is skipped when no profile resolved.
+      expect(mockRiskRewardService.getLatestAnalysis).not.toHaveBeenCalled();
+    });
+
+    it('returns the full composite payload for a resolvable ticker', async () => {
+      const note = {
+        id: '1',
+        title: 'Apple Deep Dive',
+        tickers: ['AAPL'],
+        answer_markdown: 'body',
+        created_at: new Date(),
+      };
+      mockRepo.findOne.mockResolvedValue(note);
+      mockTickersService.getTicker.mockResolvedValue({
+        id: 'ticker-1',
+        symbol: 'AAPL',
+        name: 'Apple Inc',
+        finnhub_industry: 'Tech',
+      });
+
+      const result = (await service.getPublicReportData(
+        '1',
+        sigFor('1'),
+      )) as any;
+
+      expect(result.profile.symbol).toBe('AAPL');
+      expect(result.profile.name).toBe('Apple Inc');
+      // The risk waterfall keys off the resolved profile id.
+      expect(mockRiskRewardService.getLatestAnalysis).toHaveBeenCalledWith(
+        'ticker-1',
+      );
     });
   });
 

@@ -724,4 +724,53 @@ describe('RiskRewardService', () => {
       expect(result.size).toBe(0);
     });
   });
+
+  describe('deleteAnalysesForResearchNote (M7)', () => {
+    // Fake EntityManager: the first query() is the COUNT, the rest are DELETEs.
+    const makeMgr = (count: number) => ({
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([{ count: String(count) }])
+        .mockResolvedValue([]),
+    });
+
+    it('returns 0 and issues no DELETE when no analyses reference the note', async () => {
+      const mgr = makeMgr(0);
+
+      const result = await service.deleteAnalysesForResearchNote(
+        '42',
+        mgr as any,
+      );
+
+      expect(result).toBe(0);
+      // Only the COUNT runs; an empty note must not fire any DELETE.
+      expect(mgr.query).toHaveBeenCalledTimes(1);
+      expect(mgr.query.mock.calls[0][0]).toContain('SELECT COUNT(*)');
+    });
+
+    it('deletes child rows before the parent analyses, all bound to the note id', async () => {
+      const mgr = makeMgr(2);
+
+      const result = await service.deleteAnalysesForResearchNote(
+        '42',
+        mgr as any,
+      );
+
+      expect(result).toBe(2);
+      // COUNT + 4 DELETEs (scenarios, qualitative_factors, catalysts, analyses).
+      expect(mgr.query).toHaveBeenCalledTimes(5);
+
+      const sql = mgr.query.mock.calls.map((c: any[]) => c[0] as string);
+      // Children must be removed before the parent to respect FK dependencies.
+      expect(sql[1]).toContain('DELETE FROM risk_scenarios');
+      expect(sql[2]).toContain('DELETE FROM risk_qualitative_factors');
+      expect(sql[3]).toContain('DELETE FROM risk_catalysts');
+      expect(sql[4]).toContain('DELETE FROM risk_analyses');
+
+      // The note id is always a bound parameter — never interpolated into SQL.
+      mgr.query.mock.calls.forEach((c: any[]) => {
+        expect(c[1]).toEqual(['42']);
+      });
+    });
+  });
 });

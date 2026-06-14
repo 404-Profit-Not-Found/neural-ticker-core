@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { RiskRewardScore } from './entities/risk-reward-score.entity'; // Legacy
 import { RiskAnalysis } from './entities/risk-analysis.entity';
 import { RiskScenario, ScenarioType } from './entities/risk-scenario.entity';
@@ -400,6 +400,52 @@ export class RiskRewardService {
       );
       return count;
     });
+  }
+
+  /**
+   * Deletes every risk analysis linked to a single research note (and its child
+   * rows: scenarios / qualitative factors / catalysts) using the supplied
+   * EntityManager, so the caller can run it inside the same transaction that
+   * deletes the note itself. Returns the number of analyses removed.
+   *
+   * `risk_analyses.research_note_id` stores `research_notes.id` (a bigint) as
+   * text, so the note id is bound as a string. Child rows are deleted
+   * explicitly rather than relying on a DB-level ON DELETE CASCADE, since the
+   * risk_* tables were created via schema sync (no migration) and their cascade
+   * behaviour can't be assumed — the same rationale as deleteOrphanedAnalyses.
+   */
+  async deleteAnalysesForResearchNote(
+    noteId: string,
+    mgr: EntityManager,
+  ): Promise<number> {
+    const noteWhere = `research_note_id = $1`;
+
+    const countRows: { count: string }[] = await mgr.query(
+      `SELECT COUNT(*)::int AS count FROM risk_analyses WHERE ${noteWhere}`,
+      [noteId],
+    );
+    const count = countRows[0]?.count ? Number(countRows[0].count) : 0;
+    if (count === 0) return 0;
+
+    const childSelect = `SELECT id FROM risk_analyses WHERE ${noteWhere}`;
+    await mgr.query(
+      `DELETE FROM risk_scenarios WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(
+      `DELETE FROM risk_qualitative_factors WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(
+      `DELETE FROM risk_catalysts WHERE analysis_id IN (${childSelect})`,
+      [noteId],
+    );
+    await mgr.query(`DELETE FROM risk_analyses WHERE ${noteWhere}`, [noteId]);
+
+    this.logger.log(
+      `Deleted ${count} risk analyses (and child rows) for research note ${noteId}.`,
+    );
+    return count;
   }
 
   // Called by ResearchService after a Deep Research Note is generated
