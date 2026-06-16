@@ -17,7 +17,10 @@ export function useWebPush() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check support and current subscription status on mount
+  // Check support and current subscription status on mount.
+  // If the browser has a subscription, re-send it to the backend so the
+  // server-side record stays in sync (the server auto-deletes expired
+  // subscriptions on 404/410, but the browser retains its local copy).
   useEffect(() => {
     const check = async () => {
       const supported = 'serviceWorker' in navigator && 'PushManager' in window;
@@ -33,6 +36,17 @@ export function useWebPush() {
         if (registration) {
           const sub = await registration.pushManager.getSubscription();
           setIsSubscribed(!!sub);
+
+          if (sub) {
+            const subJson = sub.toJSON();
+            await api.post('/push/subscribe', {
+              endpoint: subJson.endpoint,
+              keys: {
+                p256dh: subJson.keys?.p256dh,
+                auth: subJson.keys?.auth,
+              },
+            }).catch(() => undefined);
+          }
         }
       } catch (err) {
         console.warn('Failed to check push subscription:', err);
