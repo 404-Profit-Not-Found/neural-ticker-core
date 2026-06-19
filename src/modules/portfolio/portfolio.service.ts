@@ -52,24 +52,33 @@ export class PortfolioService implements OnModuleInit {
     userId: string,
     dto: CreatePortfolioPositionDto,
   ): Promise<PortfolioPosition> {
-    const count = await this.positionRepo.count({
-      where: { user_id: userId },
-    });
-    await this.quota.assertWithinLimit(userId, 'portfolioPositions', count);
-
-    // Auto-detect currency from ticker if not explicitly provided
+    // Auto-detect currency from ticker if not explicitly provided (read-only,
+    // safe to resolve before taking the per-user lock).
     let currency = dto.currency;
     if (!currency) {
       const ticker = await this.tickersService.findOneBySymbol(dto.symbol);
       currency = ticker?.currency || 'USD';
     }
 
-    const position = this.positionRepo.create({
-      ...dto,
-      currency,
-      user_id: userId,
+    // Serialize concurrent creates for THIS user inside a transaction. Without
+    // the advisory lock, two parallel requests could both pass the count-based
+    // quota check before either inserts, letting the user exceed their limit.
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+
+      const repo = tx.getRepository(PortfolioPosition);
+      const count = await repo.count({ where: { user_id: userId } });
+      await this.quota.assertWithinLimit(userId, 'portfolioPositions', count);
+
+      const position = repo.create({
+        ...dto,
+        currency,
+        user_id: userId,
+      });
+      return repo.save(position);
     });
-    return this.positionRepo.save(position);
   }
 
   async findAll(userId: string, displayCurrency?: string): Promise<any[]> {

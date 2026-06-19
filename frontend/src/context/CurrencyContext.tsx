@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import { api } from '../lib/api';
 import { useAuth } from './AuthContext';
 
@@ -38,14 +44,16 @@ interface CurrencyContextType {
   loading: boolean;
 }
 
-const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
+const CurrencyContext = createContext<CurrencyContextType | undefined>(
+  undefined,
+);
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [displayCurrency, setDisplayCurrencyState] = useState<string>('USD');
-  const [availableCurrencies, setAvailableCurrencies] = useState<AvailableCurrency[]>([
-    { code: 'USD', flag: '🇺🇸' },
-  ]);
+  const [availableCurrencies, setAvailableCurrencies] = useState<
+    AvailableCurrency[]
+  >([{ code: 'USD', flag: '🇺🇸' }]);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -84,19 +92,24 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     void fetchData();
   }, []);
 
-  const setDisplayCurrency = useCallback(async (currency: string) => {
-    setDisplayCurrencyState(currency);
-    localStorage.setItem('displayCurrency', currency);
+  const setDisplayCurrency = useCallback(
+    async (currency: string) => {
+      setDisplayCurrencyState(currency);
+      localStorage.setItem('displayCurrency', currency);
 
-    // Persist to user preferences if logged in
-    if (user) {
-      try {
-        await api.post('/users/me/preferences', { displayCurrency: currency });
-      } catch (error) {
-        console.warn('Failed to save currency preference:', error);
+      // Persist to user preferences if logged in
+      if (user) {
+        try {
+          await api.post('/users/me/preferences', {
+            displayCurrency: currency,
+          });
+        } catch (error) {
+          console.warn('Failed to save currency preference:', error);
+        }
       }
-    }
-  }, [user]);
+    },
+    [user],
+  );
 
   const tryConvert = useCallback(
     (amount: number, from: string, to: string): number | null => {
@@ -118,15 +131,18 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     [displayCurrency, tryConvert],
   );
 
-  const formatCurrency = useCallback((amount: number, currency?: string): string => {
-    const curr = currency || displayCurrency;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: curr,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  }, [displayCurrency]);
+  const formatCurrency = useCallback(
+    (amount: number, currency?: string): string => {
+      const curr = currency || displayCurrency;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: curr,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    },
+    [displayCurrency],
+  );
 
   const formatNative = useCallback(
     (amount: number, fromCurrency?: string): string => {
@@ -160,6 +176,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export const useCurrency = () => {
   const context = useContext(CurrencyContext);
-  if (!context) throw new Error('useCurrency must be used within a CurrencyProvider');
+  if (!context)
+    throw new Error('useCurrency must be used within a CurrencyProvider');
   return context;
 };

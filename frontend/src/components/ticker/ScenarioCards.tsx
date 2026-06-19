@@ -1,7 +1,6 @@
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '../../lib/api';
 import { Card, CardContent } from '../ui/card';
-import { useCurrency } from '../../context/CurrencyContext';
 
 type ScenarioType = 'bull' | 'base' | 'bear';
 
@@ -23,30 +22,22 @@ interface ScenarioCardsProps {
 }
 
 export function ScenarioCards({ scenarios, currentPrice, currency = 'USD' }: ScenarioCardsProps) {
-    const { displayCurrency, convert, rates } = useCurrency();
-
     // Sort logic to ensure layout order: Bear -> Base -> Bull
     const sortedScenarios = [...scenarios].sort((a, b) => {
         const order = { bear: 0, base: 1, bull: 2 };
         return order[a.scenario_type] - order[b.scenario_type];
     });
 
-    // Convert from ticker's native currency to displayCurrency. Falls back
-    // to native if rates are unavailable so the number is never misleading.
+    // Native-only render — no conversion. Show the currency the stock trades in.
     const formatCurrency = (val: number, compact = false) => {
         const native = (currency || 'USD').toUpperCase();
-        const fromRate = native === 'USD' ? 1 : rates[native];
-        const toRate = displayCurrency === 'USD' ? 1 : rates[displayCurrency];
-        const canConvert = !!(fromRate && toRate);
-        const targetCurrency = canConvert ? displayCurrency : native;
-        const value = canConvert ? convert(val, native, displayCurrency) : val;
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: targetCurrency,
+            currency: native,
             notation: compact ? 'compact' : 'standard',
             minimumFractionDigits: compact ? 1 : 2,
             maximumFractionDigits: compact ? 1 : 2,
-        }).format(value);
+        }).format(val);
     };
 
     return (

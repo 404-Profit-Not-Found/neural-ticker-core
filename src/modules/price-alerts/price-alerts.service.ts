@@ -136,32 +136,53 @@ export class PriceAlertsService {
 
     const now = new Date();
 
-    // Fetch active alerts for this symbol with cooldown check
+    // Fetch active alerts past their OWN cooldown window. Previously this used a
+    // hardcoded 1-hour floor, which kept alerts with a shorter cooldown silent
+    // for up to an hour. Compare against each alert's cooldown_minutes instead.
     const alerts = await this.alertRepo
       .createQueryBuilder('alert')
       .where('alert.enabled = true')
       .andWhere('alert.symbol = :symbol', { symbol })
       .andWhere(
-        '(alert.triggered_at IS NULL OR alert.triggered_at < :cooldownTime)',
-        {
-          cooldownTime: new Date(now.getTime() - 60 * 60 * 1000), // 1 hour minimum fallback
-        },
+        `(alert.triggered_at IS NULL OR alert.triggered_at < (:now::timestamptz - (COALESCE(alert.cooldown_minutes, 60) * interval '1 minute')))`,
+        { now },
       )
       .getMany();
 
     for (const alert of alerts) {
-      // Check per-alert cooldown
-      if (alert.triggered_at) {
-        const cooldownMs = alert.cooldown_minutes * 60 * 1000;
-        if (now.getTime() - alert.triggered_at.getTime() < cooldownMs) {
-          continue; // Still in cooldown
-        }
+      // Lazily capture a baseline for percent-change alerts that never got one
+      // (e.g. price data was unavailable at creation time). Without this the
+      // alert can never fire.
+      if (
+        (alert.alert_type === 'percent_change_up' ||
+          alert.alert_type === 'percent_change_down') &&
+        (!alert.reference_price || alert.reference_price <= 0)
+      ) {
+        alert.reference_price = currentPrice;
+        await this.alertRepo.save(alert);
+        continue; // Baseline just set — nothing to compare against yet.
       }
 
-      const shouldFire = this.checkCondition(alert, currentPrice);
-      if (shouldFire) {
-        await this.triggerAlert(alert, currentPrice);
-      }
+      if (!this.checkCondition(alert, currentPrice)) continue;
+
+      // Atomically claim the trigger. Concurrent/overlapping evaluations for the
+      // same symbol could otherwise both read the alert before either marks it
+      // triggered, firing the notification twice. The conditional UPDATE ensures
+      // exactly one evaluation wins.
+      const claim = await this.alertRepo
+        .createQueryBuilder()
+        .update(PriceAlert)
+        .set({ triggered_at: now })
+        .where('id = :id', { id: alert.id })
+        .andWhere(
+          `(triggered_at IS NULL OR triggered_at < (:now::timestamptz - (COALESCE(cooldown_minutes, 60) * interval '1 minute')))`,
+          { now },
+        )
+        .execute();
+      if (!claim.affected) continue; // Another evaluation already fired it.
+
+      alert.triggered_at = now;
+      await this.triggerAlert(alert, currentPrice);
     }
   }
 
@@ -243,9 +264,8 @@ export class PriceAlertsService {
         );
       });
 
-    // Mark alert as triggered
-    alert.triggered_at = new Date();
-    await this.alertRepo.save(alert);
+    // triggered_at is set atomically by the claim in evaluateAlerts before this
+    // runs, so there is no separate save here (avoids overwriting the claim).
   }
 
   /**

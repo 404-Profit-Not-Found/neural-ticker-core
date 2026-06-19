@@ -1,6 +1,5 @@
 
 import { cn } from '../../lib/api';
-import { useCurrency } from '../../context/CurrencyContext';
 
 interface FiftyTwoWeekRangeProps {
   low: number;
@@ -18,8 +17,6 @@ export function FiftyTwoWeekRange({
   showLabels = true,
   currency = 'USD'
 }: FiftyTwoWeekRangeProps & { currency?: string }) {
-  const { displayCurrency, convert, rates } = useCurrency();
-
   if (!low || !high || high <= low) {
     return <div className="text-xs text-muted-foreground">-</div>;
   }
@@ -28,19 +25,15 @@ export function FiftyTwoWeekRange({
   const range = high - low;
   const position = Math.min(100, Math.max(0, ((current - low) / range) * 100));
 
+  // Native-only render — no conversion. Show the currency the stock trades in.
   const format = (val: number) => {
     const native = (currency || 'USD').toUpperCase();
-    const fromRate = native === 'USD' ? 1 : rates[native];
-    const toRate = displayCurrency === 'USD' ? 1 : rates[displayCurrency];
-    const canConvert = !!(fromRate && toRate);
-    const targetCurrency = canConvert ? displayCurrency : native;
-    const value = canConvert ? convert(val, native, displayCurrency) : val;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: targetCurrency,
+      currency: native,
       notation: 'compact',
       maximumFractionDigits: 1,
-    }).format(value);
+    }).format(val);
   };
 
   return (

@@ -486,19 +486,8 @@ export class JobsService {
   }
 
   // --- DAILY DIGEST CRON ---
-  // Runs every day at 6:00 AM UTC (Pre-market)
-  // @Cron('0 6 * * *') or uses NestJS CronExpression if available, checking imports.
-  // We need to import Cron logic. But @nestjs/schedule might need @Cron decorator.
-  // Since I cannot change imports easily with replace_file (I need to see top of file),
-  // I will check if @Cron is imported.
-  // File view showed no Cron imports. I need to add imports to the top first?
-  // Limitation: I can only replace blocks.
-  // Strategy: Add imports in one tool call, then add method in another?
-  // Or just replace the whole file content? It is small enough (159 lines).
-  // No, `replace_file_content` is better.
-  // I will use `replace_file_content` to add imports at top, then method at bottom.
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  // Runs once per day at 06:00 (pre-market). Dev only — production uses GitHub Actions.
+  @Cron(CronExpression.EVERY_DAY_AT_6AM)
   private async runDailyDigestCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
     await this.runDailyDigest();
@@ -640,7 +629,9 @@ export class JobsService {
 
   async cleanupOldResearch() {
     const retentionDays = JobsService.RESEARCH_RETENTION_DAYS;
-    this.logger.log(`Starting old research cleanup (>${retentionDays} days)...`);
+    this.logger.log(
+      `Starting old research cleanup (>${retentionDays} days)...`,
+    );
     try {
       const deleted =
         await this.researchService.deleteOldResearch(retentionDays);

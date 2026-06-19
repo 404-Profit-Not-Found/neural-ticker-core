@@ -22,6 +22,7 @@ interface Position {
     buy_date: string;
     current_price?: number;
     currency?: string;
+    original_currency?: string;
 }
 
 interface OhlcDataPoint {
@@ -75,13 +76,17 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
     const [inputMode, setInputMode] = useState<'shares' | 'investment'>('investment');
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     
-    // Currency helpers
+    // Currency helpers. `currency` tracks the buy_price input, which is stored
+    // in the position's (possibly converted) display currency. The live
+    // snapshot price, however, comes from /tickers/:symbol/snapshot unconverted,
+    // so it must render in the ticker's native currency.
     const currency = position?.currency || 'USD';
+    const nativeCurrency = position?.original_currency || position?.currency || 'USD';
     const getCurrencySymbol = (curr: string) => {
         return (0).toLocaleString('en-US', { style: 'currency', currency: curr, minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\d/g, '').trim();
     };
     const currencySymbol = getCurrencySymbol(currency);
-    const formatPrice = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
+    const formatNativePrice = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: nativeCurrency }).format(val);
 
     // OHLC Data
     const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
@@ -295,7 +300,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
                         {/* Right: Price & Change */}
                         <div className="flex flex-col items-end flex-shrink-0">
                           <div className="text-xl font-mono font-bold tracking-tight text-foreground">
-                            {formatPrice(snapshot.price || snapshot.latestPrice?.close || 0)}
+                            {formatNativePrice(snapshot.price || snapshot.latestPrice?.close || 0)}
                           </div>
                           {(snapshot.change_percent !== undefined || snapshot.latestPrice?.change_percent !== undefined) && (
                             <div className={cn("text-xs font-bold flex items-center gap-0.5", (snapshot.change_percent ?? snapshot.latestPrice?.change_percent ?? 0) >= 0 ? "text-emerald-500" : "text-red-500")}>

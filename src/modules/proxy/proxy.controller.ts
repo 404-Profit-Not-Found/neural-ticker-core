@@ -83,11 +83,31 @@ export class ProxyController {
       // Cache control - cache for 1 day
       res.set('Cache-Control', 'public, max-age=86400');
 
+      // Handle mid-stream upstream failures, otherwise the client connection
+      // hangs forever and the error event goes unhandled (can crash the process).
+      response.data.on('error', (streamErr: Error) => {
+        this.logger.error(
+          `Stream error while proxying ${url}: ${streamErr.message}`,
+        );
+        if (!res.headersSent) {
+          res.status(502).send('Upstream stream error');
+        } else {
+          res.destroy(streamErr);
+        }
+      });
+
       // Pipe the stream to the response
       response.data.pipe(res);
     } catch (error) {
+      // Preserve client errors (bad/disallowed URL) as 400 instead of masking
+      // them as 404.
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.logger.error(`Failed to proxy image: ${url}`, error);
-      res.status(404).send('Image not found or inaccessible');
+      if (!res.headersSent) {
+        res.status(502).send('Image not found or inaccessible');
+      }
     }
   }
 }

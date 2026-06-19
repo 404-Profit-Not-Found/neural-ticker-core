@@ -28,70 +28,74 @@ export class TickerRequestsService {
     }
     this.logger.log(`Received request for ${startSymbol} from user ${userId}`);
 
-    // Per-user daily cap (anti-spam). Distinct arbitrary symbols would otherwise
-    // let one user create unbounded request rows.
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const dailyCount = await this.requestRepo.count({
-      where: { user_id: userId, created_at: MoreThanOrEqual(since) },
-    });
-    if (dailyCount >= TickerRequestsService.DAILY_REQUEST_LIMIT) {
-      throw new BadRequestException(
-        `Daily ticker-request limit reached (${TickerRequestsService.DAILY_REQUEST_LIMIT}). Try again tomorrow.`,
-      );
-    }
-
     try {
-      // 1. Check if already tracked
-      const existing = await this.tickersService.findOneBySymbol(startSymbol);
-      if (existing) {
-        this.logger.warn(
-          `Ticker ${startSymbol} already exists. Returning conflict.`,
-        );
-        throw new BadRequestException(
-          `Ticker ${startSymbol} is currently being tracked. You can search for it now.`,
-        );
-      }
+      // Serialize this user's concurrent requests with a per-user advisory lock
+      // so the daily-cap count below can't be raced past by parallel calls.
+      return await this.requestRepo.manager.transaction(async (tx) => {
+        const repo = tx.getRepository(TickerRequestEntity);
+        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `ticker-request:${userId}`,
+        ]);
 
-      // 2. Check for duplicate pending request for this specific symbol (Global or User?)
-      // We check globally for PENDING to avoid clutter? Or User?
-      // Existing logic was global. Let's keep it but handle potential errors.
-      const existingRequest = await this.requestRepo.findOne({
-        where: { symbol: startSymbol, status: 'PENDING' },
-      });
-
-      if (existingRequest) {
-        this.logger.log(`Pending request already exists for ${startSymbol}`);
-        return existingRequest;
-      }
-
-      // 3. Create request
-      // Guard against potential unique constraint on (user_id, symbol) if the user requested it before (REJECTED/APPROVED)
-      const userRequest = await this.requestRepo.findOne({
-        where: { user_id: userId, symbol: startSymbol },
-      });
-
-      if (userRequest) {
-        // If they have an old request, we might want to revive it or just return it?
-        // If REJECTED, maybe they can request again?
-        // For now, let's update status to PENDING if it was REJECTED?
-        // Or just return it to avoid unique violation.
-        if (userRequest.status !== 'PENDING') {
-          this.logger.log(
-            `Updating existing ${userRequest.status} request for ${startSymbol} to PENDING`,
+        // Per-user daily cap (anti-spam). Distinct arbitrary symbols would
+        // otherwise let one user create unbounded request rows.
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const dailyCount = await repo.count({
+          where: { user_id: userId, created_at: MoreThanOrEqual(since) },
+        });
+        if (dailyCount >= TickerRequestsService.DAILY_REQUEST_LIMIT) {
+          throw new BadRequestException(
+            `Daily ticker-request limit reached (${TickerRequestsService.DAILY_REQUEST_LIMIT}). Try again tomorrow.`,
           );
-          userRequest.status = 'PENDING';
-          return this.requestRepo.save(userRequest);
         }
-        return userRequest;
-      }
 
-      const request = this.requestRepo.create({
-        user_id: userId,
-        symbol: startSymbol,
-        status: 'PENDING',
+        // 1. Check if already tracked
+        const existing = await this.tickersService.findOneBySymbol(startSymbol);
+        if (existing) {
+          this.logger.warn(
+            `Ticker ${startSymbol} already exists. Returning conflict.`,
+          );
+          throw new BadRequestException(
+            `Ticker ${startSymbol} is currently being tracked. You can search for it now.`,
+          );
+        }
+
+        // 2. Check for duplicate pending request for this specific symbol (global).
+        const existingRequest = await repo.findOne({
+          where: { symbol: startSymbol, status: 'PENDING' },
+        });
+
+        if (existingRequest) {
+          this.logger.log(`Pending request already exists for ${startSymbol}`);
+          return existingRequest;
+        }
+
+        // 3. Create request
+        // Guard against unique constraint on (user_id, symbol) if the user
+        // requested it before (REJECTED/APPROVED) — revive instead of inserting.
+        const userRequest = await repo.findOne({
+          where: { user_id: userId, symbol: startSymbol },
+        });
+
+        if (userRequest) {
+          if (userRequest.status !== 'PENDING') {
+            this.logger.log(
+              `Updating existing ${userRequest.status} request for ${startSymbol} to PENDING`,
+            );
+            userRequest.status = 'PENDING';
+            return repo.save(userRequest);
+          }
+          return userRequest;
+        }
+
+        const request = repo.create({
+          user_id: userId,
+          symbol: startSymbol,
+          status: 'PENDING',
+        });
+
+        return await repo.save(request);
       });
-
-      return await this.requestRepo.save(request);
     } catch (error) {
       this.logger.error(
         `Failed to create request for ${startSymbol}: ${error.message}`,

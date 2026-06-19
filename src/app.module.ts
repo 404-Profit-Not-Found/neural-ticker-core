@@ -91,13 +91,22 @@ import configuration from './config/configuration';
           migrationsRun: true, // Always run migrations to ensure schema consistency
           migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
           connectTimeoutMS: 10000,
-          ssl:
-            process.env.DB_SSL === 'false'
-              ? false
-              : (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
-                  process.env.DB_SSL === 'true'
-                ? { rejectUnauthorized: false }
-                : false,
+          ssl: (() => {
+            if (process.env.DB_SSL === 'false') return false;
+            const sslRequired =
+              (dbConfig.url && dbConfig.url.includes('sslmode=require')) ||
+              process.env.DB_SSL === 'true';
+            if (!sslRequired) return false;
+            // Verify the server certificate when a CA bundle is provided, or
+            // when explicitly opted in via DB_SSL_REJECT_UNAUTHORIZED=true.
+            // We default to permissive only as a fallback for managed providers
+            // that present self-signed chains, but it can now be locked down
+            // without code changes.
+            const ca = process.env.DB_SSL_CA;
+            const rejectUnauthorized =
+              process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' || !!ca;
+            return ca ? { rejectUnauthorized, ca } : { rejectUnauthorized };
+          })(),
         };
       },
     }),

@@ -67,8 +67,9 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-500">
       {data.map((item) => {
         // const risk = item.aiAnalysis?.financial_risk ?? 0;
-        const upside = item.aiAnalysis?.base_price
-          ? ((Number(item.aiAnalysis.base_price) - item.current_price) / item.current_price) * 100
+        const currentPrice = Number(item.current_price);
+        const upside = item.aiAnalysis?.base_price && currentPrice > 0
+          ? ((Number(item.aiAnalysis.base_price) - currentPrice) / currentPrice) * 100
           : (Number(item.aiAnalysis?.upside_percent) || 0);
 
         const isProfit = item.gain_loss >= 0;

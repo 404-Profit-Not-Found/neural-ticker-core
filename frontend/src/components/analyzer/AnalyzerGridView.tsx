@@ -83,6 +83,7 @@ export function AnalyzerGridView({ data, isLoading }: AnalyzerGridViewProps) {
                         fiftyTwoWeekLow={fundamentals?.fifty_two_week_low ? Number(fundamentals.fifty_two_week_low) : undefined}
                         fiftyTwoWeekHigh={fundamentals?.fifty_two_week_high ? Number(fundamentals.fifty_two_week_high) : undefined}
                         marketStatus={status}
+                        currency={ticker.currency || 'USD'}
                     />
                 );
             })}

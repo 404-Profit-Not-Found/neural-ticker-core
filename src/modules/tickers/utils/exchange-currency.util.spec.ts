@@ -86,9 +86,12 @@ describe('inferCurrencyFromExchange', () => {
       ['MSFT', null],
       ['NVDA', null],
       ['BRK.A', null], // dot but unknown suffix
-    ])('returns null for US-style symbol %s with no exchange hint', (symbol) => {
-      expect(inferCurrencyFromExchange(null, symbol)).toBeNull();
-    });
+    ])(
+      'returns null for US-style symbol %s with no exchange hint',
+      (symbol) => {
+        expect(inferCurrencyFromExchange(null, symbol)).toBeNull();
+      },
+    );
 
     it('returns null for unknown exchange', () => {
       expect(inferCurrencyFromExchange('UNKNOWN', null)).toBeNull();

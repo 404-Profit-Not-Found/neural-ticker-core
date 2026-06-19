@@ -91,11 +91,12 @@ export class TickerDetailController {
       },
       market_data: {
         price: latestPrice?.close || 0,
-        change_percent: latestPrice
-          ? ((latestPrice.close - latestPrice.prevClose) /
-              latestPrice.prevClose) *
-            100
-          : 0,
+        change_percent:
+          latestPrice && latestPrice.prevClose
+            ? ((latestPrice.close - latestPrice.prevClose) /
+                latestPrice.prevClose) *
+              100
+            : 0,
         volume: latestPrice?.volume || 0,
         updated_at: latestPrice?.ts || new Date(),
         history: priceHistory || [],
