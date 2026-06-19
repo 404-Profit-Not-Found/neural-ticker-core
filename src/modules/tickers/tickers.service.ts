@@ -350,7 +350,11 @@ export class TickersService {
     includeExternal = false,
   ): Promise<
     Partial<
-      TickerEntity & { is_locally_tracked: boolean; is_queued?: boolean }
+      TickerEntity & {
+        is_locally_tracked: boolean;
+        is_queued?: boolean;
+        sparkline?: number[] | null;
+      }
     >[]
   > {
     if (!search || search.trim() === '') {

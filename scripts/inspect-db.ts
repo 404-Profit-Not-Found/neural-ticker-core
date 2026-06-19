@@ -10,14 +10,8 @@ dotenv.config();
 const entities = [PriceOhlcv, TickerEntity];
 
 const AppDataSource = new DataSource({
-  type: 'sqlite',
-  database: 'neural-ticker.db', // Adjust if using Postgres in dev, but user context says 'database: neural-ticker.db' in MEMORY[user_global] for MVP?
-  // Actually tech-stack says Neon Serverless Postgres.
-  // config/configuration.ts would tell us.
-  // Let's assume env vars are set correctly for the connection.
-  // We'll trust the env vars.
   type: 'postgres',
-  url: process.env.DATABASE_URL, 
+  url: process.env.DATABASE_URL,
   entities: entities,
   synchronize: false,
 });

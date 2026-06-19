@@ -13,7 +13,9 @@ async function testYahoo() {
     
     // 2. Test Chart (Intraday 5m)
     console.log('Fetching Chart (5m)...');
-    const chart = await yahooFinance.chart(symbol, { interval: '5m' });
+    const chart = (await yahooFinance.chart(symbol, {
+      interval: '5m',
+    })) as { quotes?: unknown[] } | null;
     if (chart && chart.quotes && chart.quotes.length > 0) {
       console.log(`Chart Success: Received ${chart.quotes.length} candles.`);
       console.log('Sample:', chart.quotes[0]);

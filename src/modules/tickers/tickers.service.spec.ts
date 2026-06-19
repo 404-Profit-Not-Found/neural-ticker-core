@@ -57,6 +57,7 @@ describe('TickersService', () => {
     create: jest.fn().mockImplementation((dto) => dto),
     save: jest.fn(),
     count: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
 
   const mockFinnhubService = {

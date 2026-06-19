@@ -27,6 +27,7 @@ describe('AuthController', () => {
     nickname: 'TestNickname',
     view_mode: 'PRO',
     theme: 'dark',
+    has_onboarded: false,
   };
 
   const mockAuthService = {

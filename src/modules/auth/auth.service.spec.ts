@@ -247,8 +247,8 @@ describe('AuthService', () => {
       mockAuthLogRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
       const result = await service.getAuthLogs({
-        startDate: new Date(),
-        endDate: new Date(),
+        startDate: new Date().toISOString(),
+        endDate: new Date().toISOString(),
         userId: 'user1',
         provider: 'google',
         limit: 50,

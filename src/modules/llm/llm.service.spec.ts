@@ -37,7 +37,12 @@ describe('LlmService', () => {
   });
 
   describe('generateResearch', () => {
-    const basePrompt = { question: 'Test?', quality: 'medium' as QualityTier };
+    const basePrompt = {
+      question: 'Test?',
+      tickers: [] as string[],
+      numericContext: {},
+      quality: 'medium' as QualityTier,
+    };
 
     it('should route to OpenAI if provider specified', async () => {
       const prompt = { ...basePrompt, provider: 'openai' as const };
@@ -68,7 +73,12 @@ describe('LlmService', () => {
     });
 
     it('should route to OpenAI by default', async () => {
-      const prompt = { question: 'q', quality: 'medium' as QualityTier };
+      const prompt = {
+        question: 'q',
+        tickers: [] as string[],
+        numericContext: {},
+        quality: 'medium' as QualityTier,
+      };
       openAiGenerate.mockResolvedValue({
         answerMarkdown: 'openai',
         models: ['gpt-4'],
