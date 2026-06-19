@@ -112,9 +112,9 @@ describe('LlmService', () => {
       expect(result.models).toContain('gemini-2.5-flash');
       expect(result.answerMarkdown).toContain('OpenAI');
       expect(result.answerMarkdown).toContain('Gemini');
-      // Note: Implementation only adds OpenAI tokens currently
-      expect(result.tokensIn).toBe(100);
-      expect(result.tokensOut).toBe(50);
+      // Ensemble sums token usage across both providers.
+      expect(result.tokensIn).toBe(180); // 100 (OpenAI) + 80 (Gemini)
+      expect(result.tokensOut).toBe(90); // 50 (OpenAI) + 40 (Gemini)
     });
 
     it('should handle ensemble mode when one provider fails', async () => {

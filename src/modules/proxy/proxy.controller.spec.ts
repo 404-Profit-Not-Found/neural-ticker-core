@@ -45,18 +45,19 @@ describe('ProxyController', () => {
       );
     });
 
-    it('should return 404 for non-finnhub domain', async () => {
+    it('should reject a non-finnhub domain with BadRequestException', async () => {
       const res = {
         set: jest.fn(),
         status: jest.fn().mockReturnThis(),
         send: jest.fn(),
       };
 
-      await controller.proxyImage('https://evil.com/image.png', res as any);
-
-      // BadRequestException is caught by try-catch and returns 404
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');
+      // Disallowed-host errors are now preserved as 400 (re-thrown) rather than
+      // masked as a 404 image-not-found response.
+      await expect(
+        controller.proxyImage('https://evil.com/image.png', res as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('should block malicious domains ending with finnhub.io', async () => {
@@ -66,17 +67,14 @@ describe('ProxyController', () => {
         send: jest.fn(),
       };
 
-      await controller.proxyImage(
-        'https://evilfinnhub.io/image.png',
-        res as any,
-      );
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');
+      await expect(
+        controller.proxyImage('https://evilfinnhub.io/image.png', res as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('should proxy image from finnhub.io', async () => {
-      const mockStream = { pipe: jest.fn() };
+      const mockStream = { pipe: jest.fn(), on: jest.fn() };
       const mockResponse = {
         headers: { 'content-type': 'image/png' },
         data: mockStream,
@@ -122,7 +120,8 @@ describe('ProxyController', () => {
         res as any,
       );
 
-      expect(res.status).toHaveBeenCalledWith(404);
+      // Upstream/transport failures now surface as 502 (bad gateway).
+      expect(res.status).toHaveBeenCalledWith(502);
       expect(res.send).toHaveBeenCalledWith('Image not found or inaccessible');
     });
   });

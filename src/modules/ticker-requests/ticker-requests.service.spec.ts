@@ -10,12 +10,27 @@ describe('TickerRequestsService', () => {
   let requestRepo: any;
   let tickersService: any;
 
-  const mockRequestRepo = {
+  const mockRequestRepo: any = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
     count: jest.fn().mockResolvedValue(0),
+  };
+
+  // createRequest() now serializes per-user work inside
+  // requestRepo.manager.transaction(tx => ...), taking an advisory lock and
+  // using the transactional repository. The tx manager delegates back to the
+  // same repo mock so existing findOne/create/save expectations still apply.
+  const mockTxManager = {
+    getRepository: jest.fn(() => mockRequestRepo),
+    query: jest.fn().mockResolvedValue(undefined),
+  };
+
+  mockRequestRepo.manager = {
+    transaction: jest.fn((cb: (m: typeof mockTxManager) => unknown) =>
+      Promise.resolve(cb(mockTxManager)),
+    ),
   };
 
   const mockTickersService = {

@@ -139,4 +139,96 @@ describe('TickerDetailController', () => {
       expect(result.ratings).toEqual([]);
     });
   });
+
+  describe('native currency resolution', () => {
+    const buildSnapshot = (ticker: Record<string, unknown>) => ({
+      ticker,
+      latestPrice: { close: 41.3, prevClose: 40, volume: 1, ts: new Date() },
+      fundamentals: null,
+    });
+
+    beforeEach(() => {
+      mockMarketDataService.getHistory.mockResolvedValue([]);
+      mockMarketDataService.getAnalystRatings.mockResolvedValue([]);
+      mockRiskRewardService.getLatestAnalysis.mockResolvedValue(null);
+      mockResearchService.getLatestNoteForTicker.mockResolvedValue(null);
+    });
+
+    it('returns the stored native currency when it is a real non-USD value', async () => {
+      mockMarketDataService.getSnapshot.mockResolvedValue(
+        buildSnapshot({
+          id: '1',
+          symbol: 'EKT.DE',
+          exchange: 'XETRA',
+          currency: 'EUR',
+        }),
+      );
+
+      const result = await controller.getCompositeData('EKT.DE');
+
+      expect(result.profile.currency).toBe('EUR');
+    });
+
+    it('infers EUR for a .DE ticker carrying a stale USD default', async () => {
+      // Rows created before currency inference existed can still hold the 'USD'
+      // fallback. The detail page must not render such a ticker in dollars.
+      mockMarketDataService.getSnapshot.mockResolvedValue(
+        buildSnapshot({
+          id: '1',
+          symbol: 'EKT.DE',
+          exchange: 'XETRA',
+          currency: 'USD',
+        }),
+      );
+
+      const result = await controller.getCompositeData('EKT.DE');
+
+      expect(result.profile.currency).toBe('EUR');
+    });
+
+    it('infers currency from the symbol suffix when stored currency is empty', async () => {
+      mockMarketDataService.getSnapshot.mockResolvedValue(
+        buildSnapshot({
+          id: '1',
+          symbol: 'BARC.L',
+          exchange: '',
+          currency: '',
+        }),
+      );
+
+      const result = await controller.getCompositeData('BARC.L');
+
+      expect(result.profile.currency).toBe('GBP');
+    });
+
+    it('keeps USD for a genuine US-listed ticker', async () => {
+      mockMarketDataService.getSnapshot.mockResolvedValue(
+        buildSnapshot({
+          id: '1',
+          symbol: 'AAPL',
+          exchange: 'NASDAQ',
+          currency: 'USD',
+        }),
+      );
+
+      const result = await controller.getCompositeData('AAPL');
+
+      expect(result.profile.currency).toBe('USD');
+    });
+
+    it('does not mislabel a dotted US symbol (e.g. BRK.B) as foreign', async () => {
+      mockMarketDataService.getSnapshot.mockResolvedValue(
+        buildSnapshot({
+          id: '1',
+          symbol: 'BRK.B',
+          exchange: 'NYSE',
+          currency: 'USD',
+        }),
+      );
+
+      const result = await controller.getCompositeData('BRK.B');
+
+      expect(result.profile.currency).toBe('USD');
+    });
+  });
 });

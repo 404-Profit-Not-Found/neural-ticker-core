@@ -26,13 +26,27 @@ const mockAnalysis = {
   createdAt: new Date(),
 };
 
-const mockPositionRepo = {
+const mockPositionRepo: any = {
   create: jest.fn().mockReturnValue(mockPosition),
   save: jest.fn().mockResolvedValue(mockPosition),
   find: jest.fn().mockResolvedValue([mockPosition]),
   findOne: jest.fn().mockResolvedValue(mockPosition),
   remove: jest.fn().mockResolvedValue(true),
   count: jest.fn().mockResolvedValue(0),
+};
+
+// create() serializes per-user inserts inside positionRepo.manager.transaction
+// (advisory lock + count-based quota check). The tx manager delegates back to
+// the same repo mock so create/save/count expectations are unchanged.
+const mockPositionTxManager = {
+  getRepository: jest.fn(() => mockPositionRepo),
+  query: jest.fn().mockResolvedValue(undefined),
+};
+
+mockPositionRepo.manager = {
+  transaction: jest.fn((cb: (m: typeof mockPositionTxManager) => unknown) =>
+    Promise.resolve(cb(mockPositionTxManager)),
+  ),
 };
 
 const mockQuotaService = { assertWithinLimit: jest.fn() };
