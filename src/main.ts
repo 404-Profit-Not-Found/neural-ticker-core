@@ -59,9 +59,22 @@ async function bootstrap() {
   // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)
   app.getHttpAdapter().getInstance().set('etag', false);
 
-  // Enable CORS
+  // Enable CORS. FRONTEND_URL may be a comma-separated list (apex + www,
+  // preview deploys, etc.). The localhost dev fallback is intentionally only
+  // used OUTSIDE production — in prod a missing FRONTEND_URL is a misconfig and
+  // must not silently allow credentialed requests from dev origins.
+  const isProd = process.env.NODE_ENV === 'production';
+  const configuredOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const allowedOrigins = configuredOrigins.length
+    ? configuredOrigins
+    : isProd
+      ? []
+      : ['http://localhost:5173'];
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
 

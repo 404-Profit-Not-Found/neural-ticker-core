@@ -60,6 +60,9 @@ export class ProxyController {
       const response = await firstValueFrom(
         this.httpService.get(url, {
           responseType: 'stream',
+          // Bound the upstream request so a slow/hung finnhub socket can't pin
+          // a server connection indefinitely.
+          timeout: 10000,
           // Only the initial host is validated, so do NOT follow redirects —
           // otherwise a finnhub open-redirect could reach an internal target.
           maxRedirects: 0,

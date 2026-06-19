@@ -216,8 +216,8 @@ export class GeminiProvider implements ILlmProvider {
           answerMarkdown: result.text || '',
           groundingMetadata: groundingMeta,
           thoughts: thoughts ? JSON.stringify(thoughts) : undefined,
-          tokensIn: result.usageMetadata?.promptTokenCount,
-          tokensOut: result.usageMetadata?.candidatesTokenCount,
+          tokensIn: result.usageMetadata?.promptTokenCount ?? 0,
+          tokensOut: result.usageMetadata?.candidatesTokenCount ?? 0,
         };
       } catch (err: any) {
         const isQuotaError =
