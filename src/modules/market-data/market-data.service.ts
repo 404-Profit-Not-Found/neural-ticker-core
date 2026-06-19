@@ -1383,13 +1383,30 @@ export class MarketDataService {
   }
 
   /**
+   * Normalizes a Yahoo `providerPublishTime` to epoch SECONDS.
+   *
+   * The Yahoo search call runs unvalidated (see YahooFinanceService.search), so
+   * the library no longer coerces this field to a Date — it arrives as a raw
+   * epoch-seconds number. Older code did `new Date(providerPublishTime)`, which
+   * (treating the number as milliseconds) would silently stamp every article at
+   * 1970. Handle both shapes: a Date, epoch-seconds, or epoch-millis.
+   */
+  private toEpochSeconds(value: unknown): number {
+    if (value instanceof Date) return Math.floor(value.getTime() / 1000);
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return Math.floor(Date.now() / 1000);
+    // ~1e12 distinguishes epoch-millis from epoch-seconds (year ~33658 in s).
+    return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
+  }
+
+  /**
    * Dedicated helper to fetch and map news from Yahoo Finance
    */
   async fetchNewsFromYahoo(symbol: string) {
     const yahooResults = await this.yahooFinanceService.search(symbol);
     return (yahooResults.news || []).map((n: any) => ({
       id: n.uuid,
-      datetime: Math.floor(new Date(n.providerPublishTime).getTime() / 1000),
+      datetime: this.toEpochSeconds(n.providerPublishTime),
       headline: n.title,
       source: n.publisher,
       url: n.link,
@@ -1456,9 +1473,7 @@ export class MarketDataService {
           await this.yahooFinanceService.search('market news');
         return (yahooResults.news || []).map((n: any) => ({
           id: n.uuid,
-          datetime: Math.floor(
-            new Date(n.providerPublishTime).getTime() / 1000,
-          ),
+          datetime: this.toEpochSeconds(n.providerPublishTime),
           headline: n.title,
           source: n.publisher,
           url: n.link,
