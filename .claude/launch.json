@@ -23,14 +23,6 @@
       "cwd": "frontend-v2"
     },
     {
-      "name": "frontend-preview",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],
-      "port": 5199,
-      "cwd": "frontend",
-      "autoPort": false
-    },
-    {
       "name": "backend-v2",
       "runtimeExecutable": "node",
       "runtimeArgs": ["dist/main"],
