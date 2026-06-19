@@ -102,6 +102,18 @@ export class YahooFinanceService implements OnModuleInit {
 
   /**
    * Fetches historical OHLCV data.
+   *
+   * Backed by yahoo-finance2's chart() rather than the deprecated historical().
+   * historical() runs strict schema validation and THROWS the whole result if a
+   * single row has null values — which happens routinely when Yahoo returns an
+   * unfinalized current-day bar (null close/adjclose). That one in-progress
+   * candle was killing the entire daily-candle sync for foreign tickers
+   * (CPRI/ETOR etc.). chart() returns the same row shape under `.quotes` without
+   * that all-or-nothing throw.
+   *
+   * Always resolves to a plain array of OHLCV rows (date/open/high/low/close/
+   * volume) — the contract every caller relies on — with incomplete (null-close)
+   * bars dropped so they can't poison downstream candle upserts.
    */
   async getHistorical(
     symbol: string,
@@ -113,11 +125,15 @@ export class YahooFinanceService implements OnModuleInit {
       this.logger.debug(
         `Fetching historical data for ${symbol} from Yahoo Finance`,
       );
-      return await this.yahoo.historical(symbol, {
+      const result = await this.yahoo.chart(symbol, {
         period1: from,
         period2: to,
         interval,
       });
+      const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
+      return quotes.filter(
+        (q: any) => q && q.close !== null && q.close !== undefined,
+      );
     } catch (error) {
       this.handleError(error, `Historical fetch failed for ${symbol}`);
       throw error;

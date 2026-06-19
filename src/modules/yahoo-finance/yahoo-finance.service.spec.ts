@@ -4,6 +4,7 @@ const mockYahooInstance = {
   quote: jest.fn(),
   quoteSummary: jest.fn(),
   historical: jest.fn(),
+  chart: jest.fn(),
   search: jest.fn(),
   _env: { suppressNotices: [] },
 };
@@ -70,21 +71,66 @@ describe('YahooFinanceService', () => {
   });
 
   describe('getHistorical', () => {
-    it('should return historical data on success', async () => {
-      const mockResult = [{ date: new Date(), close: 150 }];
-      (mockYahooInstance.historical as unknown as jest.Mock).mockResolvedValue(
-        mockResult,
-      );
+    it('should return the chart quotes array on success', async () => {
+      // Backed by chart() (not the deprecated, all-or-nothing historical()).
+      const quotes = [
+        { date: new Date('2024-01-01'), close: 150 },
+        { date: new Date('2024-01-02'), close: 151 },
+      ];
+      (mockYahooInstance.chart as unknown as jest.Mock).mockResolvedValue({
+        meta: { symbol: 'AAPL' },
+        quotes,
+      });
 
       const from = new Date('2024-01-01');
       const to = new Date('2024-01-02');
       const result = await service.getHistorical('AAPL', from, to);
-      expect(result).toEqual(mockResult);
-      expect(mockYahooInstance.historical).toHaveBeenCalledWith('AAPL', {
+      expect(result).toEqual(quotes);
+      expect(mockYahooInstance.chart).toHaveBeenCalledWith('AAPL', {
         period1: from,
         period2: to,
         interval: '1d',
       });
+    });
+
+    it('drops incomplete (null-close) bars instead of throwing', async () => {
+      // Yahoo routinely returns an unfinalized current-day bar with a null
+      // close. The deprecated historical() threw the whole result away on such
+      // partial rows, killing the daily-candle sync. chart() + a central filter
+      // keeps the good bars and silently discards the in-progress one.
+      (mockYahooInstance.chart as unknown as jest.Mock).mockResolvedValue({
+        quotes: [
+          { date: new Date('2024-01-01'), close: 150 },
+          { date: new Date('2024-01-02'), close: null, adjclose: null },
+          { date: new Date('2024-01-03'), close: undefined },
+        ],
+      });
+
+      const result = await service.getHistorical(
+        'CPRI',
+        new Date('2024-01-01'),
+      );
+
+      expect(result).toEqual([{ date: new Date('2024-01-01'), close: 150 }]);
+    });
+
+    it('returns an empty array when chart yields no quotes', async () => {
+      (mockYahooInstance.chart as unknown as jest.Mock).mockResolvedValue({
+        meta: { symbol: 'AAPL' },
+      });
+
+      const result = await service.getHistorical('AAPL', new Date());
+      expect(result).toEqual([]);
+    });
+
+    it('throws when the chart fetch fails', async () => {
+      (mockYahooInstance.chart as unknown as jest.Mock).mockRejectedValue(
+        new Error('Network down'),
+      );
+
+      await expect(
+        service.getHistorical('AAPL', new Date()),
+      ).rejects.toThrow('Network down');
     });
   });
 
