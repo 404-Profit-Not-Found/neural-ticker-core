@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { analysisStore } from '../../store/analysisStore';
+import { MODEL_OPTIONS } from '../ticker/model-options';
 
 interface PortfolioAiAnalyzerProps {
   open: boolean;
@@ -35,17 +36,22 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
   const [riskAppetite, setRiskAppetite] = useState('medium');
   const [horizon, setHorizon] = useState('medium-term');
   const [goal, setGoal] = useState('growth');
-  const [model, setModel] = useState('gemini-2.5-flash-lite');
+  const [model, setModel] = useState(MODEL_OPTIONS[0].key);
   const [analysis, setAnalysis] = useState('');
   const [history, setHistory] = useState<HistoricalAnalysis[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const credits = user?.credits_balance || 0;
 
-  const getModelCost = (m: string) => {
-    if (m.includes('pro') || m === 'gpt-5.1') return 5;
-    if (m.includes('flash-preview') || m === 'gemini-3-flash-preview') return 2;
-    return 1;
+  // Mirror the backend's authoritative pricing (CreditService.getModelCost) so
+  // the displayed cost and the affordability gate always match what is charged.
+  const getModelCost = (model?: string) => {
+    if (!model) return 1;
+    const m = model.toLowerCase();
+    if (m.includes('pro') || m.includes('gpt-5')) return 5;
+    if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash' || m === 'gemini-3.5-flash') return 2;
+    if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite')) return 1;
+    return 5;
   };
 
   const selectedCost = getModelCost(model);
@@ -240,132 +246,45 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
                   Select AI Model
                 </div>
                 <RadioGroup value={model} onValueChange={setModel} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Gemini 2.5 Flash Lite */}
-                  <Label className={cn(
-                    "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-2.5-flash-lite' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
-                  )}>
-                    <RadioGroupItem value="gemini-2.5-flash-lite" className="sr-only" />
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-bold tracking-tight">Gemini 2.5 Flash Lite</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">Ultra-fast for quick, concise summaries.</span>
-                      </div>
-                      {model === 'gemini-2.5-flash-lite' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                        <Zap size={8} /> ≈3s
-                      </Badge>
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
-                        ⚡ 1 Credit
-                      </Badge>
-                    </div>
-                  </Label>
-
-                  {/* Gemini 3 Flash */}
-                  <Label className={cn(
-                    "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-3-flash-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
-                  )}>
-                    <RadioGroupItem value="gemini-3-flash-preview" className="sr-only" />
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-bold tracking-tight">Gemini 3 Flash</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">Next-gen intelligence for regular updates.</span>
-                      </div>
-                      {model === 'gemini-3-flash-preview' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                        <Zap size={8} /> ≈6s
-                      </Badge>
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
-                        ⚡ 2 Credits
-                      </Badge>
-                    </div>
-                  </Label>
-
-                  {/* GPT-4.1 Mini
-                  <Label className={cn(
-                    "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gpt-4.1-mini' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
-                  )}>
-                    <RadioGroupItem value="gpt-4.1-mini" className="sr-only" />
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-bold tracking-tight">GPT-4.1 Mini</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">Balanced speed vs. thoroughness.</span>
-                      </div>
-                      {model === 'gpt-4.1-mini' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                        <Zap size={8} /> ≈11s
-                      </Badge>
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
-                        ⚡ 1 Credit
-                      </Badge>
-                    </div>
-                  </Label>
-                  */}
-
-                  {/* Gemini 3 Pro */}
-                  <Label className={cn(
-                    "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gemini-3-pro-preview' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
-                  )}>
-                    <RadioGroupItem value="gemini-3-pro-preview" className="sr-only" />
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold tracking-tight">Gemini 3 Pro</span>
-                          <Badge variant="default" className="h-4 px-1 text-[9px] bg-purple-600 hover:bg-purple-700 border-purple-500/50 text-white shadow-purple-500/20">
-                            PRO
+                  {/* Driven by the shared MODEL_OPTIONS so this list stays in sync
+                      with the research "Start AI Analysis" dialog. */}
+                  {MODEL_OPTIONS.map((m) => {
+                    const cost = getModelCost(m.key);
+                    const isSelected = model === m.key;
+                    return (
+                      <Label
+                        key={m.key}
+                        className={cn(
+                          "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
+                          isSelected && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
+                        )}
+                      >
+                        <RadioGroupItem value={m.key} className="sr-only" />
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold tracking-tight">{m.label}</span>
+                              {m.quality === 'deep' && (
+                                <Badge variant="default" className="h-4 px-1 text-[9px] bg-purple-600 hover:bg-purple-700 border-purple-500/50 text-white shadow-purple-500/20">
+                                  PRO
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground leading-tight">{m.description}</span>
+                          </div>
+                          {isSelected && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
+                            <Zap size={8} /> {m.speed}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
+                            ⚡ {cost} Credit{cost > 1 ? 's' : ''}
                           </Badge>
                         </div>
-                        <span className="text-[10px] text-muted-foreground leading-tight">Optimal for complex reasoning tasks.</span>
-                      </div>
-                      {model === 'gemini-3-pro-preview' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                        <Zap size={8} /> ≈18s
-                      </Badge>
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
-                        ⚡ 5 Credits
-                      </Badge>
-                    </div>
-                  </Label>
-
-                  {/* GPT-5.1 PRO
-                  <Label className={cn(
-                    "group relative flex flex-col gap-2 rounded-xl border-2 border-border p-4 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all",
-                    model === 'gpt-5.1' && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]"
-                  )}>
-                    <RadioGroupItem value="gpt-5.1" className="sr-only" />
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold tracking-tight">GPT-5.1</span>
-                          <Badge variant="default" className="h-4 px-1 text-[9px] bg-purple-600 hover:bg-purple-700 border-purple-500/50 text-white shadow-purple-500/20">
-                            PRO
-                          </Badge>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground leading-tight">OpenAI flagship for detailed thesis.</span>
-                      </div>
-                      {model === 'gpt-5.1' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal">
-                        <Zap size={8} /> ≈18s
-                      </Badge>
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1 gap-0.5 font-normal text-amber-500 bg-amber-500/10 border-amber-500/20">
-                        ⚡ 5 Credits
-                      </Badge>
-                    </div>
-                  </Label>
-                  */}
+                      </Label>
+                    );
+                  })}
                 </RadioGroup>
               </div>
             </div>

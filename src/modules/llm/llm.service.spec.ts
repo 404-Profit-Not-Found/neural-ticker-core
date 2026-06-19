@@ -37,7 +37,12 @@ describe('LlmService', () => {
   });
 
   describe('generateResearch', () => {
-    const basePrompt = { question: 'Test?', quality: 'medium' as QualityTier };
+    const basePrompt = {
+      question: 'Test?',
+      tickers: [] as string[],
+      numericContext: {},
+      quality: 'medium' as QualityTier,
+    };
 
     it('should route to OpenAI if provider specified', async () => {
       const prompt = { ...basePrompt, provider: 'openai' as const };
@@ -68,7 +73,12 @@ describe('LlmService', () => {
     });
 
     it('should route to OpenAI by default', async () => {
-      const prompt = { question: 'q', quality: 'medium' as QualityTier };
+      const prompt = {
+        question: 'q',
+        tickers: [] as string[],
+        numericContext: {},
+        quality: 'medium' as QualityTier,
+      };
       openAiGenerate.mockResolvedValue({
         answerMarkdown: 'openai',
         models: ['gpt-4'],
@@ -102,9 +112,9 @@ describe('LlmService', () => {
       expect(result.models).toContain('gemini-2.5-flash');
       expect(result.answerMarkdown).toContain('OpenAI');
       expect(result.answerMarkdown).toContain('Gemini');
-      // Note: Implementation only adds OpenAI tokens currently
-      expect(result.tokensIn).toBe(100);
-      expect(result.tokensOut).toBe(50);
+      // Ensemble sums token usage across both providers.
+      expect(result.tokensIn).toBe(180); // 100 (OpenAI) + 80 (Gemini)
+      expect(result.tokensOut).toBe(90); // 50 (OpenAI) + 40 (Gemini)
     });
 
     it('should handle ensemble mode when one provider fails', async () => {

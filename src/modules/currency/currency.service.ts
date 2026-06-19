@@ -28,16 +28,22 @@ export class CurrencyService implements OnModuleInit {
     await this.refreshRates();
   }
 
-  async getRate(from: string, to: string): Promise<number> {
+  /**
+   * Returns the conversion rate from->to, or `null` when rates are genuinely
+   * unavailable (no FX data, or a missing currency). Callers MUST handle null
+   * and surface "conversion unavailable" rather than silently using 1.0, which
+   * would corrupt foreign-currency values.
+   */
+  async getRate(from: string, to: string): Promise<number | null> {
     if (from === to) return 1;
 
     // Ensure we have rates
     const rates = await this.getRates();
     if (!rates) {
       this.logger.error(
-        `CRITICAL: No exchange rates available. Returning 1.0 for ${from}/${to} - VALUES WILL BE INCORRECT.`,
+        `No exchange rates available for ${from}/${to}. Returning null (conversion unavailable).`,
       );
-      return 1;
+      return null;
     }
 
     // Rates are relative to USD (Base)
@@ -46,16 +52,21 @@ export class CurrencyService implements OnModuleInit {
 
     if (!fromRate || !toRate) {
       this.logger.warn(
-        `Missing rate for ${from} or ${to} (Base: ${rates.base}). Defaulting to 1.`,
+        `Missing rate for ${from} or ${to} (Base: ${rates.base}). Returning null (conversion unavailable).`,
       );
-      return 1;
+      return null;
     }
 
     return toRate / fromRate;
   }
 
-  async convert(amount: number, from: string, to: string): Promise<number> {
+  async convert(
+    amount: number,
+    from: string,
+    to: string,
+  ): Promise<number | null> {
     const rate = await this.getRate(from, to);
+    if (rate === null) return null;
     return amount * rate;
   }
 

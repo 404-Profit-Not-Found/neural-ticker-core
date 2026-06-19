@@ -48,6 +48,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
+    // SECURITY: Block banned users on EVERY request, not just at login.
+    // A still-valid JWT must not outlive a 'revoked' (banned) role, otherwise a
+    // banned user keeps full access until their token naturally expires.
+    if (user.role === 'revoked') {
+      throw new UnauthorizedException('Account access has been revoked');
+    }
     return user;
   }
 }

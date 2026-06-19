@@ -129,7 +129,7 @@ export function TickerDetail() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
     const queryClient = useQueryClient();
-    const { displayCurrency, convert, formatCurrency: ctxFormatCurrency } = useCurrency();
+    const { formatNative } = useCurrency();
 
     // Validate tab or default to overview
     const validTabs = ['overview', 'financials', 'research', 'social'] as const;
@@ -325,11 +325,9 @@ export function TickerDetail() {
                 const isPriceUp = market_data?.change_percent >= 0;
 
                 const nativeCurrency = profile?.currency || 'USD';
-                const formatCurrency = (val: number, currencyCode?: string) => {
-                    const from = currencyCode || nativeCurrency;
-                    const converted = convert(val, from);
-                    return ctxFormatCurrency(converted, displayCurrency);
-                };
+                // Native-only render — no conversion. Show the currency the stock trades in.
+                const formatCurrency = (val: number, currencyCode?: string) =>
+                    formatNative(val, currencyCode || nativeCurrency);
 
                 return (
 
@@ -517,6 +515,7 @@ export function TickerDetail() {
                                                     current={market_data.price}
                                                     showLabels={true}
                                                     className="w-full"
+                                                    currency={nativeCurrency}
                                                 />
                                             </div>
                                         )}
@@ -659,6 +658,7 @@ export function TickerDetail() {
                                             high={fundamentals.fifty_two_week_high || 0}
                                             current={market_data.price}
                                             showLabels={true}
+                                            currency={nativeCurrency}
                                         />
                                     </div>
                                 )}

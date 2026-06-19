@@ -16,12 +16,23 @@ import * as webpush from 'web-push';
 describe('WebPushService', () => {
   let service: WebPushService;
 
+  // subscribe() is an atomic upsert built via the query builder:
+  //   createQueryBuilder().insert().into().values().orUpdate().execute()
+  const mockInsertQb = {
+    insert: jest.fn().mockReturnThis(),
+    into: jest.fn().mockReturnThis(),
+    values: jest.fn().mockReturnThis(),
+    orUpdate: jest.fn().mockReturnThis(),
+    execute: jest.fn().mockResolvedValue({}),
+  };
+
   const mockSubRepo = {
     findOne: jest.fn(),
     find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockInsertQb),
   };
 
   const mockUsersService = {
@@ -101,15 +112,13 @@ describe('WebPushService', () => {
       });
     });
 
-    it('should create a new subscription when none exists', async () => {
-      mockSubRepo.findOne.mockResolvedValue(null);
-      const newSub = {
+    it('upserts and returns the stored subscription when none exists', async () => {
+      const saved = {
         id: '1',
         user_id: 'user1',
         endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
       };
-      mockSubRepo.create.mockReturnValue(newSub);
-      mockSubRepo.save.mockResolvedValue(newSub);
+      mockSubRepo.findOne.mockResolvedValue(saved);
 
       const result = await service.subscribe(
         'user1',
@@ -120,14 +129,19 @@ describe('WebPushService', () => {
         'Mozilla/5.0',
       );
 
-      expect(mockSubRepo.create).toHaveBeenCalledWith({
+      expect(mockInsertQb.values).toHaveBeenCalledWith({
         user_id: 'user1',
         endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         p256dh: 'p256',
         auth: 'auth',
         user_agent: 'Mozilla/5.0',
       });
-      expect(result).toEqual(newSub);
+      expect(mockInsertQb.orUpdate).toHaveBeenCalled();
+      expect(mockInsertQb.execute).toHaveBeenCalled();
+      expect(mockSubRepo.findOne).toHaveBeenCalledWith({
+        where: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc123' },
+      });
+      expect(result).toEqual(saved);
     });
 
     it('rejects a subscription with a non-push-service endpoint (SSRF guard)', async () => {
@@ -144,21 +158,16 @@ describe('WebPushService', () => {
       expect(mockSubRepo.create).not.toHaveBeenCalled();
     });
 
-    it('should update an existing subscription', async () => {
-      const existing = {
+    it('upserts an existing endpoint to the new user and keys', async () => {
+      const upserted = {
         id: '1',
-        user_id: 'old-user',
-        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
-        p256dh: 'old-p256',
-        auth: 'old-auth',
-        user_agent: 'OldBrowser',
-      };
-      mockSubRepo.findOne.mockResolvedValue(existing);
-      mockSubRepo.save.mockResolvedValue({
-        ...existing,
         user_id: 'user1',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         p256dh: 'new-p256',
-      });
+        auth: 'new-auth',
+        user_agent: 'NewBrowser',
+      };
+      mockSubRepo.findOne.mockResolvedValue(upserted);
 
       const result = await service.subscribe(
         'user1',
@@ -170,36 +179,36 @@ describe('WebPushService', () => {
       );
 
       expect(mockSubRepo.create).not.toHaveBeenCalled();
-      expect(mockSubRepo.save).toHaveBeenCalledWith(
+      expect(mockInsertQb.values).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: 'user1',
           p256dh: 'new-p256',
+          auth: 'new-auth',
           user_agent: 'NewBrowser',
         }),
+      );
+      // Conflict on the unique endpoint re-binds user/keys/user_agent.
+      expect(mockInsertQb.orUpdate).toHaveBeenCalledWith(
+        ['user_id', 'p256dh', 'auth', 'user_agent'],
+        ['endpoint'],
       );
       expect(result.user_id).toBe('user1');
     });
 
-    it('should keep existing user_agent when none provided on update', async () => {
-      const existing = {
+    it('passes undefined user_agent when none is provided', async () => {
+      mockSubRepo.findOne.mockResolvedValue({
         id: '1',
         user_id: 'user1',
         endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
-        p256dh: 'p256',
-        auth: 'auth',
-        user_agent: 'OriginalBrowser',
-      };
-      mockSubRepo.findOne.mockResolvedValue(existing);
-      mockSubRepo.save.mockResolvedValue(existing);
+      });
 
       await service.subscribe('user1', {
         endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
         keys: { p256dh: 'p256', auth: 'auth' },
       });
 
-      expect(mockSubRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ user_agent: 'OriginalBrowser' }),
-      );
+      const valuesArg = mockInsertQb.values.mock.calls[0][0];
+      expect(valuesArg.user_agent).toBeUndefined();
     });
   });
 

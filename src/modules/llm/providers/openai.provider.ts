@@ -55,8 +55,8 @@ export class OpenAiProvider implements ILlmProvider {
         provider: 'openai',
         models: [tieredModel],
         answerMarkdown: choice.message?.content || '',
-        tokensIn: response.usage?.prompt_tokens,
-        tokensOut: response.usage?.completion_tokens,
+        tokensIn: response.usage?.prompt_tokens ?? 0,
+        tokensOut: response.usage?.completion_tokens ?? 0,
       };
     } catch (err) {
       if (err instanceof OpenAI.APIError) {

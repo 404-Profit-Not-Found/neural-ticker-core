@@ -15,6 +15,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TickersService } from './tickers.service';
+import { inferCurrencyFromExchange } from './utils/exchange-currency.util';
 import { MarketDataService } from '../market-data/market-data.service';
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { ResearchService } from '../research/research.service';
@@ -60,6 +61,19 @@ export class TickerDetailController {
     const { ticker, latestPrice, fundamentals } = snapshot;
     const safeFundamentals = fundamentals || ({} as Partial<Fundamentals>);
 
+    // Resolve the native trading currency for the detail page. Trust a real
+    // stored non-USD value; otherwise (NULL/empty/'USD' default) fall back to
+    // exchange/suffix inference so a foreign ticker like EKT.DE renders in EUR
+    // even if its row was created before currency inference existed and still
+    // carries a stale 'USD'. inferCurrencyFromExchange returns 'USD'/null for
+    // genuine US symbols, so this never mislabels a real US stock.
+    const nativeCurrency =
+      ticker.currency && ticker.currency !== 'USD'
+        ? ticker.currency
+        : inferCurrencyFromExchange(ticker.exchange, ticker.symbol) ||
+          ticker.currency ||
+          'USD';
+
     // 2. Parallel Fetching for Risk, Research, and History
     const [riskAnalysis, researchNote, priceHistory, analystRatings] =
       await Promise.all([
@@ -83,6 +97,10 @@ export class TickerDetailController {
         symbol: ticker.symbol,
         name: ticker.name,
         exchange: ticker.exchange,
+        // Native trading currency — REQUIRED by the detail page so EUR/GBP/etc.
+        // stocks don't fall back to a '$' display. Was previously omitted, which
+        // made every non-USD ticker render in dollars.
+        currency: nativeCurrency,
         logo_url: ticker.logo_url,
         industry: ticker.industry,
         sector: ticker.sector,
@@ -91,11 +109,12 @@ export class TickerDetailController {
       },
       market_data: {
         price: latestPrice?.close || 0,
-        change_percent: latestPrice
-          ? ((latestPrice.close - latestPrice.prevClose) /
-              latestPrice.prevClose) *
-            100
-          : 0,
+        change_percent:
+          latestPrice && latestPrice.prevClose
+            ? ((latestPrice.close - latestPrice.prevClose) /
+                latestPrice.prevClose) *
+              100
+            : 0,
         volume: latestPrice?.volume || 0,
         updated_at: latestPrice?.ts || new Date(),
         history: priceHistory || [],

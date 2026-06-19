@@ -64,6 +64,8 @@ export class LlmService {
             `### Gemini (${geminiRes.value.models.join(', ')})\n${geminiRes.value.answerMarkdown}`,
           );
           models.push(...geminiRes.value.models);
+          tokensIn += geminiRes.value.tokensIn || 0;
+          tokensOut += geminiRes.value.tokensOut || 0;
         }
 
         if (answerParts.length === 0) {

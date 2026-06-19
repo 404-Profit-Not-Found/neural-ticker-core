@@ -57,8 +57,15 @@ vi.mock('../ticker/VerdictBadge', () => ({
   VerdictBadge: () => <div data-testid="verdict-badge">Badge</div>,
 }));
 
+// Capture the props the table passes to the range bar so we can assert the
+// marker is fed a NATIVE current price (not the display-converted one).
+const { rangeSpy } = vi.hoisted(() => ({ rangeSpy: vi.fn() }));
 vi.mock('../dashboard/FiftyTwoWeekRange', () => ({
-  FiftyTwoWeekRange: () => <div data-testid="range-bar">Range</div>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  FiftyTwoWeekRange: (props: any) => {
+    rangeSpy(props);
+    return <div data-testid="range-bar">Range</div>;
+  },
 }));
 
 vi.mock('../ui/Sparkline', () => ({
@@ -166,5 +173,78 @@ describe('PortfolioTable', () => {
       </BrowserRouter>
     );
     expect(screen.getByTestId('sparkline')).toBeInTheDocument();
+  });
+
+  it('feeds the 52wk marker the NATIVE quote close, not the display-converted price', () => {
+    // USD stock viewed with EUR display currency: low/high are native USD,
+    // but current_price has been backend-converted to EUR. The marker must be
+    // computed in native units so (150 - 100) / (200 - 100) = 50%, not the
+    // skewed 38% you'd get from the converted 138.
+    const eurDisplayUsdStock: Position = {
+      ...mockPositions[0],
+      fiftyTwoWeekLow: 100,
+      fiftyTwoWeekHigh: 200,
+      current_price: 138, // converted to EUR
+      quote: { c: 150 }, // native USD close
+    };
+
+    render(
+      <BrowserRouter>
+        <PortfolioTable positions={[eurDisplayUsdStock]} onDelete={mockOnDelete} loading={false} />
+      </BrowserRouter>
+    );
+
+    expect(rangeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ low: 100, high: 200, current: 150 }),
+    );
+  });
+
+  it('uses original_current_price (native) when the live quote is unavailable', () => {
+    // The real-world path: outside a fresh live quote the snapshot `quote` is
+    // null, so quote.c is undefined. A USD stock viewed in EUR still has its
+    // NATIVE price in original_current_price, while current_price is converted.
+    // The marker must use the native one so (2.72 - 2.56) / (7.73 - 2.56) ~= 3%
+    // rather than clamping to 0% from the sub-low converted 2.37.
+    const quoteNullConverted: Position = {
+      ...mockPositions[0],
+      fiftyTwoWeekLow: 2.56,
+      fiftyTwoWeekHigh: 7.73,
+      current_price: 2.37, // EUR-converted (below native low -> would clamp to 0%)
+      original_current_price: 2.72, // native USD close
+      original_currency: 'USD',
+      currency: 'EUR',
+      quote: undefined, // no live quote (null in the snapshot)
+    };
+
+    render(
+      <BrowserRouter>
+        <PortfolioTable positions={[quoteNullConverted]} onDelete={mockOnDelete} loading={false} />
+      </BrowserRouter>
+    );
+
+    expect(rangeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ low: 2.56, high: 7.73, current: 2.72 }),
+    );
+  });
+
+  it('falls back to current_price for the marker when neither quote nor native price exists', () => {
+    const noQuote: Position = {
+      ...mockPositions[0],
+      fiftyTwoWeekLow: 100,
+      fiftyTwoWeekHigh: 200,
+      current_price: 150,
+      original_current_price: undefined,
+      quote: undefined,
+    };
+
+    render(
+      <BrowserRouter>
+        <PortfolioTable positions={[noQuote]} onDelete={mockOnDelete} loading={false} />
+      </BrowserRouter>
+    );
+
+    expect(rangeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ current: 150 }),
+    );
   });
 });

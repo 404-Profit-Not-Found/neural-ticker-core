@@ -129,5 +129,5 @@ function createMockContext(opts: {
     switchToRpc: () => ({}) as any,
     switchToWs: () => ({}) as any,
     getType: () => 'http',
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }

@@ -134,6 +134,7 @@ describe('MarketDataService', () => {
     getQuote: jest.fn(),
     getHistorical: jest.fn(),
     getSummary: jest.fn(),
+    search: jest.fn(),
     fetchNewsFromYahoo: jest.fn().mockResolvedValue([]),
   };
   const mockPortfolioService = {
@@ -374,6 +375,52 @@ describe('MarketDataService', () => {
         expect.any(String),
         expect.any(String),
       );
+    });
+  });
+
+  describe('fetchNewsFromYahoo (date normalization)', () => {
+    it('keeps a raw epoch-seconds providerPublishTime instead of shifting to 1970', async () => {
+      // With Yahoo search running unvalidated, providerPublishTime arrives as a
+      // raw epoch-seconds NUMBER (no Date coercion). The old
+      // new Date(seconds) misread it as millis and stamped every article 1970.
+      const publishedSeconds = 1_718_745_600; // 2024-06-18T20:00:00Z
+      mockYahooService.search.mockResolvedValue({
+        news: [
+          {
+            uuid: 'abc',
+            title: 'Energiekontor rises',
+            publisher: 'Reuters',
+            link: 'https://example.com/a',
+            providerPublishTime: publishedSeconds,
+            thumbnail: { resolutions: [{ url: 'https://img/a.png' }] },
+          },
+        ],
+      });
+
+      const [item] = await service.fetchNewsFromYahoo('EKT.DE');
+
+      expect(item.datetime).toBe(publishedSeconds);
+      // The downstream entity build does new Date(datetime * 1000) — must be 2024.
+      expect(new Date(item.datetime * 1000).getUTCFullYear()).toBe(2024);
+    });
+
+    it('still accepts a coerced Date (validation-on shape)', async () => {
+      const d = new Date('2024-06-18T20:00:00Z');
+      mockYahooService.search.mockResolvedValue({
+        news: [{ uuid: 'x', title: 't', providerPublishTime: d }],
+      });
+
+      const [item] = await service.fetchNewsFromYahoo('EKT.DE');
+
+      expect(item.datetime).toBe(Math.floor(d.getTime() / 1000));
+    });
+
+    it('returns an empty list when Yahoo yields no news', async () => {
+      mockYahooService.search.mockResolvedValue({});
+
+      const result = await service.fetchNewsFromYahoo('EKT.DE');
+
+      expect(result).toEqual([]);
     });
   });
 

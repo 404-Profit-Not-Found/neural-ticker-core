@@ -90,28 +90,33 @@ export class WebPushService {
   ): Promise<PushSubscriptionEntity> {
     this.assertValidEndpoint(subscription.endpoint);
 
-    // Upsert by endpoint to prevent duplicates
-    const existing = await this.subRepo.findOne({
-      where: { endpoint: subscription.endpoint },
-    });
-
-    if (existing) {
-      existing.user_id = userId;
-      existing.p256dh = subscription.keys.p256dh;
-      existing.auth = subscription.keys.auth;
-      existing.user_agent = userAgent || existing.user_agent;
-      return this.subRepo.save(existing);
-    }
-
-    return this.subRepo.save(
-      this.subRepo.create({
+    // Atomic upsert keyed on the unique `endpoint`. The previous find-then-save
+    // pattern raced under concurrent registrations: two callers could both read
+    // "not found" and then both INSERT, with the second crashing on the unique
+    // constraint. ON CONFLICT (endpoint) DO UPDATE collapses that into one
+    // statement and re-binds the endpoint to the current user/keys.
+    await this.subRepo
+      .createQueryBuilder()
+      .insert()
+      .into(PushSubscriptionEntity)
+      .values({
         user_id: userId,
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
-        user_agent: userAgent,
-      }),
-    );
+        user_agent: userAgent ?? undefined,
+      })
+      .orUpdate(
+        ['user_id', 'p256dh', 'auth', 'user_agent'],
+        ['endpoint'],
+      )
+      .execute();
+
+    const saved = await this.subRepo.findOne({
+      where: { endpoint: subscription.endpoint },
+    });
+    // Should always be present immediately after a successful upsert.
+    return saved as PushSubscriptionEntity;
   }
 
   /**

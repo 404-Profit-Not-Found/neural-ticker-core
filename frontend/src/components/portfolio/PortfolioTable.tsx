@@ -40,6 +40,16 @@ export interface Position {
     fiftyTwoWeekHigh?: number;
     fiftyTwoWeekLow?: number;
 
+    // Native real-time quote merged from the market snapshot (PortfolioPage).
+    // `c` is the latest close in the stock's NATIVE currency (unconverted),
+    // unlike `current_price` which the backend converts to displayCurrency.
+    quote?: {
+        c?: number;
+        d?: number;
+        dp?: number;
+        [key: string]: unknown;
+    };
+
     // Enriched Backend Data
     ticker?: {
         logo_url?: string;
@@ -200,11 +210,14 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                 // buy_price is stored native; if backend converted the row, native lives in
                 // original_currency. Convert to displayCurrency so Avg matches the rest of the row.
                 const nativeCurrency = row.original_currency || row.currency || 'USD';
-                const nativeBuyPrice = Number(
-                    row.original_current_price
-                        ? Number(row.original_cost_basis) / Number(row.shares)
-                        : row.buy_price,
-                );
+                const shares = Number(row.shares);
+                const rawBuyPrice =
+                    row.original_current_price && shares > 0
+                        ? Number(row.original_cost_basis) / shares
+                        : Number(row.buy_price);
+                // Guard against NaN/Infinity (missing cost basis, zero shares) so
+                // the cell never renders "$NaN".
+                const nativeBuyPrice = Number.isFinite(rawBuyPrice) ? rawBuyPrice : 0;
 
                 return (
                     <div className="hidden md:flex flex-col min-w-[80px]">
@@ -270,9 +283,20 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                         <FiftyTwoWeekRange
                             low={row.fiftyTwoWeekLow}
                             high={row.fiftyTwoWeekHigh}
-                            current={row.current_price}
+                            // low/high are NATIVE (from snapshot fundamentals) and the
+                            // labels render in native currency, so the marker must be
+                            // computed in native units too. `current_price` is backend-
+                            // converted to displayCurrency in non-NATIVE mode, which would
+                            // skew the dot. Prefer the live native quote close (`quote.c`),
+                            // but it is null outside a fresh live quote, so fall back to
+                            // `original_current_price` — the backend's NATIVE current price,
+                            // present exactly when the row was converted. Only when neither
+                            // exists (NATIVE mode / no conversion) is `current_price` itself
+                            // already native and safe to use.
+                            current={row.quote?.c ?? row.original_current_price ?? row.current_price}
                             showLabels={true} // Small labels
                             className="scale-90 origin-left"
+                            currency={row.original_currency || row.currency || 'USD'}
                         />
                     </div>
                 );

@@ -286,8 +286,30 @@ export class UsersService {
     };
   }
 
+  // Preference keys whose VALUES are secrets and must never be returned to a
+  // client (own profile or admin listing). The presence of a key is still
+  // surfaced as `<key>_set: true` so the UI can show "configured" state.
+  private static readonly SENSITIVE_PREF_PATTERN =
+    /(api_key|secret|token|password)/i;
+
+  private redactPreferences<T extends { preferences?: Record<string, any> }>(
+    user: T,
+  ): T {
+    if (!user || !user.preferences) return user;
+    const safe: Record<string, any> = {};
+    for (const [key, value] of Object.entries(user.preferences)) {
+      if (UsersService.SENSITIVE_PREF_PATTERN.test(key)) {
+        if (value != null && value !== '') safe[`${key}_set`] = true;
+      } else {
+        safe[key] = value;
+      }
+    }
+    user.preferences = safe;
+    return user;
+  }
+
   async getProfile(id: string): Promise<User | null> {
-    return this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: { id },
       relations: ['credit_transactions'],
       order: {
@@ -296,6 +318,7 @@ export class UsersService {
         },
       },
     });
+    return user ? this.redactPreferences(user) : null;
   }
 
   async approveUser(id: string): Promise<User> {
@@ -371,7 +394,9 @@ export class UsersService {
   }
 
   async findAll(): Promise<User[]> {
-    return this.userRepo.find();
+    const users = await this.userRepo.find();
+    // Even admins should not receive other users' raw API keys.
+    return users.map((u) => this.redactPreferences(u));
   }
 
   /**

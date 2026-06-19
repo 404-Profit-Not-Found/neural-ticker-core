@@ -102,6 +102,18 @@ export class YahooFinanceService implements OnModuleInit {
 
   /**
    * Fetches historical OHLCV data.
+   *
+   * Backed by yahoo-finance2's chart() rather than the deprecated historical().
+   * historical() runs strict schema validation and THROWS the whole result if a
+   * single row has null values — which happens routinely when Yahoo returns an
+   * unfinalized current-day bar (null close/adjclose). That one in-progress
+   * candle was killing the entire daily-candle sync for foreign tickers
+   * (CPRI/ETOR etc.). chart() returns the same row shape under `.quotes` without
+   * that all-or-nothing throw.
+   *
+   * Always resolves to a plain array of OHLCV rows (date/open/high/low/close/
+   * volume) — the contract every caller relies on — with incomplete (null-close)
+   * bars dropped so they can't poison downstream candle upserts.
    */
   async getHistorical(
     symbol: string,
@@ -113,11 +125,15 @@ export class YahooFinanceService implements OnModuleInit {
       this.logger.debug(
         `Fetching historical data for ${symbol} from Yahoo Finance`,
       );
-      return await this.yahoo.historical(symbol, {
+      const result = await this.yahoo.chart(symbol, {
         period1: from,
         period2: to,
         interval,
       });
+      const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
+      return quotes.filter(
+        (q: any) => q && q.close !== null && q.close !== undefined,
+      );
     } catch (error) {
       this.handleError(error, `Historical fetch failed for ${symbol}`);
       throw error;
@@ -158,11 +174,24 @@ export class YahooFinanceService implements OnModuleInit {
 
   /**
    * Searches for symbols or news related to a query.
+   *
+   * Runs with `validateResult: false` so Yahoo's raw payload is returned
+   * instead of throwing on schema drift. Yahoo keeps adding fields to the
+   * search response (screenerFieldResults, culturalAssets, …) that lag
+   * yahoo-finance2's strict schema; with validation on, search() THROWS and we
+   * lose the otherwise-fine `.news` array — which was flooding the logs with
+   * "Failed Yahoo Schema validation" on every cron refresh of foreign tickers.
+   * We only consume `.news` downstream, so unvalidated data is acceptable.
+   *
+   * Caveat: with validation off the library does NOT coerce dates, so
+   * `news[].providerPublishTime` comes back as a raw epoch-seconds number
+   * rather than a Date. Callers must normalize it (see
+   * MarketDataService.toEpochSeconds).
    */
   async search(query: string): Promise<any> {
     try {
       this.logger.debug(`Searching for "${query}" on Yahoo Finance`);
-      return await this.yahoo.search(query);
+      return await this.yahoo.search(query, {}, { validateResult: false });
     } catch (error) {
       this.handleError(error, `Search failed for "${query}"`);
       throw error;

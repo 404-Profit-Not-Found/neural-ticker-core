@@ -44,6 +44,7 @@ vi.mock('../hooks/useTicker', () => ({
   useTriggerResearch: vi.fn(),
   usePostComment: vi.fn(),
   useDeleteResearch: vi.fn(),
+  useDeleteComment: vi.fn(),
   useToggleCommentLike: vi.fn(),
   useMyCommentLikes: vi.fn(),
   tickerKeys: {
