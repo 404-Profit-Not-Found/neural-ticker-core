@@ -174,11 +174,24 @@ export class YahooFinanceService implements OnModuleInit {
 
   /**
    * Searches for symbols or news related to a query.
+   *
+   * Runs with `validateResult: false` so Yahoo's raw payload is returned
+   * instead of throwing on schema drift. Yahoo keeps adding fields to the
+   * search response (screenerFieldResults, culturalAssets, …) that lag
+   * yahoo-finance2's strict schema; with validation on, search() THROWS and we
+   * lose the otherwise-fine `.news` array — which was flooding the logs with
+   * "Failed Yahoo Schema validation" on every cron refresh of foreign tickers.
+   * We only consume `.news` downstream, so unvalidated data is acceptable.
+   *
+   * Caveat: with validation off the library does NOT coerce dates, so
+   * `news[].providerPublishTime` comes back as a raw epoch-seconds number
+   * rather than a Date. Callers must normalize it (see
+   * MarketDataService.toEpochSeconds).
    */
   async search(query: string): Promise<any> {
     try {
       this.logger.debug(`Searching for "${query}" on Yahoo Finance`);
-      return await this.yahoo.search(query);
+      return await this.yahoo.search(query, {}, { validateResult: false });
     } catch (error) {
       this.handleError(error, `Search failed for "${query}"`);
       throw error;
