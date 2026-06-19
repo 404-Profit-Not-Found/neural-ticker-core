@@ -143,7 +143,22 @@ describe('YahooFinanceService', () => {
 
       const result = await service.search('AAPL');
       expect(result).toEqual(mockResult);
-      expect(mockYahooInstance.search).toHaveBeenCalledWith('AAPL');
+    });
+
+    it('runs with validateResult:false so schema drift does not throw', async () => {
+      // Yahoo keeps adding fields the strict schema rejects; validation must be
+      // off or search() throws and we lose the news array entirely.
+      (mockYahooInstance.search as unknown as jest.Mock).mockResolvedValue({
+        news: [],
+      });
+
+      await service.search('EKT.DE');
+
+      expect(mockYahooInstance.search).toHaveBeenCalledWith(
+        'EKT.DE',
+        {},
+        { validateResult: false },
+      );
     });
   });
 });
