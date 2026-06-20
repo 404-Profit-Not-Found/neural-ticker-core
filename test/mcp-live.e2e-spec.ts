@@ -7,7 +7,10 @@ import request from 'supertest';
 // Force the real Postgres path: app.module.ts swaps to a sqlite test config
 // when NODE_ENV === 'test' (which jest sets by default), and sqlite can't
 // create the Postgres-only entity columns. Must run before AppModule init.
-process.env.NODE_ENV = process.env.NODE_ENV === 'test' ? 'development' : process.env.NODE_ENV || 'development';
+process.env.NODE_ENV =
+  process.env.NODE_ENV === 'test'
+    ? 'development'
+    : process.env.NODE_ENV || 'development';
 
 import { AppModule } from '../src/app.module';
 
@@ -70,7 +73,11 @@ run('MCP endpoint (LIVE AppModule e2e)', () => {
     const line = (res.text || '')
       .split('\n')
       .find((l: string) => l.startsWith('data:'));
-    return line ? JSON.parse(line.slice(5).trim()) : res.text ? JSON.parse(res.text) : {};
+    return line
+      ? JSON.parse(line.slice(5).trim())
+      : res.text
+        ? JSON.parse(res.text)
+        : {};
   }
 
   it('lists tools anonymously through the real global guards', async () => {

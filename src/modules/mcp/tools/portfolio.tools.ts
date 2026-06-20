@@ -42,7 +42,7 @@ export class PortfolioTools {
   @Tool({
     name: 'get_portfolio',
     description:
-      'Get the authenticated user\'s portfolio positions with current values. ' +
+      "Get the authenticated user's portfolio positions with current values. " +
       'Optionally convert displayed values to a chosen currency.',
     parameters: z.object({
       displayCurrency: currency
@@ -56,13 +56,15 @@ export class PortfolioTools {
     req: any,
   ) {
     const user = requireUser(req);
-    return toolJson(await this.portfolio.findAll(user.id, args.displayCurrency));
+    return toolJson(
+      await this.portfolio.findAll(user.id, args.displayCurrency),
+    );
   }
 
   @Tool({
     name: 'add_portfolio_position',
     description:
-      'Add a position to the authenticated user\'s portfolio (symbol, shares, ' +
+      "Add a position to the authenticated user's portfolio (symbol, shares, " +
       'buy price, buy date, optional currency).',
     parameters: z.object({
       symbol,
@@ -71,11 +73,7 @@ export class PortfolioTools {
         .number()
         .min(0.01)
         .describe('Average buy price per share (>= 0.01).'),
-      buy_date: z
-        .string()
-        .trim()
-        .min(1)
-        .describe('Purchase date, YYYY-MM-DD.'),
+      buy_date: z.string().trim().min(1).describe('Purchase date, YYYY-MM-DD.'),
       currency: currency
         .optional()
         .describe('Currency of the purchase. Auto-detected if omitted.'),
@@ -106,16 +104,12 @@ export class PortfolioTools {
   @Tool({
     name: 'remove_portfolio_position',
     description:
-      'Remove a position from the authenticated user\'s portfolio by id.',
+      "Remove a position from the authenticated user's portfolio by id.",
     parameters: z.object({
       id: z.string().trim().min(1).describe('The portfolio position id.'),
     }),
   })
-  async removePortfolioPosition(
-    args: { id: string },
-    _ctx: unknown,
-    req: any,
-  ) {
+  async removePortfolioPosition(args: { id: string }, _ctx: unknown, req: any) {
     const user = requireUser(req);
     await this.portfolio.remove(user.id, args.id);
     return toolJson({ removed: true, id: args.id });
@@ -124,7 +118,7 @@ export class PortfolioTools {
   @Tool({
     name: 'analyze_portfolio',
     description:
-      'Generate an AI analysis of the authenticated user\'s portfolio for a ' +
+      "Generate an AI analysis of the authenticated user's portfolio for a " +
       'given risk appetite, horizon and goal. Costs credits (deducted by the ' +
       'service). Returns a markdown analysis.',
     parameters: z.object({
@@ -174,7 +168,7 @@ export class PortfolioTools {
   @Tool({
     name: 'get_portfolio_recommendation',
     description:
-      'Get a quick, lightweight recommendation for the authenticated user\'s ' +
+      "Get a quick, lightweight recommendation for the authenticated user's " +
       'portfolio.',
     parameters: z.object({}),
   })
@@ -188,7 +182,7 @@ export class PortfolioTools {
   @Tool({
     name: 'get_watchlists',
     description:
-      'Get the authenticated user\'s watchlists, each with its ticker items.',
+      "Get the authenticated user's watchlists, each with its ticker items.",
     parameters: z.object({}),
   })
   async getWatchlists(_args: unknown, _ctx: unknown, req: any) {
@@ -214,8 +208,7 @@ export class PortfolioTools {
 
   @Tool({
     name: 'add_to_watchlist',
-    description:
-      'Add a ticker to one of the authenticated user\'s watchlists.',
+    description: "Add a ticker to one of the authenticated user's watchlists.",
     parameters: z.object({
       watchlistId: z
         .string()
@@ -249,7 +242,7 @@ export class PortfolioTools {
 
   @Tool({
     name: 'get_price_alerts',
-    description: 'Get the authenticated user\'s price alerts.',
+    description: "Get the authenticated user's price alerts.",
     parameters: z.object({}),
   })
   async getPriceAlerts(_args: unknown, _ctx: unknown, req: any) {
@@ -307,7 +300,7 @@ export class PortfolioTools {
 
   @Tool({
     name: 'delete_price_alert',
-    description: 'Delete one of the authenticated user\'s price alerts by id.',
+    description: "Delete one of the authenticated user's price alerts by id.",
     parameters: z.object({
       id: z.string().trim().min(1).describe('The price alert id.'),
     }),

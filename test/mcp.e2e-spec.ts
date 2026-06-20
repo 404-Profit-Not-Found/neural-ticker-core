@@ -64,70 +64,102 @@ class TestAuthGuard implements CanActivate {
 const deductCredits = jest.fn().mockResolvedValue({});
 
 const mockMarketData = {
-  getSnapshot: jest.fn(async (symbol: string) => ({ symbol, price: 123.45 })),
-  getSnapshots: jest.fn(async (symbols: string[]) =>
-    symbols.map((symbol) => ({ symbol, price: 1 })),
+  getSnapshot: jest.fn((symbol: string) =>
+    Promise.resolve({ symbol, price: 123.45 }),
   ),
-  getHistory: jest.fn(async (symbol: string, interval: string) => [
-    { symbol, interval, close: 1 },
-  ]),
-  getQuote: jest.fn(async (symbol: string) => ({ symbol, c: 99 })),
-  getCompanyNews: jest.fn(async (symbol: string) => [{ symbol, headline: 'x' }]),
-  getGeneralNews: jest.fn(async () => [{ headline: 'general' }]),
+  getSnapshots: jest.fn((symbols: string[]) =>
+    Promise.resolve(symbols.map((symbol) => ({ symbol, price: 1 }))),
+  ),
+  getHistory: jest.fn((symbol: string, interval: string) =>
+    Promise.resolve([{ symbol, interval, close: 1 }]),
+  ),
+  getQuote: jest.fn((symbol: string) => Promise.resolve({ symbol, c: 99 })),
+  getCompanyNews: jest.fn((symbol: string) =>
+    Promise.resolve([{ symbol, headline: 'x' }]),
+  ),
+  getGeneralNews: jest.fn(() => Promise.resolve([{ headline: 'general' }])),
 };
 const mockMarketStatus = {
-  getAllMarketsStatus: jest.fn(async () => ({ US: { isOpen: true } })),
+  getAllMarketsStatus: jest.fn(() => Promise.resolve({ US: { isOpen: true } })),
 };
 const mockTickers = {
-  searchTickers: jest.fn(async (q?: string) => [{ symbol: 'AAPL', q }]),
+  searchTickers: jest.fn((q?: string) =>
+    Promise.resolve([{ symbol: 'AAPL', q }]),
+  ),
 };
 const mockCurrency = {
   // Returns null for the sentinel target to exercise the "unavailable" path.
-  getRate: jest.fn(async (_from: string, to: string) =>
-    to === 'XXX' ? null : 0.9,
+  getRate: jest.fn((_from: string, to: string) =>
+    Promise.resolve(to === 'XXX' ? null : 0.9),
   ),
 };
 const mockRisk = {
-  getLatestScore: jest.fn(async (symbol: string) => ({ symbol, score: 7 })),
-  getScoreHistory: jest.fn(async (symbol: string) => [{ symbol, score: 7 }]),
+  getLatestScore: jest.fn((symbol: string) =>
+    Promise.resolve({ symbol, score: 7 }),
+  ),
+  getScoreHistory: jest.fn((symbol: string) =>
+    Promise.resolve([{ symbol, score: 7 }]),
+  ),
 };
 const mockResearch = {
-  createResearchTicket: jest.fn(async () => ({ id: '42', status: 'pending' })),
-  deleteResearchNote: jest.fn(async () => undefined),
-  processTicket: jest.fn(async () => undefined),
-  getResearchNote: jest.fn(async (id: string) => ({
-    id,
-    user_id: 'user-1',
-    status: 'completed',
-    answer_markdown: 'hi',
-  })),
-  findAll: jest.fn(async () => ({ data: [], total: 0, page: 1, limit: 10 })),
-  getNewsSummary: jest.fn(async (symbol: string) => ({ symbol, summary: 's' })),
+  createResearchTicket: jest.fn(() =>
+    Promise.resolve({ id: '42', status: 'pending' }),
+  ),
+  deleteResearchNote: jest.fn(() => Promise.resolve(undefined)),
+  processTicket: jest.fn(() => Promise.resolve(undefined)),
+  getResearchNote: jest.fn((id: string) =>
+    Promise.resolve({
+      id,
+      user_id: 'user-1',
+      status: 'completed',
+      answer_markdown: 'hi',
+    }),
+  ),
+  findAll: jest.fn(() =>
+    Promise.resolve({ data: [], total: 0, page: 1, limit: 10 }),
+  ),
+  getNewsSummary: jest.fn((symbol: string) =>
+    Promise.resolve({ symbol, summary: 's' }),
+  ),
 };
 const mockCredit = {
   getResearchCost: jest.fn(() => 5),
   deductCredits,
 };
 const mockPortfolio = {
-  findAll: jest.fn(async (userId: string) => [{ userId, symbol: 'AAPL' }]),
-  create: jest.fn(async (_userId: string, dto: any) => ({ id: 'p1', ...dto })),
-  remove: jest.fn(async () => undefined),
-  analyzePortfolio: jest.fn(async () => '# Analysis\nLooks good.'),
-  getQuickRecommendation: jest.fn(async () => ({ action: 'hold' })),
+  findAll: jest.fn((userId: string) =>
+    Promise.resolve([{ userId, symbol: 'AAPL' }]),
+  ),
+  create: jest.fn((_userId: string, dto: any) =>
+    Promise.resolve({ id: 'p1', ...dto }),
+  ),
+  remove: jest.fn(() => Promise.resolve(undefined)),
+  analyzePortfolio: jest.fn(() => Promise.resolve('# Analysis\nLooks good.')),
+  getQuickRecommendation: jest.fn(() => Promise.resolve({ action: 'hold' })),
 };
 const mockWatchlist = {
-  getUserWatchlists: jest.fn(async () => [{ id: '1', name: 'Default', items: [] }]),
-  createWatchlist: jest.fn(async (_userId: string, name: string) => ({
-    id: '2',
-    name,
-    items: [],
-  })),
-  addTickerToWatchlist: jest.fn(async () => ({ id: '9', ticker_id: 't1' })),
+  getUserWatchlists: jest.fn(() =>
+    Promise.resolve([{ id: '1', name: 'Default', items: [] }]),
+  ),
+  createWatchlist: jest.fn((_userId: string, name: string) =>
+    Promise.resolve({
+      id: '2',
+      name,
+      items: [],
+    }),
+  ),
+  addTickerToWatchlist: jest.fn(() =>
+    Promise.resolve({ id: '9', ticker_id: 't1' }),
+  ),
 };
 const mockPriceAlerts = {
-  findAllForUser: jest.fn(async () => [{ id: 'a1', symbol: 'AAPL' }]),
-  create: jest.fn(async (_userId: string, dto: any) => ({ id: 'a2', ...dto })),
-  deleteAlert: jest.fn(async () => undefined),
+  findAllForUser: jest.fn(() =>
+    Promise.resolve([{ id: 'a1', symbol: 'AAPL' }]),
+  ),
+  create: jest.fn((_userId: string, dto: any) =>
+    Promise.resolve({ id: 'a2', ...dto }),
+  ),
+  deleteAlert: jest.fn(() => Promise.resolve(undefined)),
 };
 
 @Module({
@@ -226,16 +258,19 @@ describe('MCP endpoint (e2e, mocked services)', () => {
       .send(body);
     if (res.body && Object.keys(res.body).length > 0) return res.body;
     const text: string = res.text || '';
-    const dataLine = text
-      .split('\n')
-      .find((l) => l.startsWith('data:'));
+    const dataLine = text.split('\n').find((l) => l.startsWith('data:'));
     if (dataLine) return JSON.parse(dataLine.slice(5).trim());
     return text ? JSON.parse(text) : {};
   }
 
   function call(name: string, args: any, headers?: Record<string, string>) {
     return rpc(
-      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name, arguments: args },
+      },
       headers,
     );
   }
@@ -263,7 +298,11 @@ describe('MCP endpoint (e2e, mocked services)', () => {
   });
 
   it('returns an error result when a currency rate is unavailable', async () => {
-    const res = await call('convert_currency', { amount: 10, from: 'usd', to: 'xxx' });
+    const res = await call('convert_currency', {
+      amount: 10,
+      from: 'usd',
+      to: 'xxx',
+    });
     expect(res.result?.isError).toBe(true);
     expect(res.result.content[0].text.toLowerCase()).toContain('unavailable');
   });

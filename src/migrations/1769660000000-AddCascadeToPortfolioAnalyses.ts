@@ -9,9 +9,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * we look it up from information_schema. The whole thing is guarded to be a
  * no-op when the table/column does not exist yet.
  */
-export class AddCascadeToPortfolioAnalyses1769660000000
-  implements MigrationInterface
-{
+export class AddCascadeToPortfolioAnalyses1769660000000 implements MigrationInterface {
   name = 'AddCascadeToPortfolioAnalyses1769660000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

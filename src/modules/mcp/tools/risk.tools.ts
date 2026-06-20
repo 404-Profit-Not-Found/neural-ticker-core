@@ -30,9 +30,7 @@ export class RiskTools {
   async getRiskScore(args: { symbol: string }) {
     const score = await this.riskReward.getLatestScore(args.symbol);
     if (!score) {
-      throw new Error(
-        `No risk analysis available for ${args.symbol}.`,
-      );
+      throw new Error(`No risk analysis available for ${args.symbol}.`);
     }
     return toolJson(score);
   }
