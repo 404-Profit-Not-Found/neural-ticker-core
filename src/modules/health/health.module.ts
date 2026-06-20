@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller';
-import { DatabaseModule } from '../../database/database.module';
 
+// HealthController injects the default TypeORM DataSource, which the root
+// TypeOrmModule.forRootAsync in AppModule provides globally (TypeORM's core
+// module is @Global). No DB module of its own — that previously opened a second,
+// duplicate default connection. The shared connection is the single source of truth.
 @Module({
-  imports: [DatabaseModule],
   controllers: [HealthController],
 })
 export class HealthModule {}
