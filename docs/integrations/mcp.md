@@ -65,6 +65,20 @@ immediately, even with an unexpired token).
 > Treat the token like a password. Prefer passing it via an environment variable in
 > client configs rather than hard-coding it.
 
+### Access levels
+
+The endpoint enforces **two** levels — there is **no** per-role (admin vs user) tool split:
+
+| Caller | Tools | Data scope |
+|---|---|---|
+| Anonymous | 11 public (market, risk, currency) | — |
+| Authenticated (`user` **or** `admin`) | + 15 user-scoped | **your own data only** — every call is scoped to your user id; you can never read or modify another user's portfolio, watchlist, alerts or research |
+
+Admins and regular users share the **same tool set**, and `tools/list` returns the
+same catalog for everyone. An `admin` differs in only two ways: they are **exempt
+from research credit charges**, and they may read **any** user's ticket via
+`get_research`. There are no admin-only tools.
+
 ---
 
 ## 3. Connecting a client
