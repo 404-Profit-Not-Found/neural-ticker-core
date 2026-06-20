@@ -17,7 +17,7 @@ start) and is reachable at a single endpoint.
 | **Method** | `POST` |
 | **Path** | `/api/mcp` |
 | **Local dev** | `http://localhost:<port>/api/mcp` — `<port>` is whatever your app logs at startup (commonly `3000` or `8080`) |
-| **Deployed** | `https://<your-neural-ticker-host>/api/mcp` |
+| **Deployed (production)** | `https://neuralticker.com/api/mcp` |
 | **Protocol** | JSON-RPC 2.0 over **Streamable HTTP** |
 | **Mode** | **Stateless** (no session affinity — works behind Cloud Run / load balancers) |
 
@@ -73,10 +73,10 @@ immediately, even with an unexpired token).
 
 ```bash
 # Anonymous (public tools only)
-claude mcp add --transport http neural-ticker https://<host>/api/mcp
+claude mcp add --transport http neural-ticker https://neuralticker.com/api/mcp
 
 # Authenticated (adds your user-scoped tools)
-claude mcp add --transport http neural-ticker https://<host>/api/mcp \
+claude mcp add --transport http neural-ticker https://neuralticker.com/api/mcp \
   --header "Authorization: Bearer <YOUR_APP_JWT>"
 ```
 
@@ -92,7 +92,7 @@ Edit `claude_desktop_config.json`:
       "command": "npx",
       "args": [
         "-y", "mcp-remote",
-        "https://<host>/api/mcp",
+        "https://neuralticker.com/api/mcp",
         "--header", "Authorization: Bearer ${NT_JWT}"
       ],
       "env": { "NT_JWT": "<YOUR_APP_JWT>" }
@@ -111,7 +111,7 @@ In `~/.cursor/mcp.json` (or the project `.cursor/mcp.json`):
 {
   "mcpServers": {
     "neural-ticker": {
-      "url": "https://<host>/api/mcp",
+      "url": "https://neuralticker.com/api/mcp",
       "headers": { "Authorization": "Bearer <YOUR_APP_JWT>" }
     }
   }
