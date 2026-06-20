@@ -14,7 +14,10 @@ export default () => {
         ''
       ).toString(),
       database: process.env.DB_DATABASE,
-      synchronize: process.env.DB_SYNCHRONIZE === 'true',
+      // NOTE: `synchronize` is intentionally NOT configured here. Schema changes
+      // go through migrations only; the root TypeOrmModule in app.module.ts is the
+      // single place that decides synchronize (opt-in via DB_SYNCHRONIZE, always
+      // forced off in production).
     },
     finnhub: {
       apiKey: process.env.FINNHUB_API_KEY,

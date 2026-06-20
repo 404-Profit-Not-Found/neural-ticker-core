@@ -33,6 +33,7 @@ import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.
 import { CurrencyModule } from './modules/currency/currency.module';
 import { PriceAlertsModule } from './modules/price-alerts/price-alerts.module';
 import { WebPushModule } from './modules/web-push/web-push.module';
+import { McpToolsModule } from './modules/mcp/mcp-tools.module';
 import configuration from './config/configuration';
 // ...
 
@@ -77,6 +78,19 @@ import configuration from './config/configuration';
           return testTypeOrmConfig;
         }
         const dbConfig = configService.get('database');
+        // Schema changes go through migrations ONLY (migrationsRun below).
+        // `synchronize` stays OFF by default and is opt-in via DB_SYNCHRONIZE=true
+        // for a deliberate one-off local sync — but is force-disabled whenever the
+        // app looks like production, so a stray env var can never auto-ALTER the
+        // live schema on boot. Note APP_ENV is 'production' in prod (not 'prod'),
+        // so we accept both spellings plus NODE_ENV.
+        const appEnv = configService.get<string>('env');
+        const isProduction =
+          appEnv === 'prod' ||
+          appEnv === 'production' ||
+          process.env.NODE_ENV === 'production';
+        const synchronize =
+          !isProduction && process.env.DB_SYNCHRONIZE === 'true';
         return {
           type: 'postgres',
           url: dbConfig.url,
@@ -87,7 +101,7 @@ import configuration from './config/configuration';
           ...(dbConfig.password ? { password: dbConfig.password } : {}),
           database: dbConfig.database || 'postgres',
           autoLoadEntities: true,
-          synchronize: dbConfig.synchronize,
+          synchronize,
           migrationsRun: true, // Always run migrations to ensure schema consistency
           migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
           connectTimeoutMS: 10000,
@@ -132,6 +146,7 @@ import configuration from './config/configuration';
     CurrencyModule,
     PriceAlertsModule,
     WebPushModule,
+    McpToolsModule,
   ],
   controllers: [],
   providers: [
