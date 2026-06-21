@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, Tooltip,
   ComposedChart, Area, CartesianGrid
 } from 'recharts';
-import { TrendingUp, TrendingDown, Bot, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bot, AlertTriangle, Wallet, History } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { format, subDays, differenceInDays, addDays, isBefore, startOfDay, parseISO, isValid } from 'date-fns';
@@ -38,6 +38,14 @@ interface PortfolioStatsProps {
   isNativeMode?: boolean;
   /** Count of rows the backend could not convert (FX rate missing). */
   conversionUnavailable?: number;
+  /** Total simulator cash, converted to displayCurrency (from /portfolio/summary). */
+  cashValue?: number;
+  /** Net worth = holdings + cash, in displayCurrency. Falls back to holdings. */
+  netWorth?: number;
+  /** Opens the deposit/withdraw cash dialog. */
+  onManageCash?: () => void;
+  /** Opens the trade-history dialog. */
+  onViewHistory?: () => void;
 }
 
 // Professional Palette - Carbon/Minimalist
@@ -113,6 +121,10 @@ export function PortfolioStats({
   displayCurrency: portfolioCurrency,
   isNativeMode = false,
   conversionUnavailable = 0,
+  cashValue,
+  netWorth,
+  onManageCash,
+  onViewHistory,
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
@@ -311,7 +323,31 @@ export function PortfolioStats({
           <h1 className="text-3xl font-bold tracking-tight text-foreground truncate">My Portfolio</h1>
           <p className="text-sm text-muted-foreground truncate hidden sm:block">Real-time cross-asset performance analytics</p>
         </div>
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {onViewHistory && (
+            <Button
+              onClick={onViewHistory}
+              variant="outline"
+              size="sm"
+              className="gap-2 h-9 text-xs"
+              title="View trade history"
+            >
+              <History size={14} />
+              <span className="hidden sm:inline">History</span>
+            </Button>
+          )}
+          {onManageCash && (
+            <Button
+              onClick={onManageCash}
+              variant="outline"
+              size="sm"
+              className="gap-2 h-9 text-xs"
+              title="Deposit or withdraw simulator cash"
+            >
+              <Wallet size={14} />
+              <span className="hidden sm:inline">Cash</span>
+            </Button>
+          )}
           <Button
             onClick={onAnalyze}
             disabled={credits <= 0}
@@ -325,7 +361,7 @@ export function PortfolioStats({
             title={credits <= 0 ? "Insufficient credits to analyze" : "Click to analyze portfolio with AI"}
           >
             <Bot size={14} className={cn(credits > 0 ? "text-white" : "text-muted-foreground")} />
-            AI Analyze
+            <span className="hidden sm:inline">AI Analyze</span>
           </Button>
         </div>
       </div>
@@ -345,11 +381,18 @@ export function PortfolioStats({
                     : undefined
                 }
               >
-                Total Net Worth
+                Net Worth
               </p>
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                {formatTotal(totalValue)}
+                {formatTotal(netWorth ?? totalValue)}
               </h2>
+              {!isNativeMode && cashValue !== undefined && (
+                <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+                  Holdings <span className="text-foreground/80 font-semibold">{formatCurrency(totalValue)}</span>
+                  <span className="mx-1.5 opacity-40">·</span>
+                  Cash <span className="text-foreground/80 font-semibold">{formatCurrency(cashValue)}</span>
+                </p>
+              )}
               {isNativeMode ? (
                 <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-muted/60 text-muted-foreground">
                   Switch from NATIVE to a single currency for totals
