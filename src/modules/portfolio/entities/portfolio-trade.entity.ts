@@ -83,7 +83,10 @@ export class PortfolioTrade {
   @Column({ length: 32, default: 'app' })
   source: string;
 
-  @Column({ name: 'external_id', length: 128, nullable: true })
+  // Explicit `type` is required: a `string | null` union reflects as `Object`,
+  // which TypeORM rejects at startup ("Data type Object not supported"). Matches
+  // the migration's varchar(128).
+  @Column({ type: 'varchar', name: 'external_id', length: 128, nullable: true })
   external_id: string | null;
 
   @Column({ type: 'text', nullable: true })
