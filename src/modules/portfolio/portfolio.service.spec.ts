@@ -3,6 +3,8 @@ import { PortfolioService } from './portfolio.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
+import { PortfolioTrade } from './entities/portfolio-trade.entity';
+import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
 import { MarketDataService } from '../market-data/market-data.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
@@ -35,11 +37,41 @@ const mockPositionRepo: any = {
   count: jest.fn().mockResolvedValue(0),
 };
 
-// create() serializes per-user inserts inside positionRepo.manager.transaction
-// (advisory lock + count-based quota check). The tx manager delegates back to
-// the same repo mock so create/save/count expectations are unchanged.
+// Cash balance repo. Default: a well-funded USD balance so strict buys pass.
+// Returns a fresh copy each call so the helper's in-place mutation of `amount`
+// doesn't leak between tests.
+const mockCashRow = {
+  id: 'cash-1',
+  user_id: 'user-1',
+  currency: 'USD',
+  amount: 100000,
+};
+const mockCashRepo: any = {
+  findOne: jest
+    .fn()
+    .mockImplementation(() => Promise.resolve({ ...mockCashRow })),
+  create: jest.fn((d: any) => ({ ...d })),
+  save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+  find: jest.fn().mockResolvedValue([{ ...mockCashRow }]),
+};
+
+// Append-only trade ledger repo. Echoes back what it's told to save.
+const mockTradeRepo: any = {
+  create: jest.fn((d: any) => ({ id: 'trade-1', ...d })),
+  save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+  findOne: jest.fn().mockResolvedValue(null),
+  find: jest.fn().mockResolvedValue([]),
+};
+
+// create()/sell()/etc. run inside positionRepo.manager.transaction (advisory
+// lock + count-based quota + cash read-modify-write). The tx manager hands back
+// the repo mock matching the requested entity.
 const mockPositionTxManager = {
-  getRepository: jest.fn(() => mockPositionRepo),
+  getRepository: jest.fn((entity: any) => {
+    if (entity === PortfolioCashBalance) return mockCashRepo;
+    if (entity === PortfolioTrade) return mockTradeRepo;
+    return mockPositionRepo;
+  }),
   query: jest.fn().mockResolvedValue(undefined),
 };
 
@@ -47,6 +79,11 @@ mockPositionRepo.manager = {
   transaction: jest.fn((cb: (m: typeof mockPositionTxManager) => unknown) =>
     Promise.resolve(cb(mockPositionTxManager)),
   ),
+  getRepository: jest.fn((entity: any) => {
+    if (entity === PortfolioCashBalance) return mockCashRepo;
+    if (entity === PortfolioTrade) return mockTradeRepo;
+    return mockPositionRepo;
+  }),
 };
 
 const mockQuotaService = { assertWithinLimit: jest.fn() };
@@ -136,7 +173,7 @@ describe('PortfolioService', () => {
   });
 
   describe('create', () => {
-    it('should create a position', async () => {
+    it('should create a position when cash covers the cost', async () => {
       const dto = {
         symbol: 'NVDA',
         shares: 10,
@@ -146,6 +183,57 @@ describe('PortfolioService', () => {
       const result = await service.create('user-1', dto);
       expect(result).toEqual(mockPosition);
       expect(mockPositionRepo.save).toHaveBeenCalled();
+      // Strict simulator: cash is debited and a BUY trade is recorded.
+      expect(mockCashRepo.save).toHaveBeenCalled();
+      expect(mockTradeRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ side: 'buy', symbol: 'NVDA' }),
+      );
+    });
+
+    it('should reject a buy when cash is insufficient', async () => {
+      // Zero balance (no cash row) for this call only.
+      mockCashRepo.findOne.mockResolvedValueOnce(null);
+      const dto = {
+        symbol: 'NVDA',
+        shares: 10,
+        buy_price: 100,
+        buy_date: '2024-01-01',
+      };
+      await expect(service.create('user-1', dto)).rejects.toThrow(
+        /Insufficient/,
+      );
+    });
+  });
+
+  describe('sell', () => {
+    it('should book realized P&L and credit proceeds to cash', async () => {
+      // Sell 5 of 10 NVDA @ 150 (bought @ 100): proceeds 750, P&L +250.
+      mockPositionRepo.findOne.mockResolvedValueOnce({
+        ...mockPosition,
+        shares: 10,
+        buy_price: 100,
+        currency: 'USD',
+      });
+      const result = await service.sell('user-1', 'uuid-1', {
+        shares: 5,
+        price: 150,
+      });
+      expect(result.proceeds).toBe(750);
+      expect(result.realized_pnl).toBe(250);
+      expect(result.cash_balance.amount).toBe(100750); // 100000 + 750
+      expect(mockTradeRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ side: 'sell' }),
+      );
+    });
+
+    it('should reject selling more shares than held', async () => {
+      mockPositionRepo.findOne.mockResolvedValueOnce({
+        ...mockPosition,
+        shares: 3,
+      });
+      await expect(
+        service.sell('user-1', 'uuid-1', { shares: 5, price: 150 }),
+      ).rejects.toThrow(/Cannot sell/);
     });
   });
 

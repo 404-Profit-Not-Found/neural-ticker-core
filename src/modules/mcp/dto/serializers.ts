@@ -95,6 +95,35 @@ export function serializePortfolioPosition(p: any): Record<string, unknown> {
   };
 }
 
+/** A trade-ledger entry. Strips the `user` and `position` relations. */
+export function serializePortfolioTrade(t: any): Record<string, unknown> {
+  return {
+    id: t.id,
+    symbol: t.symbol,
+    side: t.side,
+    shares: Number(t.shares),
+    price: Number(t.price),
+    total_value: Number(t.total_value),
+    fees: Number(t.fees),
+    realized_pnl: t.realized_pnl == null ? null : Number(t.realized_pnl),
+    currency: t.currency,
+    trade_date: t.trade_date,
+    source: t.source,
+    external_id: t.external_id,
+    note: t.note,
+    position_id: t.position_id,
+    created_at: t.created_at,
+  };
+}
+
+/** A single cash balance row ({ currency, amount }). */
+export function serializeCashBalance(c: any): Record<string, unknown> {
+  return {
+    currency: c.currency,
+    amount: Number(c.amount),
+  };
+}
+
 /** Price alert. Strips the `user` and full `ticker` relations. */
 export function serializePriceAlert(a: any): Record<string, unknown> {
   return {
@@ -155,5 +184,30 @@ export function serializeWatchlist(w: any): Record<string, unknown> {
     created_at: w.created_at,
     updated_at: w.updated_at,
     items: Array.isArray(w.items) ? w.items.map(serializeWatchlistItem) : [],
+  };
+}
+
+/**
+ * Admin Logo Manager row. Whitelists the branding-relevant ticker fields and
+ * normalizes the logo state: a saved string `'null'` (seen in legacy rows) and
+ * empty strings are treated as "no logo". Accepts both a full `TickerEntity`
+ * (from `updateLogo`) and the partial select from `searchTickersAdmin`.
+ */
+export function serializeAdminTickerLogo(
+  t: any,
+): Record<string, unknown> | null {
+  if (!t) return null;
+  const logoUrl: string | null =
+    typeof t.logo_url === 'string' && t.logo_url.trim() && t.logo_url !== 'null'
+      ? t.logo_url
+      : null;
+  return {
+    id: t.id != null ? String(t.id) : undefined,
+    symbol: t.symbol,
+    name: t.name,
+    exchange: t.exchange,
+    currency: t.currency,
+    logo_url: logoUrl,
+    has_logo: logoUrl !== null,
   };
 }
