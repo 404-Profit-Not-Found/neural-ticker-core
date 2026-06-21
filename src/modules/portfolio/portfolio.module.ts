@@ -4,6 +4,8 @@ import { PortfolioService } from './portfolio.service';
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
+import { PortfolioTrade } from './entities/portfolio-trade.entity';
+import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
@@ -13,7 +15,12 @@ import { QuotaModule } from '../../common/quota/quota.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PortfolioPosition, PortfolioAnalysis]),
+    TypeOrmModule.forFeature([
+      PortfolioPosition,
+      PortfolioAnalysis,
+      PortfolioTrade,
+      PortfolioCashBalance,
+    ]),
     forwardRef(() => MarketDataModule),
     LlmModule,
     forwardRef(() => TickersModule),

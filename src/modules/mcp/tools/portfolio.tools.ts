@@ -7,6 +7,8 @@ import { PriceAlertsService } from '../../price-alerts/price-alerts.service';
 import { requireUser } from '../auth/mcp-user.util';
 import {
   serializePortfolioPosition,
+  serializePortfolioTrade,
+  serializeCashBalance,
   serializePriceAlert,
   serializeWatchlist,
   toolJson,
@@ -175,6 +177,271 @@ export class PortfolioTools {
   async getPortfolioRecommendation(_args: unknown, _ctx: unknown, req: any) {
     const user = requireUser(req);
     return toolJson(await this.portfolio.getQuickRecommendation(user.id));
+  }
+
+  // ---- Trading simulator: sell, cash, trade history -----------------------
+
+  @Tool({
+    name: 'sell_portfolio_position',
+    description:
+      'Sell shares of an existing position. Reduces (or closes) the lot, ' +
+      'books realized P&L, and credits the proceeds (gross − fees) to the ' +
+      'matching-currency cash balance. Returns the updated position (null if ' +
+      'fully sold), the trade, proceeds and realized P&L.',
+    parameters: z.object({
+      id: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('The portfolio position id to sell.'),
+      shares: z.number().min(0.0001).describe('Number of shares to sell.'),
+      price: z.number().min(0.0001).describe('Sale price per share.'),
+      sell_date: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Sale date YYYY-MM-DD. Defaults to today.'),
+      fees: z
+        .number()
+        .min(0)
+        .optional()
+        .describe('Transaction fees deducted from proceeds.'),
+      note: z.string().trim().optional().describe('Optional free-text note.'),
+    }),
+  })
+  async sellPortfolioPosition(
+    args: {
+      id: string;
+      shares: number;
+      price: number;
+      sell_date?: string;
+      fees?: number;
+      note?: string;
+    },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    const result = await this.portfolio.sell(user.id, args.id, {
+      shares: args.shares,
+      price: args.price,
+      sell_date: args.sell_date,
+      fees: args.fees,
+      note: args.note,
+    });
+    return toolJson({
+      position: result.position
+        ? serializePortfolioPosition(result.position)
+        : null,
+      trade: serializePortfolioTrade(result.trade),
+      proceeds: result.proceeds,
+      realized_pnl: result.realized_pnl,
+      cash_balance: result.cash_balance,
+    });
+  }
+
+  @Tool({
+    name: 'get_cash_balances',
+    description:
+      "Get the authenticated user's simulator cash balances, one entry per " +
+      'currency. A missing currency means a zero balance.',
+    parameters: z.object({}),
+  })
+  async getCashBalances(_args: unknown, _ctx: unknown, req: any) {
+    const user = requireUser(req);
+    const balances = await this.portfolio.getCashBalances(user.id);
+    return toolJson(balances.map(serializeCashBalance));
+  }
+
+  @Tool({
+    name: 'deposit_cash',
+    description:
+      'Deposit simulator cash into a currency balance. Buys are funded from ' +
+      'cash, so deposit before buying.',
+    parameters: z.object({
+      amount: z.number().min(0.01).describe('Amount to deposit (> 0).'),
+      currency: currency
+        .optional()
+        .describe('Currency of the balance. Defaults to USD.'),
+      note: z.string().trim().optional().describe('Optional free-text note.'),
+    }),
+  })
+  async depositCash(
+    args: { amount: number; currency?: string; note?: string },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    return toolJson(
+      await this.portfolio.depositCash(user.id, {
+        amount: args.amount,
+        currency: args.currency,
+        note: args.note,
+      }),
+    );
+  }
+
+  @Tool({
+    name: 'withdraw_cash',
+    description:
+      'Withdraw simulator cash from a currency balance. Cannot go negative.',
+    parameters: z.object({
+      amount: z.number().min(0.01).describe('Amount to withdraw (> 0).'),
+      currency: currency
+        .optional()
+        .describe('Currency of the balance. Defaults to USD.'),
+      note: z.string().trim().optional().describe('Optional free-text note.'),
+    }),
+  })
+  async withdrawCash(
+    args: { amount: number; currency?: string; note?: string },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    return toolJson(
+      await this.portfolio.withdrawCash(user.id, {
+        amount: args.amount,
+        currency: args.currency,
+        note: args.note,
+      }),
+    );
+  }
+
+  @Tool({
+    name: 'get_trade_history',
+    description:
+      "Get the authenticated user's trade history (buys and sells), most " +
+      'recent first. Optionally filter by symbol.',
+    parameters: z.object({
+      symbol: symbol.optional().describe('Optional symbol filter.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(500)
+        .optional()
+        .describe('Max trades to return (default 100, max 500).'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of trades to skip (pagination).'),
+    }),
+  })
+  async getTradeHistory(
+    args: { symbol?: string; limit?: number; offset?: number },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    const trades = await this.portfolio.getTrades(user.id, {
+      symbol: args.symbol,
+      limit: args.limit,
+      offset: args.offset,
+    });
+    return toolJson(trades.map(serializePortfolioTrade));
+  }
+
+  @Tool({
+    name: 'get_portfolio_summary',
+    description:
+      'Net-worth summary for the authenticated user: market value of holdings ' +
+      'plus simulator cash. Optionally expressed in a chosen display currency.',
+    parameters: z.object({
+      displayCurrency: currency
+        .optional()
+        .describe('Optional currency to express the summary in.'),
+    }),
+  })
+  async getPortfolioSummary(
+    args: { displayCurrency?: string },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    return toolJson(
+      await this.portfolio.getPortfolioSummary(user.id, args.displayCurrency),
+    );
+  }
+
+  @Tool({
+    name: 'record_trade',
+    description:
+      'Record an externally-executed trade (buy or sell) to consolidate ' +
+      'holdings from other apps into this portfolio. Permissive: it mirrors a ' +
+      'trade that already happened, so it does NOT require sufficient cash. ' +
+      'Idempotent on external_id — re-recording the same key returns the ' +
+      'original trade. Sells reduce the given position_id, else the oldest ' +
+      'matching lot (FIFO).',
+    parameters: z.object({
+      symbol,
+      side: z.enum(['buy', 'sell']).describe('Trade side.'),
+      shares: z.number().min(0.0001).describe('Number of shares.'),
+      price: z.number().min(0.0001).describe('Execution price per share.'),
+      trade_date: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Date the trade executed, YYYY-MM-DD.'),
+      currency: currency
+        .optional()
+        .describe('Trade currency. Auto-detected from the ticker if omitted.'),
+      fees: z.number().min(0).optional().describe('Transaction fees.'),
+      position_id: z
+        .string()
+        .trim()
+        .optional()
+        .describe('For sells: the lot to reduce. Defaults to FIFO.'),
+      source: z
+        .string()
+        .trim()
+        .optional()
+        .describe("Origin app name, e.g. 'robinhood'. Defaults to 'mcp'."),
+      external_id: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Idempotency key from the source system.'),
+      note: z.string().trim().optional().describe('Optional free-text note.'),
+    }),
+  })
+  async recordTrade(
+    args: {
+      symbol: string;
+      side: 'buy' | 'sell';
+      shares: number;
+      price: number;
+      trade_date: string;
+      currency?: string;
+      fees?: number;
+      position_id?: string;
+      source?: string;
+      external_id?: string;
+      note?: string;
+    },
+    _ctx: unknown,
+    req: any,
+  ) {
+    const user = requireUser(req);
+    const result = await this.portfolio.recordTrade(user.id, {
+      symbol: args.symbol,
+      side: args.side,
+      shares: args.shares,
+      price: args.price,
+      trade_date: args.trade_date,
+      currency: args.currency,
+      fees: args.fees,
+      position_id: args.position_id,
+      source: args.source,
+      external_id: args.external_id,
+      note: args.note,
+    });
+    return toolJson({
+      trade: serializePortfolioTrade(result.trade),
+      idempotent: result.idempotent,
+    });
   }
 
   // ---- Watchlists ---------------------------------------------------------

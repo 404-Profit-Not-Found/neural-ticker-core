@@ -1,17 +1,23 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
   Inject,
   forwardRef,
   OnModuleInit,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
+import { PortfolioTrade } from './entities/portfolio-trade.entity';
+import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
+import { SellPositionDto } from './dto/sell-position.dto';
+import { CashOperationDto } from './dto/cash-operation.dto';
+import { RecordTradeDto } from './dto/record-trade.dto';
 import { MarketDataService } from '../market-data/market-data.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
@@ -48,21 +54,24 @@ export class PortfolioService implements OnModuleInit {
     );
   }
 
+  /**
+   * Buy a position. This is the STRICT simulator path: the buy must be funded
+   * by simulator cash in the same currency, which is deducted atomically. New
+   * users start at a zero balance, so a buy requires depositing cash first.
+   * Every buy is mirrored into the append-only trade ledger.
+   */
   async create(
     userId: string,
     dto: CreatePortfolioPositionDto,
   ): Promise<PortfolioPosition> {
     // Auto-detect currency from ticker if not explicitly provided (read-only,
     // safe to resolve before taking the per-user lock).
-    let currency = dto.currency;
-    if (!currency) {
-      const ticker = await this.tickersService.findOneBySymbol(dto.symbol);
-      currency = ticker?.currency || 'USD';
-    }
+    const currency = await this.resolveCurrency(dto.symbol, dto.currency);
 
     // Serialize concurrent creates for THIS user inside a transaction. Without
     // the advisory lock, two parallel requests could both pass the count-based
-    // quota check before either inserts, letting the user exceed their limit.
+    // quota check before either inserts, letting the user exceed their limit;
+    // it also serializes the read-modify-write on the cash balance.
     return this.positionRepo.manager.transaction(async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `portfolio:${userId}`,
@@ -72,13 +81,464 @@ export class PortfolioService implements OnModuleInit {
       const count = await repo.count({ where: { user_id: userId } });
       await this.quota.assertWithinLimit(userId, 'portfolioPositions', count);
 
+      // Deduct the cost from cash first — throws if the user can't afford it,
+      // aborting the transaction before any position/trade is written.
+      const cost = this.round2(dto.shares * dto.buy_price);
+      await this.adjustCashTx(tx, userId, currency, -cost, { enforce: true });
+
       const position = repo.create({
         ...dto,
         currency,
         user_id: userId,
       });
-      return repo.save(position);
+      const saved = await repo.save(position);
+
+      await this.insertTradeTx(tx, {
+        userId,
+        positionId: saved.id,
+        symbol: saved.symbol,
+        side: 'buy',
+        shares: dto.shares,
+        price: dto.buy_price,
+        currency,
+        tradeDate: dto.buy_date,
+        source: 'app',
+      });
+
+      return saved;
     });
+  }
+
+  /**
+   * Sell shares of an existing position. Reduces (or closes) the lot, books the
+   * realized P&L, credits the proceeds (gross − fees) to the cash balance, and
+   * records a SELL trade. Selling more than is held is rejected.
+   */
+  async sell(
+    userId: string,
+    positionId: string,
+    dto: SellPositionDto,
+  ): Promise<{
+    position: PortfolioPosition | null;
+    trade: PortfolioTrade;
+    proceeds: number;
+    realized_pnl: number;
+    cash_balance: { currency: string; amount: number };
+  }> {
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+
+      const repo = tx.getRepository(PortfolioPosition);
+      const position = await repo.findOne({
+        where: { id: positionId, user_id: userId },
+      });
+      if (!position) {
+        throw new NotFoundException('Position not found');
+      }
+
+      const held = Number(position.shares);
+      const sharesToSell = dto.shares;
+      // Tiny epsilon so floating-point representation of a "sell all" doesn't trip.
+      if (sharesToSell > held + 1e-9) {
+        throw new BadRequestException(
+          `Cannot sell ${sharesToSell} shares; only ${held} held.`,
+        );
+      }
+
+      const price = dto.price;
+      const fees = dto.fees ?? 0;
+      const currency = position.currency || 'USD';
+      const gross = this.round2(sharesToSell * price);
+      const proceeds = this.round2(gross - fees);
+      const costBasis = this.round2(sharesToSell * Number(position.buy_price));
+      const realizedPnl = this.round2(proceeds - costBasis);
+      const sellDate = dto.sell_date || this.todayIso();
+
+      // Reduce or close the lot. A full sell deletes the row; the SELL trade is
+      // kept (FK is ON DELETE SET NULL), so history survives.
+      const remaining = this.round2(held - sharesToSell);
+      let updatedPosition: PortfolioPosition | null;
+      let tradePositionId: string | null;
+      if (remaining <= 0) {
+        await repo.remove(position);
+        updatedPosition = null;
+        tradePositionId = null;
+      } else {
+        position.shares = remaining;
+        updatedPosition = await repo.save(position);
+        tradePositionId = position.id;
+      }
+
+      const trade = await this.insertTradeTx(tx, {
+        userId,
+        positionId: tradePositionId,
+        symbol: position.symbol,
+        side: 'sell',
+        shares: sharesToSell,
+        price,
+        fees,
+        realizedPnl,
+        currency,
+        tradeDate: sellDate,
+        source: 'app',
+        note: dto.note,
+      });
+
+      const cashAfter = await this.adjustCashTx(
+        tx,
+        userId,
+        currency,
+        proceeds,
+        { enforce: false },
+      );
+
+      return {
+        position: updatedPosition,
+        trade,
+        proceeds,
+        realized_pnl: realizedPnl,
+        cash_balance: { currency, amount: cashAfter },
+      };
+    });
+  }
+
+  /** Current simulator cash balances, one entry per currency (zero rows omitted). */
+  async getCashBalances(
+    userId: string,
+  ): Promise<{ currency: string; amount: number }[]> {
+    const repo = this.positionRepo.manager.getRepository(PortfolioCashBalance);
+    const rows = await repo.find({
+      where: { user_id: userId },
+      order: { currency: 'ASC' },
+    });
+    return rows.map((r) => ({
+      currency: r.currency,
+      amount: Number(r.amount),
+    }));
+  }
+
+  /** Add simulator cash to a currency balance. */
+  async depositCash(
+    userId: string,
+    dto: CashOperationDto,
+  ): Promise<{ currency: string; amount: number }> {
+    const currency = dto.currency || 'USD';
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+      const amount = await this.adjustCashTx(
+        tx,
+        userId,
+        currency,
+        this.round2(dto.amount),
+        { enforce: false },
+      );
+      return { currency, amount };
+    });
+  }
+
+  /** Withdraw simulator cash from a currency balance (cannot go negative). */
+  async withdrawCash(
+    userId: string,
+    dto: CashOperationDto,
+  ): Promise<{ currency: string; amount: number }> {
+    const currency = dto.currency || 'USD';
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+      const amount = await this.adjustCashTx(
+        tx,
+        userId,
+        currency,
+        -this.round2(dto.amount),
+        { enforce: true },
+      );
+      return { currency, amount };
+    });
+  }
+
+  /** Trade history (most recent first), optionally filtered to one symbol. */
+  async getTrades(
+    userId: string,
+    opts?: { symbol?: string; limit?: number; offset?: number },
+  ): Promise<PortfolioTrade[]> {
+    const repo = this.positionRepo.manager.getRepository(PortfolioTrade);
+    const where: Record<string, unknown> = { user_id: userId };
+    if (opts?.symbol) where.symbol = opts.symbol.toUpperCase();
+    return repo.find({
+      where,
+      order: { trade_date: 'DESC', created_at: 'DESC' },
+      take: Math.min(opts?.limit ?? 100, 500),
+      skip: opts?.offset ?? 0,
+    });
+  }
+
+  /**
+   * Record an externally-executed trade for consolidation (typically via MCP).
+   * Permissive by design — it mirrors a trade that already happened elsewhere,
+   * so it does NOT enforce sufficient cash; buys may drive the balance negative.
+   * Idempotent on `external_id`: re-recording the same key returns the original
+   * trade untouched. Sells reduce the given lot, or the oldest matching lot
+   * (FIFO) when no `position_id` is supplied; a sell with no matching lot is
+   * still recorded as a pure ledger/cash entry.
+   */
+  async recordTrade(
+    userId: string,
+    dto: RecordTradeDto,
+  ): Promise<{ trade: PortfolioTrade; idempotent: boolean }> {
+    const symbol = dto.symbol.toUpperCase();
+    const currency = await this.resolveCurrency(symbol, dto.currency);
+    const source = dto.source || 'mcp';
+    const fees = dto.fees ?? 0;
+
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+
+      // Idempotency: a previously-imported external_id is a no-op.
+      if (dto.external_id) {
+        const existing = await tx.getRepository(PortfolioTrade).findOne({
+          where: { user_id: userId, external_id: dto.external_id },
+        });
+        if (existing) return { trade: existing, idempotent: true };
+      }
+
+      const posRepo = tx.getRepository(PortfolioPosition);
+
+      if (dto.side === 'buy') {
+        // Cash mirror (allowed to go negative) + open a new lot.
+        const cost = this.round2(dto.shares * dto.price + fees);
+        await this.adjustCashTx(tx, userId, currency, -cost, {
+          enforce: false,
+        });
+        const position = posRepo.create({
+          user_id: userId,
+          symbol,
+          shares: dto.shares,
+          buy_price: dto.price,
+          buy_date: dto.trade_date,
+          currency,
+        });
+        const saved = await posRepo.save(position);
+        const trade = await this.insertTradeTx(tx, {
+          userId,
+          positionId: saved.id,
+          symbol,
+          side: 'buy',
+          shares: dto.shares,
+          price: dto.price,
+          fees,
+          currency,
+          tradeDate: dto.trade_date,
+          source,
+          externalId: dto.external_id,
+          note: dto.note,
+        });
+        return { trade, idempotent: false };
+      }
+
+      // side === 'sell'
+      let position: PortfolioPosition | null = null;
+      if (dto.position_id) {
+        position = await posRepo.findOne({
+          where: { id: dto.position_id, user_id: userId },
+        });
+        if (!position) throw new NotFoundException('Position not found');
+      } else {
+        position = await posRepo.findOne({
+          where: { user_id: userId, symbol },
+          order: { buy_date: 'ASC' },
+        });
+      }
+
+      let realizedPnl: number | null = null;
+      let tradePositionId: string | null = null;
+      if (position) {
+        const held = Number(position.shares);
+        const sell = Math.min(dto.shares, held);
+        const costBasis = this.round2(sell * Number(position.buy_price));
+        const proceedsForLot = this.round2(sell * dto.price);
+        realizedPnl = this.round2(proceedsForLot - costBasis);
+        const remaining = this.round2(held - sell);
+        if (remaining <= 0) {
+          await posRepo.remove(position);
+          tradePositionId = null;
+        } else {
+          position.shares = remaining;
+          await posRepo.save(position);
+          tradePositionId = position.id;
+        }
+      }
+
+      const proceeds = this.round2(dto.shares * dto.price - fees);
+      await this.adjustCashTx(tx, userId, currency, proceeds, {
+        enforce: false,
+      });
+      const trade = await this.insertTradeTx(tx, {
+        userId,
+        positionId: tradePositionId,
+        symbol,
+        side: 'sell',
+        shares: dto.shares,
+        price: dto.price,
+        fees,
+        realizedPnl,
+        currency,
+        tradeDate: dto.trade_date,
+        source,
+        externalId: dto.external_id,
+        note: dto.note,
+      });
+      return { trade, idempotent: false };
+    });
+  }
+
+  /**
+   * Net-worth summary: market value of holdings + simulator cash, in an optional
+   * display currency. Holdings value is reused from findAll (already converted);
+   * cash is converted best-effort (native amount kept if no FX rate is available).
+   */
+  async getPortfolioSummary(
+    userId: string,
+    displayCurrency?: string,
+  ): Promise<{
+    currency: string;
+    holdings_value: number;
+    cash_value: number;
+    net_worth: number;
+    positions_count: number;
+    cash_balances: { currency: string; amount: number }[];
+  }> {
+    const positions = await this.findAll(userId, displayCurrency);
+    const holdingsValue = positions.reduce(
+      (sum, p) => sum + (Number(p.current_value) || 0),
+      0,
+    );
+
+    const cash = await this.getCashBalances(userId);
+    let cashValue = 0;
+    for (const c of cash) {
+      if (displayCurrency && c.currency !== displayCurrency) {
+        const rate = await this.currencyService.getRate(
+          c.currency,
+          displayCurrency,
+        );
+        cashValue += rate != null ? c.amount * rate : c.amount;
+      } else {
+        cashValue += c.amount;
+      }
+    }
+
+    const currency = displayCurrency || positions[0]?.currency || 'USD';
+    return {
+      currency,
+      holdings_value: this.round2(holdingsValue),
+      cash_value: this.round2(cashValue),
+      net_worth: this.round2(holdingsValue + cashValue),
+      positions_count: positions.length,
+      cash_balances: cash,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trading-simulator internals
+  // ---------------------------------------------------------------------------
+
+  /** Round to 2 decimals, avoiding binary-float drift on .005 boundaries. */
+  private round2(n: number): number {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
+  /** Today's date as YYYY-MM-DD (the column type is a plain date). */
+  private todayIso(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  /** Resolve a trade currency: explicit value wins, else the ticker's native currency. */
+  private async resolveCurrency(
+    symbol: string,
+    explicit?: string,
+  ): Promise<string> {
+    if (explicit) return explicit;
+    const ticker = await this.tickersService.findOneBySymbol(symbol);
+    return ticker?.currency || 'USD';
+  }
+
+  /**
+   * Apply a signed delta to a (user, currency) cash balance inside a transaction
+   * and return the new amount. Find-or-create then mutate; the caller must hold
+   * the per-user advisory lock so this read-modify-write is race-free. With
+   * `enforce`, a resulting negative balance is rejected.
+   */
+  private async adjustCashTx(
+    tx: EntityManager,
+    userId: string,
+    currency: string,
+    delta: number,
+    opts: { enforce: boolean },
+  ): Promise<number> {
+    const repo = tx.getRepository(PortfolioCashBalance);
+    let row = await repo.findOne({
+      where: { user_id: userId, currency },
+    });
+    if (!row) {
+      row = repo.create({ user_id: userId, currency, amount: 0 });
+    }
+    const current = Number(row.amount);
+    const next = this.round2(current + delta);
+    if (opts.enforce && next < 0) {
+      throw new BadRequestException(
+        `Insufficient ${currency} cash: need ${Math.abs(delta).toFixed(2)}, ` +
+          `have ${current.toFixed(2)}. Deposit cash first.`,
+      );
+    }
+    row.amount = next;
+    await repo.save(row);
+    return next;
+  }
+
+  /** Insert an append-only trade-ledger row inside a transaction. */
+  private async insertTradeTx(
+    tx: EntityManager,
+    t: {
+      userId: string;
+      positionId?: string | null;
+      symbol: string;
+      side: 'buy' | 'sell';
+      shares: number;
+      price: number;
+      fees?: number;
+      realizedPnl?: number | null;
+      currency: string;
+      tradeDate: string;
+      source?: string;
+      externalId?: string | null;
+      note?: string | null;
+    },
+  ): Promise<PortfolioTrade> {
+    const repo = tx.getRepository(PortfolioTrade);
+    const trade = repo.create({
+      user_id: t.userId,
+      position_id: t.positionId ?? null,
+      symbol: t.symbol,
+      side: t.side,
+      shares: t.shares,
+      price: t.price,
+      total_value: this.round2(t.shares * t.price),
+      fees: t.fees ?? 0,
+      realized_pnl: t.realizedPnl ?? null,
+      currency: t.currency,
+      trade_date: t.tradeDate,
+      source: t.source ?? 'app',
+      external_id: t.externalId ?? null,
+      note: t.note ?? null,
+    });
+    return repo.save(trade);
   }
 
   async findAll(userId: string, displayCurrency?: string): Promise<any[]> {
