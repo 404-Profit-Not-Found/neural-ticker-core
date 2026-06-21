@@ -33,22 +33,28 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     normalize(localStorage.getItem('language') || i18n.resolvedLanguage),
   );
 
-  // Keep i18next in sync with local state.
+  // Keep i18next + localStorage in sync with the active language.
   useEffect(() => {
     if (i18n.resolvedLanguage !== language) {
       void i18n.changeLanguage(language);
     }
+    localStorage.setItem('language', language);
   }, [language]);
 
-  // Hydrate from the user's saved preference on login (cross-device).
-  useEffect(() => {
+  // Hydrate from the user's saved preference when it loads or changes (login,
+  // cross-device). Done during render via React's "adjust state when a prop
+  // changes" pattern rather than in an effect, so it doesn't trigger a
+  // setState-in-effect render cascade; the effect above persists the result.
+  const [syncedPref, setSyncedPref] = useState<string | null | undefined>(
+    undefined,
+  );
+  if (user?.preferences?.language !== syncedPref) {
+    setSyncedPref(user?.preferences?.language);
     const pref = user?.preferences?.language;
     if (typeof pref === 'string') {
-      const next = normalize(pref);
-      setLanguageState(next);
-      localStorage.setItem('language', next);
+      setLanguageState(normalize(pref));
     }
-  }, [user?.preferences?.language]);
+  }
 
   const setLanguage = useCallback(
     async (lang: AppLanguage) => {
