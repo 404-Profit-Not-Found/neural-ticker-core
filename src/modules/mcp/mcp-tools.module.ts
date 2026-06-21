@@ -18,6 +18,7 @@ import { RiskTools } from './tools/risk.tools';
 import { ResearchTools } from './tools/research.tools';
 import { PortfolioTools } from './tools/portfolio.tools';
 import { TickerRequestsTools } from './tools/ticker-requests.tools';
+import { LogoTools } from './tools/logo.tools';
 
 /**
  * In-process Model Context Protocol (MCP) server.
@@ -70,6 +71,7 @@ import { TickerRequestsTools } from './tools/ticker-requests.tools';
     ResearchTools,
     PortfolioTools,
     TickerRequestsTools,
+    LogoTools,
   ],
 })
 export class McpToolsModule {}

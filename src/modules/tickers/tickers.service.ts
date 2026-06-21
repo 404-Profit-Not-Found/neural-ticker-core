@@ -293,6 +293,15 @@ export class TickersService {
         this.httpService.get(url, {
           responseType: 'arraybuffer',
           maxRedirects: 0,
+          // Some image hosts reject a blank/default library User-Agent with
+          // HTTP 403 — notably Wikimedia/Wikipedia, a common source of company
+          // logos ("Please set a user-agent..."). Send a descriptive UA so the
+          // fetch is accepted. maxRedirects stays 0 so the SSRF host check
+          // above can't be bypassed via a redirect to a private address.
+          headers: {
+            'User-Agent': 'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
+          },
+          timeout: 10000,
         }),
       );
 
