@@ -13,6 +13,7 @@ import { TickerLogo } from '../dashboard/TickerLogo';
 import { Sparkline } from '../ui/Sparkline';
 import { PriceRangeSlider } from './PriceRangeSlider';
 import { useCurrency } from '../../context/CurrencyContext';
+import type { CashBalance } from './CashDialog';
 
 interface TickerResult {
   symbol: string;
@@ -44,13 +45,20 @@ const getCurrencySymbol = (currencyCode?: string) => {
   }
 };
 
+const formatMoney = (val: number, currency = 'USD') =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
+
 interface AddPositionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** Simulator cash balances, used to show buying power for the picked ticker. */
+  cashBalances?: CashBalance[];
+  /** Opens the cash dialog pre-set to the given currency (deposit shortcut). */
+  onRequestDeposit?: (currency: string) => void;
 }
 
-export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPositionDialogProps) {
+export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances = [], onRequestDeposit }: AddPositionDialogProps) {
   const [symbol, setSymbol] = useState('');
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
@@ -93,6 +101,17 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
   const currencySymbol = useMemo(() => {
     return getCurrencySymbol(tickerCurrency);
   }, [tickerCurrency]);
+
+  // Buying power = simulator cash held in the ticker's native currency. The
+  // strict simulator deducts the buy cost from this balance, so we surface it
+  // up-front and warn before the backend rejects an underfunded buy.
+  const buyingPower = useMemo(
+    () => cashBalances.find((b) => b.currency === tickerCurrency)?.amount ?? 0,
+    [cashBalances, tickerCurrency],
+  );
+  const estimatedCost = parseFloat(investment) || parseFloat(shares) * parseFloat(price) || 0;
+  const insufficientCash = !!symbol && estimatedCost > buyingPower + 1e-9;
+  const errorIsInsufficient = !!error && /insufficient|deposit cash/i.test(error);
 
   // Derived calculations
   useEffect(() => {
@@ -352,9 +371,20 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
 
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           {error && (
-            <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm flex items-center gap-2">
-              <AlertCircle size={16} />
-              {error}
+            <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm flex items-start gap-2">
+              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p>{error}</p>
+                {errorIsInsufficient && onRequestDeposit && (
+                  <button
+                    type="button"
+                    onClick={() => onRequestDeposit(tickerCurrency)}
+                    className="mt-1 font-bold text-primary hover:underline"
+                  >
+                    Deposit {tickerCurrency} cash →
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -629,6 +659,40 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess }: AddPosition
                             />
                         </div>
                 </div>
+
+                {symbol && (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/10 px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">
+                      Buying power{' '}
+                      <span className="font-mono font-semibold text-foreground">
+                        {formatMoney(buyingPower, tickerCurrency)}
+                      </span>
+                    </span>
+                    {insufficientCash ? (
+                      <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 font-medium text-amber-500">
+                          <AlertCircle size={12} /> Need {formatMoney(estimatedCost, tickerCurrency)}
+                        </span>
+                        {onRequestDeposit && (
+                          <button
+                            type="button"
+                            onClick={() => onRequestDeposit(tickerCurrency)}
+                            className="font-bold text-primary hover:underline"
+                          >
+                            Deposit
+                          </button>
+                        )}
+                      </span>
+                    ) : estimatedCost > 0 ? (
+                      <span className="text-muted-foreground">
+                        Cost{' '}
+                        <span className="font-mono text-foreground/80">
+                          {formatMoney(estimatedCost, tickerCurrency)}
+                        </span>
+                      </span>
+                    ) : null}
+                  </div>
+                )}
             </div>
           </Tabs>
 
