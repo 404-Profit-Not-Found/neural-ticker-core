@@ -106,10 +106,7 @@ export class WebPushService {
         auth: subscription.keys.auth,
         user_agent: userAgent ?? undefined,
       })
-      .orUpdate(
-        ['user_id', 'p256dh', 'auth', 'user_agent'],
-        ['endpoint'],
-      )
+      .orUpdate(['user_id', 'p256dh', 'auth', 'user_agent'], ['endpoint'])
       .execute();
 
     const saved = await this.subRepo.findOne({

@@ -33,6 +33,7 @@ import { TickerRequestsModule } from './modules/ticker-requests/ticker-requests.
 import { CurrencyModule } from './modules/currency/currency.module';
 import { PriceAlertsModule } from './modules/price-alerts/price-alerts.module';
 import { WebPushModule } from './modules/web-push/web-push.module';
+import { McpToolsModule } from './modules/mcp/mcp-tools.module';
 import configuration from './config/configuration';
 // ...
 
@@ -145,6 +146,7 @@ import configuration from './config/configuration';
     CurrencyModule,
     PriceAlertsModule,
     WebPushModule,
+    McpToolsModule,
   ],
   controllers: [],
   providers: [

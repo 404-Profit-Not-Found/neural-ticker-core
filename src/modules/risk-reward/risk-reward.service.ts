@@ -601,9 +601,7 @@ export class RiskRewardService {
     // SECURITY: the research note is UNTRUSTED text (may be scraped/user-influenced)
     // and could carry prompt-injection. Neutralize the closing delimiter so it can't
     // break out of the quoted block, and mark the content as data, not instructions.
-    const safeNote = text
-      .substring(0, 25000)
-      .replace(/"""/g, '”””');
+    const safeNote = text.substring(0, 25000).replace(/"""/g, '”””');
     const prompt = {
       question: `Extract a quantitative and qualitative Risk/Reward analysis for ${symbol} based on the provided Research Note.
 

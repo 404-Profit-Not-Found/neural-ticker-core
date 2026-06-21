@@ -128,9 +128,9 @@ describe('YahooFinanceService', () => {
         new Error('Network down'),
       );
 
-      await expect(
-        service.getHistorical('AAPL', new Date()),
-      ).rejects.toThrow('Network down');
+      await expect(service.getHistorical('AAPL', new Date())).rejects.toThrow(
+        'Network down',
+      );
     });
   });
 
