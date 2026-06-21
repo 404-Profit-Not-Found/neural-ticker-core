@@ -14,6 +14,9 @@ import {
 import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
+import { SellPositionDto } from './dto/sell-position.dto';
+import { CashOperationDto } from './dto/cash-operation.dto';
+import { RecordTradeDto } from './dto/record-trade.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreditGuard } from '../research/guards/credit.guard';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -66,6 +69,79 @@ export class PortfolioController {
   @ApiOperation({ summary: 'Remove a position' })
   remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.portfolioService.remove(req.user.id, id);
+  }
+
+  @Post('positions/:id/sell')
+  @ApiOperation({
+    summary: 'Sell shares of a position (credits cash, records realized P&L)',
+  })
+  sell(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: SellPositionDto,
+  ) {
+    return this.portfolioService.sell(req.user.id, id, dto);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Net-worth summary: holdings + cash' })
+  @ApiQuery({ name: 'displayCurrency', required: false, example: 'EUR' })
+  getSummary(
+    @Req() req: AuthenticatedRequest,
+    @Query('displayCurrency') displayCurrency?: string,
+  ) {
+    return this.portfolioService.getPortfolioSummary(
+      req.user.id,
+      displayCurrency,
+    );
+  }
+
+  @Get('cash')
+  @ApiOperation({ summary: 'Get simulator cash balances per currency' })
+  getCash(@Req() req: AuthenticatedRequest) {
+    return this.portfolioService.getCashBalances(req.user.id);
+  }
+
+  @Post('cash/deposit')
+  @ApiOperation({ summary: 'Deposit simulator cash' })
+  depositCash(@Req() req: AuthenticatedRequest, @Body() dto: CashOperationDto) {
+    return this.portfolioService.depositCash(req.user.id, dto);
+  }
+
+  @Post('cash/withdraw')
+  @ApiOperation({ summary: 'Withdraw simulator cash' })
+  withdrawCash(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CashOperationDto,
+  ) {
+    return this.portfolioService.withdrawCash(req.user.id, dto);
+  }
+
+  @Get('trades')
+  @ApiOperation({ summary: 'Trade history (most recent first)' })
+  @ApiQuery({ name: 'symbol', required: false, example: 'AAPL' })
+  @ApiQuery({ name: 'limit', required: false, example: 100 })
+  @ApiQuery({ name: 'offset', required: false, example: 0 })
+  getTrades(
+    @Req() req: AuthenticatedRequest,
+    @Query('symbol') symbol?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.portfolioService.getTrades(req.user.id, {
+      symbol,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
+
+  @Post('trades')
+  @ApiOperation({
+    summary:
+      'Record an externally-executed trade for consolidation (idempotent)',
+  })
+  recordTrade(@Req() req: AuthenticatedRequest, @Body() dto: RecordTradeDto) {
+    return this.portfolioService.recordTrade(req.user.id, dto);
   }
 
   @UseGuards(CreditGuard)

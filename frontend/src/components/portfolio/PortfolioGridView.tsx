@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, ArrowUp, Bot, Edit2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUp, Bot, Edit2, Banknote } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
@@ -32,9 +32,10 @@ interface PortfolioGridViewProps {
   data: PortfolioItem[];
   isLoading: boolean;
   onEdit: (position: PortfolioItem) => void;
+  onSell?: (position: PortfolioItem) => void;
 }
 
-export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridViewProps) {
+export function PortfolioGridView({ data, isLoading, onEdit, onSell }: PortfolioGridViewProps) {
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -111,6 +112,20 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
                       <Bot size={10} />
                       {rating}
                     </Badge>
+                    {onSell && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-rose-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSell(item);
+                        }}
+                        title="Sell Position"
+                      >
+                        <Banknote size={12} />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -119,6 +134,7 @@ export function PortfolioGridView({ data, isLoading, onEdit }: PortfolioGridView
                         e.stopPropagation();
                         onEdit(item);
                       }}
+                      title="Edit Position"
                     >
                       <Edit2 size={12} />
                     </Button>

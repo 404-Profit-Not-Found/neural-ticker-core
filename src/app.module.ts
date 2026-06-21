@@ -37,6 +37,13 @@ import { McpToolsModule } from './modules/mcp/mcp-tools.module';
 import configuration from './config/configuration';
 // ...
 
+// Feature flag: the experimental pixel-terminal frontend (served under /v2/) is
+// OFF by default and only mounted when FRONTEND_V2_ENABLED=true. Evaluated here
+// at module-load time — not via ConfigService — because ServeStaticModule has to
+// be conditionally present in the static @Module imports array, before DI (and
+// therefore ConfigService) exists.
+const frontendV2Enabled = process.env.FRONTEND_V2_ENABLED === 'true';
+
 @Module({
   imports: [
     // ... imports
@@ -49,10 +56,17 @@ import configuration from './config/configuration';
     // Experimental pixel-terminal frontend served under /v2/ (more specific
     // prefix listed first so it claims /v2/* before the catch-all client root).
     // Built artifact lives under frontend-v2/dist after `npm run build`.
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'frontend-v2', 'dist'),
-      serveRoot: '/v2',
-    }),
+    // Gated behind FRONTEND_V2_ENABLED: when disabled (the default) the static
+    // module is not registered at all, so /v2/* falls through to the catch-all
+    // client SPA below — the v2 frontend is completely unreachable.
+    ...(frontendV2Enabled
+      ? [
+          ServeStaticModule.forRoot({
+            rootPath: join(__dirname, '..', 'frontend-v2', 'dist'),
+            serveRoot: '/v2',
+          }),
+        ]
+      : []),
 
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),

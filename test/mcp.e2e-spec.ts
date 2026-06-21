@@ -138,6 +138,43 @@ const mockPortfolio = {
   remove: jest.fn(() => Promise.resolve(undefined)),
   analyzePortfolio: jest.fn(() => Promise.resolve('# Analysis\nLooks good.')),
   getQuickRecommendation: jest.fn(() => Promise.resolve({ action: 'hold' })),
+  sell: jest.fn((_userId: string, id: string, dto: any) =>
+    Promise.resolve({
+      position: { id, symbol: 'AAPL', shares: 5 },
+      trade: { id: 't1', side: 'sell', symbol: 'AAPL', ...dto },
+      proceeds: 750,
+      realized_pnl: 250,
+      cash_balance: { currency: 'USD', amount: 750 },
+    }),
+  ),
+  getCashBalances: jest.fn(() =>
+    Promise.resolve([{ currency: 'USD', amount: 1000 }]),
+  ),
+  depositCash: jest.fn((_userId: string, dto: any) =>
+    Promise.resolve({ currency: dto.currency || 'USD', amount: dto.amount }),
+  ),
+  withdrawCash: jest.fn((_userId: string, dto: any) =>
+    Promise.resolve({ currency: dto.currency || 'USD', amount: 0 }),
+  ),
+  getTrades: jest.fn(() =>
+    Promise.resolve([{ id: 't1', symbol: 'AAPL', side: 'buy', shares: 5 }]),
+  ),
+  getPortfolioSummary: jest.fn(() =>
+    Promise.resolve({
+      currency: 'USD',
+      holdings_value: 1500,
+      cash_value: 1000,
+      net_worth: 2500,
+      positions_count: 1,
+      cash_balances: [{ currency: 'USD', amount: 1000 }],
+    }),
+  ),
+  recordTrade: jest.fn((_userId: string, dto: any) =>
+    Promise.resolve({
+      trade: { id: 't2', ...dto },
+      idempotent: false,
+    }),
+  ),
 };
 const mockWatchlist = {
   getUserWatchlists: jest.fn(() =>
@@ -246,6 +283,14 @@ const EXPECTED_TOOLS = [
   'remove_portfolio_position',
   'analyze_portfolio',
   'get_portfolio_recommendation',
+  // trading simulator (sell, cash, trade history, consolidation)
+  'sell_portfolio_position',
+  'get_cash_balances',
+  'deposit_cash',
+  'withdraw_cash',
+  'get_trade_history',
+  'get_portfolio_summary',
+  'record_trade',
   // watchlist
   'get_watchlists',
   'create_watchlist',
@@ -349,6 +394,51 @@ describe('MCP endpoint (e2e, mocked services)', () => {
     const payload = JSON.parse(res.result.content[0].text);
     expect(payload[0].userId).toBe('user-1');
     expect(mockPortfolio.findAll).toHaveBeenCalledWith('user-1', undefined);
+  });
+
+  it('sells a position via the trading-simulator tool', async () => {
+    const res = await call(
+      'sell_portfolio_position',
+      { id: 'p1', shares: 5, price: 150 },
+      { 'x-test-user-id': 'user-1' },
+    );
+    expect(res.result?.isError).toBeFalsy();
+    const payload = JSON.parse(res.result.content[0].text);
+    expect(payload.proceeds).toBe(750);
+    expect(payload.realized_pnl).toBe(250);
+    expect(mockPortfolio.sell).toHaveBeenCalledWith(
+      'user-1',
+      'p1',
+      expect.objectContaining({ shares: 5, price: 150 }),
+    );
+  });
+
+  it('records an external trade for consolidation and upper-cases the symbol', async () => {
+    const res = await call(
+      'record_trade',
+      {
+        symbol: 'aapl',
+        side: 'buy',
+        shares: 3,
+        price: 100,
+        trade_date: '2026-06-21',
+        external_id: 'robinhood:abc',
+      },
+      { 'x-test-user-id': 'user-1' },
+    );
+    expect(res.result?.isError).toBeFalsy();
+    const payload = JSON.parse(res.result.content[0].text);
+    expect(payload.idempotent).toBe(false);
+    expect(mockPortfolio.recordTrade).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ symbol: 'AAPL', external_id: 'robinhood:abc' }),
+    );
+  });
+
+  it('rejects trading-simulator tools when anonymous', async () => {
+    const res = await call('get_cash_balances', {});
+    expect(res.result?.isError).toBe(true);
+    expect(res.result.content[0].text).toContain('Authentication required');
   });
 
   it('charges credits exactly once for create_research', async () => {
