@@ -33,9 +33,10 @@ interface PortfolioGridViewProps {
   isLoading: boolean;
   onEdit: (position: PortfolioItem) => void;
   onSell?: (position: PortfolioItem) => void;
+  onBuy?: (position: PortfolioItem) => void;
 }
 
-export function PortfolioGridView({ data, isLoading, onEdit, onSell }: PortfolioGridViewProps) {
+export function PortfolioGridView({ data, isLoading, onEdit, onSell, onBuy }: PortfolioGridViewProps) {
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -112,21 +113,6 @@ export function PortfolioGridView({ data, isLoading, onEdit, onSell }: Portfolio
                       <Bot size={10} />
                       {rating}
                     </Badge>
-                    {onSell && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 gap-1 px-2 text-xs font-medium text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSell(item);
-                        }}
-                        title="Sell shares from this position"
-                      >
-                        <Banknote size={12} />
-                        Sell
-                      </Button>
-                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -160,6 +146,42 @@ export function PortfolioGridView({ data, isLoading, onEdit, onSell }: Portfolio
                 </div>
               </div>
             </div>
+
+            {/* Buy / Sell actions */}
+            {(onBuy || onSell) && (
+              <div className="flex items-center gap-2 mb-4">
+                {onBuy && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 gap-1.5 text-xs font-semibold border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBuy(item);
+                    }}
+                    title="Buy more shares at the market price"
+                  >
+                    <ShoppingCart size={13} />
+                    Buy
+                  </Button>
+                )}
+                {onSell && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 gap-1.5 text-xs font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSell(item);
+                    }}
+                    title="Sell shares from this position"
+                  >
+                    <Banknote size={13} />
+                    Sell
+                  </Button>
+                )}
+              </div>
+            )}
 
             {/* Stats Footer */}
             <div className="mt-auto grid grid-cols-2 gap-2 pt-4 border-t border-border/50">
