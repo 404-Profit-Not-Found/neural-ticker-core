@@ -1,4 +1,4 @@
-import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle, AlertTriangle, Banknote } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
@@ -82,6 +82,7 @@ interface PortfolioTableProps {
     positions: Position[];
     onDelete: (id: string) => void;
     onEdit?: (position: Position) => void;
+    onSell?: (position: Position) => void;
     loading: boolean;
 }
 
@@ -93,7 +94,7 @@ const formatPct = (val: number) =>
     `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
 
-export function PortfolioTable({ positions, onDelete, onEdit, loading }: PortfolioTableProps) {
+export function PortfolioTable({ positions, onDelete, onEdit, onSell, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
     const { displayCurrency, formatNative } = useCurrency();
     const columnHelper = createColumnHelper<Position>();
@@ -371,6 +372,18 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
             header: 'Actions',
             cell: (info) => (
                 <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                    {onSell && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onSell(info.row.original);
+                            }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            title="Sell Position"
+                        >
+                            <Banknote size={14} />
+                        </button>
+                    )}
                     {onEdit && (
                         <button
                             onClick={(e) => {

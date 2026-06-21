@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, Tooltip,
   ComposedChart, Area, CartesianGrid
 } from 'recharts';
-import { TrendingUp, TrendingDown, Bot, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bot, AlertTriangle, Wallet, History } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { format, subDays, differenceInDays, addDays, isBefore, startOfDay, parseISO, isValid } from 'date-fns';
@@ -38,6 +38,14 @@ interface PortfolioStatsProps {
   isNativeMode?: boolean;
   /** Count of rows the backend could not convert (FX rate missing). */
   conversionUnavailable?: number;
+  /** Total simulator cash, converted to displayCurrency (from /portfolio/summary). */
+  cashValue?: number;
+  /** Net worth = holdings + cash, in displayCurrency. Falls back to holdings. */
+  netWorth?: number;
+  /** Opens the deposit/withdraw cash dialog. */
+  onManageCash?: () => void;
+  /** Opens the trade-history dialog. */
+  onViewHistory?: () => void;
 }
 
 // Professional Palette - Carbon/Minimalist
@@ -113,6 +121,10 @@ export function PortfolioStats({
   displayCurrency: portfolioCurrency,
   isNativeMode = false,
   conversionUnavailable = 0,
+  cashValue,
+  netWorth,
+  onManageCash,
+  onViewHistory,
 }: PortfolioStatsProps) {
 
   const [range, setRange] = useState<Range>('1M');
