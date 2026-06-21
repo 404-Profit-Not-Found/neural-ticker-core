@@ -254,6 +254,11 @@ describe('TickersService', () => {
         {
           responseType: 'arraybuffer',
           maxRedirects: 0,
+          headers: {
+            'User-Agent':
+              'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
+          },
+          timeout: 10000,
         },
       );
       expect(mockLogoRepo.create).toHaveBeenCalled();

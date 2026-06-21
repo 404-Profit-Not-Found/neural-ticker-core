@@ -272,18 +272,20 @@ export class JobsService {
       throw e;
     }
   }
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_HOUR)
   private async runRiskRewardScannerCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
     await this.runRiskRewardScanner();
   }
 
   /**
-   * Max tickers queued per scanner run. Small so each run stays light; the
-   * stale-first rotation + frequent cron schedule cover the whole universe
-   * over time, and the daily LLM budget is the hard ceiling on total work.
+   * Max tickers queued per scanner run. Deliberately tiny so each hourly run
+   * stays light and gentle on the LLM rate limits — no big batch all at once.
+   * The stale-first rotation spreads coverage over time (≈3/run × 24 runs/day
+   * comfortably rotates the universe within the staleness window), and the
+   * daily LLM budget is the hard ceiling on total work.
    */
-  static readonly RISK_SCANNER_BATCH_SIZE = 5;
+  static readonly RISK_SCANNER_BATCH_SIZE = 3;
 
   /**
    * Approx. free-tier flash-lite calls one research ticket consumes (the main
