@@ -105,6 +105,19 @@ export class JobsController {
     return { message: 'Pending requests processing triggered' };
   }
 
+  @Post('fill-pending-orders')
+  @ApiOperation({
+    summary: 'Fill due pending portfolio orders (Cron)',
+    description:
+      'Executes buy/sell orders that were queued while the market was closed, ' +
+      'now that the relevant market is open. Called from market-hours scheduler.',
+  })
+  @ApiResponse({ status: 200, description: 'Pending orders processed' })
+  async fillPendingOrders() {
+    const result = await this.jobsService.fillPendingOrders();
+    return { message: 'Pending orders processing triggered', stats: result };
+  }
+
   @Post('refresh-top-picks')
   @ApiOperation({
     summary: 'Trigger Top Picks Refresh (Cron)',

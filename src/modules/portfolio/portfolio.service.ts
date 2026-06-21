@@ -13,17 +13,50 @@ import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
 import { PortfolioTrade } from './entities/portfolio-trade.entity';
 import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
+import {
+  PortfolioPendingOrder,
+  PendingOrderSide,
+} from './entities/portfolio-pending-order.entity';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
 import { SellPositionDto } from './dto/sell-position.dto';
+import { BuyAtMarketDto } from './dto/buy-at-market.dto';
 import { CashOperationDto } from './dto/cash-operation.dto';
 import { RecordTradeDto } from './dto/record-trade.dto';
 import { MarketDataService } from '../market-data/market-data.service';
+import { MarketStatusService } from '../market-data/market-status.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
 import { CurrencyService } from '../currency/currency.service';
 import { QuotaService } from '../../common/quota/quota.service';
+
+/** Cash balance after a trade, echoed back to the client. */
+interface CashBalanceView {
+  currency: string;
+  amount: number;
+}
+
+/** A buy/sell that executed immediately because the market was open. */
+export interface ExecutedOrderResult {
+  status: 'executed';
+  side: PendingOrderSide;
+  position: PortfolioPosition | null;
+  trade: PortfolioTrade;
+  cost?: number;
+  proceeds?: number;
+  realized_pnl?: number;
+  cash_balance: CashBalanceView;
+}
+
+/** A buy/sell parked as pending because the market was closed at placement. */
+export interface PendingOrderResult {
+  status: 'pending';
+  side: PendingOrderSide;
+  order: PortfolioPendingOrder;
+}
+
+export type MarketOrderResult = ExecutedOrderResult | PendingOrderResult;
 
 @Injectable()
 export class PortfolioService implements OnModuleInit {
@@ -34,8 +67,11 @@ export class PortfolioService implements OnModuleInit {
     private readonly positionRepo: Repository<PortfolioPosition>,
     @InjectRepository(PortfolioAnalysis)
     private readonly analysisRepo: Repository<PortfolioAnalysis>,
+    @InjectRepository(PortfolioPendingOrder)
+    private readonly pendingRepo: Repository<PortfolioPendingOrder>,
     @Inject(forwardRef(() => MarketDataService))
     private readonly marketDataService: MarketDataService,
+    private readonly marketStatusService: MarketStatusService,
     private readonly llmService: LlmService,
     @Inject(forwardRef(() => TickersService))
     private readonly tickersService: TickersService,
@@ -110,98 +146,237 @@ export class PortfolioService implements OnModuleInit {
   }
 
   /**
-   * Sell shares of an existing position. Reduces (or closes) the lot, books the
-   * realized P&L, credits the proceeds (gross − fees) to the cash balance, and
-   * records a SELL trade. Selling more than is held is rejected.
+   * Sell shares of an existing position — MARKET-HOURS GATED.
+   *
+   * If the symbol's market is open the sale executes immediately (reduces/closes
+   * the lot, books realized P&L, credits proceeds, records a SELL trade). If the
+   * market is closed the order is QUEUED as pending and filled by the cron filler
+   * at the next open, at the market price at fill time. Selling more than is held
+   * (or more than is left after already-pending sells) is rejected either way.
    */
   async sell(
     userId: string,
     positionId: string,
     dto: SellPositionDto,
-  ): Promise<{
-    position: PortfolioPosition | null;
-    trade: PortfolioTrade;
-    proceeds: number;
-    realized_pnl: number;
-    cash_balance: { currency: string; amount: number };
-  }> {
+  ): Promise<MarketOrderResult> {
+    // Resolve the lot + market status before taking the per-user lock (reads).
+    const position = await this.findOne(userId, positionId);
+    const currency = position.currency || 'USD';
+    const status = await this.marketStatusService.getMarketStatus(
+      position.symbol,
+    );
+
+    // Market closed → queue it. The user-entered price is informational only;
+    // pending orders fill at the live price at the next open.
+    if (!status.isOpen) {
+      return this.placePendingOrder(userId, {
+        position,
+        symbol: position.symbol,
+        side: 'sell',
+        shares: dto.shares,
+        currency,
+        region: status.region,
+        requestedPrice: dto.price,
+        fees: dto.fees,
+        note: dto.note,
+      });
+    }
+
+    // Market open → execute now at the confirmed price.
+    const result = await this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+      const repo = tx.getRepository(PortfolioPosition);
+      const fresh = await repo.findOne({
+        where: { id: positionId, user_id: userId },
+      });
+      if (!fresh) throw new NotFoundException('Position not found');
+      return this.executeSellTx(tx, fresh, {
+        userId,
+        shares: dto.shares,
+        price: dto.price,
+        currency: fresh.currency || 'USD',
+        sellDate: dto.sell_date || this.todayIso(),
+        fees: dto.fees,
+        note: dto.note,
+        source: 'app',
+      });
+    });
+
+    return { status: 'executed', side: 'sell', ...result };
+  }
+
+  /**
+   * Buy MORE shares of an existing position at the LIVE market price —
+   * MARKET-HOURS GATED. (This is distinct from `create`/"Add Position", the
+   * ungated historical import where the user types the price + date.)
+   *
+   * Market open → executes now at the current snapshot price, weighted-averaged
+   * into the lot, debiting cash (must be funded). Market closed → queued as a
+   * pending buy and filled at the market price at the next open.
+   */
+  async buy(
+    userId: string,
+    positionId: string,
+    dto: BuyAtMarketDto,
+  ): Promise<MarketOrderResult> {
+    const position = await this.findOne(userId, positionId);
+    const currency = position.currency || 'USD';
+    const status = await this.marketStatusService.getMarketStatus(
+      position.symbol,
+    );
+    const price = await this.getCurrentPrice(position.symbol);
+    if (price == null) {
+      throw new BadRequestException(
+        `No live price available for ${position.symbol}; cannot place a market buy.`,
+      );
+    }
+
+    // Market closed → queue it. Soft-check funds at placement (the strict check
+    // runs again at fill time, since both price and cash can move meanwhile).
+    if (!status.isOpen) {
+      const cash = await this.getCashAmount(userId, currency);
+      const estCost = this.round2(dto.shares * price + (dto.fees ?? 0));
+      if (estCost > cash) {
+        throw new BadRequestException(
+          `Insufficient ${currency} cash: ~${estCost.toFixed(2)} needed at the ` +
+            `current price, have ${cash.toFixed(2)}. Deposit cash first.`,
+        );
+      }
+      return this.placePendingOrder(userId, {
+        position,
+        symbol: position.symbol,
+        side: 'buy',
+        shares: dto.shares,
+        currency,
+        region: status.region,
+        requestedPrice: price,
+        fees: dto.fees,
+        note: dto.note,
+      });
+    }
+
+    // Market open → execute now at the live price.
+    const result = await this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+      const repo = tx.getRepository(PortfolioPosition);
+      const fresh = await repo.findOne({
+        where: { id: positionId, user_id: userId },
+      });
+      if (!fresh) throw new NotFoundException('Position not found');
+      return this.executeBuyTx(tx, {
+        userId,
+        position: fresh,
+        symbol: fresh.symbol,
+        shares: dto.shares,
+        price,
+        currency: fresh.currency || 'USD',
+        tradeDate: this.todayIso(),
+        fees: dto.fees,
+        note: dto.note,
+        source: 'app',
+      });
+    });
+
+    return {
+      status: 'executed',
+      side: 'buy',
+      position: result.position,
+      trade: result.trade,
+      cost: result.cost,
+      cash_balance: result.cash_balance,
+    };
+  }
+
+  /**
+   * List a user's pending orders plus recent terminal ones (filled/cancelled/
+   * failed), newest first — enough for the UI to show "queued" orders and recent
+   * outcomes. Decimal columns arrive as strings; the client coerces as needed.
+   */
+  async getPendingOrders(userId: string): Promise<PortfolioPendingOrder[]> {
+    return this.pendingRepo.find({
+      where: { user_id: userId },
+      order: { created_at: 'DESC' },
+      take: 50,
+    });
+  }
+
+  /** Cancel a still-pending order. No-op-safe: a non-pending order is rejected. */
+  async cancelPendingOrder(
+    userId: string,
+    id: string,
+  ): Promise<PortfolioPendingOrder> {
     return this.positionRepo.manager.transaction(async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `portfolio:${userId}`,
       ]);
-
-      const repo = tx.getRepository(PortfolioPosition);
-      const position = await repo.findOne({
-        where: { id: positionId, user_id: userId },
-      });
-      if (!position) {
-        throw new NotFoundException('Position not found');
-      }
-
-      const held = Number(position.shares);
-      const sharesToSell = dto.shares;
-      // Tiny epsilon so floating-point representation of a "sell all" doesn't trip.
-      if (sharesToSell > held + 1e-9) {
+      const repo = tx.getRepository(PortfolioPendingOrder);
+      const order = await repo.findOne({ where: { id, user_id: userId } });
+      if (!order) throw new NotFoundException('Pending order not found');
+      if (order.status !== 'pending') {
         throw new BadRequestException(
-          `Cannot sell ${sharesToSell} shares; only ${held} held.`,
+          `Order is already ${order.status}; nothing to cancel.`,
         );
       }
-
-      const price = dto.price;
-      const fees = dto.fees ?? 0;
-      const currency = position.currency || 'USD';
-      const gross = this.round2(sharesToSell * price);
-      const proceeds = this.round2(gross - fees);
-      const costBasis = this.round2(sharesToSell * Number(position.buy_price));
-      const realizedPnl = this.round2(proceeds - costBasis);
-      const sellDate = dto.sell_date || this.todayIso();
-
-      // Reduce or close the lot. A full sell deletes the row; the SELL trade is
-      // kept (FK is ON DELETE SET NULL), so history survives.
-      const remaining = this.round2(held - sharesToSell);
-      let updatedPosition: PortfolioPosition | null;
-      let tradePositionId: string | null;
-      if (remaining <= 0) {
-        await repo.remove(position);
-        updatedPosition = null;
-        tradePositionId = null;
-      } else {
-        position.shares = remaining;
-        updatedPosition = await repo.save(position);
-        tradePositionId = position.id;
-      }
-
-      const trade = await this.insertTradeTx(tx, {
-        userId,
-        positionId: tradePositionId,
-        symbol: position.symbol,
-        side: 'sell',
-        shares: sharesToSell,
-        price,
-        fees,
-        realizedPnl,
-        currency,
-        tradeDate: sellDate,
-        source: 'app',
-        note: dto.note,
-      });
-
-      const cashAfter = await this.adjustCashTx(
-        tx,
-        userId,
-        currency,
-        proceeds,
-        { enforce: false },
-      );
-
-      return {
-        position: updatedPosition,
-        trade,
-        proceeds,
-        realized_pnl: realizedPnl,
-        cash_balance: { currency, amount: cashAfter },
-      };
+      order.status = 'cancelled';
+      return repo.save(order);
     });
+  }
+
+  /**
+   * Cron entry point: fill every pending order whose market is now open, at the
+   * live market price. Concurrency-safe for prod multi-instance: each order is
+   * filled inside a per-user advisory-lock transaction that re-checks the order
+   * is still 'pending' under a row lock, so two runners can't double-fill.
+   */
+  async fillDuePendingOrders(): Promise<{
+    filled: number;
+    failed: number;
+    skipped: number;
+  }> {
+    // Quick gate: if both US and EU are shut, nothing is fillable (OTHER tracks
+    // US hours), so skip the table scan entirely.
+    const markets = await this.marketStatusService.getAllMarketsStatus();
+    if (!markets.us.isOpen && !markets.eu.isOpen) {
+      return { filled: 0, failed: 0, skipped: 0 };
+    }
+
+    const due = await this.pendingRepo.find({
+      where: { status: 'pending' },
+      order: { created_at: 'ASC' },
+      take: 100,
+    });
+    if (due.length === 0) return { filled: 0, failed: 0, skipped: 0 };
+
+    let filled = 0;
+    let failed = 0;
+    let skipped = 0;
+    for (const order of due) {
+      // Per-order live check (cached per region — cheap). Leave it pending if
+      // its specific market isn't open yet.
+      const status = await this.marketStatusService.getMarketStatus(
+        order.symbol,
+      );
+      if (!status.isOpen) {
+        skipped++;
+        continue;
+      }
+      try {
+        const outcome = await this.fillOneOrder(order.id);
+        if (outcome === 'filled') filled++;
+        else if (outcome === 'failed') failed++;
+        else skipped++;
+      } catch (e) {
+        failed++;
+        this.logger.error(
+          `Failed to fill pending order ${order.id}: ${e?.message ?? e}`,
+        );
+      }
+    }
+    return { filled, failed, skipped };
   }
 
   /** Current simulator cash balances, one entry per currency (zero rows omitted). */
@@ -448,6 +623,381 @@ export class PortfolioService implements OnModuleInit {
   // ---------------------------------------------------------------------------
   // Trading-simulator internals
   // ---------------------------------------------------------------------------
+
+  /**
+   * Execute a BUY inside an open transaction: debit cash (enforced), add the
+   * shares to the given lot (weighted-average cost) or open a fresh lot if none
+   * is passed, and append a BUY trade. Caller must hold the per-user advisory
+   * lock. Shared by the live `buy` path and the pending-order filler.
+   */
+  private async executeBuyTx(
+    tx: EntityManager,
+    args: {
+      userId: string;
+      position: PortfolioPosition | null;
+      symbol: string;
+      shares: number;
+      price: number;
+      currency: string;
+      tradeDate: string;
+      fees?: number;
+      note?: string | null;
+      source?: string;
+    },
+  ): Promise<{
+    position: PortfolioPosition;
+    trade: PortfolioTrade;
+    cost: number;
+    cash_balance: CashBalanceView;
+  }> {
+    const repo = tx.getRepository(PortfolioPosition);
+    const fees = args.fees ?? 0;
+    const cost = this.round2(args.shares * args.price + fees);
+
+    // Debit first so an unaffordable buy aborts before any lot/trade is written.
+    const cashAfter = await this.adjustCashTx(tx, args.userId, args.currency, -cost, {
+      enforce: true,
+    });
+
+    let position = args.position;
+    if (position) {
+      // Weighted-average the new shares into the existing lot's cost basis.
+      const heldShares = Number(position.shares);
+      const heldCost = heldShares * Number(position.buy_price);
+      const addCost = args.shares * args.price;
+      const newShares = this.round2(heldShares + args.shares);
+      const newAvg =
+        newShares > 0
+          ? this.round2((heldCost + addCost) / newShares)
+          : Number(position.buy_price);
+      position.shares = newShares;
+      position.buy_price = newAvg;
+      position = await repo.save(position);
+    } else {
+      position = await repo.save(
+        repo.create({
+          user_id: args.userId,
+          symbol: args.symbol,
+          shares: args.shares,
+          buy_price: args.price,
+          buy_date: args.tradeDate,
+          currency: args.currency,
+        }),
+      );
+    }
+
+    const trade = await this.insertTradeTx(tx, {
+      userId: args.userId,
+      positionId: position.id,
+      symbol: args.symbol,
+      side: 'buy',
+      shares: args.shares,
+      price: args.price,
+      fees,
+      currency: args.currency,
+      tradeDate: args.tradeDate,
+      source: args.source ?? 'app',
+      note: args.note,
+    });
+
+    return {
+      position,
+      trade,
+      cost,
+      cash_balance: { currency: args.currency, amount: cashAfter },
+    };
+  }
+
+  /**
+   * Execute a SELL inside an open transaction: reduce/close the lot, book the
+   * realized P&L, credit proceeds (gross − fees), and append a SELL trade. Caller
+   * must hold the per-user advisory lock. Shared by the live `sell` path and the
+   * pending-order filler.
+   */
+  private async executeSellTx(
+    tx: EntityManager,
+    position: PortfolioPosition,
+    args: {
+      userId: string;
+      shares: number;
+      price: number;
+      currency: string;
+      sellDate: string;
+      fees?: number;
+      note?: string | null;
+      source?: string;
+    },
+  ): Promise<{
+    position: PortfolioPosition | null;
+    trade: PortfolioTrade;
+    proceeds: number;
+    realized_pnl: number;
+    cash_balance: CashBalanceView;
+  }> {
+    const repo = tx.getRepository(PortfolioPosition);
+    const held = Number(position.shares);
+    const sharesToSell = args.shares;
+    // Tiny epsilon so floating-point representation of a "sell all" doesn't trip.
+    if (sharesToSell > held + 1e-9) {
+      throw new BadRequestException(
+        `Cannot sell ${sharesToSell} shares; only ${held} held.`,
+      );
+    }
+
+    const fees = args.fees ?? 0;
+    const gross = this.round2(sharesToSell * args.price);
+    const proceeds = this.round2(gross - fees);
+    const costBasis = this.round2(sharesToSell * Number(position.buy_price));
+    const realizedPnl = this.round2(proceeds - costBasis);
+    const symbol = position.symbol;
+
+    // Reduce or close the lot. A full sell deletes the row; the SELL trade is
+    // kept (FK is ON DELETE SET NULL), so history survives.
+    const remaining = this.round2(held - sharesToSell);
+    let updatedPosition: PortfolioPosition | null;
+    let tradePositionId: string | null;
+    if (remaining <= 0) {
+      await repo.remove(position);
+      updatedPosition = null;
+      tradePositionId = null;
+    } else {
+      position.shares = remaining;
+      updatedPosition = await repo.save(position);
+      tradePositionId = position.id;
+    }
+
+    const trade = await this.insertTradeTx(tx, {
+      userId: args.userId,
+      positionId: tradePositionId,
+      symbol,
+      side: 'sell',
+      shares: sharesToSell,
+      price: args.price,
+      fees,
+      realizedPnl,
+      currency: args.currency,
+      tradeDate: args.sellDate,
+      source: args.source ?? 'app',
+      note: args.note,
+    });
+
+    const cashAfter = await this.adjustCashTx(
+      tx,
+      args.userId,
+      args.currency,
+      proceeds,
+      { enforce: false },
+    );
+
+    return {
+      position: updatedPosition,
+      trade,
+      proceeds,
+      realized_pnl: realizedPnl,
+      cash_balance: { currency: args.currency, amount: cashAfter },
+    };
+  }
+
+  /**
+   * Park a buy/sell as a pending order (market was closed). For sells, validate
+   * the requested shares against what's left after already-pending sells on the
+   * same lot so a user can't queue more than they hold.
+   */
+  private async placePendingOrder(
+    userId: string,
+    args: {
+      position: PortfolioPosition | null;
+      symbol: string;
+      side: PendingOrderSide;
+      shares: number;
+      currency: string;
+      region: string;
+      requestedPrice?: number | null;
+      fees?: number;
+      note?: string | null;
+    },
+  ): Promise<PendingOrderResult> {
+    return this.positionRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `portfolio:${userId}`,
+      ]);
+      const repo = tx.getRepository(PortfolioPendingOrder);
+
+      if (args.side === 'sell' && args.position) {
+        const held = Number(args.position.shares);
+        const pendingSells = await repo.find({
+          where: {
+            user_id: userId,
+            position_id: args.position.id,
+            side: 'sell',
+            status: 'pending',
+          },
+        });
+        const reserved = pendingSells.reduce(
+          (sum, o) => sum + Number(o.shares),
+          0,
+        );
+        const available = this.round2(held - reserved);
+        if (args.shares > available + 1e-9) {
+          throw new BadRequestException(
+            `Cannot queue a sell of ${args.shares}: only ${available} shares ` +
+              `available (${reserved} already queued).`,
+          );
+        }
+      }
+
+      const order = repo.create({
+        user_id: userId,
+        position_id: args.position?.id ?? null,
+        symbol: args.symbol,
+        side: args.side,
+        shares: args.shares,
+        currency: args.currency,
+        status: 'pending',
+        region: args.region,
+        requested_price: args.requestedPrice ?? null,
+        fees: args.fees ?? 0,
+        note: args.note ?? null,
+        attempts: 0,
+      });
+      const saved = await repo.save(order);
+      return { status: 'pending' as const, side: args.side, order: saved };
+    });
+  }
+
+  /**
+   * Fill ONE pending order at the live price. Execution is atomic (per-user
+   * advisory lock + row lock + status re-check); failures are recorded in a
+   * separate transaction so a rolled-back attempt never leaves the row wedged.
+   */
+  private async fillOneOrder(
+    orderId: string,
+  ): Promise<'filled' | 'failed' | 'skipped'> {
+    const pre = await this.pendingRepo.findOne({ where: { id: orderId } });
+    if (!pre || pre.status !== 'pending') return 'skipped';
+
+    // Price outside the transaction (no DB lock held during the network call).
+    const price = await this.getCurrentPrice(pre.symbol);
+    if (price == null) {
+      return this.markOrderUnfilled(orderId, 'No live price available.');
+    }
+
+    try {
+      return await this.positionRepo.manager.transaction(async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `portfolio:${pre.user_id}`,
+        ]);
+        const pendingRepo = tx.getRepository(PortfolioPendingOrder);
+        // Re-load under a row lock and re-check: another runner may have taken it.
+        const order = await pendingRepo.findOne({
+          where: { id: orderId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!order || order.status !== 'pending') return 'skipped' as const;
+
+        const posRepo = tx.getRepository(PortfolioPosition);
+        let tradeId: string;
+        if (order.side === 'buy') {
+          const position = order.position_id
+            ? await posRepo.findOne({
+                where: { id: order.position_id, user_id: order.user_id },
+              })
+            : null;
+          const { trade } = await this.executeBuyTx(tx, {
+            userId: order.user_id,
+            position,
+            symbol: order.symbol,
+            shares: Number(order.shares),
+            price,
+            currency: order.currency,
+            tradeDate: this.todayIso(),
+            fees: Number(order.fees) || 0,
+            note: order.note,
+            source: 'app',
+          });
+          tradeId = trade.id;
+        } else {
+          const position = order.position_id
+            ? await posRepo.findOne({
+                where: { id: order.position_id, user_id: order.user_id },
+              })
+            : null;
+          if (!position) {
+            throw new BadRequestException('Position no longer exists.');
+          }
+          const result = await this.executeSellTx(tx, position, {
+            userId: order.user_id,
+            shares: Number(order.shares),
+            price,
+            currency: order.currency,
+            sellDate: this.todayIso(),
+            fees: Number(order.fees) || 0,
+            note: order.note,
+            source: 'app',
+          });
+          tradeId = result.trade.id;
+        }
+
+        order.status = 'filled';
+        order.filled_at = new Date();
+        order.filled_price = price;
+        order.filled_trade_id = tradeId;
+        await pendingRepo.save(order);
+        return 'filled' as const;
+      });
+    } catch (e) {
+      // Expected failures (insufficient cash, lot gone) roll the attempt back
+      // atomically; record the reason / bump attempts in a fresh transaction.
+      return this.markOrderUnfilled(orderId, e?.message ?? String(e));
+    }
+  }
+
+  /**
+   * Record a failed fill attempt: bump `attempts`, store the reason, and mark the
+   * order permanently 'failed' once it has exhausted its retry budget (so a
+   * forever-unfundable order doesn't churn every minute indefinitely).
+   */
+  private async markOrderUnfilled(
+    orderId: string,
+    reason: string,
+  ): Promise<'failed' | 'skipped'> {
+    const MAX_ATTEMPTS = 10;
+    return this.positionRepo.manager.transaction(async (tx) => {
+      const repo = tx.getRepository(PortfolioPendingOrder);
+      const order = await repo.findOne({
+        where: { id: orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order || order.status !== 'pending') return 'skipped';
+      order.attempts = (order.attempts ?? 0) + 1;
+      order.error = reason;
+      if (order.attempts >= MAX_ATTEMPTS) order.status = 'failed';
+      await repo.save(order);
+      return order.status === 'failed' ? 'failed' : 'skipped';
+    });
+  }
+
+  /** Best-effort live price (snapshot close) for a symbol; null if unavailable. */
+  private async getCurrentPrice(symbol: string): Promise<number | null> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const snap: any = await this.marketDataService.getSnapshot(symbol);
+      const close = Number(snap?.latestPrice?.close);
+      return Number.isFinite(close) && close > 0 ? close : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Read a (user, currency) cash amount without locking; 0 if no row exists. */
+  private async getCashAmount(
+    userId: string,
+    currency: string,
+  ): Promise<number> {
+    const repo = this.positionRepo.manager.getRepository(PortfolioCashBalance);
+    const row = await repo.findOne({ where: { user_id: userId, currency } });
+    return row ? Number(row.amount) : 0;
+  }
 
   /** Round to 2 decimals, avoiding binary-float drift on .005 boundaries. */
   private round2(n: number): number {
@@ -873,7 +1423,7 @@ Keep total under 150 words. Be direct, no boilerplate.`;
 
     return {
       recommendation: result.answerMarkdown,
-      model: result.models[0] || 'gemma-4-31b-it',
+      model: result.models[0] || 'gemini-3.1-flash-lite',
       positions: portfolio.length,
     };
   }

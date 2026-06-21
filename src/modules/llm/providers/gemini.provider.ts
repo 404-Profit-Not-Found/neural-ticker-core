@@ -26,17 +26,18 @@ export class GeminiProvider implements ILlmProvider {
     // and a small context window, so large research notes 429'd it constantly
     // and blew the TPM cap ~8x in a single call. flash-lite has ~625x the TPM
     // (10M), a 1M-token context, and is among the cheapest models, so it's a
-    // strictly better fit. Gemma remains a valid manual override (see env vars)
-    // but is no longer the default for any tier.
+    // strictly better fit. These three are hardcoded (not env-tunable) in
+    // src/config/configuration.ts; edit the literal there to switch back to a
+    // gemma-* id. Gemma is no longer the default for any tier.
     summary: 'gemini-3.1-flash-lite',
     recommendation: 'gemini-3.1-flash-lite',
     scoring: 'gemini-3.1-flash-lite',
   };
 
   // Gemma models don't support Google Search grounding or thinking. No tier
-  // defaults to Gemma anymore (see defaultModels), but this set still routes a
-  // manual Gemma override (e.g. GEMINI_MODEL_SCORING=gemma-4-26b-a4b-it) to the
-  // correct no-search / no-thinking config.
+  // defaults to Gemma anymore (see defaultModels), but this set still routes any
+  // gemma-* id — set via the still-tunable tiers (e.g. GEMINI_MODEL_MEDIUM) or
+  // by editing a hardcoded literal — to the correct no-search / no-thinking config.
   private readonly gemmaModels = new Set([
     'gemma-4-26b-a4b-it',
     'gemma-4-31b-it',
@@ -177,12 +178,9 @@ export class GeminiProvider implements ILlmProvider {
     // Models available on the Primary (Free) Key. These run on the free quota
     // and MUST be metered against the daily budget. Keep in sync with the
     // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.5-flash`).
-    const freeModels = [
-      'gemini-3.5-flash',
-      'gemini-3.1-flash-lite',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-    ];
+    // Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite fallbacks were
+    // removed so the app never silently degrades to an older model on a 429.
+    const freeModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 
     const triedOnCurrentKey = new Set<string>();
 

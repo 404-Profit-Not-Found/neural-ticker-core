@@ -594,6 +594,36 @@ export class JobsService {
     }
   }
 
+  // --- PENDING PORTFOLIO ORDERS (market-hours trading) ---
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  private async fillPendingOrdersCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.fillPendingOrders();
+  }
+
+  /**
+   * Fill due pending buy/sell orders (orders placed while the market was closed).
+   * Runs every minute in dev; in production the market-hours scheduler hits the
+   * HTTP endpoint. PortfolioService.fillDuePendingOrders is concurrency-safe, so
+   * overlapping triggers can't double-fill.
+   */
+  async fillPendingOrders() {
+    this.logger.debug('Filling due pending portfolio orders...');
+    try {
+      const result = await this.portfolioService.fillDuePendingOrders();
+      if (result.filled || result.failed) {
+        this.logger.log(
+          `Pending orders processed. Filled: ${result.filled}, Failed: ${result.failed}, Skipped: ${result.skipped}`,
+        );
+      }
+      return result;
+    } catch (e) {
+      this.logger.error('Pending order fill failed', e);
+      throw e;
+    }
+  }
+
   /**
    * Daily job to backfill currency on portfolio positions from their ticker's native currency.
    * This auto-heals positions that were created before currency tracking was added.

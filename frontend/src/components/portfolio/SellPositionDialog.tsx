@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  TrendingDown,
+  Banknote,
   Calendar as CalendarIcon,
   Loader2,
   AlertCircle,
   AlertTriangle,
   Hash,
   Coins,
+  Clock,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { api, cn } from '../../lib/api';
@@ -27,6 +28,14 @@ import { TickerLogo } from '../dashboard/TickerLogo';
 import { PriceRangeSlider } from './PriceRangeSlider';
 import { Sparkline } from '../ui/Sparkline';
 import { toast } from 'sonner';
+import { useTickerMarketStatus } from '../../hooks/useMarketStatus';
+
+const marketLabel = (region?: string): string => {
+  if (region === 'EU') return 'The European market';
+  if (region === 'ASIA') return 'The Asian market';
+  if (region === 'US') return 'The US market';
+  return 'The market';
+};
 
 // The position passed in comes straight from the (possibly currency-converted)
 // Portfolio response. Selling always operates in the position's NATIVE currency
@@ -95,6 +104,11 @@ export function SellPositionDialog({
 
   const [ohlcData, setOhlcData] = useState<OhlcDataPoint[]>([]);
   const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
+
+  // Live market-hours status. Closed → the sale is queued as a pending order
+  // and filled at the market price at the next open.
+  const { data: marketStatus } = useTickerMarketStatus(position?.symbol, open);
+  const isClosed = marketStatus ? !marketStatus.isOpen : false;
 
   // Everything in this dialog is native-currency. `original_*` exist only when
   // the row was converted; fall back to the (then-native) plain fields.
@@ -249,14 +263,22 @@ export function SellPositionDialog({
         payload,
       );
 
-      const realized = Number(data?.realized_pnl ?? realizedPnl);
-      const got = Number(data?.proceeds ?? proceeds);
-      toast.success(
-        `Sold ${sharesNum} ${position.symbol} for ${formatNative(got)}`,
-        {
-          description: `Realized P&L ${realized >= 0 ? '+' : ''}${formatNative(realized)} · credited to ${nativeCurrency} cash`,
-        },
-      );
+      if (data?.status === 'pending') {
+        toast.success(`Sell order queued for ${position.symbol}`, {
+          description: `${sharesNum} sh will fill at the market price when ${marketLabel(
+            marketStatus?.region,
+          ).toLowerCase()} reopens.`,
+        });
+      } else {
+        const realized = Number(data?.realized_pnl ?? realizedPnl);
+        const got = Number(data?.proceeds ?? proceeds);
+        toast.success(
+          `Sold ${sharesNum} ${position.symbol} for ${formatNative(got)}`,
+          {
+            description: `Realized P&L ${realized >= 0 ? '+' : ''}${formatNative(realized)} · credited to ${nativeCurrency} cash`,
+          },
+        );
+      }
       onSuccess();
       onOpenChange(false);
     } catch (err: unknown) {
@@ -278,8 +300,8 @@ export function SellPositionDialog({
       <DialogContent className="sm:max-w-[500px] overflow-visible">
         <DialogHeader className="pb-2">
           <div className="flex items-center gap-3 mb-1">
-            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shadow-sm border border-rose-500/20">
-              <TrendingDown className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-sm border border-emerald-500/20">
+              <Banknote className="w-5 h-5" />
             </div>
             <div>
               <DialogTitle className="text-xl font-bold tracking-tight">
@@ -341,6 +363,18 @@ export function SellPositionDialog({
             <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm flex items-center gap-2">
               <AlertCircle size={16} />
               {error}
+            </div>
+          )}
+
+          {/* Market-closed → queued order notice */}
+          {isClosed && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex items-start gap-2">
+              <Clock size={14} className="mt-0.5 flex-shrink-0" />
+              <span>
+                {marketLabel(marketStatus?.region)} is closed. This sell will be{' '}
+                <strong>queued</strong> and filled automatically at the market
+                price when it reopens — the figures below are estimates.
+              </span>
             </div>
           )}
 
@@ -490,7 +524,9 @@ export function SellPositionDialog({
               </span>
             </div>
             <div className="flex items-center justify-between px-4 py-3 bg-muted/20 rounded-b-xl">
-              <span className="text-xs font-bold text-foreground">Realized P&amp;L</span>
+              <span className="text-xs font-bold text-foreground">
+                {isClosed ? 'Est. realized P&L' : 'Realized P&L'}
+              </span>
               <span
                 className={cn(
                   'text-base font-mono font-bold',
@@ -510,14 +546,16 @@ export function SellPositionDialog({
             <Button
               type="submit"
               disabled={!canSubmit}
-              className="bg-rose-600 hover:bg-rose-700 text-white min-w-[140px]"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[140px]"
             >
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : isClosed ? (
+                <Clock className="mr-2 h-4 w-4" />
               ) : (
-                <TrendingDown className="mr-2 h-4 w-4" />
+                <Banknote className="mr-2 h-4 w-4" />
               )}
-              Sell {position.symbol}
+              {isClosed ? 'Queue Sell' : `Sell ${position.symbol}`}
             </Button>
           </DialogFooter>
         </form>

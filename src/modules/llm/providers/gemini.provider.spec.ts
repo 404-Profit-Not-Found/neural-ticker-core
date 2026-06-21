@@ -200,7 +200,10 @@ describe('GeminiProvider', () => {
     });
 
     it('should use concise system prompt for local text tasks (no search instruction)', async () => {
-      mockGenerateContent.mockResolvedValue({ text: 'Summary', candidates: [] });
+      mockGenerateContent.mockResolvedValue({
+        text: 'Summary',
+        candidates: [],
+      });
 
       await provider.generate({ ...validPrompt, quality: 'summary' });
 

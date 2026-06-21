@@ -371,41 +371,44 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, loading }:
             id: 'actions',
             header: 'Actions',
             cell: (info) => (
-                <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-end gap-1.5">
                     {onSell && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onSell(info.row.original);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                            title="Sell Position"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground border border-border/60 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-colors"
+                            title="Sell shares from this position"
                         >
                             <Banknote size={14} />
+                            Sell
                         </button>
                     )}
-                    {onEdit && (
+                    <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                        {onEdit && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit(info.row.original);
+                                }}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                title="Edit Position"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        )}
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onEdit(info.row.original);
+                                onDelete(info.row.original.id);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title="Edit Position"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete Position"
                         >
-                            <Edit2 size={14} />
+                            <Trash2 size={14} />
                         </button>
-                    )}
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(info.row.original.id);
-                        }}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Delete Position"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    </div>
                 </div>
             )
         })
