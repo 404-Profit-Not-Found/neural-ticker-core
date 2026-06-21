@@ -9,6 +9,8 @@ import { PortfolioStats } from '../components/portfolio/PortfolioStats';
 import { AddPositionDialog } from '../components/portfolio/AddPositionDialog';
 import { EditPositionDialog } from '../components/portfolio/EditPositionDialog';
 import { SellPositionDialog } from '../components/portfolio/SellPositionDialog';
+import { BuyAtMarketDialog } from '../components/portfolio/BuyAtMarketDialog';
+import { PendingOrdersPanel } from '../components/portfolio/PendingOrdersPanel';
 import { CashDialog, type CashBalance } from '../components/portfolio/CashDialog';
 import { TradeHistoryDialog } from '../components/portfolio/TradeHistoryDialog';
 import { PortfolioAiAnalyzer } from '../components/portfolio/PortfolioAiAnalyzer';
@@ -18,7 +20,7 @@ import {
 } from '../components/portfolio/PortfolioCurrencySelector';
 import { FilterBar, type AnalyzerFilters } from '../components/analyzer/FilterBar';
 import { Toaster, toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, LayoutGrid, List, Plus, X, Bot, PieChart } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -75,11 +77,13 @@ export function PortfolioPage() {
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
   const [sellingPosition, setSellingPosition] = useState<PortfolioPosition | null>(null);
+  const [buyingPosition, setBuyingPosition] = useState<PortfolioPosition | null>(null);
   const [isCashOpen, setIsCashOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [cashDefaultCurrency, setCashDefaultCurrency] = useState('USD');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [search, setSearch] = useState('');
+  const queryClient = useQueryClient();
 
   // State for filters
   const [filters, setFilters] = useState<AnalyzerFilters>({
@@ -159,6 +163,9 @@ export function PortfolioPage() {
   const refetchAll = () => {
     void refetch();
     void refetchSummary();
+    // A buy/sell may have been queued as a pending order while the market is
+    // closed — refresh the queued-orders panel too.
+    void queryClient.invalidateQueries({ queryKey: ['portfolio-pending-orders'] });
   };
 
   // Open the cash dialog, optionally pre-selecting a currency (e.g. when a buy
@@ -412,6 +419,9 @@ export function PortfolioPage() {
           </div>
         </div>
 
+        {/* QUEUED (market-hours-pending) ORDERS */}
+        <PendingOrdersPanel onChanged={refetchAll} />
+
         {/* CONTENT */}
         {viewMode === 'table' ? (
           <div className="border border-border/50 rounded-xl bg-card overflow-hidden">
@@ -421,6 +431,7 @@ export function PortfolioPage() {
               onDelete={handleDelete}
               onEdit={(pos) => setEditingPosition(pos as unknown as PortfolioPosition)}
               onSell={(pos) => setSellingPosition(pos as unknown as PortfolioPosition)}
+              onBuy={(pos) => setBuyingPosition(pos as unknown as PortfolioPosition)}
             />
           </div>
         ) : (
@@ -429,6 +440,7 @@ export function PortfolioPage() {
             isLoading={isLoading}
             onEdit={(pos) => setEditingPosition(pos as unknown as PortfolioPosition)}
             onSell={(pos) => setSellingPosition(pos as unknown as PortfolioPosition)}
+            onBuy={(pos) => setBuyingPosition(pos as unknown as PortfolioPosition)}
           />
         )}
       </main>
@@ -467,6 +479,25 @@ export function PortfolioPage() {
           position={sellingPosition}
           onSuccess={() => {
             setSellingPosition(null);
+            refetchAll();
+          }}
+        />
+      )}
+
+      {/* Buy at Market - funds from the position's native cash balance; queued
+          as a pending order when the market is closed */}
+      {buyingPosition && (
+        <BuyAtMarketDialog
+          open={!!buyingPosition}
+          onOpenChange={(open: boolean) => !open && setBuyingPosition(null)}
+          position={buyingPosition}
+          cashBalances={cashBalances}
+          onRequestDeposit={(currency) => {
+            setBuyingPosition(null);
+            openCash(currency);
+          }}
+          onSuccess={() => {
+            setBuyingPosition(null);
             refetchAll();
           }}
         />
