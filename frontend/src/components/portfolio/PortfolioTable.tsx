@@ -1,4 +1,4 @@
-import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
@@ -132,10 +132,11 @@ export function PortfolioTable({ positions, onDelete, onEdit, loading }: Portfol
                                 </span>
                                 {conversionUnavailable && (
                                     <span
-                                        className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider"
-                                        title={`FX rate unavailable — this row is shown in its native ${currency}, not the selected display currency.`}
+                                        className="inline-flex items-center text-amber-500/80 dark:text-amber-400/80 cursor-help"
+                                        title={`Shown in native ${currency} — live FX rate to your display currency is unavailable right now.`}
+                                        aria-label={`Shown in native ${currency}; FX conversion unavailable`}
                                     >
-                                        FX UNAVAILABLE
+                                        <AlertTriangle size={12} strokeWidth={2.25} />
                                     </span>
                                 )}
 

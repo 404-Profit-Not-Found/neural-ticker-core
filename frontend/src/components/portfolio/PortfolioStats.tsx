@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, Tooltip,
   ComposedChart, Area, CartesianGrid
 } from 'recharts';
-import { TrendingUp, TrendingDown, Bot } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bot, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { format, subDays, differenceInDays, addDays, isBefore, startOfDay, parseISO, isValid } from 'date-fns';
@@ -366,12 +366,13 @@ export function PortfolioStats({
                 </div>
               )}
               {conversionUnavailable > 0 && !isNativeMode && (
-                <div
-                  className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                  title={`FX rate unavailable for ${conversionUnavailable} position(s). Those rows render in their native currency.`}
+                <span
+                  className="inline-flex items-center gap-1 mt-2 ml-2 text-[11px] font-medium text-amber-600/80 dark:text-amber-400/80 cursor-help"
+                  title={`Live FX rate unavailable for ${conversionUnavailable} of ${positions.length} position(s) — those rows are shown in their native currency.`}
                 >
-                  {conversionUnavailable} of {positions.length} not converted
-                </div>
+                  <AlertTriangle size={12} />
+                  {conversionUnavailable} in native FX
+                </span>
               )}
             </div>
 
