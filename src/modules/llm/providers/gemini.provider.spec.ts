@@ -150,7 +150,7 @@ describe('GeminiProvider', () => {
       );
     });
 
-    it('should use Gemma 26B for "summary" quality without search tools', async () => {
+    it('should use flash-lite for "summary" quality without search tools', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Summary',
         candidates: [],
@@ -160,29 +160,32 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemma-4-26b-a4b-it',
+          model: 'gemini-3.1-flash-lite',
           config: expect.objectContaining({ tools: undefined }),
         }),
       );
     });
 
-    it('should use Gemma 31B for "recommendation" quality', async () => {
+    it('should use flash-lite for "recommendation" quality', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'Rec', candidates: [] });
 
       await provider.generate({ ...validPrompt, quality: 'recommendation' });
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemma-4-31b-it' }),
+        expect.objectContaining({ model: 'gemini-3.1-flash-lite' }),
       );
     });
 
-    it('should use Gemma 26B for "scoring" quality', async () => {
+    it('should use flash-lite for "scoring" quality without search tools', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'Score', candidates: [] });
 
       await provider.generate({ ...validPrompt, quality: 'scoring' });
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemma-4-26b-a4b-it' }),
+        expect.objectContaining({
+          model: 'gemini-3.1-flash-lite',
+          config: expect.objectContaining({ tools: undefined }),
+        }),
       );
     });
 
@@ -196,8 +199,8 @@ describe('GeminiProvider', () => {
       );
     });
 
-    it('should use concise system prompt for Gemma (no search instruction)', async () => {
-      mockGenerateContent.mockResolvedValue({ text: 'Gemma', candidates: [] });
+    it('should use concise system prompt for local text tasks (no search instruction)', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Summary', candidates: [] });
 
       await provider.generate({ ...validPrompt, quality: 'summary' });
 
@@ -241,11 +244,15 @@ describe('GeminiProvider', () => {
       expect(budget.record).toHaveBeenCalledWith(1);
     });
 
-    it('does NOT meter Gemma calls against the gemini budget (separate quota)', async () => {
+    it('does NOT meter local text tasks (summary/scoring/recommendation) against the budget', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
       const budget = (provider as any).budgetService;
 
+      // These run on flash-lite (which IS a metered free model), but they must
+      // stay excluded so the daily budget keeps gating research throughput only.
       await provider.generate({ ...validPrompt, quality: 'summary' });
+      await provider.generate({ ...validPrompt, quality: 'scoring' });
+      await provider.generate({ ...validPrompt, quality: 'recommendation' });
 
       expect(budget.record).not.toHaveBeenCalled();
     });

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { SuperLoading } from './components/ui/SuperLoading';
 import { ToastProvider } from './components/ui/toast';
 import { Login } from './pages/Login';
@@ -77,9 +78,10 @@ function App() {
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
-        <CurrencyProvider>
-          <ThemeController />
-          <ToastProvider>
+        <LanguageProvider>
+          <CurrencyProvider>
+            <ThemeController />
+            <ToastProvider>
             <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -127,7 +129,8 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </ToastProvider>
-        </CurrencyProvider>
+          </CurrencyProvider>
+        </LanguageProvider>
       </AuthProvider>
     </BrowserRouter>
   );

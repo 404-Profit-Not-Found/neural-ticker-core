@@ -1,0 +1,9 @@
+{
+  "settings.title": "Profile Settings",
+  "settings.subtitle": "Manage your account and preferences.",
+  "preference.heading": "Preference",
+  "preference.theme.title": "Dark Mode & Themes",
+  "preference.theme.subtitle": "UI personalization",
+  "preference.language.title": "Language",
+  "preference.language.subtitle": "Interface language"
+}

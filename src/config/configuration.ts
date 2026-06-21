@@ -60,6 +60,15 @@ export default () => {
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3.1-pro-preview',
         extraction:
           process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
+        // Local text tasks (summarize / score / recommend over text already in
+        // the prompt — no web search). flash-lite by default: on the paid (Tier
+        // 2) key Gemma has the lowest TPM of any model (16K) and a small
+        // context, so big notes 429'd it; flash-lite gives 10M TPM, a 1M
+        // context, and is cheap. Override to a gemma-* id here to switch back.
+        summary: process.env.GEMINI_MODEL_SUMMARY || 'gemini-3.1-flash-lite',
+        recommendation:
+          process.env.GEMINI_MODEL_RECOMMENDATION || 'gemini-3.1-flash-lite',
+        scoring: process.env.GEMINI_MODEL_SCORING || 'gemini-3.1-flash-lite',
       },
     },
     llm: {
