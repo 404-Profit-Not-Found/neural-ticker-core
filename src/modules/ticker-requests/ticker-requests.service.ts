@@ -117,6 +117,41 @@ export class TickerRequestsService {
     });
   }
 
+  /**
+   * Admin convenience: add a ticker in one step — ensure it exists
+   * (Finnhub → Yahoo) and record an APPROVED request row for the audit trail.
+   * Unlike {@link createRequest} this bypasses the per-user daily cap and the
+   * "already tracked" guard (re-adding an existing ticker is a no-op), since an
+   * admin add is a deliberate action rather than a community request.
+   */
+  async adminAddTicker(adminUserId: string, symbol: string) {
+    const sym = (symbol || '').trim().toUpperCase();
+    if (!/^[A-Z0-9.-]{1,10}$/.test(sym)) {
+      throw new BadRequestException('Invalid ticker symbol format');
+    }
+
+    // Fetch + persist the ticker. Idempotent: returns the existing row if
+    // already tracked. May throw NotFoundException (unknown/rate-limited) or a
+    // 202 ACCEPTED HttpException when the add was queued for a background retry.
+    await this.tickersService.ensureTicker(sym);
+
+    // Record an APPROVED request for the audit trail, deduping on (user,symbol)
+    // to respect the unique constraint and avoid piling up rows on re-adds.
+    let request = await this.requestRepo.findOne({
+      where: { user_id: adminUserId, symbol: sym },
+    });
+    if (request) {
+      request.status = 'APPROVED';
+    } else {
+      request = this.requestRepo.create({
+        user_id: adminUserId,
+        symbol: sym,
+        status: 'APPROVED',
+      });
+    }
+    return this.requestRepo.save(request);
+  }
+
   async approveRequest(id: string) {
     const request = await this.requestRepo.findOne({ where: { id } });
     if (!request) throw new NotFoundException('Request not found');

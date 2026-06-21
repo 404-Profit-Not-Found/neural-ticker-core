@@ -22,6 +22,7 @@ import { MarketDataTools } from '../src/modules/mcp/tools/market-data.tools';
 import { RiskTools } from '../src/modules/mcp/tools/risk.tools';
 import { ResearchTools } from '../src/modules/mcp/tools/research.tools';
 import { PortfolioTools } from '../src/modules/mcp/tools/portfolio.tools';
+import { TickerRequestsTools } from '../src/modules/mcp/tools/ticker-requests.tools';
 
 import { MarketDataService } from '../src/modules/market-data/market-data.service';
 import { MarketStatusService } from '../src/modules/market-data/market-status.service';
@@ -33,6 +34,7 @@ import { CreditService } from '../src/modules/users/credit.service';
 import { PortfolioService } from '../src/modules/portfolio/portfolio.service';
 import { WatchlistService } from '../src/modules/watchlist/watchlist.service';
 import { PriceAlertsService } from '../src/modules/price-alerts/price-alerts.service';
+import { TickerRequestsService } from '../src/modules/ticker-requests/ticker-requests.service';
 
 /**
  * Hermetic integration test for the in-process MCP server.
@@ -161,6 +163,26 @@ const mockPriceAlerts = {
   ),
   deleteAlert: jest.fn(() => Promise.resolve(undefined)),
 };
+const mockTickerRequests = {
+  createRequest: jest.fn((userId: string, symbol: string) =>
+    Promise.resolve({ id: 'r1', user_id: userId, symbol, status: 'PENDING' }),
+  ),
+  adminAddTicker: jest.fn((userId: string, symbol: string) =>
+    Promise.resolve({ id: 'r2', user_id: userId, symbol, status: 'APPROVED' }),
+  ),
+  getRequests: jest.fn(() =>
+    Promise.resolve([
+      { id: 'r1', symbol: 'ELXA.F', status: 'PENDING', user_id: 'u1' },
+      { id: 'r2', symbol: 'AAPL', status: 'APPROVED', user_id: 'u2' },
+    ]),
+  ),
+  approveRequest: jest.fn((id: string) =>
+    Promise.resolve({ id, symbol: 'ELXA.F', status: 'APPROVED' }),
+  ),
+  rejectRequest: jest.fn((id: string) =>
+    Promise.resolve({ id, symbol: 'ELXA.F', status: 'REJECTED' }),
+  ),
+};
 
 @Module({
   imports: [
@@ -182,6 +204,7 @@ const mockPriceAlerts = {
     RiskTools,
     ResearchTools,
     PortfolioTools,
+    TickerRequestsTools,
     { provide: MarketDataService, useValue: mockMarketData },
     { provide: MarketStatusService, useValue: mockMarketStatus },
     { provide: TickersService, useValue: mockTickers },
@@ -192,6 +215,7 @@ const mockPriceAlerts = {
     { provide: PortfolioService, useValue: mockPortfolio },
     { provide: WatchlistService, useValue: mockWatchlist },
     { provide: PriceAlertsService, useValue: mockPriceAlerts },
+    { provide: TickerRequestsService, useValue: mockTickerRequests },
   ],
 })
 class McpTestModule {}
@@ -230,6 +254,12 @@ const EXPECTED_TOOLS = [
   'get_price_alerts',
   'create_price_alert',
   'delete_price_alert',
+  // ticker requests (community request + admin approve/add)
+  'request_ticker',
+  'add_ticker',
+  'list_ticker_requests',
+  'approve_ticker_request',
+  'reject_ticker_request',
 ];
 
 describe('MCP endpoint (e2e, mocked services)', () => {
@@ -349,6 +379,80 @@ describe('MCP endpoint (e2e, mocked services)', () => {
     );
     expect(res.result?.isError).toBeFalsy();
     expect(deductCredits).not.toHaveBeenCalled();
+  });
+
+  it('lets a user request a ticker, but rejects anonymous callers', async () => {
+    const anon = await call('request_ticker', { symbol: 'ELXA.F' });
+    expect(anon.result?.isError).toBe(true);
+    expect(anon.result.content[0].text).toContain('Authentication required');
+
+    const res = await call(
+      'request_ticker',
+      { symbol: 'elxa.f' },
+      { 'x-test-user-id': 'user-1' },
+    );
+    expect(res.result?.isError).toBeFalsy();
+    const payload = JSON.parse(res.result.content[0].text);
+    expect(payload.status).toBe('PENDING');
+    expect(payload.symbol).toBe('ELXA.F');
+    expect(mockTickerRequests.createRequest).toHaveBeenCalledWith(
+      'user-1',
+      'ELXA.F',
+    );
+  });
+
+  it('gates admin ticker tools to admins', async () => {
+    const addAsUser = await call(
+      'add_ticker',
+      { symbol: 'NVDA' },
+      { 'x-test-user-id': 'user-1', 'x-test-user-role': 'user' },
+    );
+    expect(addAsUser.result?.isError).toBe(true);
+    expect(addAsUser.result.content[0].text).toContain(
+      'Admin privileges required',
+    );
+
+    const listAsUser = await call(
+      'list_ticker_requests',
+      {},
+      { 'x-test-user-id': 'user-1', 'x-test-user-role': 'user' },
+    );
+    expect(listAsUser.result?.isError).toBe(true);
+  });
+
+  it('lets an admin add, approve and list ticker requests', async () => {
+    const added = await call(
+      'add_ticker',
+      { symbol: 'nvda' },
+      { 'x-test-user-id': 'admin-1', 'x-test-user-role': 'admin' },
+    );
+    expect(added.result?.isError).toBeFalsy();
+    const addedPayload = JSON.parse(added.result.content[0].text);
+    expect(addedPayload.status).toBe('APPROVED');
+    expect(mockTickerRequests.adminAddTicker).toHaveBeenCalledWith(
+      'admin-1',
+      'NVDA',
+    );
+
+    const approved = await call(
+      'approve_ticker_request',
+      { request_id: '123e4567-e89b-12d3-a456-426614174000' },
+      { 'x-test-user-id': 'admin-1', 'x-test-user-role': 'admin' },
+    );
+    expect(approved.result?.isError).toBeFalsy();
+    expect(mockTickerRequests.approveRequest).toHaveBeenCalledWith(
+      '123e4567-e89b-12d3-a456-426614174000',
+    );
+
+    const list = await call(
+      'list_ticker_requests',
+      { status: 'PENDING' },
+      { 'x-test-user-id': 'admin-1', 'x-test-user-role': 'admin' },
+    );
+    expect(list.result?.isError).toBeFalsy();
+    const listPayload = JSON.parse(list.result.content[0].text);
+    expect(Array.isArray(listPayload)).toBe(true);
+    expect(listPayload.every((r: any) => r.status === 'PENDING')).toBe(true);
   });
 });
 

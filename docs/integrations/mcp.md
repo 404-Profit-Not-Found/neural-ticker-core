@@ -3,7 +3,8 @@
 Neural-Ticker exposes its platform as a **Model Context Protocol (MCP)** server, so
 LLM clients (Claude Desktop, Claude Code, Cursor, the MCP Inspector, etc.) can call
 the platform's capabilities as **tools** — market data, risk scoring, AI research,
-and your portfolio / watchlists / price alerts.
+your portfolio / watchlists / price alerts, and (for admins) managing the platform's
+ticker universe.
 
 The server runs **in-process** inside the Neural-Ticker API (no separate process to
 start) and is reachable at a single endpoint.
@@ -67,17 +68,19 @@ immediately, even with an unexpired token).
 
 ### Access levels
 
-The endpoint enforces **two** levels — there is **no** per-role (admin vs user) tool split:
+The endpoint enforces **three** tiers. `tools/list` returns the **same catalog for
+everyone** — access is enforced when a tool is *called* (via `requireUser` /
+`requireAdmin`), not by hiding tools:
 
 | Caller | Tools | Data scope |
 |---|---|---|
 | Anonymous | 11 public (market, risk, currency) | — |
-| Authenticated (`user` **or** `admin`) | + 15 user-scoped | **your own data only** — every call is scoped to your user id; you can never read or modify another user's portfolio, watchlist, alerts or research |
+| Authenticated (`user` **or** `admin`) | + 16 user-scoped | **your own data only** — every call is scoped to your user id; you can never read or modify another user's portfolio, watchlist, alerts or research |
+| Admin (`admin` role) | + 4 admin-only ticker-request tools | manage the platform's ticker universe (approve / reject add requests) |
 
-Admins and regular users share the **same tool set**, and `tools/list` returns the
-same catalog for everyone. An `admin` differs in only two ways: they are **exempt
-from research credit charges**, and they may read **any** user's ticket via
-`get_research`. There are no admin-only tools.
+Beyond the 4 admin-only tools, an `admin` also differs in two ways within the shared
+set: they are **exempt from research credit charges**, and they may read **any**
+user's ticket via `get_research`.
 
 ---
 
@@ -168,9 +171,9 @@ curl -sN http://localhost:8080/api/mcp \
 
 ---
 
-## 4. Tool catalog (26 tools)
+## 4. Tool catalog (31 tools)
 
-`🔓` = anonymous (no token) · `🔐` = requires `Authorization: Bearer`
+`🔓` = anonymous (no token) · `🔐` = requires `Authorization: Bearer` · `👑` = admin only
 Symbols are **auto-uppercased** (`aapl` → `AAPL`).
 
 ### Market data — 🔓 public
@@ -181,7 +184,7 @@ Symbols are **auto-uppercased** (`aapl` → `AAPL`).
 | `get_ticker_snapshots` | `symbols[]` (max 100) | Snapshots for many symbols at once. |
 | `get_ticker_history` | `symbol`, `interval` (`1m\|5m\|15m\|1h\|1d\|1wk\|1mo`, default `1d`), `from`, `to` (YYYY-MM-DD) | Historical OHLCV candles. Intraday intervals limited to recent ranges. |
 | `get_quote` | `symbol` | Lightweight real-time quote (current price + day OHLC). |
-| `search_tickers` | `query?`, `includeExternal?` (default `false`) | Search by symbol or company name. |
+| `search_tickers` | `query?`, `includeExternal?` (default `false`) | Search by symbol or company name. With `includeExternal=true`, also finds symbols **not yet on the platform** (Finnhub/Yahoo) — results with `is_locally_tracked: false` can be added via `request_ticker` / `add_ticker`. |
 | `get_company_news` | `symbol`, `from?`, `to?` | Recent company-specific news headlines. |
 | `get_general_news` | — | Market-wide financial news. |
 | `get_market_status` | — | Open/closed status of major exchanges. |
@@ -223,6 +226,21 @@ Symbols are **auto-uppercased** (`aapl` → `AAPL`).
 | `get_price_alerts` | — | Your price alerts. |
 | `create_price_alert` | `symbol`, `alert_type` (`price_above\|price_below\|percent_change_up\|percent_change_down`), `target_value` (≥0), `cooldown_minutes?` (int ≥1) | Create a price alert. |
 | `delete_price_alert` | `id` | Delete a price alert by id. |
+
+### Ticker requests — 🔐 auth · 👑 admin
+
+Add new stocks to the platform: **discovery → request → admin approval**, mirroring
+the web app's "Request Add" search and the admin "Ticker Requests" panel. Find the
+exact symbol first with `search_tickers` (`includeExternal=true`); results with
+`is_locally_tracked: false` are addable.
+
+| Tool | Arguments | Description |
+|---|---|---|
+| `request_ticker` 🔐 | `symbol` | Request that a new ticker be added. Creates a **PENDING** request an admin must approve; subject to a per-user daily limit. Any authenticated user. |
+| `add_ticker` 👑 | `symbol` | **Admin only.** Request **+ approve in one step** — fetches the company profile from Finnhub (Yahoo fallback) and adds it immediately. Idempotent. If the provider is rate-limited the add is queued and returns `{ status: "QUEUED" }`. |
+| `list_ticker_requests` 👑 | `status?` (`PENDING\|APPROVED\|REJECTED`) | **Admin only.** List ticker-add requests (newest first), optionally filtered by status. |
+| `approve_ticker_request` 👑 | `request_id` (uuid) | **Admin only.** Approve a pending request — fetches the profile, adds the ticker, marks it APPROVED. |
+| `reject_ticker_request` 👑 | `request_id` (uuid) | **Admin only.** Reject a pending request; no ticker is added. |
 
 ---
 
@@ -278,6 +296,10 @@ Then poll:
   `get_ticker_snapshot` calls.
 - **Live data:** market-data tools hit live providers (Finnhub / Yahoo), so latency
   and provider rate limits apply.
+- **Ticker requests:** `request_ticker` is capped per user per day and creates a
+  PENDING request; an admin approves it with `approve_ticker_request` (or adds it
+  directly with `add_ticker`). Approval fetches the company profile from Finnhub
+  (Yahoo fallback), so a brand-new symbol may take a moment to populate.
 
 ---
 
@@ -286,6 +308,7 @@ Then poll:
 | Symptom | Cause / fix |
 |---|---|
 | `isError: Authentication required …` | The tool is user-scoped — add `Authorization: Bearer <token>`. |
+| `isError: Admin privileges required …` | The tool is admin-only (ticker-request management) — use an admin account's token. |
 | Bad/garbage token still rejected | Soft-auth validates the token; an invalid one is treated as anonymous. Re-grab a fresh token. |
 | `Unknown tool: …` (JSON-RPC `-32601`) | Tool name typo — check `tools/list`. |
 | Empty / 406 / parse errors | Ensure `Accept: application/json, text/event-stream` is set. |

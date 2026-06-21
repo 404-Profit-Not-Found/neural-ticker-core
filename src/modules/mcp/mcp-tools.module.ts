@@ -3,6 +3,7 @@ import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { Public } from '../auth/public.decorator';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { TickersModule } from '../tickers/tickers.module';
+import { TickerRequestsModule } from '../ticker-requests/ticker-requests.module';
 import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { ResearchModule } from '../research/research.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
@@ -16,6 +17,7 @@ import { MarketDataTools } from './tools/market-data.tools';
 import { RiskTools } from './tools/risk.tools';
 import { ResearchTools } from './tools/research.tools';
 import { PortfolioTools } from './tools/portfolio.tools';
+import { TickerRequestsTools } from './tools/ticker-requests.tools';
 
 /**
  * In-process Model Context Protocol (MCP) server.
@@ -29,7 +31,8 @@ import { PortfolioTools } from './tools/portfolio.tools';
  *    controller class so the global `JwtAuthGuard` skips it (anonymous reach).
  *  - `guards: [McpSoftAuthGuard]` then validates a Bearer token if present and
  *    populates `request.user`, but never rejects. User-scoped tools enforce
- *    auth themselves via `requireUser(req)`.
+ *    auth themselves via `requireUser(req)`; admin-only tools via
+ *    `requireAdmin(req)`.
  *
  * Stateless mode is used so the endpoint works on Cloud Run (no session
  * affinity).
@@ -51,6 +54,7 @@ import { PortfolioTools } from './tools/portfolio.tools';
     }),
     MarketDataModule,
     TickersModule,
+    TickerRequestsModule,
     RiskRewardModule,
     ResearchModule,
     PortfolioModule,
@@ -60,6 +64,12 @@ import { PortfolioTools } from './tools/portfolio.tools';
     UsersModule,
     AuthModule,
   ],
-  providers: [MarketDataTools, RiskTools, ResearchTools, PortfolioTools],
+  providers: [
+    MarketDataTools,
+    RiskTools,
+    ResearchTools,
+    PortfolioTools,
+    TickerRequestsTools,
+  ],
 })
 export class McpToolsModule {}

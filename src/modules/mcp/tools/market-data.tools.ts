@@ -109,8 +109,11 @@ export class MarketDataTools {
     name: 'search_tickers',
     description:
       'Search for tickers by symbol or company name. Set includeExternal=true ' +
-      'to also search external providers for symbols not yet in the local ' +
-      'universe.',
+      'to also discover symbols not yet on the platform (via Finnhub/Yahoo) — ' +
+      'i.e. to see what is available to add. Each result carries ' +
+      'is_locally_tracked: true (already tracked) or false (not yet — add it ' +
+      'with request_ticker, or add_ticker as admin); is_queued=true means an ' +
+      'add request is already pending.',
     parameters: z.object({
       query: z
         .string()

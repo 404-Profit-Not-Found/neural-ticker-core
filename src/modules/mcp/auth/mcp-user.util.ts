@@ -32,3 +32,18 @@ export function requireUser(req: any): User {
 export function isAdmin(user: User | undefined): boolean {
   return user?.role === 'admin';
 }
+
+/**
+ * Returns the authenticated user only when they are an admin; otherwise throws
+ * a clear tool error. Use for admin-only tools (e.g. adding new tickers).
+ * Anonymous callers and non-admin users are rejected.
+ */
+export function requireAdmin(req: any): User {
+  const user = requireUser(req);
+  if (!isAdmin(user)) {
+    throw new Error(
+      'Admin privileges required: this tool is restricted to admin users.',
+    );
+  }
+  return user;
+}

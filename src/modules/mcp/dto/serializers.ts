@@ -122,6 +122,31 @@ export function serializeWatchlistItem(it: any): Record<string, unknown> {
   };
 }
 
+/**
+ * Ticker-add request. Flattens the eager `user` relation down to a safe
+ * `requested_by` summary (id/name/email) for the admin list view — never the
+ * full `User` (credits, preferences, etc.).
+ */
+export function serializeTickerRequest(r: any): Record<string, unknown> | null {
+  if (!r) return null;
+  const out: Record<string, unknown> = {
+    id: String(r.id),
+    symbol: r.symbol,
+    status: r.status,
+    user_id: r.user_id,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+  if (r.user) {
+    out.requested_by = {
+      id: r.user.id,
+      name: r.user.full_name ?? r.user.nickname ?? null,
+      email: r.user.email,
+    };
+  }
+  return out;
+}
+
 /** Watchlist with its items. Strips the `user` relation. */
 export function serializeWatchlist(w: any): Record<string, unknown> {
   return {
