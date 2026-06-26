@@ -77,6 +77,9 @@ describe('SocialService', () => {
 
   const mockWebPushService = {
     sendToUser: jest.fn().mockResolvedValue(undefined),
+    tickerIconUrl: jest.fn(
+      (symbol: string) => `/api/v1/tickers/${symbol}/logo?fallback=app`,
+    ),
   };
 
   const mockUsersService = {

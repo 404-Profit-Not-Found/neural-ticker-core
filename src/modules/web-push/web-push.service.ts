@@ -180,4 +180,30 @@ export class WebPushService {
   getPublicKey(): string {
     return this.configService.get<string>('VAPID_PUBLIC_KEY', '');
   }
+
+  /**
+   * Build the notification `icon` URL for a ticker's logo.
+   *
+   * Centralised here because this URL was twice hand-built with the WRONG path
+   * (`/v1/tickers/...`) — the global `api` prefix was omitted, so it must be
+   * `/api/v1/tickers/...` (the controller is `@Controller('v1/tickers')` behind
+   * `app.setGlobalPrefix('api')`; the frontend's own logo hook uses `/api/v1`).
+   * The bad URL 404'd, so Android dropped the logo and rendered its generic grey
+   * app-letter icon instead.
+   *
+   * Returned ROOT-RELATIVE on purpose: the service worker resolves a relative
+   * `icon` against its own (frontend) origin, which reverse-proxies `/api` to
+   * the backend and serves `/favicon.svg` directly. This mirrors the
+   * already-working price-alert icon (`/favicon.svg`) and the frontend API
+   * client (`baseURL: '/api/v1'`), and avoids depending on FRONTEND_URL — which
+   * may be unset or a comma-separated apex+www list that would corrupt an
+   * absolute URL.
+   *
+   * `?fallback=app` tells the logo endpoint to redirect to the app favicon when
+   * a ticker has no stored logo (e.g. custom tickers), so a notification ALWAYS
+   * shows a branded icon, never the OS's grey placeholder.
+   */
+  tickerIconUrl(symbol: string): string {
+    return `/api/v1/tickers/${encodeURIComponent(symbol)}/logo?fallback=app`;
+  }
 }

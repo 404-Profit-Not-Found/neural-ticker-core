@@ -388,8 +388,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           );
 
         // 6b. Web push for creator
-        const frontendUrl = this.config.get<string>('frontendUrl') ?? '';
-        const tickerIconUrl = `${frontendUrl}/v1/tickers/${tickerSymbol}/logo`;
+        const tickerIconUrl = this.webPushService.tickerIconUrl(tickerSymbol);
         this.webPushService
           .sendToUser(note.user_id, {
             title: `Research Ready: ${note.tickers.join(', ')}`,
