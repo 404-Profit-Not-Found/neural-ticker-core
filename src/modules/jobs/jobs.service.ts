@@ -272,18 +272,20 @@ export class JobsService {
       throw e;
     }
   }
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_HOUR)
   private async runRiskRewardScannerCron() {
     if (!this.isDevMode) return; // Production uses GitHub Actions
     await this.runRiskRewardScanner();
   }
 
   /**
-   * Max tickers queued per scanner run. Small so each run stays light; the
-   * stale-first rotation + frequent cron schedule cover the whole universe
-   * over time, and the daily LLM budget is the hard ceiling on total work.
+   * Max tickers queued per scanner run. Deliberately tiny so each hourly run
+   * stays light and gentle on the LLM rate limits — no big batch all at once.
+   * The stale-first rotation spreads coverage over time (≈3/run × 24 runs/day
+   * comfortably rotates the universe within the staleness window), and the
+   * daily LLM budget is the hard ceiling on total work.
    */
-  static readonly RISK_SCANNER_BATCH_SIZE = 5;
+  static readonly RISK_SCANNER_BATCH_SIZE = 3;
 
   /**
    * Approx. free-tier flash-lite calls one research ticket consumes (the main
@@ -589,6 +591,36 @@ export class JobsService {
           updated_at: new Date(),
         });
       }
+    }
+  }
+
+  // --- PENDING PORTFOLIO ORDERS (market-hours trading) ---
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  private async fillPendingOrdersCron() {
+    if (!this.isDevMode) return; // Production uses GitHub Actions
+    await this.fillPendingOrders();
+  }
+
+  /**
+   * Fill due pending buy/sell orders (orders placed while the market was closed).
+   * Runs every minute in dev; in production the market-hours scheduler hits the
+   * HTTP endpoint. PortfolioService.fillDuePendingOrders is concurrency-safe, so
+   * overlapping triggers can't double-fill.
+   */
+  async fillPendingOrders() {
+    this.logger.debug('Filling due pending portfolio orders...');
+    try {
+      const result = await this.portfolioService.fillDuePendingOrders();
+      if (result.filled || result.failed) {
+        this.logger.log(
+          `Pending orders processed. Filled: ${result.filled}, Failed: ${result.failed}, Skipped: ${result.skipped}`,
+        );
+      }
+      return result;
+    } catch (e) {
+      this.logger.error('Pending order fill failed', e);
+      throw e;
     }
   }
 

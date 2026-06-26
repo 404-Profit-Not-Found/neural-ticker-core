@@ -894,7 +894,7 @@ Title:`;
         question: titlePrompt,
         tickers: [],
         numericContext: {},
-        quality: 'scoring' as QualityTier, // Gemma 4 26B: 1500 RPD free
+        quality: 'scoring' as QualityTier, // gemini-3.1-flash-lite: cheap, no search
         provider: 'gemini',
         maxTokens: 50,
       });
@@ -1096,7 +1096,7 @@ Title:`;
       maxTokens: 2000,
     });
 
-    // Step 2: Gemma 26B summarizes the gathered content (no search needed)
+    // Step 2: flash-lite summarizes the gathered content (no search needed)
     const summaryPrompt = `Based on the news items below, produce a tight 4-bullet summary for ${symbol} investors. Each bullet: one fact + 1-line implication.
 
 NEWS:
@@ -1112,7 +1112,7 @@ OUTPUT (strict Markdown):
       question: summaryPrompt,
       tickers: [symbol],
       numericContext: {},
-      quality: 'summary', // Gemma 4 26B (1500 RPD free)
+      quality: 'summary', // gemini-3.1-flash-lite: cheap, no search
       provider: 'gemini',
       maxTokens: 600,
     });
@@ -1541,7 +1541,7 @@ OUTPUT (strict Markdown):
       savedPending.quality = 'medium';
       savedPending.provider = LlmProvider.GEMINI;
       savedPending.status = ResearchStatus.COMPLETED;
-      savedPending.models_used = result.models || ['gemini-2.5-flash'];
+      savedPending.models_used = result.models || ['gemini-3.5-flash'];
       savedPending.tokens_in = result.tokensIn ?? 0;
       savedPending.tokens_out = result.tokensOut ?? 0;
 

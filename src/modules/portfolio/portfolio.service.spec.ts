@@ -5,7 +5,9 @@ import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
 import { PortfolioTrade } from './entities/portfolio-trade.entity';
 import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
+import { PortfolioPendingOrder } from './entities/portfolio-pending-order.entity';
 import { MarketDataService } from '../market-data/market-data.service';
+import { MarketStatusService } from '../market-data/market-status.service';
 import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
@@ -63,6 +65,15 @@ const mockTradeRepo: any = {
   find: jest.fn().mockResolvedValue([]),
 };
 
+// Pending-orders repo (market-hours-queued buys/sells). Echoes saves back.
+const mockPendingRepo: any = {
+  create: jest.fn((d: any) => ({ id: 'pending-1', ...d })),
+  save: jest.fn().mockImplementation((r: any) => Promise.resolve(r)),
+  find: jest.fn().mockResolvedValue([]),
+  findOne: jest.fn().mockResolvedValue(null),
+  update: jest.fn().mockResolvedValue({ affected: 1 }),
+};
+
 // create()/sell()/etc. run inside positionRepo.manager.transaction (advisory
 // lock + count-based quota + cash read-modify-write). The tx manager hands back
 // the repo mock matching the requested entity.
@@ -70,6 +81,7 @@ const mockPositionTxManager = {
   getRepository: jest.fn((entity: any) => {
     if (entity === PortfolioCashBalance) return mockCashRepo;
     if (entity === PortfolioTrade) return mockTradeRepo;
+    if (entity === PortfolioPendingOrder) return mockPendingRepo;
     return mockPositionRepo;
   }),
   query: jest.fn().mockResolvedValue(undefined),
@@ -101,6 +113,26 @@ const mockMarketDataService = {
       latestPrice: { close: 150, prevClose: 100 },
     },
   ]),
+  getSnapshot: jest.fn().mockResolvedValue({
+    ticker: { symbol: 'NVDA', name: 'Nvidia' },
+    latestPrice: { close: 150, prevClose: 100 },
+  }),
+};
+
+// Default: the market is OPEN, so buy()/sell() execute synchronously. Tests
+// that exercise the pending path override this per-call.
+const mockMarketStatusService = {
+  getMarketStatus: jest.fn().mockResolvedValue({
+    isOpen: true,
+    session: 'regular',
+    timezone: 'America/New_York',
+    exchange: 'US',
+    region: 'US',
+  }),
+  getAllMarketsStatus: jest.fn().mockResolvedValue({
+    us: { isOpen: true, session: 'regular', region: 'US' },
+    eu: { isOpen: true, session: 'regular', region: 'EU' },
+  }),
 };
 
 const mockLlmService = {
@@ -139,8 +171,16 @@ describe('PortfolioService', () => {
           useValue: mockAnalysisRepo,
         },
         {
+          provide: getRepositoryToken(PortfolioPendingOrder),
+          useValue: mockPendingRepo,
+        },
+        {
           provide: MarketDataService,
           useValue: mockMarketDataService,
+        },
+        {
+          provide: MarketStatusService,
+          useValue: mockMarketStatusService,
         },
         {
           provide: LlmService,
@@ -208,16 +248,25 @@ describe('PortfolioService', () => {
   describe('sell', () => {
     it('should book realized P&L and credit proceeds to cash', async () => {
       // Sell 5 of 10 NVDA @ 150 (bought @ 100): proceeds 750, P&L +250.
-      mockPositionRepo.findOne.mockResolvedValueOnce({
+      // sell() reads the lot twice: once to resolve the symbol for the
+      // market-status check, then again under the per-user lock inside the tx.
+      const lot = {
         ...mockPosition,
         shares: 10,
         buy_price: 100,
         currency: 'USD',
-      });
+      };
+      mockPositionRepo.findOne
+        .mockResolvedValueOnce(lot) // pre-lock market-status read
+        .mockResolvedValueOnce(lot); // locked authoritative read
       const result = await service.sell('user-1', 'uuid-1', {
         shares: 5,
         price: 150,
       });
+      // Market is open (default mock) → the sell executes immediately.
+      if (result.status !== 'executed') {
+        throw new Error('expected an executed sell, got a pending order');
+      }
       expect(result.proceeds).toBe(750);
       expect(result.realized_pnl).toBe(250);
       expect(result.cash_balance.amount).toBe(100750); // 100000 + 750
@@ -227,10 +276,10 @@ describe('PortfolioService', () => {
     });
 
     it('should reject selling more shares than held', async () => {
-      mockPositionRepo.findOne.mockResolvedValueOnce({
-        ...mockPosition,
-        shares: 3,
-      });
+      const lot = { ...mockPosition, shares: 3 };
+      mockPositionRepo.findOne
+        .mockResolvedValueOnce(lot) // pre-lock market-status read
+        .mockResolvedValueOnce(lot); // locked authoritative read
       await expect(
         service.sell('user-1', 'uuid-1', { shares: 5, price: 150 }),
       ).rejects.toThrow(/Cannot sell/);

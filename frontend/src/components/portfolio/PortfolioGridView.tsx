@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, ArrowUp, Bot, Edit2, Banknote } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUp, Bot, Edit2, Banknote, ShoppingCart } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { Badge } from '../ui/badge';
@@ -33,9 +33,10 @@ interface PortfolioGridViewProps {
   isLoading: boolean;
   onEdit: (position: PortfolioItem) => void;
   onSell?: (position: PortfolioItem) => void;
+  onBuy?: (position: PortfolioItem) => void;
 }
 
-export function PortfolioGridView({ data, isLoading, onEdit, onSell }: PortfolioGridViewProps) {
+export function PortfolioGridView({ data, isLoading, onEdit, onSell, onBuy }: PortfolioGridViewProps) {
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -86,7 +87,7 @@ export function PortfolioGridView({ data, isLoading, onEdit, onSell }: Portfolio
           >
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <TickerLogo
                   url={item.ticker?.logo_url}
                   symbol={item.symbol}
@@ -107,25 +108,11 @@ export function PortfolioGridView({ data, isLoading, onEdit, onSell }: Portfolio
                 const { rating, variant } = calculateAiRating(risk, upsideVal, item.aiAnalysis?.overall_score);
 
                 return (
-                  <div className="flex items-center gap-1">
-                    <Badge variant={variant} className="text-[10px] h-5 gap-1 px-1.5 cursor-default">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant={variant} className="text-[10px] h-5 gap-1 px-1.5 cursor-default whitespace-nowrap">
                       <Bot size={10} />
                       {rating}
                     </Badge>
-                    {onSell && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-rose-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSell(item);
-                        }}
-                        title="Sell Position"
-                      >
-                        <Banknote size={12} />
-                      </Button>
-                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -159,6 +146,42 @@ export function PortfolioGridView({ data, isLoading, onEdit, onSell }: Portfolio
                 </div>
               </div>
             </div>
+
+            {/* Buy / Sell actions */}
+            {(onBuy || onSell) && (
+              <div className="flex items-center gap-2 mb-4">
+                {onBuy && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 gap-1.5 text-xs font-semibold border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBuy(item);
+                    }}
+                    title="Buy more shares at the market price"
+                  >
+                    <ShoppingCart size={13} />
+                    Buy
+                  </Button>
+                )}
+                {onSell && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 gap-1.5 text-xs font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSell(item);
+                    }}
+                    title="Sell shares from this position"
+                  >
+                    <Banknote size={13} />
+                    Sell
+                  </Button>
+                )}
+              </div>
+            )}
 
             {/* Stats Footer */}
             <div className="mt-auto grid grid-cols-2 gap-2 pt-4 border-t border-border/50">

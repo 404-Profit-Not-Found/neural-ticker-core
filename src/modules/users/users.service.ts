@@ -236,7 +236,13 @@ export class UsersService {
     'displayCurrency',
     'notifications',
     'gemini_api_key',
+    'language',
   ];
+
+  // Supported UI languages. Must mirror the frontend i18n catalog
+  // (frontend/src/i18n). Used to reject bogus language codes before they land
+  // in the preferences JSON.
+  private static readonly SUPPORTED_LANGUAGES = ['en', 'sk'];
 
   async updatePreferences(
     id: string,
@@ -262,6 +268,15 @@ export class UsersService {
       if (Object.prototype.hasOwnProperty.call(preferences, key)) {
         sanitized[key] = preferences[key];
       }
+    }
+
+    if (
+      sanitized.language !== undefined &&
+      !UsersService.SUPPORTED_LANGUAGES.includes(sanitized.language)
+    ) {
+      throw new BadRequestException(
+        `Unsupported language. Allowed: ${UsersService.SUPPORTED_LANGUAGES.join(', ')}`,
+      );
     }
 
     user.preferences = { ...user.preferences, ...sanitized };

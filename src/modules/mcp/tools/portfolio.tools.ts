@@ -8,6 +8,7 @@ import { requireUser } from '../auth/mcp-user.util';
 import {
   serializePortfolioPosition,
   serializePortfolioTrade,
+  serializePendingOrder,
   serializeCashBalance,
   serializePriceAlert,
   serializeWatchlist,
@@ -229,7 +230,16 @@ export class PortfolioTools {
       fees: args.fees,
       note: args.note,
     });
+    // The market was closed: the sell was queued and will fill at the market
+    // price when the relevant market reopens.
+    if (result.status === 'pending') {
+      return toolJson({
+        status: 'pending',
+        order: serializePendingOrder(result.order),
+      });
+    }
     return toolJson({
+      status: 'executed',
       position: result.position
         ? serializePortfolioPosition(result.position)
         : null,

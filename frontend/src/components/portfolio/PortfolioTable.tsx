@@ -1,4 +1,4 @@
-import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle, AlertTriangle, Banknote } from 'lucide-react';
+import { Trash2, Edit2, ArrowUp, ArrowDown, Brain, Newspaper, MessageCircle, AlertTriangle, Banknote, ShoppingCart } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../ui/data-table';
@@ -83,6 +83,7 @@ interface PortfolioTableProps {
     onDelete: (id: string) => void;
     onEdit?: (position: Position) => void;
     onSell?: (position: Position) => void;
+    onBuy?: (position: Position) => void;
     loading: boolean;
 }
 
@@ -94,7 +95,7 @@ const formatPct = (val: number) =>
     `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
 
 
-export function PortfolioTable({ positions, onDelete, onEdit, onSell, loading }: PortfolioTableProps) {
+export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loading }: PortfolioTableProps) {
     const navigate = useNavigate();
     const { displayCurrency, formatNative } = useCurrency();
     const columnHelper = createColumnHelper<Position>();
@@ -371,41 +372,57 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, loading }:
             id: 'actions',
             header: 'Actions',
             cell: (info) => (
-                <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-end gap-1.5">
+                    {onBuy && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onBuy(info.row.original);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground border border-border/60 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/40 hover:bg-blue-500/10 transition-colors"
+                            title="Buy more shares at the market price"
+                        >
+                            <ShoppingCart size={14} />
+                            Buy
+                        </button>
+                    )}
                     {onSell && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onSell(info.row.original);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                            title="Sell Position"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground border border-border/60 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-colors"
+                            title="Sell shares from this position"
                         >
                             <Banknote size={14} />
+                            Sell
                         </button>
                     )}
-                    {onEdit && (
+                    <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                        {onEdit && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit(info.row.original);
+                                }}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                title="Edit Position"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        )}
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onEdit(info.row.original);
+                                onDelete(info.row.original.id);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title="Edit Position"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete Position"
                         >
-                            <Edit2 size={14} />
+                            <Trash2 size={14} />
                         </button>
-                    )}
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(info.row.original.id);
-                        }}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Delete Position"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    </div>
                 </div>
             )
         })

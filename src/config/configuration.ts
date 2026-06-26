@@ -50,7 +50,8 @@ export default () => {
         // 'low' = the cheap/fast research tier. gemini-3.1-flash-lite gives
         // 500 free requests/day on the primary key (vs ~20/day for the old
         // 2.5-flash-lite) and is NOT a gated "-preview" model, so it stays on
-        // the free key. 2.5-flash-lite remains an automatic 429 fallback.
+        // the free key. On a 429 it falls back to gemini-3.5-flash (also free);
+        // the legacy 2.5 models are no longer in the fallback chain.
         low: process.env.GEMINI_MODEL_LOW || 'gemini-3.1-flash-lite',
         // 'medium' = the balanced "flash" tier. gemini-3.5-flash has no
         // '-preview' suffix, so it runs on the primary (free) key.
@@ -60,6 +61,15 @@ export default () => {
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3.1-pro-preview',
         extraction:
           process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
+        // Local text tasks (summarize / score / recommend over text already in
+        // the prompt — no web search). Hardcoded to flash-lite (not env-tunable)
+        // on purpose: on the paid (Tier 2) key Gemma has the lowest TPM of any
+        // model (16K) and a small context, so big notes 429'd it; flash-lite
+        // gives 10M TPM, a 1M context, and is cheap. Change the literal below to
+        // switch back to a gemma-* id.
+        summary: 'gemini-3.1-flash-lite',
+        recommendation: 'gemini-3.1-flash-lite',
+        scoring: 'gemini-3.1-flash-lite',
       },
     },
     llm: {

@@ -37,16 +37,18 @@ vi.mock('../lib/api', () => ({
 
 // Mock components with simple return values
 vi.mock('../components/layout/Header', () => ({ Header: () => <div data-testid="header">Header</div> }));
-vi.mock('../components/portfolio/PortfolioStats', () => ({ 
-  PortfolioStats: ({ totalValue, onAnalyze }: { totalValue: number; onAnalyze: () => void }) => (
+vi.mock('../components/portfolio/PortfolioStats', () => ({
+  PortfolioStats: ({ totalValue, onAnalyze, onManageCash, onViewHistory }: { totalValue: number; onAnalyze: () => void; onManageCash?: () => void; onViewHistory?: () => void }) => (
     <div data-testid="stats">
       Value: {totalValue}
       <button onClick={onAnalyze}>Analyze</button>
+      <button onClick={onManageCash}>ManageCash</button>
+      <button onClick={onViewHistory}>ViewHistory</button>
     </div>
-  ) 
+  )
 }));
-vi.mock('../components/portfolio/PortfolioTable', () => ({ 
-  PortfolioTable: ({ positions, onDelete, onEdit }: { positions: unknown[]; onDelete: (id: string) => void; onEdit: (position: unknown) => void }) => (
+vi.mock('../components/portfolio/PortfolioTable', () => ({
+  PortfolioTable: ({ positions, onDelete, onEdit, onSell }: { positions: unknown[]; onDelete: (id: string) => void; onEdit: (position: unknown) => void; onSell: (position: unknown) => void }) => (
     <div data-testid="table">
       {(positions || []).map((p) => {
         const position = p as Record<string, unknown>;
@@ -55,15 +57,19 @@ vi.mock('../components/portfolio/PortfolioTable', () => ({
             {position.symbol as string}
             <button onClick={() => onDelete(position.id as string)}>Delete {position.symbol as string}</button>
             <button onClick={() => onEdit(position)}>Edit {position.symbol as string}</button>
+            <button onClick={() => onSell(position)}>Sell {position.symbol as string}</button>
           </div>
         );
       })}
     </div>
-  ) 
+  )
 }));
 vi.mock('../components/portfolio/PortfolioGridView', () => ({ PortfolioGridView: () => <div data-testid="grid">Grid</div> }));
 vi.mock('../components/portfolio/AddPositionDialog', () => ({ AddPositionDialog: ({ open }: { open: boolean }) => open ? <div>AddDialog</div> : null }));
 vi.mock('../components/portfolio/EditPositionDialog', () => ({ EditPositionDialog: ({ open }: { open: boolean }) => open ? <div>EditDialog</div> : null }));
+vi.mock('../components/portfolio/SellPositionDialog', () => ({ SellPositionDialog: ({ open }: { open: boolean }) => open ? <div>SellDialog</div> : null }));
+vi.mock('../components/portfolio/CashDialog', () => ({ CashDialog: ({ open }: { open: boolean }) => open ? <div>CashDialog</div> : null }));
+vi.mock('../components/portfolio/TradeHistoryDialog', () => ({ TradeHistoryDialog: ({ open }: { open: boolean }) => open ? <div>HistoryDialog</div> : null }));
 vi.mock('../components/portfolio/PortfolioAiAnalyzer', () => ({ PortfolioAiAnalyzer: ({ open }: { open: boolean }) => open ? <div>AiDialog</div> : null }));
 vi.mock('../components/analyzer/FilterBar', () => ({ FilterBar: () => <div>Filter</div> }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
@@ -159,6 +165,24 @@ describe('PortfolioPage', () => {
     renderPage();
     fireEvent.click(screen.getByText('Edit AAPL'));
     expect(screen.getByText('EditDialog')).toBeInTheDocument();
+  });
+
+  it('opens sell dialog', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('Sell AAPL'));
+    expect(screen.getByText('SellDialog')).toBeInTheDocument();
+  });
+
+  it('opens cash dialog', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('ManageCash'));
+    expect(screen.getByText('CashDialog')).toBeInTheDocument();
+  });
+
+  it('opens trade history dialog', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('ViewHistory'));
+    expect(screen.getByText('HistoryDialog')).toBeInTheDocument();
   });
 
   it('handles mobile FAB menu', () => {
