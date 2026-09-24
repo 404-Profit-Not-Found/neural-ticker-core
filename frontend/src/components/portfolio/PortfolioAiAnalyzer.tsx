@@ -49,7 +49,7 @@ export function PortfolioAiAnalyzer({ open, onOpenChange }: PortfolioAiAnalyzerP
     if (!model) return 1;
     const m = model.toLowerCase();
     if (m.includes('pro') || m.includes('gpt-5')) return 5;
-    if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash' || m === 'gemini-3.5-flash') return 2;
+    if (m === 'gemini-3-flash-preview' || m === 'gemini-3-flash' || m === 'gemini-3.5-flash' || m === 'gemini-3.8-flash') return 2;
     if (m.includes('mini') || m.includes('gpt-4') || m.includes('flash-lite')) return 1;
     return 5;
   };

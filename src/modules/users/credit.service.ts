@@ -23,6 +23,7 @@ export class CreditService {
     if (
       m === 'gemini-3-flash-preview' ||
       m === 'gemini-3-flash' ||
+      m === 'gemini-3.8-flash' ||
       m === 'gemini-3.5-flash'
     )
       return 2;

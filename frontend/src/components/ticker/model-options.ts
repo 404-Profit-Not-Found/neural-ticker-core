@@ -23,8 +23,8 @@ export const MODEL_OPTIONS: ModelOption[] = [
         defaultQuestion: 'Give me a quick summary for {ticker}',
     },
     {
-        key: 'gemini-3.5-flash',
-        label: 'Gemini 3.5 Flash',
+        key: 'gemini-3.8-flash',
+        label: 'Gemini 3.8 Flash',
         provider: 'gemini',
         quality: 'medium',
         speed: '≈6s',

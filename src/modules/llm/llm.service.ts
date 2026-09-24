@@ -96,6 +96,7 @@ export class LlmService {
     if (
       k === 'gemini-2.5-flash' ||
       k === 'gemini-3-flash-preview' ||
+      k === 'gemini-3.8-flash' ||
       k === 'gemini-3.5-flash' ||
       k === 'gemini'
     )

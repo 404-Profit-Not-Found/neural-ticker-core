@@ -16,7 +16,7 @@ export class GeminiProvider implements ILlmProvider {
 
   private readonly defaultModels = {
     deep: 'gemini-3.1-pro-preview',
-    medium: 'gemini-3.5-flash',
+    medium: 'gemini-3.8-flash',
     low: 'gemini-3.1-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
     cron: 'gemini-3.1-flash-lite',
@@ -177,10 +177,16 @@ export class GeminiProvider implements ILlmProvider {
 
     // Models available on the Primary (Free) Key. These run on the free quota
     // and MUST be metered against the daily budget. Keep in sync with the
-    // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.5-flash`).
-    // Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite fallbacks were
-    // removed so the app never silently degrades to an older model on a 429.
-    const freeModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+    // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.8-flash`).
+    // 3.5-flash stays listed so a GEMINI_MODEL_MEDIUM override back to it is
+    // still metered. Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite
+    // fallbacks were removed so the app never silently degrades to an older
+    // model on a 429.
+    const freeModels = [
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite',
+    ];
 
     const triedOnCurrentKey = new Set<string>();
 
