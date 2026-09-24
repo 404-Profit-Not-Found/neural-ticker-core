@@ -4,31 +4,59 @@
     {
       "name": "backend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start:dev"],
+      "runtimeArgs": [
+        "run",
+        "start:dev"
+      ],
       "port": 3000,
       "autoPort": false
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "cwd": "frontend"
     },
     {
       "name": "frontend-v2",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5273,
       "cwd": "frontend-v2"
     },
     {
       "name": "backend-v2",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["dist/main"],
-      "env": { "PORT": "8082" },
+      "runtimeArgs": [
+        "dist/main"
+      ],
+      "env": {
+        "PORT": "8082"
+      },
       "port": 8082,
       "autoPort": false
+    },
+    {
+      "name": "e2e-report",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "playwright",
+        "show-report",
+        "playwright-report-vs-main",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9323"
+      ],
+      "port": 9323,
+      "cwd": "frontend"
     }
   ]
 }
