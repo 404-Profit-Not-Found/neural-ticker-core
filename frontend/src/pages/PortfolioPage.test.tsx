@@ -65,6 +65,10 @@ vi.mock('../components/portfolio/PortfolioGridView', () => ({ PortfolioGridView:
 vi.mock('../components/portfolio/AddPositionDialog', () => ({ AddPositionDialog: ({ open }: { open: boolean }) => open ? <div>AddDialog</div> : null }));
 vi.mock('../components/portfolio/EditPositionDialog', () => ({ EditPositionDialog: ({ open }: { open: boolean }) => open ? <div>EditDialog</div> : null }));
 vi.mock('../components/portfolio/PortfolioAiAnalyzer', () => ({ PortfolioAiAnalyzer: ({ open }: { open: boolean }) => open ? <div>AiDialog</div> : null }));
+vi.mock('../components/portfolio/CashDialog', () => ({
+  CashDialog: ({ open, defaultCurrency }: { open: boolean; defaultCurrency?: string }) =>
+    open ? <div>CashDialog {defaultCurrency}</div> : null,
+}));
 vi.mock('../components/analyzer/FilterBar', () => ({ FilterBar: () => <div>Filter</div> }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('lucide-react', () => ({
@@ -75,6 +79,7 @@ vi.mock('lucide-react', () => ({
   X: () => <div>XIcon</div>,
   Bot: () => <div>Bot</div>,
   PieChart: () => <div>Pie</div>,
+  Wallet: () => <div>Wallet</div>,
   // Used by PortfolioCurrencySelector (mounted in the page toolbar).
   Coins: () => <div>Coins</div>,
   ChevronDown: () => <div>ChevronDown</div>,
@@ -103,7 +108,11 @@ describe('PortfolioPage', () => {
       ],
       loading: false,
     });
-    (useQuery as Mock).mockReturnValue({ data: mockPositions, isLoading: false, refetch: vi.fn() });
+    (useQuery as Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) =>
+      queryKey[0] === 'portfolio-cash'
+        ? { data: [{ currency: 'USD', amount: 25000 }], refetch: vi.fn() }
+        : { data: mockPositions, isLoading: false, refetch: vi.fn() },
+    );
     (useMarketSnapshots as Mock).mockReturnValue({ data: [], isLoading: false });
   });
 
@@ -147,6 +156,13 @@ describe('PortfolioPage', () => {
     renderPage();
     fireEvent.click(screen.getByText('Add Position'));
     expect(screen.getByText('AddDialog')).toBeInTheDocument();
+  });
+
+  it('shows the cash balance and opens the cash dialog', () => {
+    renderPage();
+    const cashBtn = screen.getByText('$25,000').closest('button');
+    fireEvent.click(cashBtn!);
+    expect(screen.getByText('CashDialog USD')).toBeInTheDocument();
   });
 
   it('opens AI analyzer', () => {

@@ -21,9 +21,15 @@ import { Label } from '../ui/label';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { NativeSelect } from '../ui/select-native';
 import { toast } from 'sonner';
+import { useCurrency } from '../../context/CurrencyContext';
 
-// Mirrors the backend SUPPORTED_CURRENCIES allow-list (cash-operation.dto.ts).
-const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'] as const;
+// Common cash currencies. The backend accepts any ISO code (buys debit the
+// ticker's native currency), so the picker also offers every currency the app
+// knows (/currency/available), the default currency and any currency held.
+const COMMON_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'];
+
+// One-click virtual funding amounts for the paper-trading account.
+const DEPOSIT_PRESETS = [1_000, 10_000, 100_000];
 
 export interface CashBalance {
   currency: string;
@@ -36,6 +42,8 @@ interface CashDialogProps {
   balances: CashBalance[];
   /** Pre-select this currency (e.g. the position the user just tried to buy). */
   defaultCurrency?: string;
+  /** Pre-fill the amount (e.g. the shortfall of a rejected buy). */
+  defaultAmount?: number;
   onSuccess: () => void;
 }
 
@@ -47,29 +55,33 @@ export function CashDialog({
   onOpenChange,
   balances,
   defaultCurrency = 'USD',
+  defaultAmount,
   onSuccess,
 }: CashDialogProps) {
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState(defaultCurrency);
-  const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { availableCurrencies } = useCurrency();
 
   useEffect(() => {
     if (open) {
       setMode('deposit');
-      setAmount('');
-      setNote('');
+      setAmount(defaultAmount && defaultAmount > 0 ? String(Math.ceil(defaultAmount)) : '');
       setError(null);
-      // Only adopt the default if it's an allowed cash currency.
-      setCurrency(
-        (SUPPORTED_CURRENCIES as readonly string[]).includes(defaultCurrency)
-          ? defaultCurrency
-          : 'USD',
-      );
+      setCurrency(/^[A-Z]{3}$/.test(defaultCurrency) ? defaultCurrency : 'USD');
     }
-  }, [open, defaultCurrency]);
+  }, [open, defaultCurrency, defaultAmount]);
+
+  const currencyOptions = Array.from(
+    new Set([
+      ...COMMON_CURRENCIES,
+      ...(availableCurrencies ?? []).map((c) => c.code),
+      currency,
+      ...balances.map((b) => b.currency),
+    ]),
+  ).filter((c) => /^[A-Z]{3}$/.test(c));
 
   const currentBalance =
     balances.find((b) => b.currency === currency)?.amount ?? 0;
@@ -83,10 +95,8 @@ export function CashDialog({
     setError(null);
     setLoading(true);
     try {
-      const payload: Record<string, unknown> = { amount: amountNum, currency };
-      if (note.trim()) payload.note = note.trim();
-
-      const { data } = await api.post(`/portfolio/cash/${mode}`, payload);
+      // No `note`: the backend accepts one but does not persist cash movements yet.
+      const { data } = await api.post(`/portfolio/cash/${mode}`, { amount: amountNum, currency });
       const verb = mode === 'deposit' ? 'Deposited' : 'Withdrew';
       toast.success(`${verb} ${formatCurrency(amountNum, currency)}`, {
         description: `${currency} balance: ${formatCurrency(Number(data?.amount ?? 0), currency)}`,
@@ -119,7 +129,7 @@ export function CashDialog({
                 Manage Cash
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Simulator cash funds your buys and holds your sale proceeds.
+                Virtual paper-trading cash — funds your buys and holds sale proceeds. No real money.
               </DialogDescription>
             </div>
           </div>
@@ -189,7 +199,7 @@ export function CashDialog({
                 onChange={(e) => setCurrency(e.target.value)}
                 className="h-9"
               >
-                {SUPPORTED_CURRENCIES.map((c) => (
+                {currencyOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -197,6 +207,21 @@ export function CashDialog({
               </NativeSelect>
             </div>
           </div>
+
+          {mode === 'deposit' && (
+            <div className="flex gap-2 -mt-2">
+              {DEPOSIT_PRESETS.map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setAmount(String((parseFloat(amount) || 0) + p))}
+                  className="flex-1 px-2 py-1 rounded-md text-xs font-mono border border-border/40 bg-muted/30 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                >
+                  +{p.toLocaleString('en-US')}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-xs px-1">
             <span className="text-muted-foreground">{currency} balance</span>
@@ -209,20 +234,6 @@ export function CashDialog({
               <AlertCircle size={11} /> Amount exceeds your {currency} balance
             </p>
           )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="cash-note" className="text-xs font-bold text-muted-foreground">
-              Note <span className="font-normal text-muted-foreground/60">(optional)</span>
-            </Label>
-            <Input
-              id="cash-note"
-              type="text"
-              placeholder="e.g. Initial funding"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="bg-muted/20"
-            />
-          </div>
 
           <DialogFooter className="pt-2 border-t border-border/50 flex-col sm:flex-row gap-2">
             <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
