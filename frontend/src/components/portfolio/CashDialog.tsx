@@ -21,10 +21,11 @@ import { Label } from '../ui/label';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { NativeSelect } from '../ui/select-native';
 import { toast } from 'sonner';
+import { useCurrency } from '../../context/CurrencyContext';
 
 // Common cash currencies. The backend accepts any ISO code (buys debit the
-// ticker's native currency), so the picker also offers the default currency
-// and any currency the user already holds.
+// ticker's native currency), so the picker also offers every currency the app
+// knows (/currency/available), the default currency and any currency held.
 const COMMON_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'];
 
 // One-click virtual funding amounts for the paper-trading account.
@@ -62,6 +63,7 @@ export function CashDialog({
   const [currency, setCurrency] = useState(defaultCurrency);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { availableCurrencies } = useCurrency();
 
   useEffect(() => {
     if (open) {
@@ -73,8 +75,13 @@ export function CashDialog({
   }, [open, defaultCurrency, defaultAmount]);
 
   const currencyOptions = Array.from(
-    new Set([...COMMON_CURRENCIES, currency, ...balances.map((b) => b.currency)]),
-  );
+    new Set([
+      ...COMMON_CURRENCIES,
+      ...(availableCurrencies ?? []).map((c) => c.code),
+      currency,
+      ...balances.map((b) => b.currency),
+    ]),
+  ).filter((c) => /^[A-Z]{3}$/.test(c));
 
   const currentBalance =
     balances.find((b) => b.currency === currency)?.amount ?? 0;
@@ -207,7 +214,7 @@ export function CashDialog({
                 <button
                   type="button"
                   key={p}
-                  onClick={() => setAmount(String(p))}
+                  onClick={() => setAmount(String((parseFloat(amount) || 0) + p))}
                   className="flex-1 px-2 py-1 rounded-md text-xs font-mono border border-border/40 bg-muted/30 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
                 >
                   +{p.toLocaleString('en-US')}

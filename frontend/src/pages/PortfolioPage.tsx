@@ -361,7 +361,7 @@ export function PortfolioPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
               <PortfolioCurrencySelector
                 value={portfolioCurrency}
                 onChange={handlePortfolioCurrencyChange}
