@@ -31,10 +31,28 @@ test.describe('portfolio — empty account', () => {
     await gotoPortfolio(page);
     await openAddDialog(page);
     await pickTicker(page, 'AAPL', 'Apple Inc');
-    await page.getByRole('button', { name: 'By Shares' }).click();
+    await page.getByRole('tab', { name: 'By Shares' }).click();
     await page.locator('#shares-input').fill('5');
     await expect(page.getByRole('button', { name: /add aapl/i })).toBeEnabled();
     await snap(page, 'add-dialog-aapl.png');
+  });
+});
+
+test.describe('portfolio — add-position form', () => {
+  test.use({ seed: { cash: [{ currency: 'USD', amount: 25_000 }] } });
+
+  // Regression: tab triggers defaulted to type="submit", so switching tabs
+  // with a filled-in order silently placed the buy.
+  test('switching input-mode tabs does not submit the order', async ({ page, backend }) => {
+    await gotoPortfolio(page);
+    await openAddDialog(page);
+    await pickTicker(page, 'AAPL', 'Apple Inc');
+    await page.getByRole('tab', { name: 'By Shares' }).click();
+    await page.locator('#shares-input').fill('10');
+    await page.getByRole('tab', { name: 'By Investment' }).click();
+    await expect(page.getByRole('tab', { name: 'By Investment' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByPlaceholder('Search symbol (e.g. AAPL)...')).toBeVisible();
+    expect(backend.callsTo('POST', '/api/v1/portfolio/positions')).toHaveLength(0);
   });
 });
 
@@ -63,15 +81,15 @@ test.describe('portfolio — with holdings', () => {
     await expect(page.getByText('AAPL', { exact: true })).toHaveCount(0);
   });
 
-  // Deletes the FIRST row: on mobile the floating "+" button covers the
-  // actions of the last visible row (known UX issue).
+  // Last row on purpose: on mobile the floating "+" button used to cover the
+  // actions of the bottom row (fixed with extra bottom padding).
   test('delete a position', async ({ page, backend }) => {
     await gotoPortfolio(page);
     page.once('dialog', (d) => d.accept());
-    const row = page.getByRole('row').filter({ hasText: 'AAPL' });
+    const row = page.getByRole('row').filter({ hasText: 'NVDA' });
     await row.getByRole('button', { name: /delete position/i }).click();
     await expect(page.getByText('Position removed')).toBeVisible();
-    expect(backend.callsTo('DELETE', '/api/v1/portfolio/positions/pos-1')).toHaveLength(1);
-    await expect(page.getByRole('row').filter({ hasText: 'AAPL' })).toHaveCount(0);
+    expect(backend.callsTo('DELETE', '/api/v1/portfolio/positions/pos-3')).toHaveLength(1);
+    await expect(page.getByRole('row').filter({ hasText: 'NVDA' })).toHaveCount(0);
   });
 });

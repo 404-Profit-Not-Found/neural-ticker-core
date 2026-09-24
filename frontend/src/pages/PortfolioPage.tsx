@@ -91,7 +91,7 @@ export function PortfolioPage() {
   // Portfolio view (legacy localStorage key, no longer applied globally).
   // We mirror it into a Portfolio-local state that also supports a NATIVE
   // mode (= empty string), which the global context cannot represent.
-  const { displayCurrency, setDisplayCurrency } = useCurrency();
+  const { displayCurrency, setDisplayCurrency, convert } = useCurrency();
   const [portfolioCurrency, setPortfolioCurrency] = useState<string>(
     () => displayCurrency || 'USD',
   );
@@ -142,6 +142,13 @@ export function PortfolioPage() {
     currency: primaryCash?.currency || 'USD',
     maximumFractionDigits: 0,
   }).format(primaryCash?.amount ?? 0);
+  // Cash in the Portfolio display currency, so Net Worth = holdings + cash.
+  // Undefined in NATIVE mode, where summing across currencies is meaningless.
+  // (Same fallback as the backend summary: an unknown FX rate counts 1:1.)
+  const cashValue = isNativeMode
+    ? undefined
+    : cashBalances.reduce((sum, b) => sum + convert(b.amount, b.currency, portfolioCurrency), 0);
+
   const openCashDialog = (currency?: string, amount?: number) =>
     setCashRequest({ currency: currency || primaryCash?.currency || 'USD', amount });
 
@@ -318,7 +325,7 @@ export function PortfolioPage() {
       <Header />
       <Toaster position="top-right" theme="dark" />
 
-      <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-4 sm:space-y-5 animate-in fade-in duration-500">
+      <main className="container mx-auto px-4 pt-8 pb-28 sm:pb-8 max-w-[90rem] space-y-4 sm:space-y-5 animate-in fade-in duration-500">
 
         {/* HERO STATS */}
         <PortfolioStats
@@ -334,6 +341,8 @@ export function PortfolioPage() {
           displayCurrency={portfolioCurrency}
           isNativeMode={isNativeMode}
           conversionUnavailable={stats.conversionUnavailable}
+          cashValue={cashValue}
+          netWorth={cashValue !== undefined ? stats.totalValue + cashValue : undefined}
         />
 
         {/* TOOLBAR: SEARCH & FILTERS */}
