@@ -9,7 +9,8 @@
       "Read(//Users/branislavlang/Documents/GitHub/**)",
       "Read(//Users/branislavlang/Documents/**)",
       "Bash(npx tsc *)",
-      "mcp__Claude_in_Chrome__browser_batch"
+      "mcp__Claude_in_Chrome__browser_batch",
+      "Bash(python3 -)"
     ]
   }
 }
