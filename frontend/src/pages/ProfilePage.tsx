@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Header } from '../components/layout/Header';
 import { api } from '../lib/api';
 import { UserService } from '../services/userService';
@@ -18,6 +20,7 @@ import {
     Check,
     Loader2,
     Bell,
+    Languages,
 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { UserTierBadge } from '../components/ui/user-tier-badge';
@@ -31,6 +34,8 @@ import { useWebPush } from '../hooks/useWebPush';
 declare const __APP_VERSION__: string;
 
 export function ProfilePage() {
+    const { t } = useTranslation('profile');
+    const { language, setLanguage } = useLanguage();
     const { user, refreshSession } = useAuth();
     const [nickname, setNickname] = useState('');
     const [originalNickname, setOriginalNickname] = useState('');
@@ -201,8 +206,8 @@ export function ProfilePage() {
 
                 {/* PAGE TITLE */}
                 <div className="space-y-1">
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Profile Settings</h1>
-                    <p className="text-muted-foreground text-sm">Manage your account and preferences.</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{t('settings.title')}</h1>
+                    <p className="text-muted-foreground text-sm">{t('settings.subtitle')}</p>
                 </div>
 
                 {/* USER PROFILE CARD - with avatar, email, tags - colorful accent */}
@@ -378,7 +383,7 @@ export function ProfilePage() {
 
                 {/* PREFERENCE SECTION */}
                 <div className="space-y-3">
-                    <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">Preference</h2>
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground px-1">{t('preference.heading')}</h2>
 
                     <div className="bg-card border border-border/40 rounded-xl p-4 space-y-4">
                         <div className="flex items-center gap-3">
@@ -386,8 +391,8 @@ export function ProfilePage() {
                                 <Settings size={18} className="text-muted-foreground" />
                             </div>
                             <div className="flex-1">
-                                <div className="text-sm font-medium">Dark Mode & Themes</div>
-                                <div className="text-xs text-muted-foreground">UI personalization</div>
+                                <div className="text-sm font-medium">{t('preference.theme.title')}</div>
+                                <div className="text-xs text-muted-foreground">{t('preference.theme.subtitle')}</div>
                             </div>
                         </div>
 
@@ -412,6 +417,40 @@ export function ProfilePage() {
                                 >
                                     <t.icon size={14} />
                                     {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Language Switcher */}
+                    <div className="bg-card border border-border/40 rounded-xl p-4 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                                <Languages size={18} className="text-muted-foreground" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium">{t('preference.language.title')}</div>
+                                <div className="text-xs text-muted-foreground">{t('preference.language.subtitle')}</div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 p-1 bg-muted/30 rounded-lg border border-border/40">
+                            {[
+                                { id: 'en' as const, label: 'English' },
+                                { id: 'sk' as const, label: 'Slovenčina' },
+                            ].map((l) => (
+                                <button
+                                    key={l.id}
+                                    type="button"
+                                    onClick={() => void setLanguage(l.id)}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all",
+                                        language === l.id
+                                            ? "bg-background text-foreground shadow-sm border border-border/50"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {l.label}
                                 </button>
                             ))}
                         </div>

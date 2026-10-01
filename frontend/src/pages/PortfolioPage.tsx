@@ -8,15 +8,19 @@ import { PortfolioGridView } from '../components/portfolio/PortfolioGridView';
 import { PortfolioStats } from '../components/portfolio/PortfolioStats';
 import { AddPositionDialog } from '../components/portfolio/AddPositionDialog';
 import { EditPositionDialog } from '../components/portfolio/EditPositionDialog';
-import { PortfolioAiAnalyzer } from '../components/portfolio/PortfolioAiAnalyzer';
+import { SellPositionDialog } from '../components/portfolio/SellPositionDialog';
+import { BuyAtMarketDialog } from '../components/portfolio/BuyAtMarketDialog';
+import { PendingOrdersPanel } from '../components/portfolio/PendingOrdersPanel';
 import { CashDialog, type CashBalance } from '../components/portfolio/CashDialog';
+import { TradeHistoryDialog } from '../components/portfolio/TradeHistoryDialog';
+import { PortfolioAiAnalyzer } from '../components/portfolio/PortfolioAiAnalyzer';
 import {
   PortfolioCurrencySelector,
   PORTFOLIO_DISPLAY_NATIVE,
 } from '../components/portfolio/PortfolioCurrencySelector';
 import { FilterBar, type AnalyzerFilters } from '../components/analyzer/FilterBar';
 import { Toaster, toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, LayoutGrid, List, Plus, X, Bot, PieChart, Wallet } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -74,8 +78,12 @@ export function PortfolioPage() {
   // Cash dialog: `null` = closed; otherwise the currency/amount to pre-fill.
   const [cashRequest, setCashRequest] = useState<{ currency: string; amount?: number } | null>(null);
   const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
+  const [sellingPosition, setSellingPosition] = useState<PortfolioPosition | null>(null);
+  const [buyingPosition, setBuyingPosition] = useState<PortfolioPosition | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [search, setSearch] = useState('');
+  const queryClient = useQueryClient();
 
   // State for filters
   const [filters, setFilters] = useState<AnalyzerFilters>({
@@ -126,10 +134,13 @@ export function PortfolioPage() {
       return data;
     },
   });
+  // Postgres decimals can arrive as strings — coerce before handing to the UI.
   const cashBalances = useMemo<CashBalance[]>(
     () =>
       Array.isArray(cashData)
-        ? cashData.filter((b): b is CashBalance => !!b && typeof b.currency === 'string')
+        ? cashData
+            .filter((b) => !!b && typeof b.currency === 'string')
+            .map((b) => ({ currency: b.currency, amount: Number(b.amount) }))
         : [],
     [cashData],
   );
@@ -160,7 +171,15 @@ export function PortfolioPage() {
     }
   };
 
-
+  // Refetch positions and cash after any mutation (buy, sell, deposit,
+  // withdraw) so the hero stats, toolbar balance and table stay in sync.
+  const refetchAll = () => {
+    void refetch();
+    void refetchCash();
+    // A buy/sell may have been queued as a pending order while the market is
+    // closed — refresh the queued-orders panel too.
+    void queryClient.invalidateQueries({ queryKey: ['portfolio-pending-orders'] });
+  };
 
   // -- Market Data for Sparklines & 52-Week Range --
   const symbols = useMemo(() => (positions || []).filter((p: PortfolioPosition) => p && p.symbol).map((p: PortfolioPosition) => p.symbol), [positions]);
@@ -310,8 +329,7 @@ export function PortfolioPage() {
     try {
       await api.delete(`/portfolio/positions/${id}`);
       toast.success('Position removed');
-      refetch();
-      refetchCash();
+      refetchAll();
     } catch {
       toast.error('Failed to remove position');
     }
@@ -343,6 +361,8 @@ export function PortfolioPage() {
           conversionUnavailable={stats.conversionUnavailable}
           cashValue={cashValue}
           netWorth={cashValue !== undefined ? stats.totalValue + cashValue : undefined}
+          onManageCash={() => openCashDialog()}
+          onViewHistory={() => setIsHistoryOpen(true)}
         />
 
         {/* TOOLBAR: SEARCH & FILTERS */}
@@ -419,6 +439,9 @@ export function PortfolioPage() {
           </div>
         </div>
 
+        {/* QUEUED (market-hours-pending) ORDERS */}
+        <PendingOrdersPanel onChanged={refetchAll} />
+
         {/* CONTENT */}
         {viewMode === 'table' ? (
           <div className="border border-border/50 rounded-xl bg-card overflow-hidden">
@@ -427,6 +450,8 @@ export function PortfolioPage() {
               loading={isLoading}
               onDelete={handleDelete}
               onEdit={(pos) => setEditingPosition(pos as unknown as PortfolioPosition)}
+              onSell={(pos) => setSellingPosition(pos as unknown as PortfolioPosition)}
+              onBuy={(pos) => setBuyingPosition(pos as unknown as PortfolioPosition)}
             />
           </div>
         ) : (
@@ -434,6 +459,8 @@ export function PortfolioPage() {
             data={filteredPositions}
             isLoading={isLoading}
             onEdit={(pos) => setEditingPosition(pos as unknown as PortfolioPosition)}
+            onSell={(pos) => setSellingPosition(pos as unknown as PortfolioPosition)}
+            onBuy={(pos) => setBuyingPosition(pos as unknown as PortfolioPosition)}
           />
         )}
       </main>
@@ -441,10 +468,7 @@ export function PortfolioPage() {
       <AddPositionDialog
         open={isAddOpen}
         onOpenChange={setIsAddOpen}
-        onSuccess={() => {
-          refetch();
-          refetchCash();
-        }}
+        onSuccess={refetchAll}
         cashBalances={cashBalances}
         onDepositRequest={openCashDialog}
       />
@@ -455,7 +479,7 @@ export function PortfolioPage() {
         balances={cashBalances}
         defaultCurrency={cashRequest?.currency}
         defaultAmount={cashRequest?.amount}
-        onSuccess={() => refetchCash()}
+        onSuccess={refetchAll}
       />
 
       <PortfolioAiAnalyzer open={isAiOpen} onOpenChange={setIsAiOpen} />
@@ -468,10 +492,45 @@ export function PortfolioPage() {
           position={editingPosition}
           onSuccess={() => {
             setEditingPosition(null);
-            refetch();
+            refetchAll();
           }}
         />
       )}
+
+      {/* Sell Dialog - credits proceeds to the position's native cash balance */}
+      {sellingPosition && (
+        <SellPositionDialog
+          open={!!sellingPosition}
+          onOpenChange={(open: boolean) => !open && setSellingPosition(null)}
+          position={sellingPosition}
+          onSuccess={() => {
+            setSellingPosition(null);
+            refetchAll();
+          }}
+        />
+      )}
+
+      {/* Buy at Market - funds from the position's native cash balance; queued
+          as a pending order when the market is closed */}
+      {buyingPosition && (
+        <BuyAtMarketDialog
+          open={!!buyingPosition}
+          onOpenChange={(open: boolean) => !open && setBuyingPosition(null)}
+          position={buyingPosition}
+          cashBalances={cashBalances}
+          onRequestDeposit={(currency) => {
+            setBuyingPosition(null);
+            openCashDialog(currency);
+          }}
+          onSuccess={() => {
+            setBuyingPosition(null);
+            refetchAll();
+          }}
+        />
+      )}
+
+      {/* Trade History - full buy/sell ledger across all sources */}
+      <TradeHistoryDialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen} />
       {/* Mobile Expandable FAB (Fixed to Viewport) */}
       <div className="sm:hidden fixed bottom-6 right-6 flex flex-col items-end gap-4 z-[9999]">
         {/* Menu Items (Stacked bottom-to-top) */}

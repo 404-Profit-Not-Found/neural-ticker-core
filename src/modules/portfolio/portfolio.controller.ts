@@ -15,6 +15,7 @@ import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioPositionDto } from './dto/create-portfolio-position.dto';
 import { UpdatePortfolioPositionDto } from './dto/update-portfolio-position.dto';
 import { SellPositionDto } from './dto/sell-position.dto';
+import { BuyAtMarketDto } from './dto/buy-at-market.dto';
 import { CashOperationDto } from './dto/cash-operation.dto';
 import { RecordTradeDto } from './dto/record-trade.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -73,7 +74,9 @@ export class PortfolioController {
 
   @Post('positions/:id/sell')
   @ApiOperation({
-    summary: 'Sell shares of a position (credits cash, records realized P&L)',
+    summary:
+      'Sell shares of a position (market-hours gated: executes when open, ' +
+      'else queued as a pending order)',
   })
   sell(
     @Req() req: AuthenticatedRequest,
@@ -81,6 +84,37 @@ export class PortfolioController {
     @Body() dto: SellPositionDto,
   ) {
     return this.portfolioService.sell(req.user.id, id, dto);
+  }
+
+  @Post('positions/:id/buy')
+  @ApiOperation({
+    summary:
+      'Buy more shares of a position at the live market price (market-hours ' +
+      'gated: executes when open, else queued as a pending order)',
+  })
+  buy(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: BuyAtMarketDto,
+  ) {
+    return this.portfolioService.buy(req.user.id, id, dto);
+  }
+
+  @Get('pending-orders')
+  @ApiOperation({
+    summary: 'List pending (and recent terminal) market orders',
+  })
+  getPendingOrders(@Req() req: AuthenticatedRequest) {
+    return this.portfolioService.getPendingOrders(req.user.id);
+  }
+
+  @Delete('pending-orders/:id')
+  @ApiOperation({ summary: 'Cancel a pending market order' })
+  cancelPendingOrder(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.portfolioService.cancelPendingOrder(req.user.id, id);
   }
 
   @Get('summary')

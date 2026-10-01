@@ -9,6 +9,7 @@ interface NotificationPreferences {
 
 interface UserPreferences {
     notifications?: NotificationPreferences;
+    language?: string;
     [key: string]: unknown;
 }
 

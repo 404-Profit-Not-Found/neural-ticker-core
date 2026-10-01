@@ -408,7 +408,7 @@ export class SocialService {
 
       try {
         const response = await genai.models.generateContent({
-          model: 'gemini-2.0-flash-lite',
+          model: 'gemini-3.1-flash-lite',
           contents: [
             {
               role: 'user',

@@ -299,7 +299,8 @@ export class TickersService {
           // fetch is accepted. maxRedirects stays 0 so the SSRF host check
           // above can't be bypassed via a redirect to a private address.
           headers: {
-            'User-Agent': 'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
+            'User-Agent':
+              'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
           },
           timeout: 10000,
         }),

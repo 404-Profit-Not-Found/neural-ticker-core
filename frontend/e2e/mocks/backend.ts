@@ -235,6 +235,9 @@ export class MockBackend {
       return json({ currency, amount: res.amount });
     }
 
+    // Portfolio: queued (market-closed) orders — none in these scenarios
+    if (v1 === '/portfolio/pending-orders' && method === 'GET') return json([]);
+
     // Portfolio: positions
     if (v1 === '/portfolio/positions' && method === 'GET') {
       return json(this.positions.map((p) => this.enrich(p)));

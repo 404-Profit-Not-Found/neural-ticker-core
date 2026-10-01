@@ -6,6 +6,7 @@ import { PortfolioPosition } from './entities/portfolio-position.entity';
 import { PortfolioAnalysis } from './entities/portfolio-analysis.entity';
 import { PortfolioTrade } from './entities/portfolio-trade.entity';
 import { PortfolioCashBalance } from './entities/portfolio-cash-balance.entity';
+import { PortfolioPendingOrder } from './entities/portfolio-pending-order.entity';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { LlmModule } from '../llm/llm.module';
 import { TickersModule } from '../tickers/tickers.module';
@@ -20,6 +21,7 @@ import { QuotaModule } from '../../common/quota/quota.module';
       PortfolioAnalysis,
       PortfolioTrade,
       PortfolioCashBalance,
+      PortfolioPendingOrder,
     ]),
     forwardRef(() => MarketDataModule),
     LlmModule,

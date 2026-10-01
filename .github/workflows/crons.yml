@@ -56,6 +56,8 @@ jobs:
       # oldest), rotating through the whole universe on a ~weekly cadence. Hard
       # daily free-LLM budget caps total calls so it never hits the billed key.
       # Endpoint returns 202 immediately and runs the scan in the background.
+      # This is the ONLY scanner trigger — hourly + a tiny batch keeps it gentle
+      # (it used to also fire every 5 min, which front-loaded the daily budget).
       - name: Trigger Risk/Reward Scanner (stale-first rotation, budget-gated)
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
@@ -110,9 +112,11 @@ jobs:
     environment: prod
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Trigger Risk/Reward Scanner (stale-first batch, budget-gated)
-        run: curl -X POST ${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" -H "Content-Type:application/json"
-
+      # NOTE: the Risk/Reward Scanner intentionally does NOT run here. It runs
+      # ONLY hourly (see hourly-jobs). Running it every 5 min front-loaded the
+      # daily LLM budget (blasted the whole day's quota in ~4h, then idled) and
+      # hammered the rate limits in bursts. Hourly + a tiny batch (3) spreads the
+      # work gently across the day.
       - name: Trigger Daily Digest Generation
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/daily-digest" \

@@ -29,6 +29,18 @@ export type QualityScoreResult =
 export class QualityScoringService {
   private readonly logger = new Logger(QualityScoringService.name);
 
+  /**
+   * Defensive ceiling on note content sent to the scorer — a safety rail, NOT a
+   * content limiter. The scorer always grades a SINGLE research note (the latest
+   * run for a ticket, or one manual upload); it never concatenates history, so
+   * real input is naturally a few thousand tokens. This cap exists only so a
+   * pathological manual upload (someone pasting a whole book) can't blow up cost
+   * or context — it must stay high enough to never truncate a legitimate
+   * deep-research note (which would unfairly tank its "comprehensiveness" grade).
+   * ~200K chars ≈ 50K tokens, comfortably inside flash-lite's 1M context.
+   */
+  private static readonly MAX_NOTE_CHARS = 200000;
+
   constructor(private readonly llmService: LlmService) {}
 
   async score(noteContent: string): Promise<QualityScoreResult> {
@@ -67,13 +79,13 @@ export class QualityScoringService {
       }
 
       NOTE CONTENT:
-      ${noteContent.substring(0, 500000)} 
+      ${noteContent.substring(0, QualityScoringService.MAX_NOTE_CHARS)}
     `;
 
     try {
       const result = await this.llmService.generateResearch({
         question: prompt,
-        quality: 'scoring', // Gemma 4 26B: 1500 RPD free, unlimited TPM, no search needed
+        quality: 'scoring', // gemini-3.1-flash-lite: cheap, 10M TPM, 1M context, no search
         provider: 'gemini',
         tickers: [],
         numericContext: {},

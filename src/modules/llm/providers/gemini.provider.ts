@@ -20,12 +20,24 @@ export class GeminiProvider implements ILlmProvider {
     low: 'gemini-3.1-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
     cron: 'gemini-3.1-flash-lite',
-    summary: 'gemma-4-26b-a4b-it',
-    recommendation: 'gemma-4-31b-it',
-    scoring: 'gemma-4-26b-a4b-it',
+    // Local text tasks (summarize / score / recommend over text already in the
+    // prompt — no web search). These USED to run on Gemma 4, but on the paid
+    // (Tier 2) key Gemma has the LOWEST limits of any model — 16K TPM / 30 RPM —
+    // and a small context window, so large research notes 429'd it constantly
+    // and blew the TPM cap ~8x in a single call. flash-lite has ~625x the TPM
+    // (10M), a 1M-token context, and is among the cheapest models, so it's a
+    // strictly better fit. These three are hardcoded (not env-tunable) in
+    // src/config/configuration.ts; edit the literal there to switch back to a
+    // gemma-* id. Gemma is no longer the default for any tier.
+    summary: 'gemini-3.1-flash-lite',
+    recommendation: 'gemini-3.1-flash-lite',
+    scoring: 'gemini-3.1-flash-lite',
   };
 
-  // Gemma models don't support Google Search grounding or thinking
+  // Gemma models don't support Google Search grounding or thinking. No tier
+  // defaults to Gemma anymore (see defaultModels), but this set still routes any
+  // gemma-* id — set via the still-tunable tiers (e.g. GEMINI_MODEL_MEDIUM) or
+  // by editing a hardcoded literal — to the correct no-search / no-thinking config.
   private readonly gemmaModels = new Set([
     'gemma-4-26b-a4b-it',
     'gemma-4-31b-it',
@@ -58,7 +70,16 @@ export class GeminiProvider implements ILlmProvider {
     // and is rate-limited harder on flash-lite tiers (returns 429 even with
     // budget left for the model itself).
     const isExtraction = prompt.quality === 'extraction';
-    const tools: Tool[] = isExtraction || isGemma ? [] : [{ googleSearch: {} }];
+    // Local text tasks operate purely on text already present in the prompt
+    // (grade a note / summarize fetched news / recommend from a portfolio list).
+    // They must NOT trigger web search — it adds latency and cost and burns the
+    // grounding quota for no benefit.
+    const isLocalTextTask =
+      prompt.quality === 'summary' ||
+      prompt.quality === 'scoring' ||
+      prompt.quality === 'recommendation';
+    const noSearch = isExtraction || isGemma || isLocalTextTask;
+    const tools: Tool[] = noSearch ? [] : [{ googleSearch: {} }];
 
     let thinkingConfig: ThinkingConfig | undefined;
     if (isThinkingModel) {
@@ -70,8 +91,8 @@ export class GeminiProvider implements ILlmProvider {
 
     const systemInstruction = isExtraction
       ? `You are a strict data extraction engine. Read the provided text and output ONLY the requested JSON. Do not search the web. Do not invent fields. Use null for anything not explicitly stated in the text.`
-      : isGemma
-        ? `You are a concise financial analyst. Answer using only the provided context — do not invent facts.
+      : isGemma || isLocalTextTask
+        ? `You are a concise financial analyst. Answer using only the provided context — do not search the web and do not invent facts.
       Context: ${JSON.stringify(prompt.numericContext)}`
         : `You are a financial analyst performing deep research.
       CRITICAL INSTRUCTION: You have access to a "Google Search" tool. You MUST use it to find the latest news, earnings reports, and market sentiment for the requested tickers. Do not rely solely on your internal knowledge. Gather all available information and resources including news, filings, and press releases, fundamentals, and market data.
@@ -157,12 +178,9 @@ export class GeminiProvider implements ILlmProvider {
     // Models available on the Primary (Free) Key. These run on the free quota
     // and MUST be metered against the daily budget. Keep in sync with the
     // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.5-flash`).
-    const freeModels = [
-      'gemini-3.5-flash',
-      'gemini-3.1-flash-lite',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-    ];
+    // Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite fallbacks were
+    // removed so the app never silently degrades to an older model on a 429.
+    const freeModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 
     const triedOnCurrentKey = new Set<string>();
 
@@ -204,9 +222,18 @@ export class GeminiProvider implements ILlmProvider {
         );
 
         // Count successful free-tier (primary key) flash-lite calls against
-        // the hard daily budget. Gemma (separate quota) and billed secondary
-        // calls are intentionally excluded.
-        if (!hasSwitchedToSecondary && freeModels.includes(currentModel)) {
+        // the hard daily budget. Billed secondary calls are excluded. Local
+        // text tasks (summary/scoring/recommendation) are also excluded: they
+        // historically ran on Gemma's separate quota and were never metered, and
+        // even now that they run on flash-lite the daily budget should keep
+        // gating *research* throughput only — otherwise per-ticket scoring +
+        // title generation would roughly halve the tickets the cron can process
+        // before hitting the cap.
+        if (
+          !hasSwitchedToSecondary &&
+          !isLocalTextTask &&
+          freeModels.includes(currentModel)
+        ) {
           await this.budgetService.record(1);
         }
 

@@ -116,6 +116,35 @@ export function serializePortfolioTrade(t: any): Record<string, unknown> {
   };
 }
 
+/**
+ * A pending (market-hours-queued) buy/sell order. Strips the `user` and
+ * `position` relations; numeric columns come back as TypeORM decimal strings,
+ * so coerce the ones callers compare on.
+ */
+export function serializePendingOrder(o: any): Record<string, unknown> | null {
+  if (!o) return null;
+  return {
+    id: o.id,
+    symbol: o.symbol,
+    side: o.side,
+    shares: Number(o.shares),
+    currency: o.currency,
+    status: o.status,
+    region: o.region,
+    requested_price: o.requested_price == null ? null : Number(o.requested_price),
+    fees: Number(o.fees),
+    note: o.note,
+    attempts: o.attempts,
+    position_id: o.position_id,
+    filled_at: o.filled_at,
+    filled_price: o.filled_price == null ? null : Number(o.filled_price),
+    filled_trade_id: o.filled_trade_id,
+    error: o.error,
+    created_at: o.created_at,
+    updated_at: o.updated_at,
+  };
+}
+
 /** A single cash balance row ({ currency, amount }). */
 export function serializeCashBalance(c: any): Record<string, unknown> {
   return {
