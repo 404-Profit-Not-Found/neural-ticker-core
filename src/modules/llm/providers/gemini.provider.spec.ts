@@ -199,6 +199,16 @@ describe('GeminiProvider', () => {
       );
     });
 
+    it('should use gemini-3.5-flash-lite for user-picked "low" quality', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Low', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'low' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemini-3.5-flash-lite' }),
+      );
+    });
+
     it('should use concise system prompt for local text tasks (no search instruction)', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Summary',

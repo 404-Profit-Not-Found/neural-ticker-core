@@ -13,13 +13,13 @@ export interface ModelOption {
 
 export const MODEL_OPTIONS: ModelOption[] = [
     {
-        key: 'gemini-3.1-flash-lite',
-        label: 'Gemini 3.1 Flash Lite',
+        key: 'gemini-3.5-flash-lite',
+        label: 'Gemini 3.5 Flash Lite',
         provider: 'gemini',
         quality: 'low',
         speed: '≈3s',
         accuracy: 'Efficient',
-        description: 'Ultra-fast and cost-effective for quick summaries. Generous free tier (500/day).',
+        description: 'Ultra-fast and cost-effective for quick summaries.',
         defaultQuestion: 'Give me a quick summary for {ticker}',
     },
     {
