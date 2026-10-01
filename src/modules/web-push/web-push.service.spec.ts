@@ -364,6 +364,28 @@ describe('WebPushService', () => {
     });
   });
 
+  describe('tickerIconUrl', () => {
+    it('builds the root-relative /api/v1 logo URL with the app fallback flag', async () => {
+      // Regression: this URL was previously built as `/v1/tickers/...` (missing
+      // the global `api` prefix), which 404'd and forced Android to fall back to
+      // its grey app-letter icon instead of the logo. It is root-relative so the
+      // service worker resolves it against the frontend origin.
+      service = await buildModule({ frontendUrl: 'https://neuralticker.com' });
+
+      expect(service.tickerIconUrl('AAPL')).toBe(
+        '/api/v1/tickers/AAPL/logo?fallback=app',
+      );
+    });
+
+    it('encodes the symbol', async () => {
+      service = await buildModule({});
+
+      expect(service.tickerIconUrl('BRK B')).toBe(
+        '/api/v1/tickers/BRK%20B/logo?fallback=app',
+      );
+    });
+  });
+
   describe('getPublicKey', () => {
     it('should return the VAPID public key', async () => {
       service = await buildModule({ VAPID_PUBLIC_KEY: 'my-pub-key' });

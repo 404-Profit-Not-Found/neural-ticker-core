@@ -27,6 +27,13 @@ const currency = z
   .enum(['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'])
   .describe('ISO 4217 currency code.');
 
+// Cash balances accept any ISO code: buys debit the ticker's native currency,
+// which can be outside the display allow-list above (e.g. SEK, HKD).
+const cashCurrency = z
+  .string()
+  .regex(/^[A-Z]{3}$/)
+  .describe('ISO 4217 currency code.');
+
 /**
  * User-scoped portfolio, watchlist and price-alert tools. All require
  * authentication (an `Authorization: Bearer` app JWT). `analyze_portfolio`
@@ -270,7 +277,7 @@ export class PortfolioTools {
       'cash, so deposit before buying.',
     parameters: z.object({
       amount: z.number().min(0.01).describe('Amount to deposit (> 0).'),
-      currency: currency
+      currency: cashCurrency
         .optional()
         .describe('Currency of the balance. Defaults to USD.'),
       note: z.string().trim().optional().describe('Optional free-text note.'),
@@ -297,7 +304,7 @@ export class PortfolioTools {
       'Withdraw simulator cash from a currency balance. Cannot go negative.',
     parameters: z.object({
       amount: z.number().min(0.01).describe('Amount to withdraw (> 0).'),
-      currency: currency
+      currency: cashCurrency
         .optional()
         .describe('Currency of the balance. Defaults to USD.'),
       note: z.string().trim().optional().describe('Optional free-text note.'),

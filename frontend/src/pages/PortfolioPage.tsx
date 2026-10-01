@@ -21,7 +21,7 @@ import {
 import { FilterBar, type AnalyzerFilters } from '../components/analyzer/FilterBar';
 import { Toaster, toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, LayoutGrid, List, Plus, X, Bot, PieChart } from 'lucide-react';
+import { Search, LayoutGrid, List, Plus, X, Bot, PieChart, Wallet } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { calculateAiRating } from '../lib/rating-utils';
@@ -75,12 +75,12 @@ export function PortfolioPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  // Cash dialog: `null` = closed; otherwise the currency/amount to pre-fill.
+  const [cashRequest, setCashRequest] = useState<{ currency: string; amount?: number } | null>(null);
   const [editingPosition, setEditingPosition] = useState<PortfolioPosition | null>(null);
   const [sellingPosition, setSellingPosition] = useState<PortfolioPosition | null>(null);
   const [buyingPosition, setBuyingPosition] = useState<PortfolioPosition | null>(null);
-  const [isCashOpen, setIsCashOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [cashDefaultCurrency, setCashDefaultCurrency] = useState('USD');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
@@ -99,7 +99,7 @@ export function PortfolioPage() {
   // Portfolio view (legacy localStorage key, no longer applied globally).
   // We mirror it into a Portfolio-local state that also supports a NATIVE
   // mode (= empty string), which the global context cannot represent.
-  const { displayCurrency, setDisplayCurrency } = useCurrency();
+  const { displayCurrency, setDisplayCurrency, convert } = useCurrency();
   const [portfolioCurrency, setPortfolioCurrency] = useState<string>(
     () => displayCurrency || 'USD',
   );
@@ -126,6 +126,43 @@ export function PortfolioPage() {
     },
   });
 
+  // Virtual paper-trading cash (per currency). Buys are funded from it.
+  const { data: cashData, refetch: refetchCash } = useQuery({
+    queryKey: ['portfolio-cash'],
+    queryFn: async () => {
+      const { data } = await api.get<CashBalance[]>('/portfolio/cash');
+      return data;
+    },
+  });
+  // Postgres decimals can arrive as strings — coerce before handing to the UI.
+  const cashBalances = useMemo<CashBalance[]>(
+    () =>
+      Array.isArray(cashData)
+        ? cashData
+            .filter((b) => !!b && typeof b.currency === 'string')
+            .map((b) => ({ currency: b.currency, amount: Number(b.amount) }))
+        : [],
+    [cashData],
+  );
+  const primaryCash =
+    cashBalances.find((b) => b.currency === (portfolioCurrency || 'USD')) ??
+    cashBalances.find((b) => b.currency === 'USD') ??
+    cashBalances[0];
+  const primaryCashLabel = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: primaryCash?.currency || 'USD',
+    maximumFractionDigits: 0,
+  }).format(primaryCash?.amount ?? 0);
+  // Cash in the Portfolio display currency, so Net Worth = holdings + cash.
+  // Undefined in NATIVE mode, where summing across currencies is meaningless.
+  // (Same fallback as the backend summary: an unknown FX rate counts 1:1.)
+  const cashValue = isNativeMode
+    ? undefined
+    : cashBalances.reduce((sum, b) => sum + convert(b.amount, b.currency, portfolioCurrency), 0);
+
+  const openCashDialog = (currency?: string, amount?: number) =>
+    setCashRequest({ currency: currency || primaryCash?.currency || 'USD', amount });
+
   const handlePortfolioCurrencyChange = (next: string) => {
     setPortfolioCurrency(next);
     // Persist non-NATIVE selections as the user's default for next visit.
@@ -134,48 +171,15 @@ export function PortfolioPage() {
     }
   };
 
-  // Simulator cash + net-worth summary. Cash balances are native per-currency,
-  // so this is useful in both NATIVE and converted modes; holdings_value /
-  // net_worth are only meaningful when a single display currency is picked.
-  const { data: summary, refetch: refetchSummary } = useQuery({
-    queryKey: ['portfolio-summary', portfolioCurrency],
-    queryFn: async () => {
-      const { data } = await api.get('/portfolio/summary', {
-        params: isNativeMode ? {} : { displayCurrency: portfolioCurrency },
-      });
-      return data;
-    },
-  });
-
-  // Postgres decimals arrive as strings — coerce before handing to the UI.
-  const cashBalances = useMemo<CashBalance[]>(
-    () =>
-      ((summary?.cash_balances ?? []) as Array<{ currency: string; amount: number | string }>).map(
-        (b) => ({ currency: b.currency, amount: Number(b.amount) }),
-      ),
-    [summary],
-  );
-  const cashValue = summary?.cash_value !== undefined ? Number(summary.cash_value) : undefined;
-  const netWorth = summary?.net_worth !== undefined ? Number(summary.net_worth) : undefined;
-
-  // Refetch both positions and the cash/net-worth summary after any mutation
-  // (buy, sell, deposit, withdraw) so the hero stats and table stay in sync.
+  // Refetch positions and cash after any mutation (buy, sell, deposit,
+  // withdraw) so the hero stats, toolbar balance and table stay in sync.
   const refetchAll = () => {
     void refetch();
-    void refetchSummary();
+    void refetchCash();
     // A buy/sell may have been queued as a pending order while the market is
     // closed — refresh the queued-orders panel too.
     void queryClient.invalidateQueries({ queryKey: ['portfolio-pending-orders'] });
   };
-
-  // Open the cash dialog, optionally pre-selecting a currency (e.g. when a buy
-  // was blocked for insufficient funds in the ticker's native currency).
-  const openCash = (currency?: string) => {
-    setCashDefaultCurrency(currency || (isNativeMode ? 'USD' : portfolioCurrency) || 'USD');
-    setIsCashOpen(true);
-  };
-
-
 
   // -- Market Data for Sparklines & 52-Week Range --
   const symbols = useMemo(() => (positions || []).filter((p: PortfolioPosition) => p && p.symbol).map((p: PortfolioPosition) => p.symbol), [positions]);
@@ -339,7 +343,7 @@ export function PortfolioPage() {
       <Header />
       <Toaster position="top-right" theme="dark" />
 
-      <main className="container mx-auto px-4 py-8 max-w-[90rem] space-y-4 sm:space-y-5 animate-in fade-in duration-500">
+      <main className="container mx-auto px-4 pt-8 pb-28 sm:pb-8 max-w-[90rem] space-y-4 sm:space-y-5 animate-in fade-in duration-500">
 
         {/* HERO STATS */}
         <PortfolioStats
@@ -356,8 +360,8 @@ export function PortfolioPage() {
           isNativeMode={isNativeMode}
           conversionUnavailable={stats.conversionUnavailable}
           cashValue={cashValue}
-          netWorth={netWorth}
-          onManageCash={() => openCash()}
+          netWorth={cashValue !== undefined ? stats.totalValue + cashValue : undefined}
+          onManageCash={() => openCashDialog()}
           onViewHistory={() => setIsHistoryOpen(true)}
         />
 
@@ -386,11 +390,27 @@ export function PortfolioPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-border/30 sm:border-0">
               <PortfolioCurrencySelector
                 value={portfolioCurrency}
                 onChange={handlePortfolioCurrencyChange}
               />
+              <Button
+                variant="outline"
+                onClick={() => openCashDialog()}
+                title={
+                  cashBalances.length
+                    ? cashBalances.map((b) => `${b.currency} ${b.amount.toFixed(2)}`).join('\n')
+                    : 'Deposit virtual cash to start paper trading'
+                }
+                className="gap-2 h-8 font-mono"
+              >
+                <Wallet size={16} />
+                {primaryCashLabel}
+                {cashBalances.length > 1 && (
+                  <span className="text-[10px] text-muted-foreground">+{cashBalances.length - 1}</span>
+                )}
+              </Button>
               <Button
                 onClick={() => setIsAddOpen(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-8 shadow-sm flex-1 sm:flex-initial"
@@ -450,10 +470,16 @@ export function PortfolioPage() {
         onOpenChange={setIsAddOpen}
         onSuccess={refetchAll}
         cashBalances={cashBalances}
-        onRequestDeposit={(currency) => {
-          setIsAddOpen(false);
-          openCash(currency);
-        }}
+        onDepositRequest={openCashDialog}
+      />
+
+      <CashDialog
+        open={!!cashRequest}
+        onOpenChange={(open) => !open && setCashRequest(null)}
+        balances={cashBalances}
+        defaultCurrency={cashRequest?.currency}
+        defaultAmount={cashRequest?.amount}
+        onSuccess={refetchAll}
       />
 
       <PortfolioAiAnalyzer open={isAiOpen} onOpenChange={setIsAiOpen} />
@@ -494,7 +520,7 @@ export function PortfolioPage() {
           cashBalances={cashBalances}
           onRequestDeposit={(currency) => {
             setBuyingPosition(null);
-            openCash(currency);
+            openCashDialog(currency);
           }}
           onSuccess={() => {
             setBuyingPosition(null);
@@ -502,15 +528,6 @@ export function PortfolioPage() {
           }}
         />
       )}
-
-      {/* Cash Dialog - deposit / withdraw simulator funds */}
-      <CashDialog
-        open={isCashOpen}
-        onOpenChange={setIsCashOpen}
-        balances={cashBalances}
-        defaultCurrency={cashDefaultCurrency}
-        onSuccess={refetchAll}
-      />
 
       {/* Trade History - full buy/sell ledger across all sources */}
       <TradeHistoryDialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen} />

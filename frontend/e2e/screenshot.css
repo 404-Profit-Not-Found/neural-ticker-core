@@ -1,0 +1,12 @@
+/* Applied only while Playwright captures toHaveScreenshot() images. */
+
+/* TanStack Query devtools launcher (dev server only). */
+.tsqd-parent-container,
+.tsqd-open-btn-container {
+  display: none !important;
+}
+
+/* Blinking text carets / focus rings shouldn't cause pixel diffs. */
+* {
+  caret-color: transparent !important;
+}

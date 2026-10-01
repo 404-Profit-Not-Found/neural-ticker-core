@@ -34,7 +34,7 @@ const Tabs = ({
 }
 
 const TabsList = ({ className, children }: { className?: string, children: React.ReactNode }) => (
-    <div className={cn("inline-flex h-10 items-center justify-start rounded-none border-b border-border bg-transparent p-0 text-muted-foreground w-full", className)}>
+    <div role="tablist" className={cn("inline-flex h-10 items-center justify-start rounded-none border-b border-border bg-transparent p-0 text-muted-foreground w-full", className)}>
         {children}
     </div>
 )
@@ -47,6 +47,12 @@ const TabsTrigger = ({ value, className, children }: { value: string, className?
 
     return (
         <button
+            // type="button": triggers often sit inside a <form>; the default
+            // type="submit" made switching tabs submit it (placing a buy /
+            // moving cash).
+            type="button"
+            role="tab"
+            aria-selected={isActive}
             className={cn(
                 "inline-flex items-center justify-center whitespace-nowrap py-2 px-4 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
                 "border-b-2 border-transparent hover:text-foreground/80",
@@ -67,7 +73,7 @@ const TabsContent = ({ value, className, children }: { value: string, className?
     if (context.value !== value) return null;
 
     return (
-        <div className={cn("mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 animate-in fade-in-50 zoom-in-99 duration-200", className)}>
+        <div role="tabpanel" className={cn("mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 animate-in fade-in-50 zoom-in-99 duration-200", className)}>
             {children}
         </div>
     )

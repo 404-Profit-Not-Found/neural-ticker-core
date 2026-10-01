@@ -1,4 +1,4 @@
-import { IsNumber, Min, IsOptional, IsString, IsIn } from 'class-validator';
+import { IsNumber, Min, IsOptional, IsString, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export const SUPPORTED_CURRENCIES = [
@@ -20,13 +20,16 @@ export class CashOperationDto {
 
   @ApiProperty({
     example: 'USD',
-    description: 'Currency of the cash balance.',
+    description:
+      'Currency of the cash balance (ISO 4217). Any code is accepted because ' +
+      "buys debit the ticker's native currency, which may be outside " +
+      'SUPPORTED_CURRENCIES (e.g. SEK, HKD).',
     required: false,
     default: 'USD',
   })
   @IsOptional()
   @IsString()
-  @IsIn(SUPPORTED_CURRENCIES as unknown as string[])
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter ISO code' })
   currency?: string;
 
   @ApiProperty({ required: false, description: 'Optional free-text note.' })

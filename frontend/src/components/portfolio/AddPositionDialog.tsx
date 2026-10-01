@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Calendar as CalendarIcon, Search, Loader2, AlertCircle, DollarSign, Hash } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Search, Loader2, AlertCircle, DollarSign, Hash, Wallet } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { api, cn } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -45,20 +45,20 @@ const getCurrencySymbol = (currencyCode?: string) => {
   }
 };
 
-const formatMoney = (val: number, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
-
 interface AddPositionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  /** Simulator cash balances, used to show buying power for the picked ticker. */
+  /** Simulator cash balances; buys are funded from the ticker's currency. */
   cashBalances?: CashBalance[];
-  /** Opens the cash dialog pre-set to the given currency (deposit shortcut). */
-  onRequestDeposit?: (currency: string) => void;
+  /** Open the deposit flow for `currency`, optionally pre-filled with `amount`. */
+  onDepositRequest?: (currency: string, amount?: number) => void;
 }
 
-export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances = [], onRequestDeposit }: AddPositionDialogProps) {
+// Backend rejection: "Insufficient USD cash: need 1161.58, have 0.00. ..."
+const INSUFFICIENT_CASH_RE = /Insufficient ([A-Z]{3}) cash: need ([\d.]+), have (-?[\d.]+)/;
+
+export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances, onDepositRequest }: AddPositionDialogProps) {
   const [symbol, setSymbol] = useState('');
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
@@ -102,16 +102,22 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances 
     return getCurrencySymbol(tickerCurrency);
   }, [tickerCurrency]);
 
-  // Buying power = simulator cash held in the ticker's native currency. The
-  // strict simulator deducts the buy cost from this balance, so we surface it
-  // up-front and warn before the backend rejects an underfunded buy.
-  const buyingPower = useMemo(
-    () => cashBalances.find((b) => b.currency === tickerCurrency)?.amount ?? 0,
-    [cashBalances, tickerCurrency],
-  );
-  const estimatedCost = parseFloat(investment) || parseFloat(shares) * parseFloat(price) || 0;
-  const insufficientCash = !!symbol && estimatedCost > buyingPower + 1e-9;
-  const errorIsInsufficient = !!error && /insufficient|deposit cash/i.test(error);
+  // The backend debits the ticker's native currency (USD when unknown).
+  const cashCurrency = selectedTicker?.currency || 'USD';
+  const availableCash = cashBalances?.find((b) => b.currency === cashCurrency)?.amount ?? 0;
+  const orderCost = (parseFloat(shares) || 0) * (parseFloat(price) || 0);
+  const cashShortfall = orderCost - availableCash;
+
+  const insufficientCash = useMemo(() => {
+    const m = error?.match(INSUFFICIENT_CASH_RE);
+    if (!m) return null;
+    return { currency: m[1], shortfall: parseFloat(m[2]) - parseFloat(m[3]) };
+  }, [error]);
+
+  const requestDeposit = (currency: string, amount?: number) => {
+    setError(null);
+    onDepositRequest?.(currency, amount);
+  };
 
   // Derived calculations
   useEffect(() => {
@@ -371,20 +377,20 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances 
 
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           {error && (
-            <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm flex items-start gap-2">
-              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p>{error}</p>
-                {errorIsInsufficient && onRequestDeposit && (
-                  <button
-                    type="button"
-                    onClick={() => onRequestDeposit(tickerCurrency)}
-                    className="mt-1 font-bold text-primary hover:underline"
-                  >
-                    Deposit {tickerCurrency} cash →
-                  </button>
-                )}
-              </div>
+            <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              <span className="flex-1">{error}</span>
+              {insufficientCash && onDepositRequest && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => requestDeposit(insufficientCash.currency, insufficientCash.shortfall)}
+                  className="shrink-0 h-7 gap-1.5 border-red-500/40 text-red-400 hover:text-foreground"
+                >
+                  <Wallet size={13} /> Deposit cash
+                </Button>
+              )}
             </div>
           )}
 
@@ -659,42 +665,29 @@ export function AddPositionDialog({ open, onOpenChange, onSuccess, cashBalances 
                             />
                         </div>
                 </div>
-
-                {symbol && (
-                  <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/10 px-3 py-2 text-xs">
-                    <span className="text-muted-foreground">
-                      Buying power{' '}
-                      <span className="font-mono font-semibold text-foreground">
-                        {formatMoney(buyingPower, tickerCurrency)}
-                      </span>
-                    </span>
-                    {insufficientCash ? (
-                      <span className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 font-medium text-amber-500">
-                          <AlertCircle size={12} /> Need {formatMoney(estimatedCost, tickerCurrency)}
-                        </span>
-                        {onRequestDeposit && (
-                          <button
-                            type="button"
-                            onClick={() => onRequestDeposit(tickerCurrency)}
-                            className="font-bold text-primary hover:underline"
-                          >
-                            Deposit
-                          </button>
-                        )}
-                      </span>
-                    ) : estimatedCost > 0 ? (
-                      <span className="text-muted-foreground">
-                        Cost{' '}
-                        <span className="font-mono text-foreground/80">
-                          {formatMoney(estimatedCost, tickerCurrency)}
-                        </span>
-                      </span>
-                    ) : null}
-                  </div>
-                )}
             </div>
           </Tabs>
+
+          {cashBalances && (
+            <div className="flex items-center justify-between gap-2 text-xs px-1">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Wallet size={13} />
+                Available {cashCurrency} cash:{' '}
+                <span className={cn('font-mono font-semibold', cashShortfall > 0.005 ? 'text-red-500' : 'text-foreground')}>
+                  {getSelectedTickerPriceDisplay(availableCash, cashCurrency)}
+                </span>
+              </span>
+              {onDepositRequest && (
+                <button
+                  type="button"
+                  onClick={() => requestDeposit(cashCurrency, cashShortfall > 0.005 ? cashShortfall : undefined)}
+                  className="text-primary hover:underline font-medium"
+                >
+                  {cashShortfall > 0.005 ? 'Deposit shortfall' : 'Deposit'}
+                </button>
+              )}
+            </div>
+          )}
 
           <DialogFooter className="pt-4 border-t border-border/50">
             <Button variant="ghost" type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground">

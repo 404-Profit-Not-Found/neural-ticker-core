@@ -153,8 +153,6 @@ export class SocialService {
       relations: ['user'],
     });
 
-    const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
-
     // If this is a reply, notify the parent comment author
     if (parentId) {
       const parent = await this.commentRepo.findOne({
@@ -188,7 +186,7 @@ export class SocialService {
           .sendToUser(parent.user_id, {
             title: `${replierName} replied to your comment`,
             body: `on ${symbol}: "${content.slice(0, 80)}"`,
-            icon: `${frontendUrl}/v1/tickers/${symbol}/logo`,
+            icon: this.webPushService.tickerIconUrl(symbol),
             data: { url: `/ticker/${symbol}`, symbol },
           })
           .catch((err) =>
@@ -232,7 +230,7 @@ export class SocialService {
           .sendToUser(mentionedId, {
             title: `${commenterName} mentioned you`,
             body: `on ${symbol}`,
-            icon: `${frontendUrl}/v1/tickers/${symbol}/logo`,
+            icon: this.webPushService.tickerIconUrl(symbol),
             data: { url: `/ticker/${symbol}`, symbol },
           })
           .catch((err) =>
@@ -304,12 +302,11 @@ export class SocialService {
             this.logger.error(`Failed to send like notification`, err),
           );
 
-        const frontendUrl = this.configService.get<string>('frontendUrl') ?? '';
         this.webPushService
           .sendToUser(comment.user_id, {
             title: `${likerName} liked your comment`,
             body: `on ${comment.ticker_symbol}`,
-            icon: `${frontendUrl}/v1/tickers/${comment.ticker_symbol}/logo`,
+            icon: this.webPushService.tickerIconUrl(comment.ticker_symbol),
             data: {
               url: `/ticker/${comment.ticker_symbol}`,
               symbol: comment.ticker_symbol,

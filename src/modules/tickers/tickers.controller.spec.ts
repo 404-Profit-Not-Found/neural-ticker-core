@@ -107,12 +107,37 @@ describe('TickersController', () => {
         set: jest.fn(),
         send: jest.fn(),
         status: jest.fn().mockReturnThis(),
+        redirect: jest.fn(),
       };
 
       await controller.getLogo({} as any, 'UNKNOWN', res as any);
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.send).toHaveBeenCalledWith('Logo not found');
+      expect(res.redirect).not.toHaveBeenCalled();
+    });
+
+    it('redirects to the app favicon when logo missing and fallback=app (push icon)', async () => {
+      // Push notifications request `?fallback=app` so a logo-less ticker still
+      // shows the branded favicon instead of the OS grey placeholder.
+      mockTickersService.getLogo.mockResolvedValue(null);
+
+      const res = {
+        set: jest.fn(),
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        redirect: jest.fn(),
+      };
+
+      await controller.getLogo(
+        { query: { fallback: 'app' } } as any,
+        'EKT.DE',
+        res as any,
+      );
+
+      expect(res.redirect).toHaveBeenCalledWith('/favicon.svg');
+      expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store');
+      expect(res.status).not.toHaveBeenCalledWith(404);
     });
   });
 

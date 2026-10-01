@@ -244,6 +244,18 @@ export class TickersController {
     const isAdmin = req.user?.role === 'admin';
     const logo = await this.tickersService.getLogo(symbol, isAdmin);
     if (!logo) {
+      // Push-notification icons request this endpoint with `?fallback=app`. A
+      // ticker with no stored logo (e.g. a custom symbol) would otherwise 404,
+      // and a push icon has no client-side onError hook — the OS just renders
+      // its grey app-letter placeholder. Redirect to the app favicon instead so
+      // the notification still shows a branded icon. The redirect is
+      // root-relative, so the client resolves it against the request origin (the
+      // public frontend, which serves /favicon.svg). In-app <img> consumers do
+      // NOT pass the flag and keep their own initials placeholder.
+      if (req.query?.fallback === 'app') {
+        res.set('Cache-Control', 'no-store');
+        return res.redirect('/favicon.svg');
+      }
       return res.status(404).send('Logo not found');
     }
 
