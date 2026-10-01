@@ -13,8 +13,8 @@ export interface ModelOption {
 
 export const MODEL_OPTIONS: ModelOption[] = [
     {
-        key: 'gemini-3.1-flash-lite',
-        label: 'Gemini 3.1 Flash Lite',
+        key: 'gemini-3.5-flash-lite',
+        label: 'Gemini 3.5 Flash Lite',
         provider: 'gemini',
         quality: 'low',
         speed: '≈3s',
@@ -23,8 +23,8 @@ export const MODEL_OPTIONS: ModelOption[] = [
         defaultQuestion: 'Give me a quick summary for {ticker}',
     },
     {
-        key: 'gemini-3.5-flash',
-        label: 'Gemini 3.5 Flash',
+        key: 'gemini-3.8-flash',
+        label: 'Gemini 3.8 Flash',
         provider: 'gemini',
         quality: 'medium',
         speed: '≈6s',

@@ -199,6 +199,16 @@ describe('GeminiProvider', () => {
       );
     });
 
+    it('should use gemini-3.5-flash-lite for user-picked "low" quality', async () => {
+      mockGenerateContent.mockResolvedValue({ text: 'Low', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'low' });
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gemini-3.5-flash-lite' }),
+      );
+    });
+
     it('should use concise system prompt for local text tasks (no search instruction)', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Summary',
@@ -232,15 +242,15 @@ describe('GeminiProvider', () => {
       const result = await provider.generate(validPrompt);
 
       expect(result.answerMarkdown).toBe('Final Answer');
-      expect(result.models).toContain('gemini-3.5-flash');
+      expect(result.models).toContain('gemini-3.8-flash');
       expect(result.groundingMetadata).toBeDefined();
     });
 
-    it('meters successful medium-quality (gemini-3.5-flash) calls against the daily budget (regression: H6)', async () => {
+    it('meters successful medium-quality (gemini-3.8-flash) calls against the daily budget (regression: H6)', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
       const budget = (provider as any).budgetService;
 
-      // 'medium' resolves to gemini-3.5-flash, which runs on the free key and
+      // 'medium' resolves to gemini-3.8-flash, which runs on the free key and
       // MUST be counted — it was previously absent from `freeModels`.
       await provider.generate({ ...validPrompt, quality: 'medium' });
 

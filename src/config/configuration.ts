@@ -47,15 +47,17 @@ export default () => {
       apiKey: process.env.GEMINI_API_KEY,
       secondaryApiKey: process.env.GEMINI_API_KEY_SECONDARY,
       models: {
-        // 'low' = the cheap/fast research tier. gemini-3.1-flash-lite gives
-        // 500 free requests/day on the primary key (vs ~20/day for the old
-        // 2.5-flash-lite) and is NOT a gated "-preview" model, so it stays on
-        // the free key. On a 429 it falls back to gemini-3.5-flash (also free);
-        // the legacy 2.5 models are no longer in the fallback chain.
-        low: process.env.GEMINI_MODEL_LOW || 'gemini-3.1-flash-lite',
-        // 'medium' = the balanced "flash" tier. gemini-3.5-flash has no
+        // 'low' = the cheap/fast research tier the user picks in the research
+        // dialog ("Flash Lite" card). gemini-3.5-flash-lite is stable (no
+        // "-preview" suffix) and has a free tier, so it stays on the free key.
+        // On a 429 it falls back to the other free models; the legacy 2.5
+        // models are no longer in the fallback chain. The high-volume
+        // background tiers (extraction/cron/summary/recommendation/scoring)
+        // deliberately stay on the cheaper gemini-3.1-flash-lite.
+        low: process.env.GEMINI_MODEL_LOW || 'gemini-3.5-flash-lite',
+        // 'medium' = the balanced "flash" tier. gemini-3.8-flash has no
         // '-preview' suffix, so it runs on the primary (free) key.
-        medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3.5-flash',
+        medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3.8-flash',
         // 'deep' = the premium "pro" tier. Pro is only available on the billed
         // (secondary) key, so it MUST keep the gated '-preview' suffix.
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3.1-pro-preview',

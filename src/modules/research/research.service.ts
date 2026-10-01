@@ -1541,7 +1541,7 @@ OUTPUT (strict Markdown):
       savedPending.quality = 'medium';
       savedPending.provider = LlmProvider.GEMINI;
       savedPending.status = ResearchStatus.COMPLETED;
-      savedPending.models_used = result.models || ['gemini-3.5-flash'];
+      savedPending.models_used = result.models || ['gemini-3.8-flash'];
       savedPending.tokens_in = result.tokensIn ?? 0;
       savedPending.tokens_out = result.tokensOut ?? 0;
 
