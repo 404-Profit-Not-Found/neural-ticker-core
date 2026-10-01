@@ -17,7 +17,7 @@ export class GeminiProvider implements ILlmProvider {
   private readonly defaultModels = {
     deep: 'gemini-3.1-pro-preview',
     medium: 'gemini-3.5-flash',
-    low: 'gemini-3.1-flash-lite',
+    low: 'gemini-3.5-flash-lite',
     extraction: 'gemini-3.1-flash-lite',
     cron: 'gemini-3.1-flash-lite',
     // Local text tasks (summarize / score / recommend over text already in the
@@ -180,7 +180,11 @@ export class GeminiProvider implements ILlmProvider {
     // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.5-flash`).
     // Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite fallbacks were
     // removed so the app never silently degrades to an older model on a 429.
-    const freeModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+    const freeModels = [
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+    ];
 
     const triedOnCurrentKey = new Set<string>();
 

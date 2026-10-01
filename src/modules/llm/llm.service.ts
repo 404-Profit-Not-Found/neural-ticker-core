@@ -91,7 +91,7 @@ export class LlmService {
   } {
     const k = key.toLowerCase();
 
-    if (k === 'gemini-2.5-flash-lite')
+    if (k === 'gemini-2.5-flash-lite' || k === 'gemini-3.5-flash-lite')
       return { provider: 'gemini', quality: 'low' };
     if (
       k === 'gemini-2.5-flash' ||
