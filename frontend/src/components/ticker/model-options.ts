@@ -19,7 +19,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
         quality: 'low',
         speed: '≈3s',
         accuracy: 'Efficient',
-        description: 'Ultra-fast and cost-effective for quick summaries.',
+        description: 'Ultra-fast and cost-effective for quick summaries. Generous free tier (500/day).',
         defaultQuestion: 'Give me a quick summary for {ticker}',
     },
     {
