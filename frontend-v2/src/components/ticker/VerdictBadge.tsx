@@ -37,6 +37,12 @@ interface VerdictBadgeProps {
      * "Not rated" instead of deriving a rating from empty inputs.
      */
     analysed?: boolean;
+    /**
+     * For narrow places (a card in a four-column grid): the longest rating is
+     * shortened to "Spec Buy" so the badge never squeezes the symbol next to
+     * it. The tooltip keeps the full name.
+     */
+    compact?: boolean;
 }
 
 const TRIGGER =
@@ -58,7 +64,8 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
     fiftyTwoWeekHigh,
     fiftyTwoWeekLow,
     revenueTTM,
-    analysed = true
+    analysed = true,
+    compact = false
 }) => {
     const getConsensusColor = (c?: string) => {
         if (!c) return "text-muted-foreground";
@@ -97,7 +104,7 @@ export const VerdictBadge: React.FC<VerdictBadgeProps> = ({
     const BadgeContent = (
         <Badge variant={badgeVariant} className={cn("gap-1.5 h-6 px-2 whitespace-nowrap cursor-help", className)}>
             {variant === 'legendary' ? <Brain size={12} className="text-white" /> : <Bot size={12} className="opacity-80" />}
-            {rating}
+            {compact && rating === 'Speculative Buy' ? <abbr title={rating} className="no-underline">Spec Buy</abbr> : rating}
         </Badge>
     );
 

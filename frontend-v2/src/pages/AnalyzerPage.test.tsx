@@ -80,6 +80,11 @@ describe('AnalyzerPage', () => {
     expect(screen.getByTestId('active-filter-upside')).toHaveTextContent('>20%');
   });
 
+  it('restores the risk/reward filter from the URL, like the other filters', () => {
+    renderWithRouter(['/analyzer?overallScore=%3E+5.0']);
+    expect(screen.getByTestId('active-filter-score')).toHaveTextContent('> 5.0');
+  });
+
   it('initializes view mode from URL', () => {
     renderWithRouter(['/analyzer?view=grid']);
     expect(screen.getByTestId('view-mode')).toHaveTextContent('grid');

@@ -345,7 +345,7 @@ export function PortfolioPage() {
     const symbol = (positions || []).find((p: PortfolioPosition) => p && p.id === id)?.symbol;
     const confirmed = await confirm({
       title: symbol ? `Delete ${symbol} position?` : 'Delete this position?',
-      description: 'This can’t be undone.',
+      description: 'The holding is removed without crediting its value to your cash — to close it for cash, sell it instead. This can’t be undone.',
       confirmLabel: 'Delete position',
       destructive: true,
     });

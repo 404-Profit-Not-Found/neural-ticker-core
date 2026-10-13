@@ -182,17 +182,18 @@ export function Dashboard() {
                     to={item.to}
                     onTouchStart={() => preloadRoute(item.to)}
                     aria-busy={item.query.isPending || undefined}
-                    className="flex h-full min-h-[4.25rem] flex-col justify-between gap-2 rounded-lg bg-card px-3 py-2.5 transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex h-full min-h-[4.25rem] flex-col items-center justify-center gap-2 rounded-lg bg-card px-2 py-2.5 text-center transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <span className="flex items-center justify-between gap-1">
+                    {/* Icon and figure read as one unit: side by side, centred. */}
+                    <span className="flex items-center justify-center gap-1.5">
+                      <item.icon size={15} className={cn('shrink-0', item.tone === 'text-foreground' ? 'text-muted-foreground' : item.tone)} aria-hidden />
                       {item.query.isPending ? (
-                        <Skeleton className="h-5 w-8" />
+                        <Skeleton className="h-5 w-7" />
                       ) : (
                         <span className={cn('num text-xl font-bold leading-none', item.tone)}>{count(item.query.data)}</span>
                       )}
-                      <item.icon size={14} className={cn('opacity-70', item.tone === 'text-foreground' ? 'text-muted-foreground' : item.tone)} aria-hidden />
                     </span>
-                    <span className="truncate text-[11px] leading-none text-muted-foreground">{item.label}</span>
+                    <span className="w-full truncate text-[11px] leading-none text-muted-foreground">{item.label}</span>
                   </Link>
                 </li>
               ))}

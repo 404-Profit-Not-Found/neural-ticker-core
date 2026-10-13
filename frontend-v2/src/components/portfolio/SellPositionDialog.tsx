@@ -413,7 +413,7 @@ export function SellPositionDialog({
                 </p>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
-                  Remaining: <strong>{remainingShares}</strong> sh
+                  Remaining: <strong>{remainingShares.toLocaleString('en-US', { maximumFractionDigits: 4 })}</strong> sh
                 </p>
               )}
             </div>

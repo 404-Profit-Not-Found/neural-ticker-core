@@ -241,7 +241,16 @@ describe('PortfolioStats', () => {
       renderStats();
       const gain = screen.getByTitle(/excluding money added or withdrawn/i);
       expect(gain).toHaveTextContent('−$120.50');
-      expect(gain).toHaveTextContent('(-3.20%)');
+      // The same minus sign in both figures.
+      expect(gain).toHaveTextContent('(−3.20%)');
+    });
+
+    it('shows no change as plain zero, never as a negative zero', () => {
+      historyState.current = readySeries({ periodGain: -0.001, periodGainPct: -0.0001 });
+      renderStats();
+      const gain = screen.getByTitle(/excluding money added or withdrawn/i);
+      expect(gain).toHaveTextContent('$0.00 (0.00%)');
+      expect(gain.textContent).not.toMatch(/[−+-]\$?0\.00/);
     });
 
     it('shows a loading placeholder — never a made-up line — while prices load', () => {
