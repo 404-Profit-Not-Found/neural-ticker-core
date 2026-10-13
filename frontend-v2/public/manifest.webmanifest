@@ -1,15 +1,24 @@
 {
-  "name": "NEURAL//TICKER — Pixel Terminal (v2)",
-  "short_name": "NeuralTicker v2",
-  "description": "Experimental pixel-art trading and research terminal",
+  "name": "NeuralTicker",
+  "short_name": "NeuralTicker",
+  "description": "AI-powered stock research, risk analysis and portfolio tracking.",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#07090f",
-  "theme_color": "#07090f",
+  "orientation": "any",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "categories": ["finance", "productivity"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Portfolio", "url": "./portfolio" },
+    { "name": "Watchlist", "url": "./watchlist" },
+    { "name": "Tickers", "url": "./analyzer" }
   ]
 }

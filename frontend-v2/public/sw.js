@@ -1,102 +1,168 @@
-// Offline-first service worker for Neural Ticker v2 (pixel terminal experimental UI)
-// Scope: /v2/
-const CACHE = "neural-ticker-v2-001";
-const ASSETS = [
-  "./",
-  "index.html",
-  "Design%20System.html",
-  "styles.css",
-  "manifest.webmanifest",
-  "favicon.png",
-  "icon-192.png",
-  "icon-512.png",
-  "src/data.js",
-  "src/components.jsx",
-  "src/skeletons.jsx",
-  "src/dashboard.jsx",
-  "src/ticker-detail.jsx",
-  "src/analyzer.jsx",
-  "src/chrome.jsx",
-  "src/design-system.jsx",
-  "src/app.jsx",
-  "src/tweaks-panel.jsx"
-];
+/**
+ * NeuralTicker service worker (scope: the app base — the origin root).
+ *
+ * 1. Speed: content-hashed build assets are served cache-first, and the app
+ *    shell (index.html) is kept as an offline fallback for navigations.
+ * 2. Web push: shows notifications and routes clicks back into the app.
+ *
+ * It never touches /api requests — data is always live and cookie-scoped —
+ * and never caches anything outside its own scope.
+ */
+const VERSION = 'nt-v2-2';
+const ASSET_CACHE = `${VERSION}-assets`;
+const SHELL_CACHE = `${VERSION}-shell`;
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {})));
+// '/' in production; derived so the worker also works under a sub-path.
+const SCOPE_PATH = new URL(self.registration.scope).pathname;
+const SHELL_URL = SCOPE_PATH; // index.html
+const ASSETS_PREFIX = `${SCOPE_PATH}assets/`;
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.add(new Request(SHELL_URL, { cache: 'reload' })))
+      .catch(() => undefined),
+  );
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", (e) => {
-  const req = e.request;
-  if (req.method !== "GET") return;
-  // Don't intercept /api/* requests — let them hit the network directly so cookies
-  // and live data work without stale cache.
-  const url = new URL(req.url);
-  if (url.pathname.startsWith("/api/")) return;
-  e.respondWith(
-    caches.match(req).then(cached =>
-      cached || fetch(req).then(res => {
-        if (res.ok && url.origin === location.origin) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached)
-    )
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            // Older versions of this worker, plus the cache of the retired
+            // pixel-terminal build ("neural-ticker-v2-*"), whose cache-first
+            // worker would otherwise keep serving its stale app shell.
+            .filter(
+              (k) =>
+                (k.startsWith('nt-v2-') && !k.startsWith(VERSION)) ||
+                k.startsWith('neural-ticker-v2'),
+            )
+            .map((k) => caches.delete(k)),
+        ),
+      )
+      .then(() => self.clients.claim()),
   );
 });
 
-// ── Web Push handling (price alerts, research-done, etc.) ──
-self.addEventListener("push", (event) => {
+function isHtml(response) {
+  return (response.headers.get('content-type') || '').includes('text/html');
+}
+
+// Hashed assets never change: serve from cache, fill on first use.
+async function assetFirst(request) {
+  const cache = await caches.open(ASSET_CACHE);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const response = await fetch(request);
+  // The SPA fallback answers unknown paths with index.html (200). Caching that
+  // under a .js/.css URL would poison the cache after a deploy — skip it.
+  if (response.ok && !isHtml(response)) {
+    cache.put(request, response.clone()).catch(() => undefined);
+  }
+  return response;
+}
+
+// Navigations: network first so a deploy is picked up immediately; fall back
+// to the cached shell only when the network is unreachable.
+async function shellNetworkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok && isHtml(response)) {
+      const cache = await caches.open(SHELL_CACHE);
+      cache.put(SHELL_URL, response.clone()).catch(() => undefined);
+    }
+    return response;
+  } catch (err) {
+    const cached = await caches.match(SHELL_URL);
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(SCOPE_PATH)) return;
+  // The API is never ours to answer — data, sign-in redirects, the API docs.
+  // At the origin root the scope covers /api/, so this is explicit.
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (url.pathname.startsWith(ASSETS_PREFIX)) {
+    event.respondWith(assetFirst(request));
+    return;
+  }
+  if (request.mode === 'navigate') {
+    event.respondWith(shellNetworkFirst(request));
+  }
+});
+
+// ── Web push ────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
   if (!event.data) return;
+
   let payload;
-  try { payload = event.data.json(); }
-  catch (e) { payload = { title: "NEURAL//TICKER", body: event.data.text() }; }
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'NeuralTicker', body: event.data.text() };
+  }
 
   const data = payload.data || {};
-  const tag = data.alertType
-    ? `price-alert-${data.symbol || ""}`
-    : data.symbol
-      ? `research-${data.symbol}`
-      : "notification";
   const options = {
-    body: payload.body || "",
-    icon: payload.icon || "/v2/icon-192.png",
-    badge: "/v2/favicon.png",
+    body: payload.body || '',
+    icon: payload.icon || `${SCOPE_PATH}favicon.svg`,
+    badge: `${SCOPE_PATH}favicon.svg`,
     data,
     vibrate: [100, 50, 100],
-    tag,
+    tag: data.alertType
+      ? `price-alert-${data.symbol}`
+      : data.symbol
+        ? `research-${data.symbol}`
+        : 'notification',
     renotify: true,
   };
+
   event.waitUntil(
-    self.registration.showNotification(payload.title || "NEURAL//TICKER", options)
+    self.registration.showNotification(payload.title || 'NeuralTicker', options),
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
+// The backend sends root-relative app routes (e.g. "/ticker/NVDA"). Resolve
+// them inside this app's scope, and refuse anything that is not a same-origin
+// path so a crafted payload cannot send the user to another site.
+function resolveTarget(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) {
+    return SCOPE_PATH;
+  }
+  if (raw.startsWith(SCOPE_PATH)) return raw;
+  return SCOPE_PATH + raw.replace(/^\/+/, '');
+}
+
+self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  // Prefer ticker detail if symbol is provided
-  const sym = event.notification.data?.symbol;
-  const target = sym ? `/v2/?sym=${encodeURIComponent(sym)}` : "/v2/";
+  const target = resolveTarget(event.notification.data && event.notification.data.url);
+
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      // Focus existing v2 tab if any
-      for (const c of list) {
-        if (c.url.includes("/v2/") && "focus" in c) {
-          c.focus();
-          if ("navigate" in c) c.navigate(target);
-          return;
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          const path = new URL(client.url).pathname;
+          if (path.startsWith(SCOPE_PATH) && 'focus' in client) {
+            client.focus();
+            if ('navigate' in client) return client.navigate(target);
+            return undefined;
+          }
         }
-      }
-      return self.clients.openWindow ? self.clients.openWindow(target) : undefined;
-    })
+        return self.clients.openWindow ? self.clients.openWindow(target) : undefined;
+      }),
   );
 });
