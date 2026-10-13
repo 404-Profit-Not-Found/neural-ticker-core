@@ -127,7 +127,7 @@ export function TickerDetail() {
             // Invalidate query to refetch ticker details and update logo
             queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
             setIsLogoUploadOpen(false);
-            if (symbol) forgetMissingLogo(symbol);
+            forgetMissingLogo(symbol);
             toast.success('Logo updated');
         } catch (err) {
             console.error('Failed to update logo', err);
