@@ -805,7 +805,13 @@ export class RiskRewardService {
       ev.price_target_weighted || 0,
     );
     analysis.upside_percent = this.clampNumeric10_2(upside);
-    analysis.time_horizon_years = parsed.time_horizon_years || 1;
+    // time_horizon_years is an integer column. The LLM regularly returns a
+    // fractional horizon (e.g. 1.5 for "18 months"), which fails the INSERT with
+    // `invalid input syntax for type integer: "1.5"` and loses the whole
+    // analysis — the ticker's overview then stays empty/stale.
+    const horizon = Math.round(Number(parsed.time_horizon_years));
+    analysis.time_horizon_years =
+      Number.isFinite(horizon) && horizon >= 1 ? Math.min(horizon, 50) : 1;
 
     // Analyst
     const as = parsed.analyst_summary || {};

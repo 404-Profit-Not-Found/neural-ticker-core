@@ -253,6 +253,49 @@ describe('RiskRewardService', () => {
       expect(mockAnalysisRepo.save).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      [1.5, 2],
+      ['1.5', 2],
+      [0.4, 1],
+      [3, 3],
+      [undefined, 1],
+      ['18 months', 1],
+      [9999, 50],
+    ])(
+      'persists an integer time_horizon_years (LLM %p -> %p)',
+      async (llmValue, expected) => {
+        // time_horizon_years is an integer column: a fractional horizon (1.5 =
+        // "18 months") used to fail the INSERT and drop the whole analysis.
+        mockMarketDataService.getSnapshot.mockResolvedValue({
+          ticker: { id: 'ticker-1', symbol: 'AAPL' },
+          latestPrice: { close: 150 },
+          fundamentals: {},
+        });
+        mockLlmService.generateResearch.mockResolvedValue({
+          answerMarkdown: JSON.stringify({
+            risk_score: { overall: 6 },
+            time_horizon_years: llmValue,
+            scenarios: {
+              bull: { probability: 0.3, price_target_mid: 200 },
+              base: { probability: 0.5, price_target_mid: 150 },
+              bear: { probability: 0.2, price_target_mid: 100 },
+            },
+          }),
+        });
+        mockAnalysisRepo.save.mockImplementation((a: RiskAnalysis) =>
+          Promise.resolve(a),
+        );
+
+        const result = await service.evaluateFromResearch({
+          id: 'note-1',
+          tickers: ['AAPL'],
+          answer_markdown: 'Research content',
+        });
+
+        expect(result?.time_horizon_years).toBe(expected);
+      },
+    );
+
     it('returns null gracefully when single-ticker extraction throws', async () => {
       const mockNote = {
         id: 'note-1',

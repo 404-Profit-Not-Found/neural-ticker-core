@@ -1125,6 +1125,17 @@ OUTPUT (strict Markdown):
     };
   }
 
+  /**
+   * Purges completed/failed research notes older than `maxAgeDays`.
+   *
+   * A note that backs a ticker's LATEST risk analysis is kept regardless of
+   * age. The orphan sweep that follows this purge deletes every analysis whose
+   * note is gone, so without this guard a ticker whose refresh hasn't landed a
+   * newer analysis (scanner down, extraction failing) loses its only analysis
+   * and its overview goes blank — no scenarios, risks or catalysts. A stale
+   * overview is recoverable; a deleted one is not. Once a newer analysis lands,
+   * the old note stops being "latest" and is purged on the next run.
+   */
   async deleteOldResearch(maxAgeDays: number = 30): Promise<number> {
     const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
 
@@ -1136,6 +1147,17 @@ OUTPUT (strict Markdown):
         statuses: [ResearchStatus.COMPLETED, ResearchStatus.FAILED],
       })
       .andWhere('created_at < :cutoff', { cutoff })
+      // risk_analyses.research_note_id stores research_notes.id as text.
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM risk_analyses ra
+           WHERE ra.research_note_id = CAST(research_notes.id AS TEXT)
+             AND ra.created_at = (
+               SELECT MAX(latest.created_at) FROM risk_analyses latest
+                WHERE latest.ticker_id = ra.ticker_id
+             )
+        )`,
+      )
       .execute();
 
     const deleted = result.affected || 0;
