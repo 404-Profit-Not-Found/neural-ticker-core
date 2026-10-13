@@ -24,9 +24,17 @@ describe('SuperLoading', () => {
         expect(screen.getByText('Signing out')).toBeInTheDocument();
     });
 
-    it('has no decorative chart', () => {
+    it('draws the candlestick chart of the boot splash', () => {
         const { container } = render(<SuperLoading />);
-        expect(container.querySelector('.chart-wrapper')).not.toBeInTheDocument();
-        expect(container.querySelector('.candle')).not.toBeInTheDocument();
+        const candles = container.querySelectorAll('.boot-chart .boot-candle');
+        expect(candles).toHaveLength(11);
+        // Decoration: not announced.
+        expect(container.querySelector('.boot-chart')).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('shows the ticker in place of the wordmark while a ticker opens', () => {
+        const { container } = render(<SuperLoading symbol="NVDA" />);
+        expect(container.querySelector('.boot-brand--symbol')).toHaveTextContent('NVDA');
+        expect(screen.queryByText('NeuralTicker.com')).not.toBeInTheDocument();
     });
 });
