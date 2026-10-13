@@ -1,14 +1,21 @@
 // Route chunks. Every page is its own lazily-loaded chunk so the first paint
-// only ships the shell; `preloadRoute` lets links and the idle callback warm a
-// chunk before the user navigates, which makes the transition itself instant.
-import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
+// only ships the shell. After that the app must never make a tap wait for the
+// network:
+//   - once the user is signed in, every page chunk is fetched in the
+//     background (`preloadRoutes`), and links warm theirs on intent
+//     (`preloadRoute`);
+//   - a page whose chunk is already in memory renders synchronously — no
+//     Suspense round-trip, so no flash of the fallback;
+//   - a page that is not loaded yet shows the loading screen at once (the
+//     router does not hold the old page on screen; see App.tsx).
+import { createElement, lazy, useState, type ComponentType } from 'react';
 
 type Loader = () => Promise<unknown>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyComponent = ComponentType<any>;
 
-export type PageComponent = LazyExoticComponent<AnyComponent> & {
+export type PageComponent = AnyComponent & {
   preload: Loader;
 };
 
@@ -18,24 +25,40 @@ function page<M extends Record<string, unknown>, K extends keyof M>(
 ): PageComponent {
   // Dedupe: a preload followed by the real render shares one import promise.
   let pending: Promise<M> | null = null;
+  // The page itself, as soon as its chunk has arrived.
+  let loaded: AnyComponent | null = null;
   const once = (): Promise<M> => {
-    pending ??= load().catch((err: unknown) => {
-      pending = null; // allow a retry after a failed chunk fetch
-      throw err;
-    });
-    return pending;
-  };
-  const C = lazy(() =>
-    once()
+    pending ??= load()
       .then((m) => {
+        loaded = m[name] as AnyComponent;
         clearReloadFlag();
-        return { default: m[name] as AnyComponent };
+        return m;
       })
       .catch((err: unknown) => {
+        pending = null; // allow a retry after a failed chunk fetch
+        throw err;
+      });
+    return pending;
+  };
+  const Lazy = lazy(() =>
+    once()
+      .then((m) => ({ default: m[name] as AnyComponent }))
+      .catch((err: unknown) => {
+        // Only a page the user actually asked for may reload the tab — a
+        // failed background preload must not.
         recoverFromStaleDeploy();
         throw err;
       }),
-  ) as PageComponent;
+  );
+
+  function Page(props: Record<string, unknown>) {
+    // Chosen once per mount: swapping the type later would remount the page.
+    const [Impl] = useState<AnyComponent>(() => loaded ?? Lazy);
+    return createElement(Impl, props);
+  }
+  Page.displayName = `Page(${String(name)})`;
+
+  const C = Page as PageComponent;
   C.preload = once;
   return C;
 }
@@ -120,16 +143,43 @@ export function preloadRoute(path: string): void {
   if (target) void target.preload().catch(() => undefined);
 }
 
-/** After first paint, warm the routes a signed-in user is most likely to open. */
-export function preloadCommonRoutes(): void {
-  const run = (): void => {
-    for (const p of [Pages.TickerDetail, Pages.Analyzer, Pages.Portfolio, Pages.Watchlist]) {
-      void p.preload().catch(() => undefined);
+/**
+ * Once the user is signed in: fetch every page of the app in the background,
+ * most likely destinations first, one at a time so they never compete with
+ * the data the current page is loading. After this no navigation waits for
+ * the network.
+ */
+export function preloadRoutes(): void {
+  // Respect "use less data"; links still warm their own chunk on intent.
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (connection?.saveData) return;
+
+  const order = [
+    Pages.TickerDetail,
+    Pages.Analyzer,
+    Pages.Watchlist,
+    Pages.Portfolio,
+    Pages.Profile,
+    Pages.Alerts,
+    Pages.News,
+    Pages.ResearchList,
+    Pages.Research,
+    Pages.Dashboard,
+    Pages.Admin,
+    Pages.About,
+  ];
+  const run = async (): Promise<void> => {
+    for (const p of order) {
+      try {
+        await p.preload();
+      } catch {
+        // Offline or a stale deploy: the page will try again when opened.
+      }
     }
   };
   if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(run, { timeout: 4000 });
+    window.requestIdleCallback(() => void run(), { timeout: 3000 });
   } else {
-    setTimeout(run, 2500);
+    setTimeout(() => void run(), 1500);
   }
 }
