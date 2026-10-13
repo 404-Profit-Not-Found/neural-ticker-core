@@ -62,22 +62,29 @@ describe('JobsController', () => {
   });
 
   describe('runRiskRewardScanner', () => {
-    it('queues scanner and returns immediately (fire-and-forget)', () => {
-      mockJobsService.runRiskRewardScanner.mockResolvedValue(undefined);
+    // The scan must run inside the request: Cloud Run throttles CPU and may
+    // stop the instance once the response has been sent.
+    it('waits for the scan and returns its stats', async () => {
+      let finished = false;
+      mockJobsService.runRiskRewardScanner.mockImplementation(async () => {
+        await new Promise((resolve) => setImmediate(resolve));
+        finished = true;
+        return { processed: 3, errors: 0, due: 3 };
+      });
 
-      const result = controller.runRiskRewardScanner();
+      const result = await controller.runRiskRewardScanner();
 
-      expect(result).toEqual({ message: 'Risk/Reward scanner queued' });
-      expect(mockJobsService.runRiskRewardScanner).toHaveBeenCalled();
+      expect(finished).toBe(true);
+      expect(result).toEqual({
+        message: 'Risk/Reward scan completed',
+        stats: { processed: 3, errors: 0, due: 3 },
+      });
     });
 
-    it('does not throw when background scan rejects', async () => {
+    it('surfaces a failed scan to the caller instead of swallowing it', async () => {
       mockJobsService.runRiskRewardScanner.mockRejectedValue(new Error('boom'));
 
-      const result = controller.runRiskRewardScanner();
-      expect(result).toEqual({ message: 'Risk/Reward scanner queued' });
-      // Allow the rejected promise's catch handler to run.
-      await new Promise((resolve) => setImmediate(resolve));
+      await expect(controller.runRiskRewardScanner()).rejects.toThrow('boom');
     });
   });
 

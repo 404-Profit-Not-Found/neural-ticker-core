@@ -296,6 +296,14 @@ export class JobsService {
   static readonly RISK_SCANNER_CALLS_PER_TICKET = 2;
 
   /**
+   * The scan runs inside the HTTP request that triggers it (see the controller
+   * for why), so it must finish within the Cloud Run request timeout (300s).
+   * No new ticket is started once a run has used this much of it; a ticket
+   * takes roughly a minute, which leaves the last one room to finish.
+   */
+  static readonly RISK_SCANNER_TIME_BUDGET_MS = 200_000;
+
+  /**
    * How long the scanner waits before re-researching a ticker whose last
    * research did NOT leave it with a fresh risk analysis (none at all, or only
    * a stale one). Much shorter than the staleness window so a failed extraction
@@ -387,6 +395,7 @@ export class JobsService {
       this.configService.get<number>('riskReward.maxAgeHours') || 168;
     const stalenessMs = maxAgeHours * 60 * 60 * 1000;
     const perTicket = JobsService.RISK_SCANNER_CALLS_PER_TICKET;
+    const startedAt = Date.now();
 
     this.logger.log(
       `Starting risk/reward scanner (cron tier, staleness: ${maxAgeHours}h)...`,
@@ -508,21 +517,22 @@ export class JobsService {
       for (let i = 0; i < claimed.length; i++) {
         const { symbol, noteId } = claimed[i];
 
-        // Re-check before each ticket — the free pool is shared with other
-        // jobs and interactive users, so it can drain mid-run.
-        if (!(await this.llmBudgetService.hasBudget(perTicket))) {
-          this.logger.warn(
-            'Daily free LLM budget reached mid-scan. Stopping early.',
-          );
+        // Stop before starting a ticket this run can't afford: either the free
+        // LLM pool drained (it is shared with other jobs and interactive users)
+        // or the run is close to the HTTP request timeout it must finish inside.
+        const stopReason = !(await this.llmBudgetService.hasBudget(perTicket))
+          ? 'Daily free LLM budget reached before this scan could run.'
+          : Date.now() - startedAt > JobsService.RISK_SCANNER_TIME_BUDGET_MS
+            ? 'Scanner run reached its time budget before this scan could run.'
+            : null;
+        if (stopReason) {
+          this.logger.warn(`Stopping scan early: ${stopReason}`);
           // Release the tickets this run claimed but will not process, so they
           // don't sit PENDING. As failed attempts they are retried after the
-          // retry window, i.e. once the budget has reset.
+          // retry window.
           for (const leftover of claimed.slice(i)) {
             await this.researchService
-              .failPendingTicket(
-                leftover.noteId,
-                'Daily free LLM budget reached before this scan could run.',
-              )
+              .failPendingTicket(leftover.noteId, stopReason)
               .catch((err) =>
                 this.logger.error(
                   `Failed to release scanner ticket for ${leftover.symbol}: ${err.message}`,

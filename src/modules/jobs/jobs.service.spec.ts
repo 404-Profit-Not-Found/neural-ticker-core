@@ -565,6 +565,53 @@ describe('JobsService', () => {
       sleepSpy.mockRestore();
     });
 
+    // The scan runs inside the triggering HTTP request (Cloud Run starves
+    // background work), so it must stop before the request timeout.
+    it('stops starting tickets once the run has used its time budget', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+      let now = 1_800_000_000_000;
+      const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '1', symbol: 'AAPL' },
+        { id: '2', symbol: 'MSFT' },
+      ]);
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.createResearchTicket
+        .mockResolvedValueOnce({ id: 'note-1' })
+        .mockResolvedValueOnce({ id: 'note-2' });
+      // The first ticket alone takes longer than the whole time budget.
+      mockResearchService.processTicket.mockImplementation(() => {
+        now += JobsService.RISK_SCANNER_TIME_BUDGET_MS + 1_000;
+        return Promise.resolve();
+      });
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(mockResearchService.processTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.failPendingTicket).toHaveBeenCalledWith(
+        'note-2',
+        expect.stringContaining('time budget'),
+      );
+      expect(result).toMatchObject({ processed: 1, due: 2 });
+
+      nowSpy.mockRestore();
+      sleepSpy.mockRestore();
+      mockResearchService.processTicket.mockReset();
+    });
+
     // Audit H9: overlapping runs used to pick the same due tickers because
     // neither had written a note yet when the other read the throttle.
     it('selects and claims its batch under the scanner advisory lock', async () => {
