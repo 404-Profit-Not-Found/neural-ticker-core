@@ -270,7 +270,7 @@ function TopOpportunitiesSection() {
     analyzerParams.sortDir = 'ASC';
   }
 
-  const { data, isLoading, isError, refetch } = useStockAnalyzer(analyzerParams);
+  const { data, isLoading, isError, isPlaceholderData, refetch } = useStockAnalyzer(analyzerParams);
   const items = data?.items || [];
   let tickerData: TickerData[] = items.map(snapshotToTickerData);
 
@@ -322,7 +322,10 @@ function TopOpportunitiesSection() {
 
       <TickerCarousel
         data={tickerData.slice(0, 4)}
-        isLoading={isLoading}
+        // While another strategy loads, the query still holds the previous
+        // strategy's rows. Those are not this strategy's answer — filtered,
+        // they would even read as "no matches" — so it is a loading state.
+        isLoading={isLoading || isPlaceholderData}
         // A failed load with nothing to show is an error, not "no matches".
         error={isError && !data}
         onRetry={() => refetch()}

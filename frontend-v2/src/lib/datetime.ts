@@ -129,6 +129,23 @@ export function formatRelative(input: DateInput, opts: DateFormatOptions = {}): 
   return formatDateShort(date, opts);
 }
 
+/**
+ * How long ago, always as a duration: "just now", "12m ago", "5h ago",
+ * "3d ago", "214d ago". Unlike `formatRelative` it never turns into a date —
+ * for "when was this account last seen", the number of days is the answer.
+ */
+export function formatTimeAgo(input: DateInput, opts: DateFormatOptions = {}): string {
+  const date = toDate(input);
+  if (!date) return EM_DASH;
+  const now = toDate(opts.now) ?? new Date();
+  const diff = Math.max(0, now.getTime() - date.getTime());
+
+  if (diff < MINUTE) return 'just now';
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
+  return `${Math.floor(diff / DAY)}d ago`;
+}
+
 /** "28 Sep – 12 Oct" (years are added only when they are needed). */
 export function formatDateRange(start: DateInput, end: DateInput, opts: DateFormatOptions = {}): string {
   const from = toDate(start);

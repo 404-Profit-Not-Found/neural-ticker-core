@@ -157,6 +157,21 @@ describe('AdminConsole', () => {
     expect(await screen.findByText(/banned@example.com/i)).toBeInTheDocument();
   });
 
+  it('shows how long ago each user last signed in, and "Never" for those who have not', async () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 60_000).toISOString();
+    (AdminService.getIdentities as Mock).mockResolvedValue([
+      { ...mockIdentities[0], last_login: threeDaysAgo },
+      { ...mockIdentities[1] },
+    ]);
+    render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);
+
+    const seen = (await screen.findByText(/user1@example.com/i)).closest('tr')!;
+    expect(within(seen).getByText('3d ago')).toBeInTheDocument();
+    const never = screen.getByText(/user2@example.com/i).closest('tr')!;
+    expect(within(never).getByText('Never')).toBeInTheDocument();
+    expect(screen.getByText(/Last login/)).toBeInTheDocument();
+  });
+
   it('confirms in the themed dialog before revoking access', async () => {
     (AdminService.revokeAccess as Mock).mockResolvedValue({});
     render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);

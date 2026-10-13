@@ -13,7 +13,7 @@ import type { AdminUser } from './UserAdminCard';
 import { Gift, Ban, CheckCircle, Clock, Shield, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { SegmentedControl } from '../ui/segmented';
-import { formatDateTime } from '../../lib/datetime';
+import { formatDateTime, formatTimeAgo } from '../../lib/datetime';
 import { cn } from '../../lib/utils';
 
 interface UserDetailDialogProps {
@@ -91,6 +91,12 @@ export function UserDetailDialog({
                                 <Clock size={12} aria-hidden /> {user.status === 'INVITED' ? 'Invited' : 'Joined'}
                             </dt>
                             <dd className="num mt-1 text-[13px] text-foreground">{formatDateTime(user.created_at || user.invited_at)}</dd>
+                        </div>
+                        <div className="min-w-0">
+                            <dt className="label-micro">Last login</dt>
+                            <dd className="num mt-1 text-[13px] text-foreground" title={user.last_login ? formatDateTime(user.last_login) : undefined}>
+                                {user.last_login ? formatTimeAgo(user.last_login) : 'Never'}
+                            </dd>
                         </div>
                         <div className="min-w-0">
                             <dt className="label-micro">User ID</dt>

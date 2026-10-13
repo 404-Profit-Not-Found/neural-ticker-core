@@ -5,6 +5,7 @@ import {
   formatDateShort,
   formatDateTime,
   formatRelative,
+  formatTimeAgo,
   formatTime,
   isoDateTime,
   toDate,
@@ -88,6 +89,29 @@ describe('formatTime / formatDateTime', () => {
   it('prints an em dash for bad input', () => {
     expect(formatTime('x')).toBe('—');
     expect(formatDateTime(null)).toBe('—');
+  });
+});
+
+describe('formatTimeAgo', () => {
+  const ago = (ms: number) => new Date(new Date(NOW).getTime() - ms);
+  const MIN = 60_000;
+  const HOUR = 60 * MIN;
+  const DAY = 24 * HOUR;
+
+  it('counts minutes and hours within a day', () => {
+    expect(formatTimeAgo(ago(30_000), at())).toBe('just now');
+    expect(formatTimeAgo(ago(12 * MIN), at())).toBe('12m ago');
+    expect(formatTimeAgo(ago(5 * HOUR), at())).toBe('5h ago');
+  });
+
+  it('counts days however long ago — it never turns into a date', () => {
+    expect(formatTimeAgo(ago(3 * DAY), at())).toBe('3d ago');
+    expect(formatTimeAgo(ago(214 * DAY), at())).toBe('214d ago');
+  });
+
+  it('prints an em dash for a missing date and never a negative duration', () => {
+    expect(formatTimeAgo(null)).toBe('—');
+    expect(formatTimeAgo(ago(-5 * MIN), at())).toBe('just now');
   });
 });
 

@@ -1,3 +1,4 @@
+import { formatDateTime, formatTimeAgo } from '../../lib/datetime';
 import { Badge } from '../ui/badge';
 import { Mail } from 'lucide-react';
 import { UserTierBadge } from '../ui/user-tier-badge';
@@ -95,6 +96,9 @@ export function UserAdminCard({ user, onClick }: UserAdminCardProps) {
                     {getStatusBadge(user.status, user.role)}
                     <div className="num mt-1 flex items-center gap-1 text-[11px] leading-none text-muted-foreground">
                         <span>{user.credits_balance?.toLocaleString() ?? 0} credits</span>
+                    </div>
+                    <div className="num text-[11px] leading-none text-muted-foreground" title={user.last_login ? formatDateTime(user.last_login) : undefined}>
+                        {user.last_login ? `seen ${formatTimeAgo(user.last_login)}` : 'never signed in'}
                     </div>
                 </div>
             </div>
