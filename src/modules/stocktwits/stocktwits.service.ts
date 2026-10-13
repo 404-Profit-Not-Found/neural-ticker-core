@@ -18,6 +18,10 @@ import { TickersService } from '../tickers/tickers.service';
 import { LlmService } from '../llm/llm.service';
 import { StockTwitsToonDto } from './dto/stocktwits-toon.dto';
 import { CreditService } from '../users/credit.service';
+import {
+  LLM_UNAVAILABLE_CODE,
+  asLlmUnavailable,
+} from '../llm/llm-unavailable.exception';
 
 @Injectable()
 export class StockTwitsService {
@@ -664,6 +668,7 @@ export class StockTwitsService {
     const companyName = ticker.name || symbol;
 
     // --- Credit Deduction ---
+    let chargedCredits = 0;
     if (userId) {
       const cost = this.creditService.getModelCost(
         options.model || 'gemini-3-flash-preview',
@@ -674,6 +679,7 @@ export class StockTwitsService {
         'social_analysis_spend',
         { symbol, model: options.model },
       );
+      chargedCredits = cost;
     }
 
     let data: any = null;
@@ -790,6 +796,30 @@ export class StockTwitsService {
           }
         }
       } catch (e) {
+        // No LLM answer can be had (no key, quota used up, provider down): a
+        // smaller prompt will not help. Give the credits back and answer the
+        // 503 as it is.
+        if (asLlmUnavailable(e)) {
+          if (userId && chargedCredits > 0) {
+            await this.creditService
+              .refundCredits(
+                userId,
+                { amount: chargedCredits },
+                {
+                  spend_reason: 'social_analysis_spend',
+                  symbol,
+                  cause: LLM_UNAVAILABLE_CODE,
+                },
+              )
+              .catch((err) =>
+                this.logger.error(
+                  `Refund failed for social analysis of ${symbol}`,
+                  err,
+                ),
+              );
+          }
+          throw e;
+        }
         if (i === attempts - 1) throw e;
         this.logger.warn(
           `Analysis failed (Attempt ${i + 1}): ${e.message}. Retrying...`,

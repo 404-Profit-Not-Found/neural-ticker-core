@@ -8,7 +8,13 @@ import { MarketDataService } from '../market-data/market-data.service';
 import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
 import { StockTwitsService } from '../stocktwits/stocktwits.service';
-import { RequestQueue } from './entities/request-queue.entity';
+import {
+  RequestQueue,
+  RequestStatus,
+  RequestType,
+} from './entities/request-queue.entity';
+import { TickerCreationCapException } from '../tickers/tickers.service';
+import { currentActor } from '../../common/request-actor/request-actor';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { LlmBudgetService } from '../llm/llm-budget.service';
 
@@ -115,6 +121,340 @@ describe('JobsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  // The gate itself and "every @Cron handler is behind it":
+  // src/common/background-jobs.spec.ts.
+  describe('BACKGROUND_JOBS switch', () => {
+    const before = process.env.BACKGROUND_JOBS;
+    afterEach(() => {
+      if (before === undefined) delete process.env.BACKGROUND_JOBS;
+      else process.env.BACKGROUND_JOBS = before;
+    });
+
+    it('scheduled handlers do nothing with BACKGROUND_JOBS=off', async () => {
+      process.env.BACKGROUND_JOBS = 'off';
+
+      await (service as any).processPendingRequestsCron();
+      await (service as any).syncDailyCandlesCron();
+
+      expect(mockRequestQueueRepo.find).not.toHaveBeenCalled();
+      expect(mockTickersService.getAllTickers).not.toHaveBeenCalled();
+    });
+
+    it('and run as before without it', async () => {
+      delete process.env.BACKGROUND_JOBS;
+
+      await (service as any).processPendingRequestsCron();
+
+      expect(mockRequestQueueRepo.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('the same work is still available on request (the cron endpoints call these)', async () => {
+      process.env.BACKGROUND_JOBS = 'off';
+
+      await service.processPendingRequests();
+
+      expect(mockRequestQueueRepo.find).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // The automatic work for a newly created ticker. Nobody paid for it, so it
+  // obeys the scanner's rules: needs free budget, never the billed key, once.
+  describe('initializeTicker', () => {
+    beforeEach(() => {
+      mockMarketDataService.getSnapshot.mockResolvedValue({});
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.createResearchTicket.mockResolvedValue({ id: '501' });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+    });
+
+    it('syncs snapshot + history, then runs ONE free-only research ticket', async () => {
+      await service.initializeTicker('nvda');
+
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledWith('NVDA');
+      expect(mockMarketDataService.syncTickerHistory).toHaveBeenCalledWith(
+        'NVDA',
+        5,
+      );
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
+        null,
+        ['NVDA'],
+        expect.stringContaining('initial analysis for NVDA'),
+        'gemini',
+        'low',
+      );
+      // free-only: the research call and every enrichment call after it
+      expect(mockResearchService.processTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.processTicket).toHaveBeenCalledWith('501', {
+        freeOnly: true,
+      });
+    });
+
+    it('with no free LLM budget left: snapshot and history still run, the research is skipped cleanly (no ticket)', async () => {
+      mockLlmBudgetService.hasBudget.mockResolvedValue(false);
+
+      await service.initializeTicker('NVDA');
+
+      expect(mockLlmBudgetService.hasBudget).toHaveBeenCalledWith(
+        JobsService.RISK_SCANNER_CALLS_PER_TICKET,
+      );
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalled();
+      expect(mockMarketDataService.syncTickerHistory).toHaveBeenCalled();
+      expect(mockRequestQueueRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockResearchService.createResearchTicket).not.toHaveBeenCalled();
+      expect(mockResearchService.processTicket).not.toHaveBeenCalled();
+    });
+
+    it('claims the ticker under the scanner’s advisory lock, so the scanner and a second instance cannot research it too', async () => {
+      await service.initializeTicker('NVDA');
+
+      expect(mockScannerLockQuery).toHaveBeenCalledWith(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        ['risk-reward-scanner'],
+      );
+      // lock → look for existing system research → create the ticket
+      const lock = mockScannerLockQuery.mock.invocationCallOrder[0];
+      const check =
+        mockResearchService.getLastResearchedAtBySymbol.mock
+          .invocationCallOrder[0];
+      const create =
+        mockResearchService.createResearchTicket.mock.invocationCallOrder[0];
+      expect(lock).toBeLessThan(check);
+      expect(check).toBeLessThan(create);
+      expect(
+        mockResearchService.getLastResearchedAtBySymbol,
+      ).toHaveBeenCalledWith(['NVDA']);
+    });
+
+    it('does nothing when the ticker already has system research (another instance, or the scanner, got there first)', async () => {
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map([['NVDA', Date.now() - 1000]]),
+      );
+
+      await service.initializeTicker('NVDA');
+
+      expect(mockResearchService.createResearchTicket).not.toHaveBeenCalled();
+      expect(mockResearchService.processTicket).not.toHaveBeenCalled();
+    });
+
+    it('a second call for a ticker that is still being initialised returns at once', async () => {
+      let release: () => void = () => undefined;
+      mockMarketDataService.getSnapshot.mockReturnValue(
+        new Promise<void>((resolve) => (release = () => resolve())),
+      );
+
+      const first = service.initializeTicker('NVDA');
+      await service.initializeTicker('nvda'); // same ticker, while the first runs
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(1);
+
+      release();
+      await first;
+      expect(mockResearchService.processTicket).toHaveBeenCalledTimes(1);
+
+      // …and once it has finished, the ticker can be initialised again.
+      mockMarketDataService.getSnapshot.mockResolvedValue({});
+      await service.initializeTicker('NVDA');
+      expect(mockMarketDataService.getSnapshot).toHaveBeenCalledTimes(2);
+    });
+
+    it('never throws into its caller (it runs unawaited)', async () => {
+      mockMarketDataService.getSnapshot.mockRejectedValue(new Error('down'));
+
+      await expect(service.initializeTicker('NVDA')).resolves.toBeUndefined();
+
+      // and the in-progress marker is cleared
+      mockMarketDataService.getSnapshot.mockResolvedValue({});
+      await service.initializeTicker('NVDA');
+      expect(mockResearchService.processTicket).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('ADD_TICKER queue', () => {
+    const openRowQuery = (existing: unknown) => {
+      const qb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(existing),
+      };
+      const manager: any = {
+        query: jest.fn().mockResolvedValue([]),
+        createQueryBuilder: jest.fn(() => qb),
+        create: jest.fn((_entity: unknown, row: unknown) => row),
+        save: jest.fn((row: any) => Promise.resolve({ id: 'q-new', ...row })),
+      };
+      mockRequestQueueRepo.manager.transaction.mockImplementationOnce(
+        (cb: (m: any) => Promise<unknown>) => cb(manager),
+      );
+      return { qb, manager };
+    };
+
+    describe('queueRequest is idempotent per symbol', () => {
+      it('inserts a row when none is open, under an advisory lock keyed by the symbol', async () => {
+        const { manager, qb } = openRowQuery(null);
+
+        const row = await service.queueRequest(RequestType.ADD_TICKER, {
+          symbol: 'nvda',
+          requested_by: 'user-1',
+        });
+
+        expect(manager.query).toHaveBeenCalledWith(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          ['add-ticker:NVDA'],
+        );
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          "q.payload ->> 'symbol' = :symbol",
+          { symbol: 'NVDA' },
+        );
+        expect(manager.save).toHaveBeenCalledWith({
+          type: RequestType.ADD_TICKER,
+          payload: { symbol: 'NVDA', requested_by: 'user-1' },
+          status: RequestStatus.PENDING,
+          attempts: 0,
+        });
+        expect(row).toMatchObject({ id: 'q-new' });
+      });
+
+      it('returns the open row instead of adding a second one', async () => {
+        const open = { id: 'q-1', payload: { symbol: 'NVDA' } };
+        const { manager } = openRowQuery(open);
+
+        const row = await service.queueRequest(RequestType.ADD_TICKER, {
+          symbol: 'NVDA',
+        });
+
+        expect(row).toBe(open);
+        expect(manager.save).not.toHaveBeenCalled();
+      });
+
+      it('"open" = PENDING, or PROCESSING that is not stale (a crashed worker must not block the symbol for ever)', async () => {
+        const { qb } = openRowQuery(null);
+        const before = Date.now();
+
+        await service.queueRequest(RequestType.ADD_TICKER, { symbol: 'NVDA' });
+
+        const [sql, params] = qb.andWhere.mock.calls.find(([text]: [string]) =>
+          text.includes('q.status = :pending'),
+        );
+        expect(sql).toBe(
+          '(q.status = :pending OR (q.status = :processing AND q.updated_at > :fresh))',
+        );
+        expect(params.pending).toBe(RequestStatus.PENDING);
+        expect(params.processing).toBe(RequestStatus.PROCESSING);
+        expect(before - params.fresh.getTime()).toBeGreaterThanOrEqual(
+          JobsService.REQUEST_PROCESSING_STALE_MS - 50,
+        );
+      });
+    });
+
+    describe('processPendingRequests', () => {
+      const pending = (payload: Record<string, unknown>, attempts = 0) => ({
+        id: 'q-1',
+        type: RequestType.ADD_TICKER,
+        payload,
+        status: RequestStatus.PENDING,
+        attempts,
+      });
+      const lastUpdate = () =>
+        mockRequestQueueRepo.update.mock.calls[
+          mockRequestQueueRepo.update.mock.calls.length - 1
+        ];
+
+      it('claims the row with one conditional UPDATE and skips it when another worker already has', async () => {
+        mockRequestQueueRepo.find.mockResolvedValue([
+          pending({ symbol: 'NVDA' }),
+        ]);
+        mockRequestQueueRepo.update.mockResolvedValue({ affected: 0 });
+
+        await service.processPendingRequests();
+
+        expect(mockRequestQueueRepo.update).toHaveBeenCalledTimes(1);
+        expect(mockRequestQueueRepo.update).toHaveBeenCalledWith(
+          { id: 'q-1', status: RequestStatus.PENDING },
+          { status: RequestStatus.PROCESSING },
+        );
+        expect(mockTickersService.ensureTicker).not.toHaveBeenCalled();
+      });
+
+      it('creates the ticker and completes the request', async () => {
+        mockRequestQueueRepo.find.mockResolvedValue([
+          pending({ symbol: 'NVDA' }),
+        ]);
+        mockRequestQueueRepo.update.mockResolvedValue({ affected: 1 });
+        mockTickersService.ensureTicker.mockImplementation(() =>
+          Promise.resolve(currentActor()),
+        );
+
+        await service.processPendingRequests();
+
+        expect(mockTickersService.ensureTicker).toHaveBeenCalledWith('NVDA');
+        // queued by a system job / an admin: created on nobody's behalf
+        await expect(
+          mockTickersService.ensureTicker.mock.results[0].value,
+        ).resolves.toBeNull();
+        expect(lastUpdate()[1]).toMatchObject({
+          status: RequestStatus.COMPLETED,
+        });
+      });
+
+      it('a request queued for a user is created ON THEIR BEHALF, so it counts against their daily cap', async () => {
+        mockRequestQueueRepo.find.mockResolvedValue([
+          pending({ symbol: 'NVDA', requested_by: 'user-1' }),
+        ]);
+        mockRequestQueueRepo.update.mockResolvedValue({ affected: 1 });
+        mockTickersService.ensureTicker.mockImplementation(() =>
+          Promise.resolve(currentActor()),
+        );
+
+        await service.processPendingRequests();
+
+        await expect(
+          mockTickersService.ensureTicker.mock.results[0].value,
+        ).resolves.toEqual({ userId: 'user-1', role: 'user' });
+      });
+
+      it('the requester’s cap is final: the request fails at once instead of being retried ten times', async () => {
+        mockRequestQueueRepo.find.mockResolvedValue([
+          pending({ symbol: 'NVDA', requested_by: 'user-1' }),
+        ]);
+        mockRequestQueueRepo.update.mockResolvedValue({ affected: 1 });
+        mockTickersService.ensureTicker.mockRejectedValue(
+          new TickerCreationCapException(10),
+        );
+
+        await service.processPendingRequests();
+
+        expect(lastUpdate()[1]).toMatchObject({
+          status: RequestStatus.FAILED,
+          attempts: 1,
+        });
+      });
+
+      it('any other failure is retried with backoff, as before', async () => {
+        mockRequestQueueRepo.find.mockResolvedValue([
+          pending({ symbol: 'NVDA' }),
+        ]);
+        mockRequestQueueRepo.update.mockResolvedValue({ affected: 1 });
+        mockTickersService.ensureTicker.mockRejectedValue(
+          new Error('Yahoo rate limited'),
+        );
+
+        await service.processPendingRequests();
+
+        expect(lastUpdate()[1]).toMatchObject({
+          status: RequestStatus.PENDING,
+          attempts: 1,
+        });
+        expect(lastUpdate()[1].next_attempt.getTime()).toBeGreaterThan(
+          Date.now() + 20000,
+        );
+      });
+    });
   });
 
   describe('syncDailyCandles (hourly stale-first batch)', () => {

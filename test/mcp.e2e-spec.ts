@@ -7,7 +7,7 @@ import {
   Injectable,
   Module,
 } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PassportModule, PassportStrategy } from '@nestjs/passport';
 import { Test, TestingModule } from '@nestjs/testing';
 import { McpModule, McpTransportType, Tool } from '@rekog/mcp-nest';
@@ -20,6 +20,7 @@ import { Public } from '../src/modules/auth/public.decorator';
 
 import { MarketDataTools } from '../src/modules/mcp/tools/market-data.tools';
 import { RiskTools } from '../src/modules/mcp/tools/risk.tools';
+import { RequestActorInterceptor } from '../src/common/request-actor/request-actor.interceptor';
 import { ResearchTools } from '../src/modules/mcp/tools/research.tools';
 import { PortfolioTools } from '../src/modules/mcp/tools/portfolio.tools';
 import { TickerRequestsTools } from '../src/modules/mcp/tools/ticker-requests.tools';
@@ -89,6 +90,53 @@ const mockTickers = {
     Promise.resolve([{ symbol: 'AAPL', q }]),
   ),
 };
+
+// The REAL TickersService decides what an anonymous caller may read (its
+// public-read gate), on top of a stubbed "tickers" table and stubbed
+// providers — so the tests below can show that an anonymous MCP call never
+// reaches a data provider, an insert or the initialisation job.
+const TRACKED_SYMBOLS = ['AAPL', 'MSFT', 'RELIANCE.NS'];
+const tickerRepoStub: any = {
+  count: jest.fn(({ where }: any) =>
+    Promise.resolve(TRACKED_SYMBOLS.includes(where.symbol) ? 1 : 0),
+  ),
+  find: jest.fn(({ where }: any) =>
+    Promise.resolve(
+      TRACKED_SYMBOLS.filter((s) => where.symbol.value.includes(s)).map(
+        (symbol) => ({ symbol }),
+      ),
+    ),
+  ),
+  findOne: jest.fn(),
+  findOneOrFail: jest.fn(),
+  create: jest.fn((dto: any) => ({ ...dto })),
+  save: jest.fn(),
+  // ensureTicker inserts a new ticker in manager.transaction; for a capped
+  // user it first counts what they created in the last 24 hours.
+  manager: {
+    query: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
+    save: jest.fn((ticker: any) => tickerRepoStub.save(ticker)),
+    transaction: jest.fn((cb: (m: any) => Promise<unknown>) =>
+      cb(tickerRepoStub.manager),
+    ),
+  } as any,
+};
+const finnhubStub = { getCompanyProfile: jest.fn() };
+const yahooStub = { getSummary: jest.fn(), getQuote: jest.fn() };
+const jobsStub = { initializeTicker: jest.fn(), queueRequest: jest.fn() };
+const tickersService = new TickersService(
+  tickerRepoStub,
+  {} as any, // logoRepo
+  {} as any, // ohlcvRepo
+  {} as any, // requestRepo
+  finnhubStub as any,
+  yahooStub as any,
+  jobsStub as any,
+  {} as any, // httpService
+  { get: () => undefined } as any, // configService (default daily cap: 10)
+);
+tickersService.searchTickers = mockTickers.searchTickers as any;
 const mockCurrency = {
   // Returns null for the sentinel target to exercise the "unavailable" path.
   getRate: jest.fn((_from: string, to: string) =>
@@ -244,7 +292,7 @@ const mockTickerRequests = {
     TickerRequestsTools,
     { provide: MarketDataService, useValue: mockMarketData },
     { provide: MarketStatusService, useValue: mockMarketStatus },
-    { provide: TickersService, useValue: mockTickers },
+    { provide: TickersService, useValue: tickersService },
     { provide: CurrencyService, useValue: mockCurrency },
     { provide: RiskRewardService, useValue: mockRisk },
     { provide: ResearchService, useValue: mockResearch },
@@ -253,6 +301,9 @@ const mockTickerRequests = {
     { provide: WatchlistService, useValue: mockWatchlist },
     { provide: PriceAlertsService, useValue: mockPriceAlerts },
     { provide: TickerRequestsService, useValue: mockTickerRequests },
+    // Registered globally by TickersModule in the real app: carries the
+    // caller of an MCP request down to TickersService.ensureTicker.
+    { provide: APP_INTERCEPTOR, useClass: RequestActorInterceptor },
   ],
 })
 class McpTestModule {}
@@ -317,6 +368,11 @@ describe('MCP endpoint (e2e, mocked services)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api'); // match main.ts -> POST /api/mcp
     await app.init();
+    // Bind once, on loopback. Left unbound, supertest does a wildcard
+    // listen(0) per request, and macOS hands out ephemeral ports that another
+    // local app already holds on 127.0.0.1 — the request then reaches that app
+    // instead of this server (hang / "Parse Error: Expected HTTP/").
+    await app.listen(0, '127.0.0.1');
   }, 30000);
 
   afterAll(async () => {
@@ -370,6 +426,237 @@ describe('MCP endpoint (e2e, mocked services)', () => {
     const payload = JSON.parse(res.result.content[0].text);
     expect(payload.symbol).toBe('AAPL');
     expect(mockMarketData.getSnapshot).toHaveBeenCalledWith('AAPL');
+  });
+
+  // An untracked symbol resolved through the snapshot / history / news path
+  // makes the platform ask its data providers, INSERT the ticker and start its
+  // initialisation (history sync + an LLM research run). An anonymous MCP
+  // caller must never trigger that. The two risk-score tools are in the same
+  // position: RiskRewardService resolves their symbol through getSnapshot().
+  describe('anonymous market-data and risk tools never create a ticker', () => {
+    const asUser = { 'x-test-user-id': 'user-1' };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    const expectNothingCreated = () => {
+      expect(finnhubStub.getCompanyProfile).not.toHaveBeenCalled();
+      expect(yahooStub.getSummary).not.toHaveBeenCalled();
+      expect(yahooStub.getQuote).not.toHaveBeenCalled();
+      expect(tickerRepoStub.save).not.toHaveBeenCalled();
+      expect(jobsStub.initializeTicker).not.toHaveBeenCalled();
+      expect(jobsStub.queueRequest).not.toHaveBeenCalled();
+    };
+
+    const SINGLE_SYMBOL_TOOLS: [string, Record<string, unknown>, jest.Mock][] =
+      [
+        ['get_ticker_snapshot', {}, mockMarketData.getSnapshot],
+        [
+          'get_ticker_history',
+          { from: '2026-01-01', to: '2026-02-01' },
+          mockMarketData.getHistory,
+        ],
+        ['get_company_news', {}, mockMarketData.getCompanyNews],
+        ['get_risk_score', {}, mockRisk.getLatestScore],
+        ['get_risk_score_history', {}, mockRisk.getScoreHistory],
+      ];
+
+    describe.each(SINGLE_SYMBOL_TOOLS)('%s', (tool, extra, serviceCall) => {
+      it('anonymous + untracked symbol → the "not found" tool error, and the creating read is never reached', async () => {
+        const res = await call(tool, { symbol: 'nvda', ...extra });
+
+        expect(res.result?.isError).toBe(true);
+        expect(res.result.content[0].text).toContain('Ticker NVDA not found');
+        expect(serviceCall).not.toHaveBeenCalled();
+        expectNothingCreated();
+      });
+
+      it('anonymous + tracked symbol → served as before', async () => {
+        const res = await call(tool, { symbol: 'aapl', ...extra });
+
+        expect(res.result?.isError).toBeFalsy();
+        expect(serviceCall).toHaveBeenCalledTimes(1);
+        expect(serviceCall.mock.calls[0][0]).toBe('AAPL');
+        expectNothingCreated();
+      });
+
+      it('anonymous + a tracked symbol that breaks the strict pattern (11 chars) → still served', async () => {
+        const res = await call(tool, { symbol: 'RELIANCE.NS', ...extra });
+
+        expect(res.result?.isError).toBeFalsy();
+        expect(serviceCall.mock.calls[0][0]).toBe('RELIANCE.NS');
+      });
+
+      it('anonymous + untracked malformed symbol → a tool error, nothing looked up upstream', async () => {
+        const res = await call(tool, { symbol: 'not a symbol!', ...extra });
+
+        expect(res.result?.isError).toBe(true);
+        expect(res.result.content[0].text).toContain(
+          'Invalid ticker symbol format',
+        );
+        expect(serviceCall).not.toHaveBeenCalled();
+        expectNothingCreated();
+      });
+
+      it('signed-in + untracked symbol → unchanged: the read (and with it creation) goes ahead, ungated', async () => {
+        const res = await call(tool, { symbol: 'nvda', ...extra }, asUser);
+
+        expect(res.result?.isError).toBeFalsy();
+        expect(serviceCall).toHaveBeenCalledTimes(1);
+        expect(serviceCall.mock.calls[0][0]).toBe('NVDA');
+        // Not even the gate's lookup runs for a signed-in caller.
+        expect(tickerRepoStub.count).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('get_ticker_snapshots (bulk)', () => {
+      it('anonymous: tracked symbols are served, untracked ones come back as per-symbol not-found entries — and never reach the snapshot path', async () => {
+        const res = await call('get_ticker_snapshots', {
+          symbols: ['aapl', 'nvda', 'msft', 'zzzq', 'RELIANCE.NS'],
+        });
+
+        expect(res.result?.isError).toBeFalsy();
+        const payload = JSON.parse(res.result.content[0].text);
+        expect(payload).toEqual([
+          { symbol: 'AAPL', price: 1 },
+          { symbol: 'MSFT', price: 1 },
+          { symbol: 'RELIANCE.NS', price: 1 },
+          { symbol: 'NVDA', error: 'Ticker NVDA not found' },
+          { symbol: 'ZZZQ', error: 'Ticker ZZZQ not found' },
+        ]);
+        // Only the tracked symbols were handed to the service that would
+        // otherwise create the others.
+        expect(mockMarketData.getSnapshots).toHaveBeenCalledTimes(1);
+        expect(mockMarketData.getSnapshots).toHaveBeenCalledWith([
+          'AAPL',
+          'MSFT',
+          'RELIANCE.NS',
+        ]);
+        // One lookup for the whole list.
+        expect(tickerRepoStub.find).toHaveBeenCalledTimes(1);
+        expectNothingCreated();
+      });
+
+      it('anonymous + only untracked symbols → all not-found, the snapshot path is not called at all', async () => {
+        const res = await call('get_ticker_snapshots', {
+          symbols: ['nvda', 'tsla'],
+        });
+
+        const payload = JSON.parse(res.result.content[0].text);
+        expect(payload).toEqual([
+          { symbol: 'NVDA', error: 'Ticker NVDA not found' },
+          { symbol: 'TSLA', error: 'Ticker TSLA not found' },
+        ]);
+        expect(mockMarketData.getSnapshots).not.toHaveBeenCalled();
+        expectNothingCreated();
+      });
+
+      it('signed-in → unchanged: every symbol goes to the snapshot path, ungated', async () => {
+        const res = await call(
+          'get_ticker_snapshots',
+          { symbols: ['aapl', 'nvda'] },
+          asUser,
+        );
+
+        const payload = JSON.parse(res.result.content[0].text);
+        expect(payload).toEqual([
+          { symbol: 'AAPL', price: 1 },
+          { symbol: 'NVDA', price: 1 },
+        ]);
+        expect(mockMarketData.getSnapshots).toHaveBeenCalledWith([
+          'AAPL',
+          'NVDA',
+        ]);
+        expect(tickerRepoStub.find).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // A signed-in MCP caller may create tickers by reading them, but only a
+  // limited number a day. The caller reaches TickersService.ensureTicker —
+  // several calls below the tool — through the global interceptor.
+  describe('signed-in tools and the daily cap on NEW tickers', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      tickerRepoStub.findOne.mockResolvedValue(null); // not tracked
+      finnhubStub.getCompanyProfile.mockResolvedValue({
+        name: 'NVIDIA Corp',
+        exchange: 'NASDAQ',
+        currency: 'USD',
+      });
+      tickerRepoStub.save.mockImplementation((t: any) =>
+        Promise.resolve({ id: '9', ...t }),
+      );
+      tickerRepoStub.findOneOrFail.mockResolvedValue({
+        id: '9',
+        symbol: 'NVDA',
+      });
+      // What the real MarketDataService does first: resolve the ticker.
+      mockMarketData.getSnapshot.mockImplementationOnce(
+        async (symbol: string) => ({
+          symbol: (await tickersService.ensureTicker(symbol)).symbol,
+          price: 1,
+        }),
+      );
+    });
+
+    it('under the limit: the ticker is created on behalf of the MCP user', async () => {
+      tickerRepoStub.manager.count.mockResolvedValue(3);
+
+      const res = await call(
+        'get_ticker_snapshot',
+        { symbol: 'nvda' },
+        { 'x-test-user-id': 'user-1' },
+      );
+
+      expect(res.result?.isError).toBeFalsy();
+      expect(tickerRepoStub.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbol: 'NVDA',
+          created_by_user_id: 'user-1',
+        }),
+      );
+      expect(tickerRepoStub.manager.count.mock.calls[0][1].where).toMatchObject(
+        { created_by_user_id: 'user-1' },
+      );
+      expect(jobsStub.initializeTicker).toHaveBeenCalledWith('NVDA');
+    });
+
+    it('at the limit: a tool error that points to the request flow, and nothing is created', async () => {
+      tickerRepoStub.manager.count.mockResolvedValue(10);
+
+      const res = await call(
+        'get_ticker_snapshot',
+        { symbol: 'nvda' },
+        { 'x-test-user-id': 'user-1' },
+      );
+
+      expect(res.result?.isError).toBe(true);
+      expect(res.result.content[0].text).toContain(
+        'You have reached the limit of 10 new tickers per day',
+      );
+      expect(res.result.content[0].text).toContain('submit a ticker request');
+      expect(finnhubStub.getCompanyProfile).not.toHaveBeenCalled();
+      expect(tickerRepoStub.save).not.toHaveBeenCalled();
+      expect(jobsStub.initializeTicker).not.toHaveBeenCalled();
+    });
+
+    it('an admin is not capped', async () => {
+      tickerRepoStub.manager.count.mockResolvedValue(999);
+
+      const res = await call(
+        'get_ticker_snapshot',
+        { symbol: 'nvda' },
+        { 'x-test-user-id': 'admin-1', 'x-test-user-role': 'admin' },
+      );
+
+      expect(res.result?.isError).toBeFalsy();
+      expect(tickerRepoStub.manager.count).not.toHaveBeenCalled();
+      expect(tickerRepoStub.save).toHaveBeenCalledWith(
+        expect.objectContaining({ created_by_user_id: 'admin-1' }),
+      );
+    });
   });
 
   it('returns an error result when a currency rate is unavailable', async () => {
@@ -624,6 +911,8 @@ describe('MCP global-guard carve-out (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     await app.init();
+    // Loopback bind — see the note in the first beforeAll.
+    await app.listen(0, '127.0.0.1');
   }, 30000);
 
   afterAll(async () => {

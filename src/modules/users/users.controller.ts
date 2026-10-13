@@ -6,7 +6,7 @@ import {
   Param,
   Query,
   UseGuards,
-  UnauthorizedException,
+  BadRequestException,
   Request,
   Post,
   Patch,
@@ -25,6 +25,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthLogFilterDto } from '../auth/dto/auth-log-filter.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -67,7 +68,9 @@ export class UsersController {
   @Put(':id/role')
   async updateUserRole(@Param('id') id: string, @Body('role') role: string) {
     if (!['user', 'admin'].includes(role)) {
-      throw new UnauthorizedException('Invalid role. Must be user or admin.');
+      // 400, not 401: the clients treat a 401 as an expired session and sign
+      // the admin out.
+      throw new BadRequestException('Invalid role. Must be user or admin.');
     }
     return this.usersService.updateRole(id, role);
   }
@@ -131,16 +134,9 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @Patch('me')
-  async updateProfile(
-    @Request() req: any,
-    @Body()
-    body: {
-      nickname?: string;
-      view_mode?: string;
-      theme?: string;
-      has_onboarded?: boolean;
-    },
-  ) {
+  @ApiResponse({ status: 400, description: 'Invalid or reserved nickname' })
+  @ApiResponse({ status: 409, description: 'Nickname already taken' })
+  async updateProfile(@Request() req: any, @Body() body: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user.id, body);
   }
 }

@@ -41,6 +41,8 @@ export class PortfolioPosition {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  @Column({ length: 3, default: 'USD' })
+  // Nullable in the database (AddCurrencyToPortfolioPositions added it with
+  // a DEFAULT only); every row the application writes has a value.
+  @Column({ length: 3, default: 'USD', nullable: true })
   currency: string;
 }

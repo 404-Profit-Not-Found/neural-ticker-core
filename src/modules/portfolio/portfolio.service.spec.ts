@@ -1,3 +1,4 @@
+import { LlmUnavailableException } from '../llm/llm-unavailable.exception';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PortfolioService } from './portfolio.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -148,6 +149,7 @@ const mockTickersService = {
 const mockCreditService = {
   getModelCost: jest.fn().mockReturnValue(1),
   deductCredits: jest.fn().mockResolvedValue({}),
+  refundCredits: jest.fn().mockResolvedValue(1),
 };
 
 const mockCurrencyService = {
@@ -304,6 +306,79 @@ describe('PortfolioService', () => {
       expect(mockLlmService.generateText).toHaveBeenCalled();
       expect(mockCreditService.deductCredits).toHaveBeenCalled();
       expect(mockAnalysisRepo.save).toHaveBeenCalled();
+    });
+
+    // The analysis is paid for before the LLM is called.
+    describe('when the LLM cannot answer', () => {
+      beforeEach(() => {
+        mockCreditService.deductCredits.mockClear();
+        mockCreditService.refundCredits.mockClear();
+        mockAnalysisRepo.save.mockClear();
+      });
+      afterEach(() => {
+        mockLlmService.generateText.mockResolvedValue(
+          'Suggested Analysis: Hold NVDA.',
+        );
+        mockCreditService.getModelCost.mockReturnValue(1);
+      });
+
+      it('LLM unavailable → the credits are refunded and the caller gets the 503', async () => {
+        const unavailable = new LlmUnavailableException('quota_exhausted');
+        mockLlmService.generateText.mockRejectedValue(unavailable);
+        mockCreditService.getModelCost.mockReturnValue(2);
+
+        await expect(service.analyzePortfolio('user-1', 'medium')).rejects.toBe(
+          unavailable,
+        );
+
+        expect(mockCreditService.deductCredits).toHaveBeenCalledTimes(1);
+        expect(mockCreditService.refundCredits).toHaveBeenCalledTimes(1);
+        expect(mockCreditService.refundCredits).toHaveBeenCalledWith(
+          'user-1',
+          { amount: 2 },
+          {
+            spend_reason: 'portfolio_analysis_spend',
+            cause: 'LLM_UNAVAILABLE',
+          },
+        );
+        expect(mockAnalysisRepo.save).not.toHaveBeenCalled();
+      });
+
+      it('a failing refund does not replace the 503', async () => {
+        const unavailable = new LlmUnavailableException('provider_error');
+        mockLlmService.generateText.mockRejectedValue(unavailable);
+        mockCreditService.refundCredits.mockRejectedValueOnce(new Error('db'));
+
+        await expect(service.analyzePortfolio('user-1', 'medium')).rejects.toBe(
+          unavailable,
+        );
+      });
+
+      it('any other failure is rethrown unchanged, with no refund', async () => {
+        const bug = new TypeError('x is not a function');
+        mockLlmService.generateText.mockRejectedValue(bug);
+
+        await expect(service.analyzePortfolio('user-1', 'medium')).rejects.toBe(
+          bug,
+        );
+
+        expect(mockCreditService.refundCredits).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('getQuickRecommendation', () => {
+    it('passes "LLM unavailable" through as the 503 it is (nothing was charged)', async () => {
+      mockCreditService.refundCredits.mockClear();
+      const unavailable = new LlmUnavailableException('not_configured');
+      (mockLlmService as any).generateResearch = jest
+        .fn()
+        .mockRejectedValue(unavailable);
+
+      await expect(service.getQuickRecommendation('user-1')).rejects.toBe(
+        unavailable,
+      );
+      expect(mockCreditService.refundCredits).not.toHaveBeenCalled();
     });
   });
 });

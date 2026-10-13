@@ -1,0 +1,25 @@
+{
+  // Type-check and ts-node settings for the local-development seed
+  // (seed-local.ts, mock-source.ts, local-db.ts). These files are excluded
+  // from the root tsconfig.json because they import frontend-v2/mock, whose
+  // files import each other with explicit ".ts" specifiers.
+  //
+  //   type-check:  npx tsc -p scripts/tsconfig.local.json
+  //   run:         npm run seed:local   (ts-node --project this file)
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "incremental": false
+  },
+  "include": ["seed-local.ts", "mock-source.ts", "local-db.ts"],
+  "exclude": [],
+  "ts-node": {
+    "transpileOnly": true,
+    // frontend-v2/package.json says "type": "module"; the seed runs as
+    // CommonJS (like the backend), so load the mock as CommonJS too.
+    "moduleTypes": {
+      "../frontend-v2/mock/**/*.ts": "cjs"
+    }
+  }
+}

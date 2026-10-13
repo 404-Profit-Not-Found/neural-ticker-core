@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { GeminiProvider } from './gemini.provider';
 import { LlmBudgetService } from '../llm-budget.service';
 import { ResearchPrompt } from '../llm.types';
+import { LlmUnavailableException } from '../llm-unavailable.exception';
+import { GEMINI_FLASH_LITE_MODEL } from '../../../config/configuration';
 import { GoogleGenAI } from '@google/genai';
 
 // Mock the Google GenAI SDK module structure
@@ -69,11 +71,17 @@ describe('GeminiProvider', () => {
       quality: 'medium',
     };
 
-    it('should throw error if no API key is available', async () => {
+    it('with no API key available it is "LLM unavailable" (503), not a plain error (500)', async () => {
       jest.spyOn(configService, 'get').mockReturnValue(null);
-      await expect(
-        provider.generate({ ...validPrompt, apiKey: undefined }),
-      ).rejects.toThrow('Gemini API Key not configured');
+
+      const error = await provider
+        .generate({ ...validPrompt, apiKey: undefined })
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(LlmUnavailableException);
+      expect(error.reason).toBe('not_configured');
+      expect(error.getStatus()).toBe(503);
+      expect(mockGenerateContent).not.toHaveBeenCalled();
     });
 
     it('should use system API key if not provided in prompt', async () => {
@@ -160,7 +168,7 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.5-flash-lite',
           config: expect.objectContaining({ tools: undefined }),
         }),
       );
@@ -172,7 +180,7 @@ describe('GeminiProvider', () => {
       await provider.generate({ ...validPrompt, quality: 'recommendation' });
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-3.1-flash-lite' }),
+        expect.objectContaining({ model: 'gemini-3.5-flash-lite' }),
       );
     });
 
@@ -183,20 +191,123 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.5-flash-lite',
           config: expect.objectContaining({ tools: undefined }),
         }),
       );
     });
 
-    it('should use gemini-3.1-flash-lite for "cron" quality', async () => {
+    it('should use gemini-3.5-flash-lite for "cron" quality', async () => {
       mockGenerateContent.mockResolvedValue({ text: 'Cron', candidates: [] });
 
       await provider.generate({ ...validPrompt, quality: 'cron' });
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-3.1-flash-lite' }),
+        expect.objectContaining({ model: 'gemini-3.5-flash-lite' }),
       );
+    });
+
+    // Flash Lite is ONE default (GEMINI_FLASH_LITE_MODEL) for the user-facing
+    // `low` tier and every background tier.
+    it.each([
+      'low',
+      'extraction',
+      'cron',
+      'summary',
+      'recommendation',
+      'scoring',
+    ] as const)(
+      'the %s tier defaults to gemini-3.5-flash-lite',
+      async (quality) => {
+        mockGenerateContent.mockResolvedValue({ text: 'x', candidates: [] });
+
+        await provider.generate({ ...validPrompt, quality });
+
+        expect(mockGenerateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ model: GEMINI_FLASH_LITE_MODEL }),
+        );
+        expect(GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+      },
+    );
+
+    it('a configured model (env override, e.g. GEMINI_MODEL_EXTRACTION) still wins over the default', async () => {
+      (configService.get as jest.Mock).mockImplementation((key: string) =>
+        key === 'gemini.apiKey'
+          ? 'test-system-key'
+          : key === 'gemini.models'
+            ? { extraction: 'gemini-3.1-flash-lite', low: 'custom-low-model' }
+            : null,
+      );
+      mockGenerateContent.mockResolvedValue({ text: 'x', candidates: [] });
+
+      await provider.generate({ ...validPrompt, quality: 'extraction' });
+      await provider.generate({ ...validPrompt, quality: 'low' });
+      await provider.generate({ ...validPrompt, quality: 'scoring' });
+
+      expect(
+        mockGenerateContent.mock.calls.map(([call]) => call.model),
+      ).toEqual([
+        'gemini-3.1-flash-lite', // overridden back to the previous default
+        'custom-low-model',
+        'gemini-3.5-flash-lite', // not overridden: the default
+      ]);
+    });
+
+    it('a Flash Lite call falls back to the other Flash Lite first on a 429, and that call is still metered', async () => {
+      const budget = (provider as any).budgetService;
+      const quota = { status: 429, message: '429 quota exceeded' };
+      mockGenerateContent
+        .mockRejectedValueOnce(quota) // gemini-3.5-flash-lite
+        .mockResolvedValue({ text: 'ok', candidates: [] }); // gemini-3.1-flash-lite
+
+      const result = await provider.generate({
+        ...validPrompt,
+        quality: 'cron',
+      });
+
+      expect(
+        mockGenerateContent.mock.calls.map(([call]) => call.model),
+      ).toEqual(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
+      expect(result.models).toEqual(['gemini-3.1-flash-lite']);
+      expect(budget.record).toHaveBeenCalledWith(1);
+    });
+
+    it('a Flash Lite call reaches the Flash models only after both Flash Lites answer 429', async () => {
+      const quota = { status: 429, message: '429 quota exceeded' };
+      mockGenerateContent
+        .mockRejectedValueOnce(quota) // gemini-3.5-flash-lite
+        .mockRejectedValueOnce(quota) // gemini-3.1-flash-lite
+        .mockRejectedValueOnce(quota) // gemini-3.8-flash
+        .mockResolvedValue({ text: 'ok', candidates: [] }); // gemini-3.5-flash
+
+      await provider.generate({ ...validPrompt, quality: 'low' });
+
+      expect(
+        mockGenerateContent.mock.calls.map(([call]) => call.model),
+      ).toEqual([
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+      ]);
+    });
+
+    it('a Flash ("medium") call keeps its fallback order: Flash models first, Flash Lite after', async () => {
+      const quota = { status: 429, message: '429 quota exceeded' };
+      mockGenerateContent
+        .mockRejectedValueOnce(quota) // gemini-3.8-flash
+        .mockRejectedValueOnce(quota) // gemini-3.5-flash
+        .mockResolvedValue({ text: 'ok', candidates: [] }); // gemini-3.5-flash-lite
+
+      await provider.generate({ ...validPrompt, quality: 'medium' });
+
+      expect(
+        mockGenerateContent.mock.calls.map(([call]) => call.model),
+      ).toEqual([
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+      ]);
     });
 
     it('should use gemini-3.5-flash-lite for user-picked "low" quality', async () => {
@@ -268,6 +379,81 @@ describe('GeminiProvider', () => {
       await provider.generate({ ...validPrompt, quality: 'recommendation' });
 
       expect(budget.record).not.toHaveBeenCalled();
+    });
+
+    // Background research nobody paid for (cron scans, the initial research of
+    // a newly created ticker) runs free-only: whatever happens, the billed
+    // secondary key is never used.
+    describe('free-only calls and the billed secondary key', () => {
+      const quota = { status: 429, message: '429 quota exceeded' };
+      const usedBilledKey = (): boolean =>
+        (GoogleGenAI as unknown as jest.Mock).mock.calls.some(
+          ([options]) => options?.apiKey === 'billed-key',
+        );
+
+      beforeEach(() => {
+        (configService.get as jest.Mock).mockImplementation((key: string) =>
+          key === 'gemini.apiKey'
+            ? 'test-system-key'
+            : key === 'gemini.secondaryApiKey'
+              ? 'billed-key'
+              : null,
+        );
+      });
+
+      const exhaustFreeModelsThenSucceed = () =>
+        mockGenerateContent
+          .mockRejectedValueOnce(quota)
+          .mockRejectedValueOnce(quota)
+          .mockRejectedValueOnce(quota)
+          .mockRejectedValueOnce(quota)
+          .mockResolvedValue({ text: 'from the billed key', candidates: [] });
+
+      it('control — a normal call falls through to the billed key once every free model answers 429', async () => {
+        exhaustFreeModelsThenSucceed();
+
+        const result = await provider.generate({ ...validPrompt });
+
+        expect(result.answerMarkdown).toBe('from the billed key');
+        expect(usedBilledKey()).toBe(true);
+      });
+
+      it.each([
+        ['freeOnly: true', { freeOnly: true }],
+        ["quality: 'cron'", { quality: 'cron' as const }],
+      ])(
+        '%s — fails instead, after trying the free models only',
+        async (_l, extra) => {
+          exhaustFreeModelsThenSucceed();
+
+          await expect(
+            provider.generate({ ...validPrompt, ...extra }),
+          ).rejects.toEqual(quota);
+
+          expect(mockGenerateContent).toHaveBeenCalledTimes(4);
+          expect(usedBilledKey()).toBe(false);
+        },
+      );
+
+      it('control — a model only the billed key serves switches to it up front', async () => {
+        mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
+
+        await provider.generate({ ...validPrompt, quality: 'deep' });
+
+        expect(usedBilledKey()).toBe(true);
+      });
+
+      it('free-only — even such a model stays on the free key', async () => {
+        mockGenerateContent.mockResolvedValue({ text: 'ok', candidates: [] });
+
+        await provider.generate({
+          ...validPrompt,
+          quality: 'deep',
+          freeOnly: true,
+        });
+
+        expect(usedBilledKey()).toBe(false);
+      });
     });
   });
 });

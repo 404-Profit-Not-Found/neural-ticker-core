@@ -23,6 +23,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { NumericIdPipe } from '../../common/pipes/numeric-id.pipe';
+import { PostCommentDto } from './dto/post-comment.dto';
 
 @ApiTags('Social')
 @ApiBearerAuth()
@@ -33,47 +36,34 @@ export class SocialController {
   @ApiOperation({ summary: 'Get Comments for a Ticker' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
   @ApiResponse({ status: 200, description: 'List of comments' })
+  // Public, but a signed-in caller is identified (never required): authors
+  // also get their own taken-down comments, admins get all of them.
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('comments/:symbol')
-  async getComments(@Param('symbol') symbol: string) {
-    return this.socialService.getComments(symbol);
+  async getComments(@Param('symbol') symbol: string, @Request() req?: any) {
+    const viewer = req?.user ? { id: req.user.id, role: req.user.role } : null;
+    return this.socialService.getComments(symbol, viewer);
   }
 
   @ApiOperation({ summary: 'Post a Comment or Reply' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        content: { type: 'string' },
-        parent_id: { type: 'string', nullable: true },
-      },
-    },
-  })
+  @ApiBody({ type: PostCommentDto })
   @ApiResponse({ status: 201, description: 'Comment created' })
+  @ApiResponse({ status: 400, description: 'Empty / too long / wrong ticker' })
+  @ApiResponse({ status: 404, description: 'Parent comment not found' })
   @UseGuards(JwtAuthGuard)
   @Post('comments/:symbol')
   async postComment(
     @Request() req: any,
     @Param('symbol') symbol: string,
-    @Body('content') content: any,
-    @Body('parent_id') parentId?: string,
+    @Body() dto: PostCommentDto,
   ) {
-    let normalizedContent: string;
-
-    if (typeof content === 'string') {
-      normalizedContent = content;
-    } else if (Array.isArray(content)) {
-      normalizedContent = content.length > 0 ? String(content[0]) : '';
-    } else {
-      normalizedContent = content != null ? String(content) : '';
-    }
-
     return this.socialService.postComment(
       req.user.id,
       symbol,
-      normalizedContent,
-      parentId,
+      dto.content,
+      dto.parent_id || undefined,
     );
   }
 
@@ -82,7 +72,10 @@ export class SocialController {
   @ApiResponse({ status: 200, description: 'Like toggled' })
   @UseGuards(JwtAuthGuard)
   @Post('comments/:commentId/like')
-  async toggleLike(@Request() req: any, @Param('commentId') commentId: string) {
+  async toggleLike(
+    @Request() req: any,
+    @Param('commentId', NumericIdPipe) commentId: string,
+  ) {
     return this.socialService.toggleLike(req.user.id, commentId);
   }
 
@@ -121,7 +114,7 @@ export class SocialController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Delete('comments/:id')
-  async deleteComment(@Param('id') id: string) {
+  async deleteComment(@Param('id', NumericIdPipe) id: string) {
     await this.socialService.deleteComment(id);
     return { success: true };
   }

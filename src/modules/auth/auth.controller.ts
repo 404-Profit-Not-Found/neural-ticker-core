@@ -28,6 +28,8 @@ import {
   CreateUserTokenDto,
   FirebaseLoginDto,
 } from './dto/create-user-token.dto';
+import { User } from '../users/entities/user.entity';
+import { toAccountUser } from '../users/public-user';
 
 @Public()
 @ApiTags('Auth')
@@ -61,6 +63,7 @@ export class AuthController {
     // req.user contains the user from GoogleStrategy.validate()
     const user = req.user as any;
 
+    // The web client lives at the origin root (see app.module.ts).
     const frontendUrl = this.configService.get<string>('frontendUrl') || '';
 
     // Handle "Just Joined" Waitlist
@@ -96,7 +99,9 @@ export class AuthController {
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
   getProfile(@Req() req: Request) {
-    return req.user;
+    // req.user is the full row loaded by JwtStrategy for server-side use.
+    // The owner gets their account back, minus secret preference values.
+    return toAccountUser(req.user as User);
   }
 
   @ApiOperation({

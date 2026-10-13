@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { CreditTransaction } from './credit-transaction.entity';
+import { PublicUser, toPublicUser } from '../public-user';
 
 @Entity('users')
 export class User {
@@ -69,6 +70,17 @@ export class User {
   @Column({ type: 'jsonb', nullable: true })
   preferences: Record<string, any>;
 
+  /**
+   * The user's personal Gemini API key, ENCRYPTED (SecretBox:
+   * `v1:<keyId>:<iv>:<tag>:<ciphertext>`, bound to this user's id). Written
+   * and read only through UsersService (`getUserLlmKey`); never returned to a
+   * client — the account view reports `preferences.gemini_api_key_set` and
+   * drops this column. NULL = no key, or encryption at rest is not configured
+   * (then the key, if any, is in `preferences.gemini_api_key` as before).
+   */
+  @Column({ type: 'text', nullable: true })
+  gemini_api_key_enc: string | null;
+
   @ApiProperty({ example: 'FunnyPanda123' })
   @Column({ nullable: true })
   nickname: string;
@@ -84,4 +96,17 @@ export class User {
   @ApiProperty({ example: 'dark' })
   @Column({ default: 'dark' })
   theme: string;
+
+  /**
+   * Structural guard: a `User` that reaches `JSON.stringify` (an HTTP
+   * response, an SSE frame, an MCP tool result) serializes as its PUBLIC view,
+   * whatever columns were loaded. So an entity embedded through a relation or
+   * returned as-is can never carry `email`, `google_id`, `credits_balance` or
+   * `preferences` (API keys) to a client. Server code reads the properties and
+   * is unaffected; endpoints that return an account to its owner or an admin
+   * opt in with `toAccountUser()` (see ../public-user.ts).
+   */
+  toJSON(): PublicUser {
+    return toPublicUser(this) as PublicUser;
+  }
 }

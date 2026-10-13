@@ -6,6 +6,7 @@ import {
   Inject,
   forwardRef,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/public.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @ApiTags('tickers')
 @ApiBearerAuth()
@@ -47,7 +49,13 @@ export class TickerDetailController {
   @ApiResponse({ status: 404, description: 'Ticker not found' })
   @Get(':symbol/composite')
   @Public()
-  async getCompositeData(@Param('symbol') symbol: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getCompositeData(@Param('symbol') symbol: string, @Req() req?: any) {
+    // 0. Public route: an anonymous caller can only read a ticker we already
+    // track — it must never be the one that creates it (and starts its LLM
+    // research). Also rejects a malformed symbol before any lookup.
+    await this.tickersService.assertPublicReadAllowed(symbol, !!req?.user);
+
     // 1. Get Market Data Snapshot (Handles Ticker existence and Fundamentals)
     // If ticker doesn't exist, getSnapshot attempts to fetch from Finnhub or throws.
     let snapshot;
@@ -164,12 +172,19 @@ export class TickerDetailController {
             },
             upside_percent: riskAnalysis.upside_percent,
             price_target: riskAnalysis.price_target_weighted,
+            // The server's AI rating for this ticker, as the snapshot computed
+            // it — the same derivation the analyzer filters and sorts by
+            // (src/lib/ticker-verdict.ts).
+            rating: snapshot.aiAnalysis?.rating ?? null,
+            rating_score: snapshot.aiAnalysis?.rating_score ?? null,
             scenarios: riskAnalysis.scenarios,
             catalysts: riskAnalysis.catalysts,
             red_flags: riskAnalysis.red_flags,
             updated_at: riskAnalysis.created_at,
           }
         : null,
+      // This route is unauthenticated: the note is the public SUMMARY only
+      // (ResearchService.getLatestNoteForTicker), never the note itself.
       notes: researchNote ? [researchNote] : [], // Legacy support expects array
       ratings: analystRatings,
       news: {

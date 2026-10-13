@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { TickerRequestsService } from './ticker-requests.service';
 import { TickerRequestEntity } from './entities/ticker-request.entity';
 import { TickersService } from '../tickers/tickers.service';
+import { User } from '../users/entities/user.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('TickerRequestsService', () => {
@@ -77,18 +78,41 @@ describe('TickerRequestsService', () => {
       );
     });
 
-    it('should return existing request if it is already pending', async () => {
+    it("should return the caller's own request if it is already pending", async () => {
       tickersService.findOneBySymbol.mockResolvedValue(null);
       const existingRequest = {
         id: 'req-1',
         symbol: 'AAPL',
         status: 'PENDING',
+        user_id: userId,
       };
       requestRepo.findOne.mockResolvedValue(existingRequest);
 
       const result = await service.createRequest(userId, symbol);
       expect(result).toEqual(existingRequest);
       expect(requestRepo.create).not.toHaveBeenCalled();
+    });
+
+    it("never returns ANOTHER user's pending request row — only that the symbol is already requested", async () => {
+      tickersService.findOneBySymbol.mockResolvedValue(null);
+      requestRepo.findOne.mockResolvedValue({
+        id: 'req-of-someone-else',
+        symbol: 'AAPL',
+        status: 'PENDING',
+        user_id: 'other-user-uuid',
+        created_at: new Date('2026-10-01T10:00:00Z'),
+        updated_at: new Date('2026-10-01T10:00:00Z'),
+      });
+
+      const result = await service.createRequest(userId, symbol);
+
+      expect(result).toEqual({ symbol: 'AAPL', status: 'PENDING' });
+      const json = JSON.stringify(result);
+      expect(json).not.toContain('other-user-uuid');
+      expect(json).not.toContain('req-of-someone-else');
+      // Still de-duplicated: no second row for the same symbol.
+      expect(requestRepo.create).not.toHaveBeenCalled();
+      expect(requestRepo.save).not.toHaveBeenCalled();
     });
 
     it('should create and save a new request', async () => {
@@ -155,6 +179,86 @@ describe('TickerRequestsService', () => {
 
       const result = await service.rejectRequest('1');
       expect(result.status).toBe('REJECTED');
+    });
+  });
+
+  describe('getRequests (admin listing)', () => {
+    const mockListQuery = (rows: any[]) => {
+      const qb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      mockRequestRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+      return qb;
+    };
+
+    it('joins the requester with the admin-summary columns only', async () => {
+      const qb = mockListQuery([]);
+
+      await service.getRequests();
+
+      expect(qb.leftJoin).toHaveBeenCalledWith('request.user', 'user');
+      expect(qb.addSelect).toHaveBeenCalledWith([
+        'user.id',
+        'user.nickname',
+        'user.avatar_url',
+        'user.tier',
+        'user.email',
+        'user.full_name',
+      ]);
+      expect(qb.leftJoinAndSelect).not.toHaveBeenCalled();
+      expect(qb.orderBy).toHaveBeenCalledWith('request.created_at', 'DESC');
+    });
+
+    it("gives an admin the requester's contact summary but never the row's secrets", async () => {
+      // A fully loaded requester, to pin the projection on its own.
+      mockListQuery([
+        {
+          id: 'r1',
+          symbol: 'VWS.CO',
+          status: 'PENDING',
+          user_id: 'u1',
+          user: Object.assign(new User(), {
+            id: 'u1',
+            email: 'alice.private@example.com',
+            google_id: 'google-sub-1234567890',
+            full_name: 'Alice Private',
+            credits_balance: 4242,
+            nickname: 'FunnyPanda123',
+            avatar_url: null,
+            tier: 'pro',
+            preferences: { gemini_api_key: 'SECRET' },
+          }),
+        },
+      ]);
+
+      const result = await service.getRequests();
+
+      expect(result).toEqual([
+        {
+          id: 'r1',
+          symbol: 'VWS.CO',
+          status: 'PENDING',
+          user_id: 'u1',
+          // What the admin panel (tier, avatar, nickname, email) and the MCP
+          // list_ticker_requests serializer (full_name, email) read.
+          user: {
+            id: 'u1',
+            nickname: 'FunnyPanda123',
+            avatar_url: null,
+            tier: 'pro',
+            email: 'alice.private@example.com',
+            full_name: 'Alice Private',
+          },
+        },
+      ]);
+      const json = JSON.stringify(result);
+      expect(json).not.toContain('SECRET');
+      expect(json).not.toContain('google-sub-1234567890');
+      expect(json).not.toContain('4242');
     });
   });
 });

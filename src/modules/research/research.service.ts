@@ -24,6 +24,11 @@ import { RiskRewardService } from '../risk-reward/risk-reward.service';
 import { QualityTier } from '../llm/llm.types';
 import { UsersService } from '../users/users.service';
 import { CreditService } from '../users/credit.service'; // Added
+import {
+  LLM_UNAVAILABLE_CODE,
+  asLlmUnavailable,
+} from '../llm/llm-unavailable.exception';
+import { PublicUser, userColumns, withPublicUser } from '../users/public-user';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
 
@@ -38,6 +43,40 @@ export interface ResearchEvent {
   type: 'status' | 'thought' | 'source' | 'content' | 'error';
   data: any;
 }
+
+/**
+ * A research note as returned to a client: `user` is the author's PUBLIC view
+ * (or null for system notes), never the `users` row.
+ */
+export type ResearchNoteView = Omit<ResearchNote, 'user'> & {
+  user: PublicUser | null;
+};
+
+/**
+ * What an ANONYMOUS visitor gets of a research note (the public ticker page:
+ * GET /v1/tickers/:symbol/composite). An allow-list of descriptive fields —
+ * never the answer, the asker's question, the raw LLM response, the reasoning
+ * trace, the numeric context, the error, the content hash or the author.
+ */
+export const PUBLIC_NOTE_SUMMARY_FIELDS = [
+  'id',
+  'title',
+  'status',
+  'tickers',
+  'provider',
+  'models_used',
+  'rarity',
+  'quality_score',
+  'created_at',
+  'updated_at',
+] as const;
+
+export type PublicResearchNoteSummary = Pick<
+  ResearchNote,
+  (typeof PUBLIC_NOTE_SUMMARY_FIELDS)[number]
+>;
+
+const DIGEST_TITLE_PATTERN = 'Smart News Briefing%';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebPushService } from '../web-push/web-push.service';
@@ -266,9 +305,19 @@ export class ResearchService implements OnModuleInit {
   // Or just removed. I will remove it to force usage of new async flow.
   // The controller was the only user.
 
-  async processTicket(id: string): Promise<void> {
+  /**
+   * @param options.freeOnly Background research nobody paid for (the initial
+   *   run for a newly created ticker): the research call AND every enrichment
+   *   call after it stay on the free key and never fall through to the billed
+   *   secondary one.
+   */
+  async processTicket(
+    id: string,
+    options: { freeOnly?: boolean } = {},
+  ): Promise<void> {
     const note = await this.noteRepo.findOne({ where: { id } });
     if (!note) return;
+    const freeOnly = options.freeOnly === true;
 
     try {
       note.status = ResearchStatus.PROCESSING;
@@ -310,10 +359,12 @@ export class ResearchService implements OnModuleInit {
       }
 
       // 2. Resolve API Key
+      // The user's personal key, if they have one that can be read — never
+      // throws; a key that cannot be decrypted counts as "none".
       let apiKey: string | undefined;
       if (note.user_id) {
-        const user = await this.usersService.findById(note.user_id);
-        apiKey = user?.preferences?.gemini_api_key;
+        apiKey =
+          (await this.usersService.getUserLlmKey(note.user_id)) ?? undefined;
       }
       // Fallback to System Default if User Key missing
       if (!apiKey) {
@@ -370,6 +421,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         quality: note.quality as QualityTier,
         provider: note.provider as any,
         apiKey,
+        ...(freeOnly ? { freeOnly: true } : {}),
       });
 
       // 4. COMPLETE CORE DATA (Allows UI to render results immediately)
@@ -495,7 +547,12 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
       const enrichmentTasks = [
         // A. Title Generation (Fast)
-        this.generateTitle(note.question, result.answerMarkdown, note.tickers)
+        this.generateTitle(
+          note.question,
+          result.answerMarkdown,
+          note.tickers,
+          freeOnly,
+        )
           .then(async (title) => {
             await this.noteRepo.update(id, { title });
             this.logger.log(`Title generated for ticket ${id}: ${title}`);
@@ -508,7 +565,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
 
         // B. Quality Scoring (Fast)
         this.qualityScoringService
-          .score(result.answerMarkdown)
+          .score(result.answerMarkdown, { freeOnly })
           .then(async (judgment) => {
             if (!judgment.ok) {
               // Transient scoring failure — leave quality_score / rarity NULL
@@ -543,7 +600,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         // and deliberately skips anything but a single-ticker note — so null
         // means "failed" only when an analysis was actually expected.
         this.riskRewardService
-          .evaluateFromResearch(note)
+          .evaluateFromResearch(note, { freeOnly })
           .then((analysis) => {
             enrichment.risk_analysis = analysis
               ? 'ok'
@@ -559,7 +616,13 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         // D. Financial Extraction (Slowest)
         // Also swallows per-ticker errors; nothing extracted at all is the
         // "no fundamentals" gap this status exists to expose.
-        this.extractFinancialsFromResearch(note.tickers, result.answerMarkdown)
+        this.extractFinancialsFromResearch(
+          note.tickers,
+          result.answerMarkdown,
+          {
+            freeOnly,
+          },
+        )
           .then((extracted) => {
             enrichment.financials =
               extracted.description || extracted.financials || extracted.ratings
@@ -606,13 +669,39 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       note.error = e.message;
       await this.noteRepo.save(note);
 
+      // The research was paid for up front. When it failed because no LLM
+      // answer could be had (no key, quota used up, provider down) the user
+      // gets the credits back — whatever was deducted for THIS ticket, once.
+      // Any other failure is unchanged.
+      let refunded = 0;
+      if (note.user_id && asLlmUnavailable(e)) {
+        refunded = await this.creditService
+          .refundCredits(
+            note.user_id,
+            {
+              spendMatch: {
+                reason: 'research_spend',
+                metadataKey: 'research_id',
+                metadataValue: String(note.id),
+              },
+            },
+            { cause: LLM_UNAVAILABLE_CODE },
+          )
+          .catch((err) => {
+            this.logger.error(`Refund failed for ticket ${id}`, err);
+            return 0;
+          });
+      }
+
       if (note.user_id) {
         await this.notificationsService.create(
           note.user_id,
           'research_failed',
           `Research Failed: ${note.tickers.join(', ')}`,
-          `We encountered an error analyzing ${note.tickers.join(', ')}.`,
-          { researchId: note.id, error: e.message },
+          refunded > 0
+            ? `We could not analyze ${note.tickers.join(', ')} right now. Your ${refunded} credit${refunded === 1 ? ' has' : 's have'} been refunded.`
+            : `We encountered an error analyzing ${note.tickers.join(', ')}.`,
+          { researchId: note.id, error: e.message, refunded },
         );
       }
     }
@@ -751,12 +840,14 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       saveDescription?: boolean;
       saveFinancials?: boolean;
       saveRatings?: boolean;
+      freeOnly?: boolean;
     } = {}, // Default: save everything
   ): Promise<{ description: boolean; financials: boolean; ratings: boolean }> {
     const {
       saveDescription = true,
       saveFinancials = true,
       saveRatings = true,
+      freeOnly = false,
     } = options;
 
     if (tickers.length === 0 || !text)
@@ -812,6 +903,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
           quality: 'extraction' as QualityTier,
           provider: 'gemini',
           maxTokens: 1000,
+          ...(freeOnly ? { freeOnly: true } : {}),
         });
 
         try {
@@ -950,6 +1042,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
     question: string,
     answerMarkdown: string,
     tickers: string[],
+    freeOnly = false,
   ): Promise<string> {
     try {
       // Extract first 500 chars of answer for context
@@ -972,9 +1065,10 @@ Title:`;
         question: titlePrompt,
         tickers: [],
         numericContext: {},
-        quality: 'scoring' as QualityTier, // gemini-3.1-flash-lite: cheap, no search
+        quality: 'scoring' as QualityTier, // Flash Lite tier: cheap, no search
         provider: 'gemini',
         maxTokens: 50,
+        ...(freeOnly ? { freeOnly: true } : {}),
       });
 
       // Clean up the title (remove quotes, trim, limit length)
@@ -996,19 +1090,55 @@ Title:`;
     }
   }
 
-  async getResearchNote(id: string): Promise<ResearchNote | null> {
-    // if (id === 'daily-digest-latest') { return ... } // Legacy legacy
-    return this.noteRepo.findOne({ where: { id }, relations: ['user'] });
-  }
-
-  async getLatestNoteForTicker(symbol: string): Promise<ResearchNote | null> {
+  /**
+   * Query for notes that are returned to a client together with their author.
+   * Any authenticated user may read any note (and the latest note of a ticker
+   * is public), so the author is joined with the public columns only — the
+   * rest of the `users` row is never loaded.
+   */
+  private notesWithAuthor() {
     return this.noteRepo
       .createQueryBuilder('note')
-      .leftJoinAndSelect('note.user', 'user')
+      .leftJoin('note.user', 'user')
+      .addSelect(userColumns('user'));
+  }
+
+  async getResearchNote(id: string): Promise<ResearchNoteView | null> {
+    // if (id === 'daily-digest-latest') { return ... } // Legacy legacy
+    const note = await this.notesWithAuthor()
+      .where('note.id = :id', { id })
+      .getOne();
+    return note ? withPublicUser(note) : null;
+  }
+
+  /**
+   * Summary of the ticker's latest completed research, for the PUBLIC ticker
+   * page. Served without authentication, so only the summary columns are
+   * loaded and returned (see PUBLIC_NOTE_SUMMARY_FIELDS); a user's personal
+   * daily digest never stands in for a ticker's research.
+   */
+  async getLatestNoteForTicker(
+    symbol: string,
+  ): Promise<PublicResearchNoteSummary | null> {
+    const note = await this.noteRepo
+      .createQueryBuilder('note')
+      .select(PUBLIC_NOTE_SUMMARY_FIELDS.map((field) => `note.${field}`))
       .where(':symbol = ANY(note.tickers)', { symbol })
       .andWhere('note.status = :status', { status: ResearchStatus.COMPLETED })
+      .andWhere('(note.title IS NULL OR note.title NOT LIKE :excludeTitle)', {
+        excludeTitle: DIGEST_TITLE_PATTERN,
+      })
       .orderBy('note.created_at', 'DESC')
       .getOne();
+    if (!note) return null;
+
+    // Project on the way out as well: whatever the row carries, only the
+    // summary fields leave this method.
+    const summary: Record<string, unknown> = {};
+    for (const field of PUBLIC_NOTE_SUMMARY_FIELDS) {
+      summary[field] = note[field];
+    }
+    return summary as PublicResearchNoteSummary;
   }
 
   async deleteResearchNote(id: string, userId: string): Promise<void> {
@@ -1023,9 +1153,10 @@ Title:`;
     const isOwner = note.user_id === userId;
 
     if (!isAdmin && !isOwner) {
-      throw new Error(
-        'Unauthorized: Only Admin or Owner can delete research notes',
-      );
+      // Same 404 as a missing note, so the response is a proper HTTP error
+      // (a plain Error surfaced as a 500) and matches POST :id/title, which
+      // also answers a non-owner with NotFound.
+      throw new NotFoundException('Research note not found');
     }
 
     // Delete the note AND every risk analysis that references it (plus those
@@ -1043,10 +1174,8 @@ Title:`;
     userId: string,
     newTitle: string,
   ): Promise<ResearchNote> {
-    const note = await this.noteRepo.findOne({
-      where: { id },
-      relations: ['user'],
-    });
+    // The permission check needs `user_id` only — the author is not loaded.
+    const note = await this.noteRepo.findOne({ where: { id } });
     if (!note) {
       throw new Error('Research note not found');
     }
@@ -1071,13 +1200,12 @@ Title:`;
     ticker?: string,
     sinceHours?: number,
   ): Promise<{
-    data: ResearchNote[];
+    data: ResearchNoteView[];
     total: number;
     page: number;
     limit: number;
   }> {
-    const query = this.noteRepo.createQueryBuilder('note');
-    query.leftJoinAndSelect('note.user', 'user');
+    const query = this.notesWithAuthor();
 
     // MODIFIED: If ticker is provided, we show ALL research for that ticker (Community View).
     // If NO ticker is provided, we filter by User (My Research View).
@@ -1091,10 +1219,14 @@ Title:`;
 
     if (ticker) {
       query.andWhere(':ticker = ANY(note.tickers)', { ticker });
-      // Exclude generic Daily Digests from the specific ticker's research feed
-      query.andWhere('note.title NOT LIKE :excludeTitle', {
-        excludeTitle: 'Smart News Briefing%',
-      });
+      // Exclude generic Daily Digests from the specific ticker's research feed.
+      // `IS NULL OR`: a bare `NOT LIKE` is NULL (not true) for a NULL title, so
+      // it would also drop research that has no title yet — i.e. every ticket
+      // still pending/processing, which the feed polls for.
+      query.andWhere(
+        '(note.title IS NULL OR note.title NOT LIKE :excludeTitle)',
+        { excludeTitle: DIGEST_TITLE_PATTERN },
+      );
     }
 
     // Filter by Time (e.g. for "New Reports")
@@ -1109,10 +1241,10 @@ Title:`;
     query.skip((page - 1) * safeLimit);
     query.take(safeLimit);
 
-    const [data, total] = await query.getManyAndCount();
+    const [notes, total] = await query.getManyAndCount();
 
     return {
-      data,
+      data: notes.map((note) => withPublicUser(note)),
       total,
       page,
       limit: safeLimit,
@@ -1197,7 +1329,7 @@ OUTPUT (strict Markdown):
       question: summaryPrompt,
       tickers: [symbol],
       numericContext: {},
-      quality: 'summary', // gemini-3.1-flash-lite: cheap, no search
+      quality: 'summary', // Flash Lite tier: cheap, no search
       provider: 'gemini',
       maxTokens: 600,
     });
@@ -1829,10 +1961,41 @@ OUTPUT (strict Markdown):
       throw new NotFoundException('Research note not found');
     }
 
+    // The report is served WITHOUT authentication: expose a fixed set of note
+    // fields — never the entity (author, question, raw LLM response).
+    const publicNote = {
+      id: note.id,
+      title: note.title,
+      content: note.answer_markdown,
+      created_at: note.created_at,
+      models_used: note.models_used,
+      rarity: note.rarity,
+      quality_score: note.quality_score,
+    };
+
     // 3. Fetch Context Data in Parallel (Live/Latest Data to match Private View)
     const mainTicker = note.tickers[0];
     if (!mainTicker) {
-      return { note }; // Should not happen for valid notes
+      return { note: publicNote }; // No ticker (e.g. a digest): note only
+    }
+
+    // This endpoint is served WITHOUT authentication. Everything below
+    // resolves the ticker through TickersService.ensureTicker(), which — for a
+    // symbol we do not track — asks the data providers, inserts the ticker and
+    // starts its initialisation (history + an LLM research run). A shared link
+    // must never do that: look the ticker up WITHOUT creating it, and when it
+    // is not tracked serve the report alone, with no market block.
+    const trackedTicker = await this.tickersService.findOneBySymbol(mainTicker);
+    if (!trackedTicker) {
+      return {
+        note: publicNote,
+        profile: { symbol: mainTicker, name: mainTicker },
+        market_context: null,
+        risk_analysis: null,
+        ratings: [],
+        news: null,
+        fundamentals: {},
+      };
     }
 
     // Grab profile, snapshot, news, ratings in parallel
@@ -1905,15 +2068,7 @@ OUTPUT (strict Markdown):
     const marketData = snapshot.latestPrice || { close: 0, prevClose: 0 };
 
     return {
-      note: {
-        id: note.id,
-        title: note.title,
-        content: note.answer_markdown,
-        created_at: note.created_at,
-        models_used: note.models_used,
-        rarity: note.rarity,
-        quality_score: note.quality_score,
-      },
+      note: publicNote,
       // Null-safe: when the main ticker can't be resolved (hidden/de-listed),
       // fall back to the bare symbol so the frontend still has something to
       // render — the rest of the payload is unaffected.
@@ -1950,17 +2105,51 @@ OUTPUT (strict Markdown):
             regulatory_risk: riskAnalysis.regulatory_risk,
             sentiment: riskAnalysis.sentiment,
             upside_percent: riskAnalysis.upside_percent,
+            // The server's AI rating of the ticker, as the snapshot computed
+            // it (src/lib/ticker-verdict.ts) — same as in the app.
+            rating: snapshot.aiAnalysis?.rating ?? null,
+            rating_score: snapshot.aiAnalysis?.rating_score ?? null,
             scenarios: riskAnalysis.scenarios,
             red_flags: (riskAnalysis as any).red_flags || [],
             catalysts: (riskAnalysis as any).catalysts || [],
           }
         : null,
       ratings: ratings || [],
-      news: newsData && newsData.length > 0 ? newsData[0] : null,
+      news: this.publicReportNews(newsData, snapshot.ticker),
+      // An allow-list — this endpoint is unauthenticated. Exactly the inputs
+      // the clients' shared AI-rating function reads from `fundamentals`, with
+      // the same names and values as the in-app composite, so the public page
+      // and the app derive the same rating for the same ticker.
       fundamentals: {
-        ...snapshot.fundamentals,
         pe_ratio: snapshot.fundamentals?.pe_ttm || snapshot.ticker?.pe_ratio,
+        consensus_rating: snapshot.fundamentals?.consensus_rating,
+        fifty_two_week_high: snapshot.fundamentals?.fifty_two_week_high,
+        fifty_two_week_low: snapshot.fundamentals?.fifty_two_week_low,
+        // A rating input: without it the page takes the "no revenue" 5 points
+        // off every company.
+        revenue_ttm: snapshot.fundamentals?.revenue_ttm,
       },
     };
+  }
+
+  /**
+   * `news` of the public report: the latest company-news item (as before)
+   * plus the ticker's news `sentiment` and `score` — the two news inputs of
+   * the clients' AI-rating function, named and valued as in the in-app
+   * composite (ticker.news_sentiment / ticker.news_impact_score). Null only
+   * when there is neither an item nor a sentiment / score.
+   */
+  private publicReportNews(
+    newsData: any[] | null,
+    ticker?: {
+      news_sentiment?: string | null;
+      news_impact_score?: number | null;
+    },
+  ) {
+    const latest = newsData && newsData.length > 0 ? newsData[0] : null;
+    const sentiment = ticker?.news_sentiment ?? null;
+    const score = ticker?.news_impact_score ?? null;
+    if (!latest && sentiment === null && score === null) return null;
+    return { ...latest, sentiment, score };
   }
 }

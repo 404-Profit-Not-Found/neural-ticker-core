@@ -180,7 +180,9 @@ describe('MCP serializers', () => {
 
   describe('serializeCashBalance', () => {
     it('coerces the amount to a number', () => {
-      expect(serializeCashBalance({ currency: 'EUR', amount: '1234.56' })).toEqual({
+      expect(
+        serializeCashBalance({ currency: 'EUR', amount: '1234.56' }),
+      ).toEqual({
         currency: 'EUR',
         amount: 1234.56,
       });
@@ -190,14 +192,18 @@ describe('MCP serializers', () => {
   describe('serializePriceAlert', () => {
     it('prefers an explicit symbol over the ticker relation', () => {
       expect(
-        serializePriceAlert({ id: 'a1', symbol: 'TSLA', ticker: { symbol: 'X' } }),
+        serializePriceAlert({
+          id: 'a1',
+          symbol: 'TSLA',
+          ticker: { symbol: 'X' },
+        }),
       ).toMatchObject({ id: 'a1', symbol: 'TSLA' });
     });
 
     it('falls back to the ticker relation symbol', () => {
-      expect(serializePriceAlert({ id: 'a2', ticker: { symbol: 'NVDA' } })).toMatchObject(
-        { symbol: 'NVDA' },
-      );
+      expect(
+        serializePriceAlert({ id: 'a2', ticker: { symbol: 'NVDA' } }),
+      ).toMatchObject({ symbol: 'NVDA' });
     });
   });
 
@@ -214,7 +220,11 @@ describe('MCP serializers', () => {
 
     it('falls back to company_name and a flat symbol', () => {
       expect(
-        serializeWatchlistItem({ id: 6, symbol: 'MSFT', ticker: { company_name: 'Microsoft' } }),
+        serializeWatchlistItem({
+          id: 6,
+          symbol: 'MSFT',
+          ticker: { company_name: 'Microsoft' },
+        }),
       ).toMatchObject({ symbol: 'MSFT', name: 'Microsoft' });
     });
   });
@@ -224,8 +234,22 @@ describe('MCP serializers', () => {
       expect(serializeTickerRequest(null)).toBeNull();
     });
 
+    it('has no id / user_id for a pending request that belongs to someone else', () => {
+      // TickerRequestsService.createRequest answers `{ symbol, status }` then.
+      const out = serializeTickerRequest({ symbol: 'AAPL', status: 'PENDING' });
+
+      expect(JSON.parse(JSON.stringify(out))).toEqual({
+        symbol: 'AAPL',
+        status: 'PENDING',
+      });
+    });
+
     it('omits requested_by when there is no user relation', () => {
-      const out = serializeTickerRequest({ id: 1, symbol: 'AAPL', status: 'pending' });
+      const out = serializeTickerRequest({
+        id: 1,
+        symbol: 'AAPL',
+        status: 'pending',
+      });
       expect(out).toMatchObject({ id: '1', symbol: 'AAPL' });
       expect(out).not.toHaveProperty('requested_by');
     });
@@ -235,7 +259,12 @@ describe('MCP serializers', () => {
         id: 2,
         symbol: 'AAPL',
         status: 'pending',
-        user: { id: 'u1', full_name: 'Jane', email: 'jane@example.com', credits: 50 },
+        user: {
+          id: 'u1',
+          full_name: 'Jane',
+          email: 'jane@example.com',
+          credits: 50,
+        },
       });
       expect(out?.requested_by).toEqual({
         id: 'u1',
@@ -284,16 +313,29 @@ describe('MCP serializers', () => {
 
     it('reports a real logo as present', () => {
       expect(
-        serializeAdminTickerLogo({ id: 1, symbol: 'AAPL', logo_url: 'https://x/a.png' }),
-      ).toMatchObject({ id: '1', symbol: 'AAPL', logo_url: 'https://x/a.png', has_logo: true });
+        serializeAdminTickerLogo({
+          id: 1,
+          symbol: 'AAPL',
+          logo_url: 'https://x/a.png',
+        }),
+      ).toMatchObject({
+        id: '1',
+        symbol: 'AAPL',
+        logo_url: 'https://x/a.png',
+        has_logo: true,
+      });
     });
 
     it("treats the legacy string 'null' and blanks as no logo", () => {
-      expect(serializeAdminTickerLogo({ id: 2, logo_url: 'null' })).toMatchObject({
+      expect(
+        serializeAdminTickerLogo({ id: 2, logo_url: 'null' }),
+      ).toMatchObject({
         logo_url: null,
         has_logo: false,
       });
-      expect(serializeAdminTickerLogo({ id: 3, logo_url: '   ' })).toMatchObject({
+      expect(
+        serializeAdminTickerLogo({ id: 3, logo_url: '   ' }),
+      ).toMatchObject({
         logo_url: null,
         has_logo: false,
       });

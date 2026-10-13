@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { UsersService } from './users.service';
+import { User } from './entities/user.entity';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -130,9 +131,9 @@ describe('AdminController', () => {
       );
     });
 
-    it('should throw if email missing', async () => {
+    it('should throw if email missing (400 — a 401 makes the clients sign the admin out)', async () => {
       await expect(controller.addToUserlist({ email: '' })).rejects.toThrow(
-        UnauthorizedException,
+        BadRequestException,
       );
     });
   });
@@ -160,6 +161,50 @@ describe('AdminController', () => {
       expect(mockUsersService.deleteWaitlistUser).toHaveBeenCalledWith(
         'test@example.com',
       );
+    });
+  });
+
+  describe('giftCredits', () => {
+    it("returns the account without the user's secret preference values", async () => {
+      // CreditService hands back the full row it just updated.
+      mockCreditService.addCredits.mockResolvedValue(
+        Object.assign(new User(), {
+          id: 'u1',
+          email: 'alice.private@example.com',
+          credits_balance: 4242,
+          preferences: { gemini_api_key: 'SECRET', language: 'sk' },
+        }),
+      );
+
+      const result = await controller.giftCredits('u1', { amount: 10 });
+
+      expect(mockCreditService.addCredits).toHaveBeenCalledWith(
+        'u1',
+        10,
+        'admin_gift',
+        { gifted_by: 'admin' },
+      );
+
+      // The body's reason is a note, never the ledger reason: a gift must not
+      // be bookable as e.g. a contribution (which counts against a daily cap).
+      await controller.giftCredits('u1', {
+        amount: 5,
+        reason: 'manual_contribution',
+      });
+      expect(mockCreditService.addCredits).toHaveBeenLastCalledWith(
+        'u1',
+        5,
+        'admin_gift',
+        { gifted_by: 'admin', note: 'manual_contribution' },
+      );
+      const json = JSON.parse(JSON.stringify(result));
+      expect(json.email).toBe('alice.private@example.com');
+      expect(json.credits_balance).toBe(4242);
+      expect(json.preferences).toEqual({
+        gemini_api_key_set: true,
+        language: 'sk',
+      });
+      expect(JSON.stringify(result)).not.toContain('SECRET');
     });
   });
 });

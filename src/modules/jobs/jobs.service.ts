@@ -2,7 +2,10 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { RiskRewardService } from '../risk-reward/risk-reward.service';
-import { TickersService } from '../tickers/tickers.service';
+import {
+  TickerCreationCapException,
+  TickersService,
+} from '../tickers/tickers.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import { MarketStatusService } from '../market-data/market-status.service';
 import { ResearchService } from '../research/research.service';
@@ -17,12 +20,17 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, LessThanOrEqual } from 'typeorm';
+import { runWithActor } from '../../common/request-actor/request-actor';
+import { inProcessJobsEnabled } from '../../common/background-jobs';
 
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
   // In-app crons only run in development - GitHub Actions handles production crons
-  private readonly isDevMode = process.env.NODE_ENV !== 'production';
+  // (and not at all with BACKGROUND_JOBS=off — see inProcessJobsEnabled).
+  private get isDevMode(): boolean {
+    return inProcessJobsEnabled();
+  }
 
   constructor(
     private readonly riskRewardService: RiskRewardService, // Added back
@@ -64,41 +72,98 @@ export class JobsService {
     await this.stocktwitsService.handleDailyWatchersSync();
   }
 
+  /** Symbols whose initialisation is running in this process. */
+  private readonly initializing = new Set<string>();
+
   /**
    * Performs an exhaustive initial sync for a new ticker:
    * 1. Snapshot (Price + Fundamentals)
    * 2. History (180 days for charts)
    * 3. Initial AI Research (Risk/Reward)
+   *
+   * Runs at most once per ticker: a second call for a symbol that is already
+   * being initialised here returns immediately, and the research step claims
+   * the ticker in the database (see runInitialResearch).
    */
   async initializeTicker(symbol: string) {
-    this.logger.log(`Initializing new ticker: ${symbol}`);
+    const sym = symbol.toUpperCase();
+    if (this.initializing.has(sym)) {
+      this.logger.log(`Ticker ${sym} is already being initialized; skipping.`);
+      return;
+    }
+    this.initializing.add(sym);
+
+    this.logger.log(`Initializing new ticker: ${sym}`);
     try {
       // 1. Snapshot
-      await this.marketDataService.getSnapshot(symbol);
+      await this.marketDataService.getSnapshot(sym);
 
       // 2. History
       // 2. History (5 years)
-      await this.marketDataService.syncTickerHistory(symbol, 5);
+      await this.marketDataService.syncTickerHistory(sym, 5);
 
-      // 3. Queue Research
-      this.logger.log(`Queueing initial research for ${symbol}...`);
-      const note = await this.researchService.createResearchTicket(
-        null, // System
-        [symbol.toUpperCase()],
-        `Perform initial analysis for ${symbol}. Provide company profile, financials, and risk/reward assessment.`,
-        'gemini',
-        'low',
-      );
-      // Process if not too busy, or let a separate worker handle it.
-      // Here we process immediately since it's a "fresh add" event.
-      await this.researchService.processTicket(note.id);
+      // 3. Initial research (budget-gated, free-only, once per ticker)
+      await this.runInitialResearch(sym);
 
-      this.logger.log(`Initialization complete for ${symbol}`);
+      this.logger.log(`Initialization complete for ${sym}`);
     } catch (err: any) {
-      this.logger.error(
-        `Failed to initialize ticker ${symbol}: ${err.message}`,
-      );
+      this.logger.error(`Failed to initialize ticker ${sym}: ${err.message}`);
+    } finally {
+      this.initializing.delete(sym);
     }
+  }
+
+  /**
+   * The automatic research for a newly created ticker. It is background work
+   * nobody paid for, so it obeys the same rules as the scanner:
+   *
+   *  - it needs free LLM budget; with none left it is skipped cleanly (no
+   *    ticket is created) and the scanner — which takes never-researched
+   *    tickers first — does it once the budget is back;
+   *  - it is free-only: neither the research call nor the enrichment calls
+   *    after it may fall through to the billed secondary key;
+   *  - it runs once: the ticket is claimed under the scanner's advisory lock,
+   *    so a second instance, a retry, or a scanner run that picked the same
+   *    new ticker sees the first claim and does nothing.
+   */
+  private async runInitialResearch(symbol: string): Promise<void> {
+    const perTicket = JobsService.RISK_SCANNER_CALLS_PER_TICKET;
+    if (!(await this.llmBudgetService.hasBudget(perTicket))) {
+      this.logger.warn(
+        `Daily free LLM budget exhausted. Skipping initial research for ${symbol}; the scanner will pick it up.`,
+      );
+      return;
+    }
+
+    const noteId = await this.requestQueueRepo.manager.transaction(
+      async (mgr) => {
+        await mgr.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [JobsService.RISK_SCANNER_LOCK],
+        );
+        const researched =
+          await this.researchService.getLastResearchedAtBySymbol([symbol]);
+        if (researched.has(symbol)) return null;
+
+        const note = await this.researchService.createResearchTicket(
+          null, // System
+          [symbol],
+          `Perform initial analysis for ${symbol}. Provide company profile, financials, and risk/reward assessment.`,
+          'gemini',
+          'low',
+        );
+        return note.id;
+      },
+    );
+    if (!noteId) {
+      this.logger.log(
+        `Ticker ${symbol} already has system research; skipping the initial run.`,
+      );
+      return;
+    }
+
+    this.logger.log(`Running initial research for ${symbol}...`);
+    await this.researchService.processTicket(noteId, { freeOnly: true });
   }
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -296,6 +361,13 @@ export class JobsService {
   static readonly RISK_SCANNER_CALLS_PER_TICKET = 2;
 
   /**
+   * Advisory-lock key under which system research for a ticker is claimed —
+   * by the scanner for its batch and by the initial research of a new ticker,
+   * so the two can never research the same ticker at the same time.
+   */
+  static readonly RISK_SCANNER_LOCK = 'risk-reward-scanner';
+
+  /**
    * The scan runs inside the HTTP request that triggers it (see the controller
    * for why), so it must finish within the Cloud Run request timeout (300s).
    * No new ticket is started once a run has used this much of it; a ticket
@@ -441,7 +513,7 @@ export class JobsService {
         await this.requestQueueRepo.manager.transaction(async (mgr) => {
           await mgr.query(
             'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-            ['risk-reward-scanner'],
+            [JobsService.RISK_SCANNER_LOCK],
           );
 
           // Build one id-keyed "last researched" signal from two sources, taking the
@@ -610,14 +682,61 @@ export class JobsService {
 
   // --- ASYNC REQUEST QUEUE ---
 
+  /** A PROCESSING row older than this is a crashed worker, not a live one. */
+  static readonly REQUEST_PROCESSING_STALE_MS = 30 * 60 * 1000;
+
+  /**
+   * Queues a background request. ADD_TICKER is idempotent per symbol: while a
+   * request for the symbol is open (PENDING, or PROCESSING and not stale) the
+   * existing row is returned instead of a second one — every caller that hits
+   * the same provider rate limit used to add its own row, each retried up to
+   * ten times. The check and the insert share an advisory lock keyed by the
+   * symbol, so two instances cannot both insert.
+   */
   async queueRequest(type: RequestType, payload: any) {
-    const request = this.requestQueueRepo.create({
-      type,
-      payload,
-      status: RequestStatus.PENDING,
-      attempts: 0,
+    if (type !== RequestType.ADD_TICKER || !payload?.symbol) {
+      const request = this.requestQueueRepo.create({
+        type,
+        payload,
+        status: RequestStatus.PENDING,
+        attempts: 0,
+      });
+      return this.requestQueueRepo.save(request);
+    }
+
+    const symbol = String(payload.symbol).toUpperCase();
+    return this.requestQueueRepo.manager.transaction(async (mgr) => {
+      await mgr.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `add-ticker:${symbol}`,
+      ]);
+
+      const open = await mgr
+        .createQueryBuilder(RequestQueue, 'q')
+        .where('q.type = :type', { type })
+        .andWhere(`q.payload ->> 'symbol' = :symbol`, { symbol })
+        .andWhere(
+          '(q.status = :pending OR (q.status = :processing AND q.updated_at > :fresh))',
+          {
+            pending: RequestStatus.PENDING,
+            processing: RequestStatus.PROCESSING,
+            fresh: new Date(
+              Date.now() - JobsService.REQUEST_PROCESSING_STALE_MS,
+            ),
+          },
+        )
+        .orderBy('q.created_at', 'ASC')
+        .getOne();
+      if (open) return open;
+
+      return mgr.save(
+        mgr.create(RequestQueue, {
+          type,
+          payload: { ...payload, symbol },
+          status: RequestStatus.PENDING,
+          attempts: 0,
+        }),
+      );
     });
-    return this.requestQueueRepo.save(request);
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -642,16 +761,26 @@ export class JobsService {
     this.logger.log(`Found ${pending.length} pending requests to process.`);
 
     for (const req of pending) {
-      // Lock it (simple optimistic locking via status)
-      req.status = RequestStatus.PROCESSING;
-      await this.requestQueueRepo.save(req);
+      // Claim it: PENDING -> PROCESSING in one statement, so a second worker
+      // (overlapping cron run, another instance) that read the same row does
+      // not process it too.
+      const claim = await this.requestQueueRepo.update(
+        { id: req.id, status: RequestStatus.PENDING },
+        { status: RequestStatus.PROCESSING },
+      );
+      if (!claim.affected) continue;
 
       try {
         if (req.type === RequestType.ADD_TICKER) {
-          const { symbol } = req.payload;
+          const { symbol, requested_by: requestedBy } = req.payload;
           this.logger.log(`Processing queued ticker addition: ${symbol}`);
           // Force ensure ticker (will fail again if 429, but that's handled locally here)
-          await this.tickersService.ensureTicker(symbol);
+          // A request queued for a (non-admin) user is created on their
+          // behalf, so it still counts against their daily cap.
+          await runWithActor(
+            requestedBy ? { userId: String(requestedBy), role: 'user' } : null,
+            () => this.tickersService.ensureTicker(symbol),
+          );
         }
 
         // deeply update status
@@ -668,8 +797,11 @@ export class JobsService {
         const attempts = req.attempts + 1;
 
         let newStatus = RequestStatus.PENDING;
+        // The requester's daily cap on new tickers is not a transient error:
+        // retrying only repeats the refusal.
+        const capReached = err instanceof TickerCreationCapException;
         // Max 10 attempts
-        if (attempts >= 10) {
+        if (capReached || attempts >= 10) {
           newStatus = RequestStatus.FAILED;
           this.logger.error(
             `Request ${req.id} failed permanently after ${attempts} attempts.`,

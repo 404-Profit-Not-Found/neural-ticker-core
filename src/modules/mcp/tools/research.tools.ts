@@ -110,7 +110,11 @@ export class ResearchTools {
       'Fetch a research ticket by id. Returns status and, when completed, the ' +
       'answer markdown. Only the owner (or an admin) may read a ticket.',
     parameters: z.object({
-      ticket_id: z.string().trim().min(1).describe('The research ticket id.'),
+      ticket_id: z
+        .string()
+        .trim()
+        .regex(/^\d{1,18}$/, 'Must be a numeric research ticket id.')
+        .describe('The research ticket id.'),
     }),
   })
   async getResearch(args: { ticket_id: string }, _ctx: unknown, req: any) {

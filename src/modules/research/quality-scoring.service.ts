@@ -43,7 +43,10 @@ export class QualityScoringService {
 
   constructor(private readonly llmService: LlmService) {}
 
-  async score(noteContent: string): Promise<QualityScoreResult> {
+  async score(
+    noteContent: string,
+    options: { freeOnly?: boolean } = {},
+  ): Promise<QualityScoreResult> {
     const prompt = `
       You are an expert Senior Lead Analyst at a top-tier hedge fund. Your job is to grade investment research notes with extreme precision and nuance.
 
@@ -85,10 +88,11 @@ export class QualityScoringService {
     try {
       const result = await this.llmService.generateResearch({
         question: prompt,
-        quality: 'scoring', // gemini-3.1-flash-lite: cheap, 10M TPM, 1M context, no search
+        quality: 'scoring', // Flash Lite tier: cheap, 10M TPM, 1M context, no search
         provider: 'gemini',
         tickers: [],
         numericContext: {},
+        ...(options.freeOnly ? { freeOnly: true } : {}),
       });
 
       // Extract JSON-like block if embedded in text

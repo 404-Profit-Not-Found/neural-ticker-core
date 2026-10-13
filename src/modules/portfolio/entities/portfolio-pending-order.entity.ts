@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { PortfolioPosition } from './portfolio-position.entity';
+import { PortfolioTrade } from './portfolio-trade.entity';
 
 export type PendingOrderSide = 'buy' | 'sell';
 export type PendingOrderStatus = 'pending' | 'filled' | 'cancelled' | 'failed';
@@ -27,8 +28,8 @@ export type PendingOrderStatus = 'pending' | 'filled' | 'cancelled' | 'failed';
  * market" and "Sell" do.
  */
 @Entity('portfolio_pending_orders')
-@Index(['user_id', 'status'])
-@Index(['status', 'region'])
+@Index('IDX_portfolio_pending_user_status', ['user_id', 'status'])
+@Index('IDX_portfolio_pending_status_region', ['status', 'region'])
 export class PortfolioPendingOrder {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,7 +38,10 @@ export class PortfolioPendingOrder {
   user_id: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'portfolio_pending_orders_user_id_fkey',
+  })
   user: User;
 
   // The lot this order targets: the lot to sell from, or the lot a "buy more"
@@ -48,7 +52,10 @@ export class PortfolioPendingOrder {
   position_id: string | null;
 
   @ManyToOne(() => PortfolioPosition, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'position_id' })
+  @JoinColumn({
+    name: 'position_id',
+    foreignKeyConstraintName: 'portfolio_pending_orders_position_id_fkey',
+  })
   position: PortfolioPosition | null;
 
   @Column()
@@ -107,13 +114,22 @@ export class PortfolioPendingOrder {
   @Column({ type: 'uuid', name: 'filled_trade_id', nullable: true })
   filled_trade_id: string | null;
 
+  // The database has this foreign key (AddPendingOrders); declared so the
+  // entity matches it. Not loaded anywhere.
+  @ManyToOne(() => PortfolioTrade, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({
+    name: 'filled_trade_id',
+    foreignKeyConstraintName: 'portfolio_pending_orders_filled_trade_id_fkey',
+  })
+  filled_trade?: PortfolioTrade | null;
+
   // Last failure reason (insufficient cash, no price, lot gone, …).
   @Column({ type: 'text', nullable: true })
   error: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updated_at: Date;
 }

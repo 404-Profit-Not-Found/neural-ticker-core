@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -12,6 +12,8 @@ import { MarketDataService } from './market-data.service';
 import { MarketStatusService } from './market-status.service';
 
 import { Public } from '../auth/public.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { TickerCreationCapException } from '../tickers/tickers.service';
 
 @ApiTags('Market Data')
 @ApiBearerAuth()
@@ -63,9 +65,13 @@ export class MarketDataController {
       },
     },
   })
+  // Public, but an anonymous caller can only read a ticker we already track:
+  // see TickersService.assertPublicReadAllowed.
   @Get('snapshot')
   @Public()
-  getSnapshot(@Param('symbol') symbol: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getSnapshot(@Param('symbol') symbol: string, @Req() req?: any) {
+    await this.service.assertPublicReadAllowed(symbol, !!req?.user);
     return this.service.getSnapshot(symbol);
   }
 
@@ -105,13 +111,17 @@ export class MarketDataController {
   @ApiResponse({ status: 200, description: 'History retrieved.' })
   @Get('history')
   @Public()
-  getHistory(
+  @UseGuards(OptionalJwtAuthGuard)
+  async getHistory(
     @Param('symbol') symbol: string,
     @Query('days') days?: number,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('interval') interval: string = '1d',
+    @Req() req?: any,
   ) {
+    await this.service.assertPublicReadAllowed(symbol, !!req?.user);
+
     let fromDate: Date;
     let toDate: Date;
 
@@ -156,6 +166,7 @@ export class MarketDataController {
   @ApiResponse({ status: 200, description: 'List of company news.' })
   @Get('news')
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiQuery({
     name: 'from',
     required: false,
@@ -166,12 +177,19 @@ export class MarketDataController {
     required: false,
     description: 'End date (YYYY-MM-DD). Defaults to today.',
   })
-  getNews(
+  async getNews(
     @Param('symbol') symbol: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Req() req?: any,
   ) {
-    return this.service.getCompanyNews(symbol, from, to).catch(() => {
+    // Outside the catch below: a 400 / 404 from the gate must not become [].
+    await this.service.assertPublicReadAllowed(symbol, !!req?.user);
+
+    return this.service.getCompanyNews(symbol, from, to).catch((error) => {
+      // The daily cap on new tickers is an answer for the caller, not a
+      // failed news fetch.
+      if (error instanceof TickerCreationCapException) throw error;
       // Return empty array if news fetch fails (ticker may not have news coverage)
       return [];
     });

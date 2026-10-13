@@ -9,7 +9,17 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ColumnNumericTransformer } from '../../../common/transformers/column-numeric.transformer';
 
 @Entity('price_ohlcv')
-@Index(['symbol_id', 'timeframe', 'ts'], { unique: true }) // Composite Unique Index for Timescale
+// Composite Unique Index for Timescale — and the two lookup indexes the
+// CreatePriceOhlcv migration adds (named as in the database).
+@Index(
+  'IDX_price_ohlcv_symbol_timeframe_ts',
+  ['symbol_id', 'timeframe', 'ts'],
+  {
+    unique: true,
+  },
+)
+@Index('IDX_price_ohlcv_symbol_id', ['symbol_id'])
+@Index('IDX_price_ohlcv_ts', ['ts'])
 export class PriceOhlcv {
   @ApiProperty({ example: '1' })
   @PrimaryColumn({ type: 'bigint' })

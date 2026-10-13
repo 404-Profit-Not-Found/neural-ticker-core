@@ -14,6 +14,9 @@ import { Repository } from 'typeorm';
 import { AuthLog } from './entities/auth-log.entity';
 import { AuthLogFilterDto } from './dto/auth-log-filter.dto';
 
+const FIREBASE_WAITLIST_MESSAGE =
+  'Access pending: your account is on the waitlist.';
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -94,42 +97,89 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Exchanges a Firebase ID token for a user, under the SAME access policy as
+   * the Google OAuth path (validateOAuthLogin + its controller): the invite
+   * list decides who gets in, banned and waitlisted accounts get no session.
+   *
+   * The email in the token is the key that links the login to an existing
+   * account and that auto-promotes the default admins, so it must be VERIFIED:
+   * Firebase issues tokens for addresses nobody has proven they own (e.g.
+   * email/password sign-up), and such a token must never reach
+   * createOrUpdateGoogleUser.
+   */
   async loginWithFirebase(token: string): Promise<any> {
+    let decoded: Awaited<ReturnType<FirebaseService['verifyIdToken']>>;
     try {
-      const decoded = await this.firebaseService.verifyIdToken(token);
-
-      if (!decoded.email) {
-        throw new UnauthorizedException(
-          'Firebase account must have an email address.',
-        );
-      }
-
-      // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
-      const userEntity = await this.usersService.findByEmail(decoded.email);
-      if (userEntity && userEntity.role === 'revoked') {
-        this.logger.warn(
-          `Blocked banned user login attempt (Firebase): ${decoded.email}`,
-        );
-        throw new UnauthorizedException('Your account has been suspended.');
-      }
-
-      const user = await this.usersService.createOrUpdateGoogleUser({
-        email: decoded.email,
-        googleId: decoded.uid, // Firebase UID is the stable ID
-        fullName: decoded.name || decoded.email.split('@')[0],
-        avatarUrl: decoded.picture || '',
-      });
-
-      // Log the successful login
-      await this.logLogin(user.id, 'firebase', user.email);
-      this.logger.log(
-        `User Logged In via Firebase: ${user.email} (${user.id})`,
-      );
-
-      return user;
+      decoded = await this.firebaseService.verifyIdToken(token);
     } catch (err) {
       throw new UnauthorizedException(`Invalid Firebase Token: ${err.message}`);
     }
+
+    const email = decoded.email;
+    if (!email) {
+      throw new UnauthorizedException(
+        'Firebase account must have an email address.',
+      );
+    }
+    if (decoded.email_verified !== true) {
+      this.logger.warn(
+        `Blocked Firebase login with an unverified email (uid ${decoded.uid})`,
+      );
+      throw new UnauthorizedException(
+        'Firebase account email is not verified.',
+      );
+    }
+
+    // Access Control: Check Whitelist (same as validateOAuthLogin)
+    const isAllowed = await this.usersService.isEmailAllowed(email);
+
+    // SECURITY FIX: Check if user is explicitly BANNED (Role = 'revoked')
+    const userEntity = await this.usersService.findByEmail(email);
+    if (userEntity && userEntity.role === 'revoked') {
+      this.logger.warn(
+        `Blocked banned user login attempt (Firebase): ${email}`,
+      );
+      throw new UnauthorizedException('Your account has been suspended.');
+    }
+
+    // A waitlisted account gets no session on the Google path either (its
+    // callback redirects to "waitlist pending" instead of issuing a token).
+    if (userEntity && userEntity.role === 'waitlist') {
+      this.logger.log(`Waitlist user login blocked (Firebase): ${email}`);
+      throw new UnauthorizedException(FIREBASE_WAITLIST_MESSAGE);
+    }
+
+    if (!isAllowed) {
+      this.logger.warn(
+        `Login attempt blocked for non-whitelisted email (Firebase): ${email}`,
+      );
+      throw new UnauthorizedException(
+        'Access Denied: You are not on the invite list.',
+      );
+    }
+
+    const user = await this.usersService.createOrUpdateGoogleUser({
+      email,
+      googleId: decoded.uid, // Firebase UID is the stable ID
+      fullName: decoded.name || email.split('@')[0],
+      avatarUrl: decoded.picture || '',
+    });
+
+    // The account is matched case-insensitively, the checks above are exact:
+    // re-check the role of the account we actually resolved.
+    if (user.role === 'revoked') {
+      throw new UnauthorizedException('Your account has been suspended.');
+    }
+    if (user.role === 'waitlist') {
+      throw new UnauthorizedException(FIREBASE_WAITLIST_MESSAGE);
+    }
+
+    // Log the successful login
+    await this.logLogin(user.id, 'firebase', user.email);
+    this.logger.log(`User Logged In via Firebase: ${user.email} (${user.id})`);
+
+    return user;
   }
 
   async localDevLogin(email: string) {

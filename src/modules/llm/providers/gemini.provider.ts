@@ -8,6 +8,8 @@ import {
 } from '@google/genai'; // NEW SDK
 import { ILlmProvider, ResearchPrompt, ResearchResult } from '../llm.types';
 import { LlmBudgetService } from '../llm-budget.service';
+import { GEMINI_FLASH_LITE_MODEL } from '../../../config/configuration';
+import { LlmUnavailableException } from '../llm-unavailable.exception';
 
 @Injectable()
 export class GeminiProvider implements ILlmProvider {
@@ -17,21 +19,21 @@ export class GeminiProvider implements ILlmProvider {
   private readonly defaultModels = {
     deep: 'gemini-3.1-pro-preview',
     medium: 'gemini-3.8-flash',
-    low: 'gemini-3.5-flash-lite',
-    extraction: 'gemini-3.1-flash-lite',
-    cron: 'gemini-3.1-flash-lite',
+    low: GEMINI_FLASH_LITE_MODEL,
+    extraction: GEMINI_FLASH_LITE_MODEL,
+    cron: GEMINI_FLASH_LITE_MODEL,
     // Local text tasks (summarize / score / recommend over text already in the
     // prompt — no web search). These USED to run on Gemma 4, but on the paid
     // (Tier 2) key Gemma has the LOWEST limits of any model — 16K TPM / 30 RPM —
     // and a small context window, so large research notes 429'd it constantly
     // and blew the TPM cap ~8x in a single call. flash-lite has ~625x the TPM
     // (10M), a 1M-token context, and is among the cheapest models, so it's a
-    // strictly better fit. These three are hardcoded (not env-tunable) in
-    // src/config/configuration.ts; edit the literal there to switch back to a
-    // gemma-* id. Gemma is no longer the default for any tier.
-    summary: 'gemini-3.1-flash-lite',
-    recommendation: 'gemini-3.1-flash-lite',
-    scoring: 'gemini-3.1-flash-lite',
+    // strictly better fit. Like every Flash Lite default here they follow
+    // GEMINI_FLASH_LITE_MODEL (src/config/configuration.ts); these three are
+    // not env-tunable. Gemma is no longer the default for any tier.
+    summary: GEMINI_FLASH_LITE_MODEL,
+    recommendation: GEMINI_FLASH_LITE_MODEL,
+    scoring: GEMINI_FLASH_LITE_MODEL,
   };
 
   // Gemma models don't support Google Search grounding or thinking. No tier
@@ -56,7 +58,8 @@ export class GeminiProvider implements ILlmProvider {
   async generate(prompt: ResearchPrompt): Promise<ResearchResult> {
     const apiKey =
       prompt.apiKey || this.configService.get<string>('gemini.apiKey');
-    if (!apiKey) throw new Error('Gemini API Key not configured');
+    // Not a bug: nothing is configured to answer. A stable 503, not a 500.
+    if (!apiKey) throw new LlmUnavailableException('not_configured');
 
     const client = prompt.apiKey ? new GoogleGenAI({ apiKey }) : this.client;
 
@@ -179,9 +182,12 @@ export class GeminiProvider implements ILlmProvider {
     // and MUST be metered against the daily budget. Keep in sync with the
     // free-tier entries of `defaultModels` (e.g. `medium: gemini-3.8-flash`,
     // `low: gemini-3.5-flash-lite`). 3.5-flash stays listed so a
-    // GEMINI_MODEL_MEDIUM override back to it is still metered. Gemini 3.x
-    // only — the legacy 2.5-flash / 2.5-flash-lite fallbacks were removed so
-    // the app never silently degrades to an older model on a 429.
+    // GEMINI_MODEL_MEDIUM override back to it is still metered, and
+    // 3.1-flash-lite (the background default until it moved to 3.5) so an
+    // override back to it — and its place as a free fallback on a 429 (see
+    // freeFallbackOrder below) — keeps working. Gemini 3.x only — the legacy 2.5-flash / 2.5-flash-lite
+    // fallbacks were removed so the app never silently degrades to an older
+    // model on a 429.
     const freeModels = [
       'gemini-3.8-flash',
       'gemini-3.5-flash',
@@ -189,12 +195,35 @@ export class GeminiProvider implements ILlmProvider {
       'gemini-3.1-flash-lite',
     ];
 
+    // Order in which a 429 moves a call to another free model. A Flash Lite
+    // call tries the other Flash Lite first: every model has its own free
+    // quota at Google (500 requests a day for each Flash Lite), so that is a
+    // like-for-like move, and it leaves the Flash models' free quota to the
+    // `medium` tier that asks for them. Any other call keeps the list order.
+    const isFlashLite = (m: string) => m.includes('flash-lite');
+    const freeFallbackOrder = isFlashLite(modelName)
+      ? [
+          ...freeModels.filter(isFlashLite),
+          ...freeModels.filter((m) => !isFlashLite(m)),
+        ]
+      : freeModels;
+
     const triedOnCurrentKey = new Set<string>();
 
     // CRITICAL: gemini-3 preview models are gated behind the Secondary (Billed) Key for stability/quota
     const isGatedPreviewModel =
       currentModel.startsWith('gemini-3') && currentModel.endsWith('-preview');
-    if (isGatedPreviewModel && !hasSwitchedToSecondary && secondaryApiKey) {
+    if (isGatedPreviewModel && freeOnly) {
+      // A free-only call never uses the billed key — not even for a model that
+      // only the billed key serves. It stays on the free key and fails there.
+      this.logger.warn(
+        `${currentModel} needs the billed key, but this call is free-only. Staying on the Primary key.`,
+      );
+    } else if (
+      isGatedPreviewModel &&
+      !hasSwitchedToSecondary &&
+      secondaryApiKey
+    ) {
       this.logger.warn(
         `${currentModel} is restricted on Free Key. Switching to SECONDARY API KEY immediately.`,
       );
@@ -262,7 +291,7 @@ export class GeminiProvider implements ILlmProvider {
 
         if (isQuotaError && attempts < maxAttempts * 6) {
           // 1. Try to find another FREE model on the CURRENT key
-          const nextFreeModel = freeModels.find(
+          const nextFreeModel = freeFallbackOrder.find(
             (m) => !triedOnCurrentKey.has(m),
           );
           // Gating check for next model in chain
@@ -304,7 +333,7 @@ export class GeminiProvider implements ILlmProvider {
 
           // 3. If we are on Secondary and it hits 429, try other models on Secondary too
           if (hasSwitchedToSecondary) {
-            const nextSecondaryModel = freeModels.find(
+            const nextSecondaryModel = freeFallbackOrder.find(
               (m) => !triedOnCurrentKey.has(m),
             );
             if (nextSecondaryModel) {

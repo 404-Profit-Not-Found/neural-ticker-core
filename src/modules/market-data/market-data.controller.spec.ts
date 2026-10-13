@@ -11,6 +11,7 @@ describe('MarketDataController', () => {
     getSnapshot: jest.fn(),
     getHistory: jest.fn(),
     getCompanyNews: jest.fn(),
+    assertPublicReadAllowed: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockMarketStatusService = {

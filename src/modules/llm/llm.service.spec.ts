@@ -1,3 +1,4 @@
+import { LlmUnavailableException } from './llm-unavailable.exception';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { LlmService } from './llm.service';
@@ -56,6 +57,103 @@ describe('LlmService', () => {
       expect(result.answerMarkdown).toBe('openai');
       expect(openAiGenerate).toHaveBeenCalled();
       expect(geminiGenerate).not.toHaveBeenCalled();
+    });
+
+    // No key, quota used up, provider down: a stable 503 for the caller, with
+    // none of the provider's text. Everything else stays the error it is.
+    describe('when no LLM answer can be had', () => {
+      const quota = Object.assign(
+        new Error('429 quota exceeded for key AIzaSy-FAKE'),
+        {
+          status: 429,
+        },
+      );
+
+      it.each([
+        ['gemini', () => geminiGenerate],
+        ['openai', () => openAiGenerate],
+      ] as const)(
+        '%s failing on quota → LlmUnavailableException',
+        async (provider, mock) => {
+          mock().mockRejectedValue(quota);
+
+          const error = await service
+            .generateResearch({ ...basePrompt, provider })
+            .catch((e) => e);
+
+          expect(error).toBeInstanceOf(LlmUnavailableException);
+          expect(error.reason).toBe('quota_exhausted');
+          expect(JSON.stringify(error.getResponse())).not.toContain('AIza');
+        },
+      );
+
+      it('a provider that reports itself unavailable is passed through as is', async () => {
+        const notConfigured = new LlmUnavailableException('not_configured');
+        geminiGenerate.mockRejectedValue(notConfigured);
+
+        await expect(
+          service.generateResearch({ ...basePrompt, provider: 'gemini' }),
+        ).rejects.toBe(notConfigured);
+      });
+
+      it('a genuine bug is NOT disguised as an outage', async () => {
+        const bug = new TypeError(
+          "Cannot read properties of undefined (reading 'text')",
+        );
+        geminiGenerate.mockRejectedValue(bug);
+
+        await expect(
+          service.generateResearch({ ...basePrompt, provider: 'gemini' }),
+        ).rejects.toBe(bug);
+      });
+
+      it('ensemble: both providers down → unavailable; both failing otherwise → the generic error', async () => {
+        openAiGenerate.mockRejectedValue(new Error('boom'));
+        geminiGenerate.mockRejectedValue(quota);
+        await expect(
+          service.generateResearch({ ...basePrompt, provider: 'ensemble' }),
+        ).rejects.toBeInstanceOf(LlmUnavailableException);
+
+        geminiGenerate.mockRejectedValue(new Error('bang'));
+        await expect(
+          service.generateResearch({ ...basePrompt, provider: 'ensemble' }),
+        ).rejects.toThrow('All ensemble providers failed');
+      });
+
+      it('generateText (portfolio analysis) goes through the same door', async () => {
+        geminiGenerate.mockRejectedValue(quota);
+        await expect(
+          service.generateText('hello', 'gemini'),
+        ).rejects.toBeInstanceOf(LlmUnavailableException);
+      });
+    });
+
+    // "Free-only" = no billed spend. OpenAI has no free tier.
+    it.each(['openai', 'ensemble', undefined] as const)(
+      'refuses a free-only call for the billed provider %s without calling it',
+      async (provider) => {
+        await expect(
+          service.generateResearch({ ...basePrompt, provider, freeOnly: true }),
+        ).rejects.toThrow(/free-only LLM call cannot use the billed provider/);
+
+        expect(openAiGenerate).not.toHaveBeenCalled();
+        expect(geminiGenerate).not.toHaveBeenCalled();
+      },
+    );
+
+    it('passes a free-only call to Gemini with the flag intact', async () => {
+      geminiGenerate.mockResolvedValue({ answerMarkdown: 'g', models: ['m'] });
+
+      await service.generateResearch({
+        ...basePrompt,
+        provider: 'gemini',
+        freeOnly: true,
+      });
+
+      expect(geminiGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ freeOnly: true }),
+      );
+      expect(openAiGenerate).not.toHaveBeenCalled();
     });
 
     it('should route to Gemini if specified', async () => {

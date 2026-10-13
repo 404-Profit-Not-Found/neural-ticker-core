@@ -155,8 +155,11 @@ export class ResearchNote {
   @Column({ type: 'jsonb', nullable: true })
   enrichment_status: EnrichmentStatus | null;
 
+  // NOT eager: an eager relation rides along on every find() and puts the
+  // author's whole `users` row (email, preferences/API keys) into whatever
+  // returns the note. Readers that show the author join it explicitly and
+  // select the public columns only (see ResearchService).
   @ManyToOne('User', 'research_notes', {
-    eager: true,
     nullable: true,
     onDelete: 'SET NULL',
   })

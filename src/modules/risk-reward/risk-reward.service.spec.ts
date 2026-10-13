@@ -196,6 +196,17 @@ describe('RiskRewardService', () => {
       expect(result).toBeDefined();
       expect(mockLlmService.generateResearch).toHaveBeenCalled();
       expect(mockAnalysisRepo.save).toHaveBeenCalled();
+      // By default the extraction may use any key…
+      expect(
+        mockLlmService.generateResearch.mock.calls[0][0],
+      ).not.toHaveProperty('freeOnly');
+
+      // …for background research nobody paid for it stays on the free one.
+      mockLlmService.generateResearch.mockClear();
+      await service.evaluateFromResearch(mockNote, { freeOnly: true });
+      expect(mockLlmService.generateResearch.mock.calls[0][0]).toMatchObject({
+        freeOnly: true,
+      });
     });
 
     it('should skip auto risk-analysis for multi-ticker notes (M5)', async () => {

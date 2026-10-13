@@ -29,6 +29,11 @@ import { LlmService } from '../llm/llm.service';
 import { TickersService } from '../tickers/tickers.service';
 import { CreditService } from '../users/credit.service';
 import { CurrencyService } from '../currency/currency.service';
+import { GEMINI_FLASH_LITE_MODEL } from '../../config/configuration';
+import {
+  LLM_UNAVAILABLE_CODE,
+  asLlmUnavailable,
+} from '../llm/llm-unavailable.exception';
 import { QuotaService } from '../../common/quota/quota.service';
 
 /** Cash balance after a trade, echoed back to the client. */
@@ -655,9 +660,15 @@ export class PortfolioService implements OnModuleInit {
     const cost = this.round2(args.shares * args.price + fees);
 
     // Debit first so an unaffordable buy aborts before any lot/trade is written.
-    const cashAfter = await this.adjustCashTx(tx, args.userId, args.currency, -cost, {
-      enforce: true,
-    });
+    const cashAfter = await this.adjustCashTx(
+      tx,
+      args.userId,
+      args.currency,
+      -cost,
+      {
+        enforce: true,
+      },
+    );
 
     let position = args.position;
     if (position) {
@@ -1346,7 +1357,31 @@ export class PortfolioService implements OnModuleInit {
     - Max 300 words. Use clear Markdown headings.
     `;
 
-    const response = await this.llmService.generateText(prompt, model);
+    let response: string;
+    try {
+      response = await this.llmService.generateText(prompt, model);
+    } catch (error) {
+      // Paid for and not delivered because no LLM answer could be had: give
+      // the credits back, then answer the 503 as it is.
+      if (asLlmUnavailable(error)) {
+        await this.creditService
+          .refundCredits(
+            userId,
+            { amount: cost },
+            {
+              spend_reason: 'portfolio_analysis_spend',
+              cause: LLM_UNAVAILABLE_CODE,
+            },
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Refund failed for portfolio analysis of user ${userId}`,
+              err,
+            ),
+          );
+      }
+      throw error;
+    }
 
     // Persist to DB
     const analysis = this.analysisRepo.create({
@@ -1423,7 +1458,7 @@ Keep total under 150 words. Be direct, no boilerplate.`;
 
     return {
       recommendation: result.answerMarkdown,
-      model: result.models[0] || 'gemini-3.1-flash-lite',
+      model: result.models[0] || GEMINI_FLASH_LITE_MODEL,
       positions: portfolio.length,
     };
   }

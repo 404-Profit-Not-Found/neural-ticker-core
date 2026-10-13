@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
@@ -84,10 +84,14 @@ describe('UsersController', () => {
       expect(service.updateRole).toHaveBeenCalledWith('user-1', 'admin');
     });
 
-    it('should throw UnauthorizedException for invalid role', async () => {
-      await expect(
-        controller.updateUserRole('user-1', 'superadmin'),
-      ).rejects.toThrow(UnauthorizedException);
+    it('answers an invalid role with 400 — a 401 makes the clients sign the admin out', async () => {
+      const error = await controller
+        .updateUserRole('user-1', 'superadmin')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error.getStatus()).toBe(400);
+      expect(service.updateRole).not.toHaveBeenCalled();
     });
 
     it('should accept user role', async () => {

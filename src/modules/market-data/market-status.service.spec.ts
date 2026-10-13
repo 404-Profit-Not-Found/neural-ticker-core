@@ -29,7 +29,96 @@ describe('MarketStatusService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('getRegion', () => {
+    it.each([
+      // Exchange suffix = the part after the last dot.
+      ['SAP.DE', 'EU'],
+      ['ASML.AS', 'EU'],
+      ['VOLV-B.ST', 'EU'], // hyphen = share class, dot = venue
+      ['MC.PA', 'EU'],
+      ['BARC.L', 'EU'],
+      ['7203.T', 'OTHER'], // Tokyo: a venue, but neither EU nor US
+      ['SHOP.TO', 'OTHER'],
+      // US share classes: a dot that is not a venue.
+      ['BRK.A', 'US'],
+      ['BRK.B', 'US'],
+      // US symbols that merely CONTAIN a two-letter EU code.
+      ['COIN', 'US'], // "CO"
+      ['SMCI', 'US'], // "MC", "MI"
+      ['COST', 'US'], // "CO", "ST"
+      ['ASML', 'US'], // "AS" — the NASDAQ listing, no suffix
+      ['PANW', 'US'], // "PA"
+      ['HES', 'US'], // "HE"
+      ['AAPL', 'US'],
+    ])('classifies %s as %s', (symbol, region) => {
+      expect(service.getRegion(symbol)).toBe(region);
+      // getMarketStatus() passes 'US' when the caller has no exchange.
+      expect(service.getRegion(symbol, 'US')).toBe(region);
+    });
+
+    it.each([
+      ['AAPL', 'NASDAQ NMS - GLOBAL MARKET'], // "NASDAQ" contains "AS"
+      ['COIN', 'NasdaqGS'],
+      ['IBM', 'NEW YORK STOCK EXCHANGE, INC.'], // "STOCK" contains "ST"
+      ['BRK.B', 'NEW YORK STOCK EXCHANGE, INC.'],
+      ['BRK.A', 'NYSE'],
+    ])(
+      'does not read EU codes out of a US exchange name (%s on %s)',
+      (symbol, exchange) => {
+        expect(service.getRegion(symbol, exchange)).toBe('US');
+      },
+    );
+
+    it('falls back to the exchange CODE when the symbol has no suffix', () => {
+      expect(service.getRegion('SAP', 'XETRA')).toBe('EU');
+      expect(service.getRegion('BARC', 'LSE')).toBe('EU');
+      expect(service.getRegion('ASML', 'AS')).toBe('EU');
+    });
+
+    it('lets the symbol suffix win over the exchange field', () => {
+      expect(service.getRegion('SAP.DE', 'NASDAQ')).toBe('EU');
+      expect(service.getRegion('7203.T', 'XETRA')).toBe('OTHER');
+    });
+
+    it('keeps an unknown multi-letter suffix out of the US bucket', () => {
+      expect(service.getRegion('BBCA.JK')).toBe('OTHER');
+      expect(service.getRegion('BBCA.JK', 'NYSE')).toBe('US');
+    });
+
+    it('is case-insensitive', () => {
+      expect(service.getRegion('sap.de')).toBe('EU');
+      expect(service.getRegion('coin')).toBe('US');
+    });
+  });
+
   describe('getMarketStatus', () => {
+    it('does not let COIN / BRK.B share (and poison) the EU status cache', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2025-01-08T10:00:00Z'));
+      mockYahooService.getMarketStatus.mockImplementation((symbol: string) =>
+        Promise.resolve({
+          isOpen: symbol === 'SAP.DE',
+          session: symbol === 'SAP.DE' ? 'regular' : 'pre',
+          timezone: symbol === 'SAP.DE' ? 'Europe/Berlin' : 'America/New_York',
+          exchange: symbol === 'SAP.DE' ? 'GER' : 'NMS',
+        }),
+      );
+
+      const eu = await service.getMarketStatus('SAP.DE');
+      const coin = await service.getMarketStatus('COIN');
+      const brk = await service.getMarketStatus('BRK.B');
+
+      expect(eu.region).toBe('EU');
+      expect(eu.isOpen).toBe(true);
+      // Previously COIN / BRK.B resolved to region EU and were served SAP.DE's
+      // cached "open" status (the cache is keyed by region).
+      expect(coin.region).toBe('US');
+      expect(coin.isOpen).toBe(false);
+      expect(brk.region).toBe('US');
+      expect(brk.isOpen).toBe(false);
+
+      jest.useRealTimers();
+    });
+
     it('should coalesce concurrent requests for the same symbol/region', async () => {
       // Set to a weekday (Wed Jan 08 2025) to bypass weekend short-circuit
       jest.useFakeTimers().setSystemTime(new Date('2025-01-08T10:00:00Z'));

@@ -37,12 +37,16 @@ import { McpToolsModule } from './modules/mcp/mcp-tools.module';
 import configuration from './config/configuration';
 // ...
 
-// Feature flag: the experimental pixel-terminal frontend (served under /v2/) is
-// OFF by default and only mounted when FRONTEND_V2_ENABLED=true. Evaluated here
-// at module-load time — not via ConfigService — because ServeStaticModule has to
-// be conditionally present in the static @Module imports array, before DI (and
-// therefore ConfigService) exists.
-const frontendV2Enabled = process.env.FRONTEND_V2_ENABLED === 'true';
+// Which web client is served at `/`. The current client (frontend-v2) is the
+// default. FRONTEND_LEGACY=true switches back to the previous client (built
+// into ./client) with no rebuild — the image carries both — as a rollback
+// switch. Evaluated at module-load time, not via ConfigService, because
+// ServeStaticModule has to be in the static @Module imports array before DI
+// exists.
+const serveLegacyFrontend = process.env.FRONTEND_LEGACY === 'true';
+const frontendRoot = serveLegacyFrontend
+  ? join(__dirname, '..', 'client')
+  : join(__dirname, '..', 'frontend-v2', 'dist');
 
 @Module({
   imports: [
@@ -53,23 +57,22 @@ const frontendV2Enabled = process.env.FRONTEND_V2_ENABLED === 'true';
       load: [configuration],
     }),
 
-    // Experimental pixel-terminal frontend served under /v2/ (more specific
-    // prefix listed first so it claims /v2/* before the catch-all client root).
-    // Built artifact lives under frontend-v2/dist after `npm run build`.
-    // Gated behind FRONTEND_V2_ENABLED: when disabled (the default) the static
-    // module is not registered at all, so /v2/* falls through to the catch-all
-    // client SPA below — the v2 frontend is completely unreachable.
-    ...(frontendV2Enabled
-      ? [
-          ServeStaticModule.forRoot({
-            rootPath: join(__dirname, '..', 'frontend-v2', 'dist'),
-            serveRoot: '/v2',
-          }),
-        ]
-      : []),
-
+    // The web client (see `frontendRoot` above).
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'client'),
+      rootPath: frontendRoot,
+      serveStaticOptions: {
+        // Vite emits content-hashed files under /assets — safe to cache
+        // forever. Everything else (index.html, sw.js, the manifest) must
+        // revalidate so a deploy is picked up on the next load.
+        setHeaders: (res, filePath) => {
+          res.setHeader(
+            'Cache-Control',
+            /[\\/]assets[\\/]/.test(filePath)
+              ? 'public, max-age=31536000, immutable'
+              : 'no-cache',
+          );
+        },
+      },
     }),
 
     // Global Rate Limiting: 300 requests per minute per IP. Effective only now

@@ -107,6 +107,74 @@ const EXCHANGE_TO_CURRENCY: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The symbol's exchange suffix — the part after its LAST dot — when it is a
+ * venue we know: `SAP.DE` → 'DE', `VOLV-B.ST` → 'ST' (the hyphen separates the
+ * share class, the dot the venue), `7203.T` → 'T'.
+ *
+ * Returns `null` for a bare symbol (`AAPL`) and for a dot that is not a venue:
+ * US share classes are written the same way (`BRK.A`, `BRK.B`), so a dotted
+ * symbol is only foreign when its suffix is in the table above.
+ */
+export function getExchangeSuffix(
+  symbol: string | null | undefined,
+): string | null {
+  const normalized = (symbol || '').trim();
+  const dot = normalized.lastIndexOf('.');
+  if (dot < 0) return null;
+  return SUFFIX_TO_CURRENCY.some(([pattern]) => pattern.test(normalized))
+    ? normalized.slice(dot + 1).toUpperCase()
+    : null;
+}
+
+/**
+ * True for a symbol written the US way: bare (`AAPL`, `RDS-A`) or with a
+ * share-class suffix — a dot and ONE letter that is not a venue (`BRK.A`,
+ * `BRK.B`, `BF.B`). False for anything carrying an exchange suffix, whether we
+ * know the venue (`SAP.DE`, `7203.T`) or not (`BBCA.JK`).
+ *
+ * Use this instead of `symbol.includes('.')` to tell US from non-US listings:
+ * the dot alone also matches US share classes.
+ */
+export function isUsStyleSymbol(symbol: string | null | undefined): boolean {
+  const normalized = (symbol || '').trim();
+  const dot = normalized.lastIndexOf('.');
+  if (dot < 0) return true;
+  if (getExchangeSuffix(normalized)) return false;
+  return /^[A-Za-z]$/.test(normalized.slice(dot + 1));
+}
+
+/**
+ * The venues written as ONE letter (`.L` London, `.F` Frankfurt, `.T` Tokyo,
+ * `.V` TSX Venture) — the only dotted one-letter endings that are NOT a US
+ * share class. Derived from the suffix table, so it cannot drift from it.
+ */
+export const ONE_LETTER_VENUE_SUFFIXES: readonly string[] =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    .split('')
+    .filter((letter) => getExchangeSuffix(`X.${letter}`) !== null);
+
+/**
+ * {@link isUsStyleSymbol} as a SQL predicate over a symbol column, for
+ * queries that have to decide in the database (the analyzer's region filter).
+ * `column` is a trusted column reference, never user input. Bind
+ * `:oneLetterVenues` to {@link ONE_LETTER_VENUE_SUFFIXES}.
+ *
+ *   no dot at all                              → US-style
+ *   ends in ".<one letter>" that is no venue   → US-style (BRK.B)
+ *   anything else with a dot (SAP.DE, VOD.L)   → not
+ *
+ * test/db/region-filter.db-spec.ts checks it against isUsStyleSymbol symbol
+ * by symbol on PostgreSQL.
+ */
+export function usStyleSymbolSql(column: string): string {
+  return (
+    `(${column} NOT LIKE '%.%' OR (` +
+    `${column} ~ '\\.[A-Za-z]$' AND ` +
+    `UPPER(RIGHT(${column}, 1)) NOT IN (:...oneLetterVenues)))`
+  );
+}
+
+/**
  * Infer the native trading currency from a ticker's exchange / symbol.
  *
  * @param exchange The exchange code as returned by the data provider

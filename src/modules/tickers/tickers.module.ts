@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TickersService } from './tickers.service';
 import { TickersController } from './tickers.controller';
@@ -14,6 +15,7 @@ import { RiskRewardModule } from '../risk-reward/risk-reward.module';
 import { ResearchModule } from '../research/research.module';
 import { YahooFinanceModule } from '../yahoo-finance/yahoo-finance.module';
 import { JobsModule } from '../jobs/jobs.module'; // Added
+import { RequestActorInterceptor } from '../../common/request-actor/request-actor.interceptor';
 
 @Module({
   imports: [
@@ -32,7 +34,12 @@ import { JobsModule } from '../jobs/jobs.module'; // Added
     forwardRef(() => JobsModule), // Added
   ],
   controllers: [TickersController, TickerDetailController],
-  providers: [TickersService],
+  providers: [
+    TickersService,
+    // Global (APP_INTERCEPTOR applies app-wide from any module): tells
+    // ensureTicker which user a request acts for — see request-actor.ts.
+    { provide: APP_INTERCEPTOR, useClass: RequestActorInterceptor },
+  ],
   exports: [TickersService],
 })
 export class TickersModule {}

@@ -8,7 +8,8 @@ import { UnauthorizedException } from '@nestjs/common';
 describe('AuthController', () => {
   let controller: AuthController;
 
-  const mockUser: User = {
+  // A real entity instance, as JwtStrategy puts it on req.user.
+  const mockUser: User = Object.assign(new User(), {
     id: '123',
     email: 'test@example.com',
     full_name: 'Test User',
@@ -28,7 +29,7 @@ describe('AuthController', () => {
     view_mode: 'PRO',
     theme: 'dark',
     has_onboarded: false,
-  };
+  });
 
   const mockAuthService = {
     login: jest.fn(),
@@ -126,12 +127,70 @@ describe('AuthController', () => {
       );
       expect(mockAuthService.login).not.toHaveBeenCalled();
     });
+
+    it('never redirects to a client-supplied location', async () => {
+      mockAuthService.login.mockResolvedValue({
+        access_token: 'jwt-token',
+        user: mockUser,
+      });
+      const res = {
+        cookie: jest.fn().mockReturnThis(),
+        clearCookie: jest.fn(),
+        redirect: jest.fn(),
+      };
+
+      // The retired "which client started the login" marker is ignored.
+      await controller.googleAuthRedirect(
+        { user: mockUser, cookies: { nt_app: '//evil.example' } } as any,
+        res as any,
+      );
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/oauth-callback',
+      );
+    });
   });
 
   describe('getProfile', () => {
     it('should return req.user', () => {
       const req = { user: mockUser };
       expect(controller.getProfile(req as any)).toEqual(mockUser);
+    });
+
+    it('returns the account the session UI reads, minus secret preference values', () => {
+      const user = Object.assign(new User(), {
+        ...mockUser,
+        preferences: {
+          gemini_api_key: 'SECRET',
+          language: 'sk',
+          notifications: { push_enabled: true },
+        },
+      });
+
+      const result = controller.getProfile({ user } as any);
+      const json = JSON.parse(JSON.stringify(result));
+
+      // What both frontends' AuthContext reads off /auth/profile.
+      expect(json).toMatchObject({
+        id: '123',
+        email: 'test@example.com',
+        nickname: 'TestNickname',
+        role: 'user',
+        tier: 'free',
+        credits_balance: 100,
+        avatar_url: 'http://picture.url',
+        view_mode: 'PRO',
+        theme: 'dark',
+        has_onboarded: false,
+        preferences: {
+          gemini_api_key_set: true,
+          language: 'sk',
+          notifications: { push_enabled: true },
+        },
+      });
+      expect(JSON.stringify(result)).not.toContain('SECRET');
+      // req.user itself stays intact for the rest of the request.
+      expect(user.preferences.gemini_api_key).toBe('SECRET');
     });
   });
 
