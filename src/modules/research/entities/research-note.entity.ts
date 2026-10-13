@@ -24,6 +24,21 @@ export enum ResearchStatus {
   FAILED = 'failed',
 }
 
+/** Outcome of one best-effort enrichment step run after a note completes. */
+export type EnrichmentStepStatus = 'ok' | 'failed' | 'skipped';
+
+/**
+ * Per-step enrichment outcome for a research note. A step that is absent never
+ * ran (the note predates the column, was uploaded manually, or the research
+ * itself failed before enrichment).
+ */
+export type EnrichmentStatus = Partial<
+  Record<
+    'title' | 'quality' | 'risk_analysis' | 'financials',
+    EnrichmentStepStatus
+  >
+>;
+
 @Index('idx_research_notes_user_content_hash', ['user_id', 'content_hash'])
 @Entity('research_notes')
 export class ResearchNote {
@@ -128,6 +143,17 @@ export class ResearchNote {
   })
   @Column({ type: 'varchar', length: 64, nullable: true })
   content_hash: string | null;
+
+  @ApiProperty({
+    description:
+      'Outcome of each post-completion enrichment step (title, quality, ' +
+      'risk_analysis, financials). A COMPLETED note can still have failed ' +
+      'steps — the steps are best-effort (H4).',
+    required: false,
+    example: { title: 'ok', quality: 'ok', risk_analysis: 'failed' },
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  enrichment_status: EnrichmentStatus | null;
 
   @ManyToOne('User', 'research_notes', {
     eager: true,

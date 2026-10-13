@@ -1,4 +1,4 @@
-import { Controller, Post, Logger, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, UseGuards } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { MarketDataService } from '../market-data/market-data.service';
 import {
@@ -21,8 +21,6 @@ import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
 @Public()
 @UseGuards(CronSecretGuard)
 export class JobsController {
-  private readonly logger = new Logger(JobsController.name);
-
   constructor(
     private readonly jobsService: JobsService,
     private readonly marketDataService: MarketDataService,
@@ -47,17 +45,20 @@ export class JobsController {
   @Post('run-risk-reward-scanner')
   @ApiOperation({
     summary:
-      'Trigger risk/reward scanner (Cron) - queues research for tickers with stale (>14d) or missing analysis',
+      'Run the risk/reward scanner (Cron) - researches the most-stale tickers and returns when the batch is done',
   })
-  @ApiResponse({
-    status: 202,
-    description: 'Scanner queued (runs in background)',
-  })
-  runRiskRewardScanner() {
-    void this.jobsService.runRiskRewardScanner().catch((err) => {
-      this.logger.error('Risk/Reward scanner failed in background', err);
-    });
-    return { message: 'Risk/Reward scanner queued' };
+  @ApiResponse({ status: 201, description: 'Scan completed' })
+  async runRiskRewardScanner() {
+    // Awaited on purpose — do NOT turn this back into fire-and-forget. Cloud Run
+    // only allocates CPU while a request is in flight and may stop an idle
+    // instance at any time. When this endpoint returned immediately, the scan
+    // kept going only as long as some other request happened to overlap it:
+    // the first ticket usually finished, later ones hit DB connection timeouts
+    // and "Cannot use a pool after calling end on the pool", and their research
+    // notes were left COMPLETED without a risk analysis (or stuck PROCESSING).
+    // The batch is sized to finish well inside the 300s request timeout.
+    const result = await this.jobsService.runRiskRewardScanner();
+    return { message: 'Risk/Reward scan completed', stats: result };
   }
 
   @Post('cleanup-research')

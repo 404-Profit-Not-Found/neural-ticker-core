@@ -9,9 +9,10 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not, MoreThanOrEqual } from 'typeorm';
+import { Repository, Like, LessThan, Not, MoreThanOrEqual, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  EnrichmentStatus,
   ResearchNote,
   LlmProvider,
   ResearchStatus,
@@ -99,6 +100,18 @@ export class ResearchService implements OnModuleInit {
     return this.noteRepo.save(note);
   }
 
+  /**
+   * Fails a ticket that was created but will not be processed (e.g. the scanner
+   * claimed it and then ran out of budget), so it doesn't sit PENDING. No-op
+   * unless the ticket is still PENDING.
+   */
+  async failPendingTicket(id: string, reason: string): Promise<void> {
+    await this.noteRepo.update(
+      { id, status: ResearchStatus.PENDING },
+      { status: ResearchStatus.FAILED, error: reason },
+    );
+  }
+
   async createManualNote(
     userId: string,
     tickers: string[],
@@ -106,6 +119,14 @@ export class ResearchService implements OnModuleInit {
     content: string,
     model?: string,
   ): Promise<ResearchNote> {
+    // Normalize symbols on write (audit L2): every lookup of a note by ticker
+    // (`:symbol = ANY(note.tickers)`, the scanner's recency join) compares
+    // verbatim against upper-case symbols, so "aapl" / " AAPL " would be
+    // invisible on the ticker page and to the throttle.
+    tickers = [
+      ...new Set((tickers || []).map((t) => String(t).trim().toUpperCase())),
+    ].filter(Boolean);
+
     // 1. Create Note
     const note = this.noteRepo.create({
       request_id: uuidv4(),
@@ -466,16 +487,24 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       // However, parallelizing these saves real-world seconds.
       this.logger.log(`Starting parallel enrichment for ticket ${id}...`);
 
+      // Outcome of each enrichment step, persisted on the note (audit H4). The
+      // note is already COMPLETED and every step below swallows its own errors,
+      // so without this a note whose risk analysis or financials silently
+      // failed is indistinguishable from a fully enriched one.
+      const enrichment: EnrichmentStatus = {};
+
       const enrichmentTasks = [
         // A. Title Generation (Fast)
         this.generateTitle(note.question, result.answerMarkdown, note.tickers)
           .then(async (title) => {
             await this.noteRepo.update(id, { title });
             this.logger.log(`Title generated for ticket ${id}: ${title}`);
+            enrichment.title = 'ok';
           })
-          .catch((err) =>
-            this.logger.error(`Title generation failed for ticket ${id}`, err),
-          ),
+          .catch((err) => {
+            enrichment.title = 'failed';
+            this.logger.error(`Title generation failed for ticket ${id}`, err);
+          }),
 
         // B. Quality Scoring (Fast)
         this.qualityScoringService
@@ -487,6 +516,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
               this.logger.warn(
                 `Quality scoring unavailable for ticket ${id}; left unscored: ${judgment.error}`,
               );
+              enrichment.quality = 'failed';
               return;
             }
             const groundingWithJudgment = {
@@ -501,28 +531,48 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
             this.logger.log(
               `Quality scored for ticket ${id}: ${judgment.score}`,
             );
+            enrichment.quality = 'ok';
           })
-          .catch((err) =>
-            this.logger.error(`Quality scoring failed for ticket ${id}`, err),
-          ),
+          .catch((err) => {
+            enrichment.quality = 'failed';
+            this.logger.error(`Quality scoring failed for ticket ${id}`, err);
+          }),
 
         // C. Risk Verification (Medium)
+        // evaluateFromResearch swallows extraction errors and resolves null,
+        // and deliberately skips anything but a single-ticker note — so null
+        // means "failed" only when an analysis was actually expected.
         this.riskRewardService
           .evaluateFromResearch(note)
-          .catch((err) =>
-            this.logger.error(`Risk verification failed for ticket ${id}`, err),
-          ),
+          .then((analysis) => {
+            enrichment.risk_analysis = analysis
+              ? 'ok'
+              : note.tickers.length === 1
+                ? 'failed'
+                : 'skipped';
+          })
+          .catch((err) => {
+            enrichment.risk_analysis = 'failed';
+            this.logger.error(`Risk verification failed for ticket ${id}`, err);
+          }),
 
         // D. Financial Extraction (Slowest)
-        this.extractFinancialsFromResearch(
-          note.tickers,
-          result.answerMarkdown,
-        ).catch((err) =>
-          this.logger.error(
-            `Financial extraction failed for ticket ${id}`,
-            err,
-          ),
-        ),
+        // Also swallows per-ticker errors; nothing extracted at all is the
+        // "no fundamentals" gap this status exists to expose.
+        this.extractFinancialsFromResearch(note.tickers, result.answerMarkdown)
+          .then((extracted) => {
+            enrichment.financials =
+              extracted.description || extracted.financials || extracted.ratings
+                ? 'ok'
+                : 'failed';
+          })
+          .catch((err) => {
+            enrichment.financials = 'failed';
+            this.logger.error(
+              `Financial extraction failed for ticket ${id}`,
+              err,
+            );
+          }),
       ];
 
       // Since each task now has its own catch block, Promise.all will only reject
@@ -530,7 +580,26 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       // This ensures a failure in Title Gen doesn't mark the whole research as FAILED.
       await Promise.all(enrichmentTasks);
 
-      this.logger.log(`Enrichment complete for ticket ${id}.`);
+      // Best-effort: recording the outcome must never flip a COMPLETED note to
+      // FAILED via the outer catch.
+      try {
+        await this.noteRepo.update(id, { enrichment_status: enrichment });
+      } catch (err) {
+        this.logger.error(
+          `Failed to persist enrichment status for ticket ${id}`,
+          err,
+        );
+      }
+
+      const failedSteps = Object.entries(enrichment)
+        .filter(([, status]) => status === 'failed')
+        .map(([step]) => step);
+      this.logger.log(
+        `Enrichment complete for ticket ${id}.` +
+          (failedSteps.length
+            ? ` Failed steps: ${failedSteps.join(', ')}.`
+            : ''),
+      );
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
@@ -550,16 +619,24 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
   }
 
   /**
-   * Returns the timestamp (epoch ms) of the most recent research note that
-   * covered each of the given symbols, keyed by symbol. Symbols absent from the
-   * map have never been researched.
+   * Returns the timestamp (epoch ms) of the most recent SYSTEM research note
+   * (scanner / ticker initialisation — `user_id IS NULL`) for each of the given
+   * symbols, keyed by symbol. Symbols absent from the map have never been
+   * researched by the system.
    *
    * This is the authoritative throttle for the universe scanner: a research
    * note row is written the moment a scan starts (well before the best-effort
    * risk-analysis enrichment runs), so it reliably records "we researched this
    * ticker" even when the downstream analysis write fails. All statuses count —
    * a ticker we just attempted (even one that failed) must not be re-queued
-   * every few minutes; it waits out the staleness window like any other.
+   * every few minutes; it waits out the retry window like any other.
+   *
+   * User-owned notes are deliberately NOT counted. The daily news digest is
+   * saved as a note carrying every ticker it mentions and never produces a risk
+   * analysis, so counting it reset the throttle for those tickers every day and
+   * the scanner never came back to them — their overview froze. User research
+   * that does produce an analysis is already covered by the analysis timestamp
+   * the scanner merges with this one.
    *
    * `research_notes.tickers` is a `text[]` of symbols (no FK), so the array is
    * unnested and the latest note per symbol is taken in a single query.
@@ -575,7 +652,8 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         `SELECT s AS symbol, MAX(n.created_at) AS last_at
            FROM research_notes n
            CROSS JOIN LATERAL unnest(n.tickers) AS s
-          WHERE s = ANY($1)
+          WHERE n.user_id IS NULL
+            AND s = ANY($1)
           GROUP BY s`,
         [symbols],
       );
@@ -1057,6 +1135,13 @@ Title:`;
     };
 
     if (staleMinutes > 0) {
+      // Also sweep stale PENDING tickets (audit L3). Every producer processes
+      // its ticket immediately, so one still PENDING after the threshold died
+      // before reaching PROCESSING (cold start, rejected fire-and-forget) and
+      // would otherwise hang forever — the user's request never resolves and a
+      // PENDING digest blocks that user's next one. Only with a threshold:
+      // with 0 this would fail tickets another instance created moments ago.
+      where.status = In([ResearchStatus.PENDING, ResearchStatus.PROCESSING]);
       where.updated_at = LessThan(threshold);
     }
 

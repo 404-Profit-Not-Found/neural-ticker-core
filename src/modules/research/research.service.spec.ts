@@ -196,6 +196,25 @@ describe('ResearchService', () => {
   });
 
   describe('createManualNote', () => {
+    it('normalizes ticker symbols on write (L2)', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        ok: false,
+        error: 'unavailable',
+      });
+
+      await service.createManualNote(
+        'user-1',
+        [' aapl ', 'AAPL', 'msft', ''],
+        'Title',
+        'Content',
+      );
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tickers: ['AAPL', 'MSFT'] }),
+      );
+    });
+
     it('should create a manual note and reward credits for high quality', async () => {
       const userId = 'user-1';
       const tickers = ['AAPL'];
@@ -576,6 +595,29 @@ describe('ResearchService', () => {
       );
     });
 
+    it('also sweeps stale PENDING tickets when a threshold is given (L3)', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await service.failStuckTickets(20);
+
+      const where = mockRepo.find.mock.calls[0][0].where;
+      expect(where.status.value).toEqual([
+        ResearchStatus.PENDING,
+        ResearchStatus.PROCESSING,
+      ]);
+      expect(where.updated_at).toBeDefined();
+    });
+
+    it('only clears PROCESSING tickets when called without a threshold', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await service.failStuckTickets(0);
+
+      const where = mockRepo.find.mock.calls[0][0].where;
+      expect(where.status).toBe(ResearchStatus.PROCESSING);
+      expect(where.updated_at).toBeUndefined();
+    });
+
     it('should return 0 if no stuck tickets', async () => {
       mockRepo.find.mockResolvedValue([]);
 
@@ -643,6 +685,104 @@ describe('ResearchService', () => {
       await service.processTicket('999');
 
       expect(mockLlmService.generateResearch).not.toHaveBeenCalled();
+    });
+
+    describe('enrichment_status (H4)', () => {
+      const arrange = (tickers: string[]) => {
+        const note: any = {
+          id: '42',
+          tickers,
+          question: 'q',
+          quality: 'cron',
+          provider: 'gemini',
+          user_id: null,
+        };
+        mockRepo.findOne.mockResolvedValue(note);
+        mockMarketDataService.getSnapshot.mockResolvedValue({});
+        mockRiskRewardService.getLatestScore.mockResolvedValue(null);
+        mockLlmService.generateResearch.mockResolvedValue({
+          answerMarkdown: '# Report',
+          models: ['m'],
+        });
+        jest.spyOn(service as any, 'generateTitle').mockResolvedValue('Title');
+        jest
+          .spyOn(service as any, 'extractFinancialsFromResearch')
+          .mockResolvedValue({
+            description: true,
+            financials: false,
+            ratings: false,
+          });
+        mockQualityScoringService.score.mockResolvedValue({
+          ok: false,
+          error: '429',
+        });
+        return note;
+      };
+
+      it('records a swallowed risk-analysis failure on a note that still completes', async () => {
+        const note = arrange(['HELP']);
+        // evaluateFromResearch swallows the extraction error and resolves null.
+        mockRiskRewardService.evaluateFromResearch.mockResolvedValue(null);
+
+        await service.processTicket('42');
+
+        expect(note.status).toBe(ResearchStatus.COMPLETED);
+        expect(mockRepo.update).toHaveBeenCalledWith('42', {
+          enrichment_status: {
+            title: 'ok',
+            quality: 'failed',
+            risk_analysis: 'failed',
+            financials: 'ok',
+          },
+        });
+      });
+
+      it('records ok when the analysis lands, and skipped for multi-ticker notes', async () => {
+        arrange(['HELP']);
+        mockRiskRewardService.evaluateFromResearch.mockResolvedValue({
+          id: 'a1',
+        });
+        await service.processTicket('42');
+        expect(mockRepo.update).toHaveBeenCalledWith('42', {
+          enrichment_status: expect.objectContaining({ risk_analysis: 'ok' }),
+        });
+
+        mockRepo.update.mockClear();
+        arrange(['AAPL', 'MSFT']);
+        mockRiskRewardService.evaluateFromResearch.mockResolvedValue(null);
+        await service.processTicket('42');
+        expect(mockRepo.update).toHaveBeenCalledWith('42', {
+          enrichment_status: expect.objectContaining({
+            risk_analysis: 'skipped',
+          }),
+        });
+      });
+
+      it('keeps the note COMPLETED when persisting the status itself fails', async () => {
+        const note = arrange(['HELP']);
+        mockRiskRewardService.evaluateFromResearch.mockResolvedValue(null);
+        mockRepo.update.mockImplementation((_id: string, patch: any) =>
+          patch.enrichment_status
+            ? Promise.reject(new Error('column missing'))
+            : Promise.resolve({ affected: 1 }),
+        );
+
+        await service.processTicket('42');
+
+        expect(note.status).toBe(ResearchStatus.COMPLETED);
+        mockRepo.update.mockImplementation(() =>
+          Promise.resolve({ affected: 1 }),
+        );
+      });
+    });
+
+    it('failPendingTicket only touches a ticket that is still PENDING', async () => {
+      await service.failPendingTicket('7', 'no budget');
+
+      expect(mockRepo.update).toHaveBeenCalledWith(
+        { id: '7', status: ResearchStatus.PENDING },
+        { status: ResearchStatus.FAILED, error: 'no budget' },
+      );
     });
   });
 
@@ -830,6 +970,17 @@ describe('ResearchService', () => {
       ]);
       expect(result.get('FRVIA.PA')).toBe(tForvia.getTime());
       expect(result.get('AAPL')).toBe(tApple.getTime());
+    });
+
+    it('counts only system notes, so user digests cannot reset the scanner throttle', async () => {
+      mockRepo.query.mockResolvedValue([]);
+
+      await service.getLastResearchedAtBySymbol(['MSFT']);
+
+      expect(mockRepo.query).toHaveBeenCalledWith(
+        expect.stringContaining('n.user_id IS NULL'),
+        [['MSFT']],
+      );
     });
 
     it('skips rows whose last_at is null', async () => {
