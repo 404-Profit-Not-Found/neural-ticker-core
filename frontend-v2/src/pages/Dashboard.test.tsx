@@ -39,7 +39,6 @@ vi.mock('../context/CurrencyContext', () => ({
 vi.mock('../hooks/useTicker', () => ({
     useTickerResearch: vi.fn(),
     useTriggerResearch: vi.fn(),
-    useToggleFavorite: vi.fn(),
     useActiveResearchCount: vi.fn() // Also mocked to avoid warnings
 }));
 vi.mock('../hooks/useStockAnalyzer', () => ({
@@ -81,7 +80,7 @@ vi.mock('recharts', () => ({
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
-import { useTickerResearch, useTriggerResearch, useToggleFavorite, useActiveResearchCount } from '../hooks/useTicker';
+import { useTickerResearch, useTriggerResearch, useActiveResearchCount } from '../hooks/useTicker';
 import { useStockAnalyzer } from '../hooks/useStockAnalyzer';
 import { api } from '../lib/api';
 import { dashboardKeys } from '../hooks/useDashboardData';
@@ -132,10 +131,6 @@ describe('Dashboard', () => {
             isPending: false
         });
 
-        (useToggleFavorite as Mock).mockReturnValue({
-            mutate: vi.fn(),
-            isPending: false
-        });
         (useActiveResearchCount as Mock).mockReturnValue({
             data: 0,
             isLoading: false

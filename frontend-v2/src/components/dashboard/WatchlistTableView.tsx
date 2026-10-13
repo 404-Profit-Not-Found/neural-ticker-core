@@ -343,9 +343,6 @@ export function WatchlistTableView({
                     } else if (rLower.includes('sell')) {
                         displayRating = 'Sell';
                         variant = 'sell';
-                    } else {
-                        displayRating = 'Hold';
-                        variant = 'hold';
                     }
 
                     const count = info.row.original.analystCount;
