@@ -9,7 +9,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not, MoreThanOrEqual } from 'typeorm';
+import { Repository, Like, LessThan, Not, MoreThanOrEqual, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ResearchNote,
@@ -106,6 +106,14 @@ export class ResearchService implements OnModuleInit {
     content: string,
     model?: string,
   ): Promise<ResearchNote> {
+    // Normalize symbols on write (audit L2): every lookup of a note by ticker
+    // (`:symbol = ANY(note.tickers)`, the scanner's recency join) compares
+    // verbatim against upper-case symbols, so "aapl" / " AAPL " would be
+    // invisible on the ticker page and to the throttle.
+    tickers = [
+      ...new Set((tickers || []).map((t) => String(t).trim().toUpperCase())),
+    ].filter(Boolean);
+
     // 1. Create Note
     const note = this.noteRepo.create({
       request_id: uuidv4(),
@@ -550,16 +558,24 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
   }
 
   /**
-   * Returns the timestamp (epoch ms) of the most recent research note that
-   * covered each of the given symbols, keyed by symbol. Symbols absent from the
-   * map have never been researched.
+   * Returns the timestamp (epoch ms) of the most recent SYSTEM research note
+   * (scanner / ticker initialisation — `user_id IS NULL`) for each of the given
+   * symbols, keyed by symbol. Symbols absent from the map have never been
+   * researched by the system.
    *
    * This is the authoritative throttle for the universe scanner: a research
    * note row is written the moment a scan starts (well before the best-effort
    * risk-analysis enrichment runs), so it reliably records "we researched this
    * ticker" even when the downstream analysis write fails. All statuses count —
    * a ticker we just attempted (even one that failed) must not be re-queued
-   * every few minutes; it waits out the staleness window like any other.
+   * every few minutes; it waits out the retry window like any other.
+   *
+   * User-owned notes are deliberately NOT counted. The daily news digest is
+   * saved as a note carrying every ticker it mentions and never produces a risk
+   * analysis, so counting it reset the throttle for those tickers every day and
+   * the scanner never came back to them — their overview froze. User research
+   * that does produce an analysis is already covered by the analysis timestamp
+   * the scanner merges with this one.
    *
    * `research_notes.tickers` is a `text[]` of symbols (no FK), so the array is
    * unnested and the latest note per symbol is taken in a single query.
@@ -575,7 +591,8 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
         `SELECT s AS symbol, MAX(n.created_at) AS last_at
            FROM research_notes n
            CROSS JOIN LATERAL unnest(n.tickers) AS s
-          WHERE s = ANY($1)
+          WHERE n.user_id IS NULL
+            AND s = ANY($1)
           GROUP BY s`,
         [symbols],
       );
@@ -1057,6 +1074,13 @@ Title:`;
     };
 
     if (staleMinutes > 0) {
+      // Also sweep stale PENDING tickets (audit L3). Every producer processes
+      // its ticket immediately, so one still PENDING after the threshold died
+      // before reaching PROCESSING (cold start, rejected fire-and-forget) and
+      // would otherwise hang forever — the user's request never resolves and a
+      // PENDING digest blocks that user's next one. Only with a threshold:
+      // with 0 this would fail tickets another instance created moments ago.
+      where.status = In([ResearchStatus.PENDING, ResearchStatus.PROCESSING]);
       where.updated_at = LessThan(threshold);
     }
 

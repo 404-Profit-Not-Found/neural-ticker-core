@@ -415,6 +415,56 @@ describe('JobsService', () => {
       sleepSpy.mockRestore();
     });
 
+    // Audit H4: a research note only proves we tried. A ticker whose research
+    // completed but left no risk analysis (the enrichment swallows its errors)
+    // used to hide behind the weekly throttle with a blank overview.
+    it('re-queues a ticker with no risk analysis once its last research is past the retry window', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+
+      // A realistic 7-day staleness window, so the 24h retry window is the
+      // only thing that can make a 2-day-old attempt due.
+      ((service as any).configService.get as jest.Mock).mockReturnValue(168);
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '226', symbol: 'HELP' }, // researched 2 days ago, no analysis
+        { id: '20', symbol: 'AAPL' }, // researched 2 days ago, analysis landed
+      ]);
+      const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map([['20', twoDaysAgo]]),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map([
+          ['HELP', twoDaysAgo],
+          ['AAPL', twoDaysAgo],
+        ]),
+      );
+      mockResearchService.createResearchTicket.mockResolvedValue({
+        id: 'note-h',
+      });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+
+      const result = await service.runRiskRewardScanner();
+
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
+        null,
+        ['HELP'],
+        expect.any(String),
+        'gemini',
+        'cron',
+      );
+      expect(result).toMatchObject({ processed: 1, due: 1 });
+
+      sleepSpy.mockRestore();
+    });
+
     it('drops tickers without an id or symbol before selecting the batch', async () => {
       mockLlmBudgetService.getRemaining.mockResolvedValue(450);
       mockLlmBudgetService.hasBudget.mockResolvedValue(true);
@@ -560,6 +610,65 @@ describe('JobsService', () => {
       // never-researched (BBB, ZZZ alphabetical) then oldest-first (MSFT before
       // AAPL — but AAPL is within the 7d window so it isn't due at all).
       expect(due.map((c) => c.symbol)).toEqual(['BBB', 'ZZZ', 'MSFT']);
+    });
+
+    describe('selfHeal (audit H4)', () => {
+      const RETRY = 24 * HOUR;
+      const select = (
+        attemptHoursAgo: number,
+        analysisHoursAgo: number | null,
+      ) =>
+        JobsService.selectDueTickers(
+          [{ id: '1', symbol: 'HELP' }],
+          new Map([['1', NOW - attemptHoursAgo * HOUR]]),
+          NOW,
+          WINDOW,
+          5,
+          {
+            lastAnalysisAtById:
+              analysisHoursAgo === null
+                ? new Map()
+                : new Map([['1', NOW - analysisHoursAgo * HOUR]]),
+            retryAfterMs: RETRY,
+          },
+        ).map((c) => c.symbol);
+
+      it('retries a ticker with no analysis once the attempt is past the retry window', () => {
+        expect(select(25, null)).toEqual(['HELP']);
+      });
+
+      it('does not retry inside the retry window (bounds a failing ticker to one attempt per window)', () => {
+        expect(select(2, null)).toEqual([]);
+      });
+
+      it('retries when the only analysis is itself older than the staleness window', () => {
+        expect(select(30, 2000)).toEqual(['HELP']);
+      });
+
+      it('leaves a ticker with a fresh analysis alone', () => {
+        expect(select(30, 30)).toEqual([]);
+      });
+
+      it('orders plainly stale tickers ahead of retries, so retries cannot starve them', () => {
+        const due = JobsService.selectDueTickers(
+          [
+            { id: '1', symbol: 'RETRY' }, // attempted 30h ago, no analysis
+            { id: '2', symbol: 'STALE' }, // last touched 200h ago
+          ],
+          new Map([
+            ['1', NOW - 30 * HOUR],
+            ['2', NOW - 200 * HOUR],
+          ]),
+          NOW,
+          WINDOW,
+          5,
+          {
+            lastAnalysisAtById: new Map([['2', NOW - 200 * HOUR]]),
+            retryAfterMs: RETRY,
+          },
+        );
+        expect(due.map((c) => c.symbol)).toEqual(['STALE', 'RETRY']);
+      });
     });
 
     it('respects the limit', () => {

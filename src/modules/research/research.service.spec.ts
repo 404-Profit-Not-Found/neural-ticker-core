@@ -196,6 +196,25 @@ describe('ResearchService', () => {
   });
 
   describe('createManualNote', () => {
+    it('normalizes ticker symbols on write (L2)', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+      mockQualityScoringService.score.mockResolvedValueOnce({
+        ok: false,
+        error: 'unavailable',
+      });
+
+      await service.createManualNote(
+        'user-1',
+        [' aapl ', 'AAPL', 'msft', ''],
+        'Title',
+        'Content',
+      );
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tickers: ['AAPL', 'MSFT'] }),
+      );
+    });
+
     it('should create a manual note and reward credits for high quality', async () => {
       const userId = 'user-1';
       const tickers = ['AAPL'];
@@ -576,6 +595,29 @@ describe('ResearchService', () => {
       );
     });
 
+    it('also sweeps stale PENDING tickets when a threshold is given (L3)', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await service.failStuckTickets(20);
+
+      const where = mockRepo.find.mock.calls[0][0].where;
+      expect(where.status.value).toEqual([
+        ResearchStatus.PENDING,
+        ResearchStatus.PROCESSING,
+      ]);
+      expect(where.updated_at).toBeDefined();
+    });
+
+    it('only clears PROCESSING tickets when called without a threshold', async () => {
+      mockRepo.find.mockResolvedValue([]);
+
+      await service.failStuckTickets(0);
+
+      const where = mockRepo.find.mock.calls[0][0].where;
+      expect(where.status).toBe(ResearchStatus.PROCESSING);
+      expect(where.updated_at).toBeUndefined();
+    });
+
     it('should return 0 if no stuck tickets', async () => {
       mockRepo.find.mockResolvedValue([]);
 
@@ -830,6 +872,17 @@ describe('ResearchService', () => {
       ]);
       expect(result.get('FRVIA.PA')).toBe(tForvia.getTime());
       expect(result.get('AAPL')).toBe(tApple.getTime());
+    });
+
+    it('counts only system notes, so user digests cannot reset the scanner throttle', async () => {
+      mockRepo.query.mockResolvedValue([]);
+
+      await service.getLastResearchedAtBySymbol(['MSFT']);
+
+      expect(mockRepo.query).toHaveBeenCalledWith(
+        expect.stringContaining('n.user_id IS NULL'),
+        [['MSFT']],
+      );
     });
 
     it('skips rows whose last_at is null', async () => {

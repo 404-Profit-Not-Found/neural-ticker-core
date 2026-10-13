@@ -296,6 +296,17 @@ export class JobsService {
   static readonly RISK_SCANNER_CALLS_PER_TICKET = 2;
 
   /**
+   * How long the scanner waits before re-researching a ticker whose last
+   * research did NOT leave it with a fresh risk analysis (none at all, or only
+   * a stale one). Much shorter than the staleness window so a failed extraction
+   * self-heals within a day instead of hiding behind the weekly throttle, yet
+   * long enough that a ticker whose extraction keeps failing costs at most one
+   * retry per day — never the ~10x/day loop the note-based throttle was added
+   * to stop.
+   */
+  static readonly RISK_SCANNER_RETRY_HOURS = 24;
+
+  /**
    * Pure selection for the universe scanner: from `candidates`, return up to
    * `limit` tickers that are "due" for (re)research — never-researched first,
    * then oldest first. A ticker is due when it has no recorded research/analysis
@@ -305,6 +316,15 @@ export class JobsService {
    * within the window is never re-queued, regardless of how its symbol is
    * spelled. This is the gate that stops the same company being researched
    * ~10x/day instead of once per staleness window.
+   *
+   * `selfHeal` (audit H4) adds one exception to "researched within the window
+   * is not due": a research note only proves we TRIED. If the ticker still has
+   * no risk analysis newer than `maxAgeMs` — the enrichment that writes it is
+   * best-effort and swallows its errors — the attempt did not produce what the
+   * overview shows, so the ticker becomes due again once that attempt is older
+   * than `retryAfterMs`. Ordering is unchanged (oldest attempt first), so
+   * retries only fill capacity left over by tickers that are plainly stale and
+   * can never starve them.
    */
   static selectDueTickers(
     candidates: { id: string; symbol: string }[],
@@ -312,12 +332,22 @@ export class JobsService {
     now: number,
     maxAgeMs: number,
     limit: number,
+    selfHeal?: {
+      lastAnalysisAtById: Map<string, number>;
+      retryAfterMs: number;
+    },
   ): { id: string; symbol: string }[] {
     if (candidates.length === 0 || limit <= 0) return [];
 
     const due = candidates.filter((c) => {
       const ts = lastResearchedAtById.get(c.id);
-      return ts === undefined || now - ts > maxAgeMs; // never researched or stale
+      if (ts === undefined || now - ts > maxAgeMs) return true; // never researched or stale
+      if (!selfHeal) return false;
+
+      const analysisTs = selfHeal.lastAnalysisAtById.get(c.id);
+      const hasFreshAnalysis =
+        analysisTs !== undefined && now - analysisTs <= maxAgeMs;
+      return !hasFreshAnalysis && now - ts > selfHeal.retryAfterMs;
     });
 
     return due
@@ -395,13 +425,20 @@ export class JobsService {
 
       // Stale-first rotation (never-researched first, then oldest). Coverage
       // advances every run; a freshly-researched ticker is excluded until its
-      // research is older than the staleness window.
+      // research is older than the staleness window — unless that research left
+      // it without a fresh analysis, in which case it is retried after the
+      // (much shorter) retry window so the gap self-heals.
+      const retryAfterMs = Math.min(
+        JobsService.RISK_SCANNER_RETRY_HOURS * 60 * 60 * 1000,
+        stalenessMs,
+      );
       const dueCandidates = JobsService.selectDueTickers(
         candidates,
         lastResearchedAtById,
         Date.now(),
         stalenessMs,
         limit,
+        { lastAnalysisAtById: lastAnalysisById, retryAfterMs },
       );
       const dueSymbols = dueCandidates.map((c) => c.symbol);
 
