@@ -11,14 +11,22 @@ function fallbackLabel(symbol?: string): string {
     return root.slice(0, 4).toUpperCase();
 }
 
+interface TickerLogoProps {
+    url?: string;
+    symbol: string;
+    className?: string;
+    /** The caller knows the ticker has no logo: show the letters without asking the server for one. */
+    noLogo?: boolean;
+}
+
 // Memoize because base64 image rendering is heavy
-export const TickerLogo = memo(({ url, symbol, className }: { url?: string, symbol: string, className?: string }) => {
+export const TickerLogo = memo(({ url, symbol, className, noLogo }: TickerLogoProps) => {
     const { data: logoSrc, isLoading, isError: hookError } = useTickerLogo(symbol);
     const [failedSymbol, setFailedSymbol] = useState<string | null>(null);
     const imgError = failedSymbol === symbol || isLogoMissing(symbol);
 
     // Fallback logic
-    const showPlaceholder = hookError || imgError || (!isLoading && !logoSrc && !url);
+    const showPlaceholder = noLogo || hookError || imgError || (!isLoading && !logoSrc && !url);
 
     if (showPlaceholder) {
         const label = fallbackLabel(symbol);

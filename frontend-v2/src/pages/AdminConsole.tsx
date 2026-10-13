@@ -1,55 +1,38 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { AdminService } from '../services/adminService';
 import { useAuth } from '../context/AuthContext';
-import {
-    Plus,
-    Search,
-    ChevronLeft,
-    ArrowUpDown,
-    Crown,
-    Sparkles,
-    Gift,
-    Ban,
-    CheckCircle,
-    LayoutGrid,
-    List,
-} from 'lucide-react';
-import { TickerRequestCard } from '../components/admin/TickerRequestCard';
-import { UserAdminCard, type AdminUser } from '../components/admin/UserAdminCard';
+import { Plus, SearchX } from 'lucide-react';
 import { ShadowBanManager } from '../components/admin/ShadowBanManager';
 import { LogoManager } from '../components/admin/LogoManager';
 import { useNavigate } from 'react-router-dom';
 import { TickerRequestRow } from '../components/admin/TickerRequestRow';
+import { TickerRequestListRow } from '../components/admin/TickerRequestListRow';
+import { UserListRow } from '../components/admin/UserListRow';
+import { UserTable, type UserSort } from '../components/admin/UserTable';
+import type { AdminUser } from '../components/admin/model';
+import {
+    ADMIN_LIST,
+    ADMIN_TABLE,
+    AdminRowsSkeleton,
+    AdminTableSkeleton,
+    Pager,
+    SearchField,
+    Th,
+} from '../components/admin/admin-ui';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { useConfirm, usePrompt } from '../components/ui/confirm';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import {
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '../components/ui/table';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '../components/ui/popover';
 import { AdminStatsBar, type AdminFilterKey } from '../components/admin/AdminStatsBar';
 import { UserDetailDialog } from '../components/admin/UserDetailDialog';
-import { UserTierBadge } from '../components/ui/user-tier-badge';
 import { RequestStatsBar, type RequestFilterKey } from '../components/admin/RequestStatsBar';
 import { PageHeader } from '../components/ui/page-header';
 import { BackButton } from '../components/ui/back-button';
-import { SegmentedControl } from '../components/ui/segmented';
-import { EmptyState } from '../components/ui/empty-state';
+import { EmptyState, LoadError } from '../components/ui/empty-state';
 import { Label } from '../components/ui/label';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useCompactLayout } from '../hooks/useMediaQuery';
-import { formatDateTime, formatTimeAgo } from '../lib/datetime';
 
 /**
  * The one account allowed to revoke another admin's access.
@@ -66,22 +49,8 @@ const ADMIN_TABS: ReadonlyArray<{ id: AdminTab; label: string; description: stri
     { id: 'logo', label: 'Logos', description: 'Assign logos to tickers that are missing one.' },
 ];
 
-type SortConfig = {
-    key: string;
-    direction: 'asc' | 'desc';
-};
-
-// Get user initials for avatar
-function getInitials(email: string, nickname?: string): string {
-    if (nickname) {
-        const parts = nickname.split(' ');
-        if (parts.length >= 2) {
-            return (parts[0][0] + parts[1][0]).toUpperCase();
-        }
-        return nickname.slice(0, 2).toUpperCase();
-    }
-    return email.slice(0, 2).toUpperCase();
-}
+/** The tabs whose list this page loads itself (the other two load their own). */
+type ListTab = 'users' | 'requests';
 
 export function AdminConsole() {
     const { user: currentUser } = useAuth();
@@ -91,14 +60,15 @@ export function AdminConsole() {
 
     // Tab State
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
     // Users Tab State
     const [identities, setIdentities] = useState<AdminUser[]>([]);
     const [newEmail, setNewEmail] = useState('');
-    const [loading, setLoading] = useState(true);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_error, setError] = useState<string | null>(null);
+    // Which lists have arrived at least once. Until then a tab shows a
+    // skeleton (or the load error) — never "nothing here".
+    const [loaded, setLoaded] = useState<Record<ListTab, boolean>>({ users: false, requests: false });
+    const loadedRef = useRef(loaded);
+    const [error, setError] = useState<{ tab: ListTab; message: string } | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
     const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -114,15 +84,14 @@ export function AdminConsole() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<AdminFilterKey>('ALL');
     const [requestFilter, setRequestFilter] = useState<RequestFilterKey>('ALL');
-    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState<UserSort>({ key: 'created_at', direction: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
     const isSuperAdmin = currentUser?.email === SUPERADMIN_EMAIL;
 
-    // Below `lg` a users/requests table cannot fit: cards are the only view.
+    // One tree per width: compact rows below `lg`, tables from there up.
     const compact = useCompactLayout();
-    const view: 'list' | 'grid' = compact ? 'grid' : viewMode;
 
     // Redirect non-admin users immediately
     useEffect(() => {
@@ -133,33 +102,33 @@ export function AdminConsole() {
 
     const loadData = useCallback(async () => {
         // Don't load if not admin
-        if (!currentUser || currentUser.role !== 'admin') {
-            setLoading(false);
-            return;
-        }
+        if (!currentUser || currentUser.role !== 'admin') return;
+        if (activeTab !== 'users' && activeTab !== 'requests') return;
+        const tab: ListTab = activeTab;
 
-        setLoading(true);
         setError(null);
         try {
-            if (activeTab === 'users') {
+            if (tab === 'users') {
                 const data = await AdminService.getIdentities();
                 setIdentities(data);
-            } else if (activeTab === 'requests') {
+            } else {
                 const data = await AdminService.getTickerRequests();
                 setRequests(Array.isArray(data) ? data : []);
             }
+            loadedRef.current = { ...loadedRef.current, [tab]: true };
+            setLoaded(loadedRef.current);
         } catch (err: unknown) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const errorResponse = (err as any).response;
             if (errorResponse?.status === 403 || errorResponse?.status === 401) {
-                setError('Access denied. Admin privileges required.');
+                setError({ tab, message: 'Access denied. Admin privileges required.' });
                 navigate('/access-denied', { replace: true });
             } else {
                 const msg = errorResponse?.data?.message || 'Failed to load data';
-                setError(msg);
+                setError({ tab, message: msg });
+                // A list already on screen stays; say that the refresh failed.
+                if (loadedRef.current[tab]) toast.error(msg);
             }
-        } finally {
-            setLoading(false);
         }
     }, [currentUser, navigate, activeTab]);
 
@@ -428,11 +397,16 @@ export function AdminConsole() {
             filtered = filtered.filter(u => u.status !== 'BANNED');
         }
 
+        // A column sorts by what it shows: "Joined" falls back to the invite date.
+        const sortValue = (user: AdminUser) =>
+            sortConfig.key === 'created_at'
+                ? user.created_at || user.invited_at
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                : (user as any)[sortConfig.key];
+
         return [...filtered].sort((a, b) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const aVal = (a as any)[sortConfig.key];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const bVal = (b as any)[sortConfig.key];
+            const aVal = sortValue(a);
+            const bVal = sortValue(b);
 
             // No value (never signed in, no balance yet) goes last either way,
             // instead of landing wherever the comparison happens to leave it.
@@ -475,531 +449,240 @@ export function AdminConsole() {
     }, [requests]);
 
     // Pagination
-    const totalPages = Math.ceil(processedData.length / itemsPerPage);
     const paginatedData = processedData.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    const renderSortIcon = (key: string) => {
-        if (sortConfig.key !== key) return <ArrowUpDown size={14} className="ml-1 text-muted-foreground opacity-50" />;
-        return sortConfig.direction === 'asc' ? (
-            <ChevronLeft size={14} className="ml-1 rotate-90 text-primary" />
-        ) : (
-            <ChevronLeft size={14} className="ml-1 -rotate-90 text-primary" />
-        );
-    };
-
-    // Get status badge variant - using standard variants
-    const getStatusBadge = (status: string, role?: string) => {
-        const badges = [];
-        const isAdmin = role === 'admin' || status === 'ADMIN';
-
-        if (isAdmin) {
-            badges.push(<UserTierBadge key="admin" tier="admin" />);
-        }
-
-        if (status !== 'ADMIN') {
-            switch (status) {
-                case 'ACTIVE':
-                    badges.push(<Badge key="active" variant="outline" className="text-up bg-emerald-500/5">ACTIVE</Badge>);
-                    break;
-                case 'WAITLIST':
-                    badges.push(<Badge key="waitlist" variant="secondary" className="text-amber-500">WAITLIST</Badge>);
-                    break;
-                case 'INVITED':
-                    badges.push(<Badge key="invited" variant="outline" className="text-blue-500 bg-blue-500/5">INVITED</Badge>);
-                    break;
-                case 'BANNED':
-                    badges.push(<Badge key="banned" variant="destructive">BANNED</Badge>);
-                    break;
-                default:
-                    if (status) badges.push(<Badge key="other" variant="outline">{status}</Badge>);
-            }
-        }
-
-        return <div className="flex flex-wrap gap-1">{badges}</div>;
-    };
-
-    // Get tier badge - matches mobile card styling (UserAdminCard)
-    const getTierBadge = (tier: string | undefined) => <UserTierBadge tier={tier} />;
-
-    // Loading skeleton - view-aware to avoid hydration errors
-    const LoadingSkeleton = ({ mode = view }: { mode?: 'list' | 'grid' }) => {
-        const items = [...Array(mode === 'list' ? 5 : 6)];
-
-        if (mode === 'list') {
-            // Wrap TableRow elements in proper table structure to avoid hydration errors
-            return (
-                <div className="overflow-x-auto">
-                    <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
-                        <TableBody>
-                            {items.map((_, i) => (
-                                <TableRow key={`skeleton-row-${i}`} className="bg-card rounded-lg">
-                                    <TableCell className="pl-6 rounded-l-lg">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
-                                            <div className="space-y-2">
-                                                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-                                                <div className="h-3 w-32 bg-muted animate-pulse rounded" />
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell><div className="h-5 w-16 bg-muted animate-pulse rounded-full" /></TableCell>
-                                    <TableCell><div className="h-4 w-12 bg-muted animate-pulse rounded" /></TableCell>
-                                    <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
-                                    <TableCell className="rounded-r-lg"><div className="h-4 w-8 bg-muted animate-pulse rounded ml-auto" /></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </table>
-                </div>
-            );
-        }
-
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {items.map((_, i) => (
-                    <div key={`skeleton-card-${i}`} className="h-32 bg-card rounded-xl animate-pulse" />
-                ))}
-            </div>
-        );
-    };
+    const tabError = (tab: ListTab) => (error?.tab === tab ? error.message : null);
+    const isFiltered = !!searchTerm || statusFilter !== 'ALL';
 
     return (
-        <div className="min-h-page bg-background relative flex flex-col">
+        <div className="min-h-page bg-background">
+            <main className="container mx-auto max-w-7xl space-y-4 px-4 pb-10 pt-4 sm:px-6 lg:space-y-5 lg:pt-6">
+                {/* One fixed title; the tab says where you are. */}
+                <PageHeader
+                    back={<BackButton />}
+                    title="Admin"
+                    description={ADMIN_TABS.find((tab) => tab.id === activeTab)?.description}
+                />
 
-            {/* Main Content Area */}
-            <main className="flex-1">
-                <div className="container mx-auto max-w-7xl space-y-5 px-4 pb-10 pt-6 sm:px-6 sm:pt-8">
-                    {/* One fixed title; the tab says where you are. */}
-                    <PageHeader
-                        back={<BackButton />}
-                        title="Admin"
-                        description={ADMIN_TABS.find((tab) => tab.id === activeTab)?.description}
-                    />
+                <Tabs
+                    className="space-y-4"
+                    value={activeTab}
+                    onValueChange={(next) => {
+                        setActiveTab(next as AdminTab);
+                        setCurrentPage(1);
+                    }}
+                >
+                    <TabsList aria-label="Admin sections">
+                        {ADMIN_TABS.map((tab) => (
+                            <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                        ))}
+                    </TabsList>
 
-                    <Tabs
-                        value={activeTab}
-                        onValueChange={(next) => {
-                            setActiveTab(next as AdminTab);
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <TabsList aria-label="Admin sections">
-                            {ADMIN_TABS.map((tab) => (
-                                <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
+                    {/* Users */}
+                    <TabsContent value="users" className="mt-0 space-y-3">
+                        {/* Toolbar: search and the one action on a line, the counts-as-filter
+                            under it (one scrolling row on phones). From `lg` it is one line. */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+                            <SearchField
+                                className="order-1 min-w-0 flex-1 lg:w-64 lg:flex-none xl:w-72"
+                                label="Search users by email or nickname"
+                                placeholder="Search users…"
+                                value={searchTerm}
+                                onChange={(value) => {
+                                    setSearchTerm(value);
+                                    setCurrentPage(1);
+                                }}
+                            />
+                            {/* Tonal on purpose: blue is kept for the commit inside the sheet. */}
+                            <Button
+                                variant="outline"
+                                className="order-2 h-11 shrink-0 gap-1.5 px-3.5 lg:order-3 lg:h-9"
+                                onClick={() => setIsInviteOpen(true)}
+                            >
+                                <Plus size={16} aria-hidden />
+                                Add user
+                            </Button>
+                            <div className="order-3 w-full min-w-0 lg:order-2 lg:w-auto lg:flex-1">
+                                <AdminStatsBar
+                                    stats={stats}
+                                    loading={!loaded.users}
+                                    selectedFilter={statusFilter}
+                                    onFilterChange={(filter) => {
+                                        setStatusFilter(filter);
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </div>
+                        </div>
 
-                    <div>
-                        {/* Shadow Ban Tab */}
-                        {activeTab === 'shadowban' && <ShadowBanManager />}
-                        {/* Logo Manager Tab */}
-                        {activeTab === 'logo' && <LogoManager />}
-
-                        {/* Requests Tab */}
-                        {
-                            activeTab === 'requests' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <RequestStatsBar
-                                        stats={requestStats}
-                                        selectedFilter={requestFilter}
-                                        onFilterChange={setRequestFilter}
-                                    />
-                                    {!compact && (
-                                        <div className="flex justify-end">
-                                            <SegmentedControl
-                                                    label="View"
-                                                    size="sm"
-                                                    value={viewMode}
-                                                    onChange={setViewMode}
-                                                    options={[
-                                                        { value: 'list', label: <List size={14} aria-hidden />, ariaLabel: 'Table' },
-                                                        { value: 'grid', label: <LayoutGrid size={14} aria-hidden />, ariaLabel: 'Cards' },
-                                                    ]}
-                                                />
-                                        </div>
-                                    )}
-
-                                    {/* Requests Grid/List Logic same as before... */}
-                                    {view === 'list' ? (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
-                                                <TableHeader>
-                                                    <TableRow className="bg-transparent hover:bg-transparent">
-                                                        <TableHead className="font-medium text-muted-foreground pl-6">Symbol</TableHead>
-                                                        <TableHead className="font-medium text-muted-foreground">Status</TableHead>
-                                                        <TableHead className="font-medium text-muted-foreground">Requested By</TableHead>
-                                                        <TableHead className="font-medium text-muted-foreground">Date</TableHead>
-                                                        <TableHead className="text-right font-medium text-muted-foreground pr-6">Actions</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody className="space-y-2">
-                                                    {loading ? (
-                                                        <TableRow><TableCell colSpan={5} className="h-24 text-center"><LoadingSkeleton /></TableCell></TableRow>
-                                                    ) : processedRequests.length === 0 ? (
-                                                        <TableRow className="bg-card hover:bg-card rounded-lg">
-                                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">{requestFilter === 'ALL' ? 'No ticker requests yet' : `No ${requestFilter.toLowerCase()} requests`}</TableCell>
-                                                        </TableRow>
-                                                    ) : (
-                                                        processedRequests.map((req) => (
-                                                            <TickerRequestRow
-                                                                key={req.id}
-                                                                request={req}
-                                                                onApprove={handleApproveRequest}
-                                                                onReject={handleRejectRequest}
-                                                            />
-                                                        ))
-                                                    )}
-                                                </TableBody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <div className="w-full">
-                                            {loading ? (
-                                                <LoadingSkeleton mode="grid" />
-                                            ) : processedRequests.length === 0 ? (
-                                                <div className="h-32 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg col-span-full">{requestFilter === 'ALL' ? 'No ticker requests yet' : `No ${requestFilter.toLowerCase()} requests`}</div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {processedRequests.map((req) => (
-                                                        <TickerRequestCard
-                                                            key={req.id}
-                                                            request={req}
-                                                            onApprove={handleApproveRequest}
-                                                            onReject={handleRejectRequest}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                        {!loaded.users ? (
+                            tabError('users') ? (
+                                <LoadError what="users" onRetry={() => void loadData()} className="rounded-lg bg-card" />
+                            ) : compact ? (
+                                <AdminRowsSkeleton rows={8} label="Loading users" />
+                            ) : (
+                                <AdminTableSkeleton rows={8} columns={6} label="Loading users" />
                             )
-                        }
+                        ) : paginatedData.length === 0 ? (
+                            <EmptyState
+                                className="rounded-lg bg-card"
+                                icon={<SearchX className="h-5 w-5" />}
+                                title={isFiltered ? 'No users match' : 'No users yet'}
+                                description={isFiltered ? 'Try a different search, or clear the filter above.' : undefined}
+                                action={isFiltered ? <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setCurrentPage(1); }}>Show all users</Button> : undefined}
+                            />
+                        ) : compact ? (
+                            <ul className={ADMIN_LIST}>
+                                {paginatedData.map((user, index) => (
+                                    <li key={user.id || user.email || `user-${index}`}>
+                                        <UserListRow user={user} onOpen={openUserDetail} />
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <UserTable
+                                users={paginatedData}
+                                sort={sortConfig}
+                                onSort={handleSort}
+                                onOpen={openUserDetail}
+                                onUpdateTier={handleUpdateTier}
+                                onGiftCredits={handleGiftCredits}
+                                onApprove={handleApprove}
+                                onRevoke={handleRevoke}
+                                onUnban={handleUnban}
+                            />
+                        )}
 
-                        {/* Users Tab (Refactored) */}
-                        {
-                            activeTab === 'users' && (
-                                <div className="space-y-6">
-                                    {/* New Admin Stats Bar */}
-                                    <AdminStatsBar
-                                        stats={stats}
-                                        selectedFilter={statusFilter}
-                                        onFilterChange={setStatusFilter}
-                                    />
+                        {loaded.users && (
+                            <Pager page={currentPage} pageSize={itemsPerPage} total={processedData.length} onPage={setCurrentPage} />
+                        )}
+                    </TabsContent>
 
-                                    {/* User Management Section */}
-                                    <div className="space-y-4">
+                    {/* Ticker requests */}
+                    <TabsContent value="requests" className="mt-0 space-y-3">
+                        <RequestStatsBar
+                            stats={requestStats}
+                            loading={!loaded.requests}
+                            selectedFilter={requestFilter}
+                            onFilterChange={setRequestFilter}
+                        />
 
-                                        {/* Search & Actions Row */}
-                                        <div className="flex w-full flex-col items-center gap-3 sm:flex-row">
-                                            <div className="relative flex-1 w-full">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    placeholder="Search by email or nickname..."
-                                                    className="h-11 pl-10 lg:h-9"
-                                                    aria-label="Search users"
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
-                                            </div>
+                        {!loaded.requests ? (
+                            tabError('requests') ? (
+                                <LoadError what="ticker requests" onRetry={() => void loadData()} className="rounded-lg bg-card" />
+                            ) : compact ? (
+                                <AdminRowsSkeleton rows={5} label="Loading ticker requests" />
+                            ) : (
+                                <AdminTableSkeleton rows={5} columns={5} label="Loading ticker requests" />
+                            )
+                        ) : processedRequests.length === 0 ? (
+                            <EmptyState
+                                className="rounded-lg bg-card"
+                                title={requestFilter === 'ALL' ? 'No ticker requests yet' : `No ${requestFilter.toLowerCase()} requests`}
+                                action={requestFilter === 'ALL' ? undefined : <Button variant="outline" size="sm" onClick={() => setRequestFilter('ALL')}>Show all requests</Button>}
+                            />
+                        ) : compact ? (
+                            <ul className={ADMIN_LIST}>
+                                {processedRequests.map((req) => (
+                                    <li key={req.id}>
+                                        <TickerRequestListRow
+                                            request={req}
+                                            onApprove={handleApproveRequest}
+                                            onReject={handleRejectRequest}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className={ADMIN_TABLE}>
+                                    <thead>
+                                        <tr>
+                                            <Th>Ticker</Th>
+                                            <Th>Status</Th>
+                                            <Th>Requested by</Th>
+                                            <Th>Date</Th>
+                                            <Th className="text-right">
+                                                <span className="sr-only">Actions</span>
+                                            </Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {processedRequests.map((req) => (
+                                            <TickerRequestRow
+                                                key={req.id}
+                                                request={req}
+                                                onApprove={handleApproveRequest}
+                                                onReject={handleRejectRequest}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </TabsContent>
 
-                                            <Button
-                                                className="h-11 w-full shrink-0 gap-2 lg:h-9 sm:w-auto"
-                                                onClick={() => setIsInviteOpen(true)}
-                                            >
-                                                <Plus size={16} />
-                                                Add User
-                                            </Button>
-                                            {!compact && (
-                                                <SegmentedControl
-                                                    label="View"
-                                                    size="sm"
-                                                    value={viewMode}
-                                                    onChange={setViewMode}
-                                                    options={[
-                                                        { value: 'list', label: <List size={14} aria-hidden />, ariaLabel: 'Table' },
-                                                        { value: 'grid', label: <LayoutGrid size={14} aria-hidden />, ariaLabel: 'Cards' },
-                                                    ]}
-                                                />
-                                            )}
+                    {/* Shadow ban */}
+                    <TabsContent value="shadowban" className="mt-0">
+                        <ShadowBanManager />
+                    </TabsContent>
 
-                                            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                                                <form
-                                                    noValidate
-                                                    onSubmit={(e) => {
-                                                        e.preventDefault();
-                                                        if (!/^\S+@\S+\.\S+$/.test(newEmail.trim())) {
-                                                            setInviteError('Enter a valid email address.');
-                                                            return;
-                                                        }
-                                                        void handleAddEmail();
-                                                    }}
-                                                >
-                                                    <DialogHeader>
-                                                        <DialogTitle>Add a user</DialogTitle>
-                                                        <DialogDescription>
-                                                            The address is added to the waitlist so the person can sign in.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="space-y-2 pb-5">
-                                                        <Label htmlFor="admin-invite-email">Email address</Label>
-                                                        <Input
-                                                            id="admin-invite-email"
-                                                            type="email"
-                                                            inputMode="email"
-                                                            autoComplete="off"
-                                                            autoFocus
-                                                            value={newEmail}
-                                                            onChange={(e) => {
-                                                                setNewEmail(e.target.value);
-                                                                if (inviteError) setInviteError(null);
-                                                            }}
-                                                            placeholder="user@example.com"
-                                                            aria-invalid={inviteError ? true : undefined}
-                                                            aria-describedby={inviteError ? 'admin-invite-error' : undefined}
-                                                        />
-                                                        {inviteError && (
-                                                            <p id="admin-invite-error" role="alert" className="text-xs text-down">{inviteError}</p>
-                                                        )}
-                                                    </div>
-                                                    <DialogFooter>
-                                                        <Button type="button" variant="ghost" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                                                        <Button type="submit">Add user</Button>
-                                                    </DialogFooter>
-                                                </form>
-                                            </Dialog>
-                                        </div>
-
-                                        {/* Consolidated List/Grid View */}
-                                        <div className="w-full">
-                                            {loading ? (
-                                                <LoadingSkeleton mode={view} />
-                                            ) : (
-                                                <>
-                                                    {paginatedData.length === 0 ? (
-                                                        <EmptyState
-                                                            className="rounded-lg bg-card py-14"
-                                                            title="No users match"
-                                                            description="Try a different search, or clear the filter above."
-                                                            action={searchTerm || statusFilter !== 'ALL' ? <Button variant="outline" onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); }}>Show all users</Button> : undefined}
-                                                        />
-                                                    ) : view === 'list' ? (
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full caption-bottom text-sm border-separate border-spacing-y-2">
-                                                                <TableHeader>
-                                                                    <TableRow className="bg-transparent hover:bg-transparent">
-                                                                        <TableHead className="w-[260px] cursor-pointer pl-6 font-medium text-muted-foreground xl:w-[350px]" onClick={() => handleSort('email')}>
-                                                                            <div className="flex items-center gap-1">User {renderSortIcon('email')}</div>
-                                                                        </TableHead>
-                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('status')}>
-                                                                            <div className="flex items-center gap-1">Status {renderSortIcon('status')}</div>
-                                                                        </TableHead>
-                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('credits_balance')}>
-                                                                            <div className="flex items-center gap-1">Credits {renderSortIcon('credits_balance')}</div>
-                                                                        </TableHead>
-                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('created_at')}>
-                                                                            <div className="flex items-center gap-1">Joined {renderSortIcon('created_at')}</div>
-                                                                        </TableHead>
-                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('last_login')}>
-                                                                            <div className="flex items-center gap-1">Last login {renderSortIcon('last_login')}</div>
-                                                                        </TableHead>
-                                                                        <TableHead className="text-right text-muted-foreground font-medium pr-6">Actions</TableHead>
-                                                                    </TableRow>
-                                                                </TableHeader>
-                                                                <TableBody className="space-y-2">
-                                                                    {paginatedData.map((user, index) => (
-                                                                        <TableRow
-                                                                            key={user.id || user.email || `user-${index}`}
-                                                                            className="bg-card hover:bg-card/80 transition-colors rounded-lg group text-xs sm:text-sm cursor-pointer"
-                                                                            onClick={() => openUserDetail(user)}
-                                                                        >
-                                                                            <TableCell className="pl-6 font-medium rounded-l-lg py-3">
-                                                                                <div className="flex items-center gap-3">
-                                                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground overflow-hidden shrink-0">
-                                                                                        {user.avatar_url ? (
-                                                                                            <img src={user.avatar_url} alt="User" className="w-full h-full object-cover" />
-                                                                                        ) : (
-                                                                                            getInitials(user.email, user.nickname)
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="flex flex-col">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="font-bold text-foreground truncate max-w-[150px]">{user.nickname || user.email?.split('@')[0]}</span>
-                                                                                            {getTierBadge(user.tier)}
-                                                                                        </div>
-                                                                                        <span className="text-xs text-muted-foreground font-normal truncate max-w-[200px]">{user.email}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </TableCell>
-                                                                            <TableCell className="py-3">
-                                                                                {getStatusBadge(user.status, user.role)}
-                                                                            </TableCell>
-                                                                            <TableCell className="py-3">
-                                                                                <div className="font-mono text-xs bg-muted/30 w-fit px-2 py-1 rounded">
-                                                                                    <span>{user.credits_balance?.toLocaleString() ?? 0}</span>
-                                                                                </div>
-                                                                            </TableCell>
-                                                                            <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                                                                                {formatDateTime(user.created_at || user.invited_at)}
-                                                                            </TableCell>
-                                                                            <TableCell className="font-mono text-xs whitespace-nowrap">
-                                                                                {user.last_login ? (
-                                                                                    <time dateTime={user.last_login} title={formatDateTime(user.last_login)} className="text-foreground/90">
-                                                                                        {formatTimeAgo(user.last_login)}
-                                                                                    </time>
-                                                                                ) : (
-                                                                                    <span className="text-muted-foreground">Never</span>
-                                                                                )}
-                                                                            </TableCell>
-                                                                            <TableCell className="text-right pr-6 rounded-r-lg py-3">
-                                                                                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                                                                                    {/* DESKTOP ACTIONS - Always Visible with Text */}
-                                                                                    <Popover>
-                                                                                        <PopoverTrigger asChild>
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                                                                                            >
-                                                                                                <Sparkles size={12} className="text-purple-400" />
-                                                                                                <span className="sr-only xl:not-sr-only">Tier</span>
-                                                                                            </Button>
-                                                                                        </PopoverTrigger>
-                                                                                        <PopoverContent className="w-48 p-0" align="end">
-                                                                                            <div className="p-2">
-                                                                                                <p className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">Set Tier</p>
-                                                                                                {(['free', 'pro', 'whale'] as const).map((t) => (
-                                                                                                    <Button
-                                                                                                        key={t}
-                                                                                                        variant={user.tier === t ? 'secondary' : 'ghost'}
-                                                                                                        size="sm"
-                                                                                                        className="w-full justify-start h-8 text-xs mb-1"
-                                                                                                        onClick={() => user.id && handleUpdateTier(user.id, t)}
-                                                                                                        disabled={!user.id}
-                                                                                                    >
-                                                                                                        {t === 'whale' && <Crown size={10} className="mr-2 text-amber-400" />}
-                                                                                                        {t.charAt(0).toUpperCase() + t.slice(1)}
-                                                                                                    </Button>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </PopoverContent>
-                                                                                    </Popover>
-
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="sm"
-                                                                                        className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:bg-pink-500/10 hover:text-pink-500 transition-colors"
-                                                                                        onClick={() => handleGiftCredits(user)}
-                                                                                    >
-                                                                                        <Gift size={12} className="text-pink-500" />
-                                                                                        <span className="sr-only xl:not-sr-only">Gift</span>
-                                                                                    </Button>
-
-                                                                                    {user.status === 'WAITLIST' && (
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="sm"
-                                                                                            className="h-8 gap-1.5 px-2 text-xs text-up hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
-                                                                                            onClick={() => user.email && handleApprove(user.email)}
-                                                                                        >
-                                                                                            <CheckCircle size={12} className="text-up" />
-                                                                                            <span className="sr-only xl:not-sr-only">Approve</span>
-                                                                                        </Button>
-                                                                                    )}
-
-                                                                                    {user.status !== 'BANNED' ? (
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="sm"
-                                                                                            className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:bg-down/10 hover:text-down"
-                                                                                            onClick={() => handleRevoke(user)}
-                                                                                        >
-                                                                                            <Ban size={12} className="text-down" />
-                                                                                            <span className="sr-only xl:not-sr-only">Ban</span>
-                                                                                        </Button>
-                                                                                    ) : (
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="sm"
-                                                                                            className="h-8 gap-1.5 px-2 text-xs text-up hover:bg-emerald-500/10 hover:text-emerald-500"
-                                                                                            onClick={() => handleUnban(user)}
-                                                                                        >
-                                                                                            <CheckCircle size={12} className="text-up" />
-                                                                                            <span className="sr-only xl:not-sr-only">Unban</span>
-                                                                                        </Button>
-                                                                                    )}
-
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                                                        onClick={() => openUserDetail(user)}
-                                                                                        title="User details"
-                                                                                        aria-label={`Details for ${user.email}`}
-                                                                                    >
-                                                                                        <List size={16} />
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </TableCell>
-                                                                        </TableRow>
-                                                                    ))}
-                                                                </TableBody>
-                                                            </table>
-                                                        </div>
-                                                    ) : (
-                                                        /* Grid View */
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                            {paginatedData.map((user, index) => (
-                                                                <UserAdminCard
-                                                                    key={user.id || user.email || `user-grid-${index}`}
-                                                                    user={user}
-                                                                    onClick={openUserDetail}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Pagination */}
-                                        {totalPages > 1 && (
-                                            <div className="flex items-center justify-between mt-4">
-                                                <p className="text-sm text-muted-foreground">
-                                                    Page {currentPage} of {totalPages}
-                                                </p>
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-11 lg:h-9"
-                                                        disabled={currentPage === 1}
-                                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                                    >
-                                                        Previous
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-11 lg:h-9"
-                                                        disabled={currentPage === totalPages}
-                                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                                    >
-                                                        Next
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                    </div>
-                </div>
+                    {/* Logos */}
+                    <TabsContent value="logo" className="mt-0">
+                        <LogoManager />
+                    </TabsContent>
+                </Tabs>
             </main>
+
+            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                <form
+                    noValidate
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!/^\S+@\S+\.\S+$/.test(newEmail.trim())) {
+                            setInviteError('Enter a valid email address.');
+                            return;
+                        }
+                        void handleAddEmail();
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Add a user</DialogTitle>
+                        <DialogDescription>
+                            The address is added to the waitlist so the person can sign in.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 pb-5">
+                        <Label htmlFor="admin-invite-email">Email address</Label>
+                        <Input
+                            id="admin-invite-email"
+                            type="email"
+                            inputMode="email"
+                            autoComplete="off"
+                            autoFocus
+                            value={newEmail}
+                            onChange={(e) => {
+                                setNewEmail(e.target.value);
+                                if (inviteError) setInviteError(null);
+                            }}
+                            placeholder="user@example.com"
+                            className="h-11 lg:h-10"
+                            aria-invalid={inviteError ? true : undefined}
+                            aria-describedby={inviteError ? 'admin-invite-error' : undefined}
+                        />
+                        {inviteError && (
+                            <p id="admin-invite-error" role="alert" className="text-xs text-down">{inviteError}</p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
+                        <Button type="submit">Add user</Button>
+                    </DialogFooter>
+                </form>
+            </Dialog>
 
             <UserDetailDialog
                 user={selectedUser}

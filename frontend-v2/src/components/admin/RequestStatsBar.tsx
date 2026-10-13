@@ -1,5 +1,4 @@
-import { List, CheckCircle, Clock, Ban } from 'lucide-react';
-import { StatPill } from '../dashboard/StatPill';
+import { FilterChips } from './admin-ui';
 
 export type RequestFilterKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -14,43 +13,26 @@ interface RequestStatsBarProps {
     stats: RequestStats;
     selectedFilter: RequestFilterKey;
     onFilterChange: (filter: RequestFilterKey) => void;
+    /** The list has not loaded: no counts yet. */
+    loading?: boolean;
+    className?: string;
 }
 
-export function RequestStatsBar({ stats, selectedFilter, onFilterChange }: RequestStatsBarProps) {
+/** The request counters, as the strip that filters the list by state. */
+export function RequestStatsBar({ stats, selectedFilter, onFilterChange, loading, className }: RequestStatsBarProps) {
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <StatPill
-                icon={List}
-                label="Total Requests"
-                value={stats.total}
-                isActive={selectedFilter === 'ALL'}
-                onClick={() => onFilterChange('ALL')}
-                tone="primary"
-            />
-            <StatPill
-                icon={Clock}
-                label="Pending"
-                value={stats.pending}
-                isActive={selectedFilter === 'PENDING'}
-                onClick={() => onFilterChange('PENDING')}
-                tone="amber"
-            />
-            <StatPill
-                icon={CheckCircle}
-                label="Approved"
-                value={stats.approved}
-                isActive={selectedFilter === 'APPROVED'}
-                onClick={() => onFilterChange('APPROVED')}
-                tone="emerald"
-            />
-            <StatPill
-                icon={Ban}
-                label="Rejected"
-                value={stats.rejected}
-                isActive={selectedFilter === 'REJECTED'}
-                onClick={() => onFilterChange('REJECTED')}
-                tone="rose"
-            />
-        </div>
+        <FilterChips
+            label="Filter requests"
+            className={className}
+            loading={loading}
+            value={selectedFilter}
+            onChange={onFilterChange}
+            options={[
+                { value: 'ALL', label: 'All', count: stats.total },
+                { value: 'PENDING', label: 'Pending', count: stats.pending },
+                { value: 'APPROVED', label: 'Approved', count: stats.approved },
+                { value: 'REJECTED', label: 'Rejected', count: stats.rejected },
+            ]}
+        />
     );
 }

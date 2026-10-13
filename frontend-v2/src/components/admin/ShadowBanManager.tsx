@@ -1,22 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminService } from '../../services/adminService';
-import { Search, EyeOff, Eye, Loader2 } from 'lucide-react';
+import { EyeOff, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { EmptyState } from '../ui/empty-state';
-import { Skeleton } from '../ui/skeleton';
+import { EmptyState, LoadError } from '../ui/empty-state';
 import { useConfirm } from '../ui/confirm';
-import { useCompactLayout } from '../../hooks/useMediaQuery';
-import { cn } from '../../lib/utils';
-import {
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '../ui/table';
+import { TickerLogo } from '../dashboard/TickerLogo';
+import { AdminRow, AdminRowsSkeleton, SearchField } from './admin-ui';
 
 interface HiddenTicker {
     id: string;
@@ -26,27 +17,30 @@ interface HiddenTicker {
     is_hidden: boolean;
 }
 
+// Rows share a line from `lg`: two columns of the same mini cards.
+const GRID = 'grid grid-cols-1 gap-1.5 lg:grid-cols-2';
+
 export function ShadowBanManager() {
     const [tickers, setTickers] = useState<HiddenTicker[]>([]);
-    const [hiddenTickers, setHiddenTickers] = useState<HiddenTicker[]>([]);
+    // null until the list has loaded once: "not loaded" is not "nothing hidden".
+    const [hiddenTickers, setHiddenTickers] = useState<HiddenTicker[] | null>(null);
+    const [hiddenError, setHiddenError] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
-    const [loadingHidden, setLoadingHidden] = useState(true);
+    const [searchError, setSearchError] = useState(false);
     const [togglingSymbol, setTogglingSymbol] = useState<string | null>(null);
     // The text the last completed search was run for (null = none yet).
     const [searchedTerm, setSearchedTerm] = useState<string | null>(null);
-    const compact = useCompactLayout();
     const confirm = useConfirm();
 
     const loadHiddenTickers = useCallback(async () => {
-        setLoadingHidden(true);
+        setHiddenError(false);
         try {
             const data = await AdminService.getHiddenTickers();
             setHiddenTickers(data);
         } catch (error) {
             console.error('Failed to load hidden tickers:', error);
-        } finally {
-            setLoadingHidden(false);
+            setHiddenError(true);
         }
     }, []);
 
@@ -54,22 +48,34 @@ export function ShadowBanManager() {
         void loadHiddenTickers();
     }, [loadHiddenTickers]);
 
+    // A new search may start before the last one answered: only the latest counts.
+    const searchRun = useRef(0);
+
     const handleSearch = async () => {
+        const run = ++searchRun.current;
         if (!searchTerm.trim()) {
             setTickers([]);
             setSearchedTerm(null);
+            setSearchError(false);
+            setLoading(false);
             return;
         }
         setLoading(true);
+        setSearchError(false);
         try {
             const term = searchTerm.trim();
             const data = await AdminService.searchTickersAdmin(searchTerm);
+            if (run !== searchRun.current) return;
             setTickers(data);
             setSearchedTerm(term);
         } catch (error) {
             console.error('Failed to search tickers:', error);
+            if (run !== searchRun.current) return;
+            setTickers([]);
+            setSearchedTerm(null);
+            setSearchError(true);
         } finally {
-            setLoading(false);
+            if (run === searchRun.current) setLoading(false);
         }
     };
 
@@ -105,138 +111,114 @@ export function ShadowBanManager() {
         await handleToggleHidden(ticker.symbol, ticker.is_hidden);
     };
 
-    const toggleButton = (ticker: HiddenTicker) => (
-        <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void requestToggle(ticker)}
-            disabled={togglingSymbol === ticker.symbol}
-            className={cn('h-11 shrink-0 gap-1.5 lg:h-8', ticker.is_hidden ? 'text-up hover:bg-up/10 hover:text-up' : 'text-down hover:bg-down/10 hover:text-down')}
-            aria-label={`${ticker.is_hidden ? 'Unhide' : 'Hide'} ${ticker.symbol}`}
-        >
-            {togglingSymbol === ticker.symbol ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-            ) : ticker.is_hidden ? (
-                <>
-                    <Eye className="h-4 w-4" />
-                    Unhide
-                </>
-            ) : (
-                <>
-                    <EyeOff className="h-4 w-4" />
-                    Hide
-                </>
-            )}
-        </Button>
+    const row = (ticker: HiddenTicker) => (
+        <li key={ticker.symbol}>
+            <AdminRow
+                identifier
+                leading={<TickerLogo symbol={ticker.symbol} className="h-10 w-10 shrink-0" />}
+                title={ticker.symbol}
+                // Visible is the normal state and needs no stamp; hidden is the exception.
+                stamps={
+                    ticker.is_hidden ? (
+                        <Badge variant="statusBanned" className="h-5 shrink-0 gap-1 px-1.5 text-[11px]">
+                            <EyeOff className="h-3 w-3" aria-hidden />
+                            Hidden
+                        </Badge>
+                    ) : undefined
+                }
+                subtitle={
+                    <>
+                        {ticker.name}
+                        {ticker.exchange && <span className="num"> · {ticker.exchange}</span>}
+                    </>
+                }
+                action={
+                    <div className="flex shrink-0 items-center pr-2.5">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void requestToggle(ticker)}
+                            disabled={togglingSymbol === ticker.symbol}
+                            className="h-11 min-w-[5.75rem] gap-1.5 px-3 lg:h-8 lg:min-w-[5.25rem] lg:text-xs"
+                            aria-label={`${ticker.is_hidden ? 'Unhide' : 'Hide'} ${ticker.symbol}`}
+                        >
+                            {togglingSymbol === ticker.symbol ? (
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                            ) : ticker.is_hidden ? (
+                                <>
+                                    <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
+                                    Unhide
+                                </>
+                            ) : (
+                                <>
+                                    <EyeOff className="h-4 w-4 text-muted-foreground" aria-hidden />
+                                    Hide
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                }
+            />
+        </li>
     );
 
-    const statusStamp = (hidden: boolean) => (
-        <Badge variant={hidden ? 'statusBanned' : 'active'} className="h-5 gap-1 px-1.5 text-[11px]">
-            {hidden ? <EyeOff className="h-3 w-3" aria-hidden /> : <Eye className="h-3 w-3" aria-hidden />}
-            {hidden ? 'Hidden' : 'Visible'}
-        </Badge>
-    );
+    // Only once a search has actually run for the text in the field.
+    const searchedCurrent = searchedTerm !== null && searchedTerm === searchTerm.trim();
+    const showResults = loading || searchError || tickers.length > 0 || searchedCurrent;
 
     return (
-        <div className="space-y-8">
-            {/* Search */}
-            <section className="space-y-3" aria-label="Find a ticker">
-                <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        void handleSearch();
-                    }}
-                >
-                    <div className="relative flex-1">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                        <Input
-                            type="text"
-                            placeholder="Search ticker symbol or name..."
-                            aria-label="Search tickers to hide or unhide"
-                            value={searchTerm}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                            className="h-11 pl-9 lg:h-9"
-                        />
-                    </div>
-                    <Button type="submit" disabled={loading} className="h-11 min-w-[5.5rem] lg:h-9">
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
-                    </Button>
-                </form>
+        <div className="space-y-6">
+            <SearchField
+                className="lg:max-w-md"
+                label="Search tickers to hide or unhide"
+                placeholder="Search symbol or name…"
+                value={searchTerm}
+                onChange={setSearchTerm}
+                onSubmit={() => void handleSearch()}
+                busy={loading}
+            />
 
-                {tickers.length > 0 && (
-                    compact ? (
-                        <ul className="space-y-1.5">
-                            {tickers.map((ticker) => (
-                                <li key={ticker.symbol} className="flex items-center gap-3 rounded-lg bg-card px-3.5 py-3">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                            <span className="text-[15px] font-semibold text-foreground">{ticker.symbol}</span>
-                                            {statusStamp(ticker.is_hidden)}
-                                        </div>
-                                        <div className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                                            {ticker.name}{ticker.exchange && <span className="num"> · {ticker.exchange}</span>}
-                                        </div>
-                                    </div>
-                                    {toggleButton(ticker)}
-                                </li>
-                            ))}
-                        </ul>
+            {showResults && (
+                <section className="space-y-2.5" aria-labelledby="shadowban-results-heading">
+                    <h2 id="shadowban-results-heading" className="label-micro flex items-center gap-2">
+                        Results
+                        {!loading && !searchError && <span className="num text-foreground">{tickers.length}</span>}
+                    </h2>
+                    {searchError ? (
+                        <LoadError what="search results" onRetry={() => void handleSearch()} className="rounded-lg bg-card" />
+                    ) : tickers.length > 0 ? (
+                        <ul className={GRID}>{tickers.map(row)}</ul>
+                    ) : loading ? (
+                        <AdminRowsSkeleton rows={4} label="Searching tickers" className={GRID} />
                     ) : (
-                        <table className="w-full caption-bottom text-sm border-separate border-spacing-y-1.5">
-                            <TableHeader>
-                                <TableRow className="bg-transparent hover:bg-transparent">
-                                    <TableHead className="pl-6 font-medium text-muted-foreground">Symbol</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Name</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Exchange</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Status</TableHead>
-                                    <TableHead className="pr-6 text-right font-medium text-muted-foreground">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tickers.map((ticker) => (
-                                    <TableRow key={ticker.symbol} className="bg-card">
-                                        <TableCell className="rounded-l-lg py-3 pl-6 text-base font-semibold text-foreground">{ticker.symbol}</TableCell>
-                                        <TableCell className="font-medium text-foreground">{ticker.name}</TableCell>
-                                        <TableCell className="num text-xs text-muted-foreground">{ticker.exchange}</TableCell>
-                                        <TableCell>{statusStamp(ticker.is_hidden)}</TableCell>
-                                        <TableCell className="rounded-r-lg pr-6 text-right">{toggleButton(ticker)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </table>
-                    )
-                )}
+                        <EmptyState
+                            className="rounded-lg bg-card"
+                            title={`No tickers match “${searchedTerm}”`}
+                            description="Check the symbol or try the company name."
+                        />
+                    )}
+                </section>
+            )}
 
-                {/* Only after a search has actually run for this text. */}
-                {searchedTerm !== null && searchedTerm === searchTerm.trim() && tickers.length === 0 && !loading && (
-                    <EmptyState title={`No tickers match “${searchedTerm}”`} description="Check the symbol or try the company name." />
-                )}
-            </section>
-
-            <section className="space-y-3" aria-labelledby="hidden-tickers-heading">
-                <h2 id="hidden-tickers-heading" className="label-micro px-1">
-                    Currently hidden <span className="num">({hiddenTickers.length})</span>
+            <section className="space-y-2.5" aria-labelledby="hidden-tickers-heading">
+                <h2 id="hidden-tickers-heading" className="label-micro flex items-center gap-2">
+                    Currently hidden
+                    {hiddenTickers && <span className="num text-foreground">{hiddenTickers.length}</span>}
                 </h2>
-                {loadingHidden ? (
-                    <div role="status" aria-label="Loading hidden tickers" className="space-y-1.5">
-                        <Skeleton className="h-14 w-full" />
-                        <Skeleton className="h-14 w-full" />
-                    </div>
+                {hiddenTickers === null ? (
+                    hiddenError ? (
+                        <LoadError what="hidden tickers" onRetry={() => void loadHiddenTickers()} className="rounded-lg bg-card" />
+                    ) : (
+                        <AdminRowsSkeleton rows={2} label="Loading hidden tickers" className={GRID} />
+                    )
                 ) : hiddenTickers.length === 0 ? (
-                    <EmptyState className="rounded-lg bg-card" title="No tickers are hidden" />
+                    <EmptyState
+                        className="rounded-lg bg-card"
+                        title="No tickers are hidden"
+                        description="Search for a ticker above to hide it from suggestions."
+                    />
                 ) : (
-                    <ul className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">
-                        {hiddenTickers.map((ticker) => (
-                            <li key={ticker.symbol} className="flex items-center gap-3 rounded-lg bg-card px-3.5 py-2.5">
-                                <div className="min-w-0 flex-1">
-                                    <span className="text-[15px] font-semibold text-foreground">{ticker.symbol}</span>
-                                    <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{ticker.name}</span>
-                                </div>
-                                {toggleButton({ ...ticker, is_hidden: true })}
-                            </li>
-                        ))}
-                    </ul>
+                    <ul className={GRID}>{hiddenTickers.map((ticker) => row({ ...ticker, is_hidden: true }))}</ul>
                 )}
             </section>
         </div>
