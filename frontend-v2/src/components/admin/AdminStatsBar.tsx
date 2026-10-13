@@ -1,5 +1,4 @@
-import { Users, CheckCircle, Clock, Sparkles, Crown, Ban } from 'lucide-react';
-import { StatPill } from '../dashboard/StatPill';
+import { FilterChips } from './admin-ui';
 
 export type AdminFilterKey = 'ALL' | 'ACTIVE' | 'WAITLIST' | 'BANNED' | 'PRO' | 'WHALE';
 
@@ -16,61 +15,28 @@ interface AdminStatsBarProps {
     stats: AdminStats;
     selectedFilter: AdminFilterKey;
     onFilterChange: (filter: AdminFilterKey) => void;
+    /** The list has not loaded: no counts yet. */
+    loading?: boolean;
+    className?: string;
 }
 
-
-
-export function AdminStatsBar({ stats, selectedFilter, onFilterChange }: AdminStatsBarProps) {
+/** The user counts, as the strip that filters the list by status or tier. */
+export function AdminStatsBar({ stats, selectedFilter, onFilterChange, loading, className }: AdminStatsBarProps) {
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            <StatPill
-                icon={Users}
-                label="Total Users"
-                value={stats.total}
-                isActive={selectedFilter === 'ALL'}
-                onClick={() => onFilterChange('ALL')}
-                tone="primary"
-            />
-            <StatPill
-                icon={CheckCircle}
-                label="Active"
-                value={stats.active}
-                isActive={selectedFilter === 'ACTIVE'}
-                onClick={() => onFilterChange('ACTIVE')}
-                tone="emerald"
-            />
-            <StatPill
-                icon={Clock}
-                label="Waitlist"
-                value={stats.waitlist}
-                isActive={selectedFilter === 'WAITLIST'}
-                onClick={() => onFilterChange('WAITLIST')}
-                tone="amber"
-            />
-            <StatPill
-                icon={Ban}
-                label="Banned"
-                value={stats.banned}
-                isActive={selectedFilter === 'BANNED'}
-                onClick={() => onFilterChange('BANNED')}
-                tone="rose"
-            />
-            <StatPill
-                icon={Sparkles}
-                label="Pro"
-                value={stats.pro}
-                isActive={selectedFilter === 'PRO'}
-                onClick={() => onFilterChange('PRO')}
-                tone="muted"
-            />
-            <StatPill
-                icon={Crown}
-                label="Whales"
-                value={stats.whale}
-                isActive={selectedFilter === 'WHALE'}
-                onClick={() => onFilterChange('WHALE')}
-                tone="amber"
-            />
-        </div>
+        <FilterChips
+            label="Filter users"
+            className={className}
+            loading={loading}
+            value={selectedFilter}
+            onChange={onFilterChange}
+            options={[
+                { value: 'ALL', label: 'All', count: stats.total },
+                { value: 'ACTIVE', label: 'Active', count: stats.active },
+                { value: 'WAITLIST', label: 'Waitlist', count: stats.waitlist },
+                { value: 'BANNED', label: 'Banned', count: stats.banned },
+                { value: 'PRO', label: 'Pro', count: stats.pro },
+                { value: 'WHALE', label: 'Whale', count: stats.whale },
+            ]}
+        />
     );
 }

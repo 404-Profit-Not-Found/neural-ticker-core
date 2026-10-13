@@ -49,14 +49,6 @@ vi.mock('../components/ui/select-native', () => ({ NativeSelect: ({ children, on
 vi.mock('../components/ui/button', () => ({ Button: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => <button onClick={onClick} className={className}>{children}</button> }));
 vi.mock('../components/ui/input', () => ({ Input: ({ value, onChange, placeholder }: { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string }) => <input value={value} onChange={onChange} placeholder={placeholder} /> }));
 vi.mock('../components/ui/badge', () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
-vi.mock('../components/ui/table', () => ({ 
-  Table: ({ children }: { children: React.ReactNode }) => <table>{children}</table>, 
-  TableHeader: ({ children }: { children: React.ReactNode }) => <thead>{children}</thead>, 
-  TableBody: ({ children }: { children: React.ReactNode }) => <tbody>{children}</tbody>, 
-  TableRow: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <tr onClick={onClick}>{children}</tr>, 
-  TableHead: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <th onClick={onClick}>{children}</th>, 
-  TableCell: ({ children }: { children: React.ReactNode }) => <td>{children}</td> 
-}));
 vi.mock('../components/ui/dialog', () => ({ 
   Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) => open ? <div>{children}</div> : null, 
   DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, 
@@ -68,29 +60,36 @@ vi.mock('../components/ui/dialog', () => ({
 vi.mock('../components/ui/popover', () => ({ Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('../components/ui/user-tier-badge', () => ({ UserTierBadge: () => <div>UTB</div> }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// Every icon the page and its unmocked parts (admin-ui, UserTable) render.
 vi.mock('lucide-react', () => ({ 
   Plus: () => <span>+</span>, 
   Search: () => <span>S</span>, 
+  SearchX: () => <span>S</span>, 
   ChevronLeft: () => <span>{'<'}</span>, 
+  ChevronRight: () => <span>{'>'}</span>, 
+  ChevronsUpDown: () => <span>⇅</span>, 
   ArrowLeft: () => <span>{'←'}</span>, 
-  ArrowUpDown: () => <span>⇅</span>, 
-  Crown: () => <span>C</span>, 
+  ArrowRight: () => <span>{'→'}</span>, 
+  ArrowUp: () => <span>↑</span>, 
+  ArrowDown: () => <span>↓</span>, 
+  Loader2: () => <span>…</span>, 
   Sparkles: () => <span>S</span>, 
   Gift: () => <span>G</span>, 
   Ban: () => <span>B</span>, 
+  Check: () => <span>✓</span>, 
   CheckCircle: () => <span>✓</span>, 
-  LayoutGrid: () => <span>G</span>, 
-  List: () => <span>L</span>,
+  MoreHorizontal: () => <span>⋯</span>, 
+  // Used by LoadError when a list fails to load.
+  CloudOff: () => <span>x</span>, 
   // Used by the themed confirm dialog (ConfirmProvider) for destructive actions.
   AlertTriangle: () => <span>!</span>
 }));
 
 // Individual Sub-components
-vi.mock('../components/admin/TickerRequestCard', () => ({ TickerRequestCard: () => <div>TickerRequestCard</div> }));
-vi.mock('../components/admin/UserAdminCard', () => ({ UserAdminCard: () => <div>UserAdminCard</div> }));
+vi.mock('../components/admin/TickerRequestListRow', () => ({ TickerRequestListRow: () => <div>TickerRequestListRow</div> }));
 vi.mock('../components/admin/ShadowBanManager', () => ({ ShadowBanManager: () => <div>ShadowBanManager</div> }));
 vi.mock('../components/admin/LogoManager', () => ({ LogoManager: () => <div>LogoManager</div> }));
-vi.mock('../components/admin/TickerRequestRow', () => ({ TickerRequestRow: () => <div>TickerRequestRow</div> }));
+vi.mock('../components/admin/TickerRequestRow', () => ({ TickerRequestRow: () => <tr><td>TickerRequestRow</td></tr> }));
 vi.mock('../components/admin/AdminStatsBar', () => ({ AdminStatsBar: () => <div>AdminStatsBar</div> }));
 vi.mock('../components/admin/UserDetailDialog', () => ({ UserDetailDialog: () => <div>UserDetailDialog</div> }));
 vi.mock('../components/admin/RequestStatsBar', () => ({ RequestStatsBar: () => <div>RequestStatsBar</div> }));
@@ -134,7 +133,7 @@ describe('AdminConsole', () => {
     render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);
     await waitFor(() => screen.getByText(/user1@example.com/i));
     
-    const searchInput = screen.getByPlaceholderText(/search by email/i);
+    const searchInput = screen.getByPlaceholderText(/search users/i);
     fireEvent.change(searchInput, { target: { value: 'user2' } });
     
     await waitFor(() => {
@@ -152,9 +151,52 @@ describe('AdminConsole', () => {
     await screen.findByText(/user1@example.com/i);
     expect(screen.queryByText(/banned@example.com/i)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText(/search by email/i), { target: { value: 'banned' } });
+    fireEvent.change(screen.getByPlaceholderText(/search users/i), { target: { value: 'banned' } });
 
     expect(await screen.findByText(/banned@example.com/i)).toBeInTheDocument();
+  });
+
+  it('says the list failed to load, and loads it on retry', async () => {
+    (AdminService.getIdentities as Mock).mockRejectedValueOnce(new Error('boom'));
+    render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);
+
+    // A failure is never dressed up as an empty list.
+    expect(await screen.findByText("Couldn't load users")).toBeInTheDocument();
+    expect(screen.queryByText(/No users/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText(/user1@example.com/i)).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load users")).not.toBeInTheDocument();
+  });
+
+  it('shows ticker requests as a table once they have loaded', async () => {
+    (AdminService.getTickerRequests as Mock).mockResolvedValue([
+      { id: 'r1', symbol: 'ARM', user_id: '1', status: 'PENDING', created_at: '2023-01-01' },
+    ]);
+    render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Ticker Requests' }));
+
+    expect(await screen.findByText('TickerRequestRow')).toBeInTheDocument();
+    expect(screen.queryByText('No ticker requests yet')).not.toBeInTheDocument();
+  });
+
+  it('sorts users without a balance last, whichever way the column is sorted', async () => {
+    (AdminService.getIdentities as Mock).mockResolvedValue([
+      { id: '1', email: 'a@example.com', status: 'ACTIVE', role: 'user', credits_balance: 5, created_at: '2023-01-03' },
+      { email: 'invited@example.com', status: 'INVITED', role: 'user', invited_at: '2023-01-02' },
+      { id: '2', email: 'b@example.com', status: 'ACTIVE', role: 'user', credits_balance: 0, created_at: '2023-01-01' },
+    ]);
+    render(<BrowserRouter><ConfirmProvider><AdminConsole /></ConfirmProvider></BrowserRouter>);
+    await screen.findByText('a@example.com');
+    const emails = () => screen.getAllByRole('row').slice(1).map((row) => within(row).getByText(/@example\.com/).textContent);
+
+    fireEvent.click(screen.getByRole('button', { name: /Credits/ }));
+    expect(emails()).toEqual(['b@example.com', 'a@example.com', 'invited@example.com']);
+
+    fireEvent.click(screen.getByRole('button', { name: /Credits/ }));
+    expect(emails()).toEqual(['a@example.com', 'b@example.com', 'invited@example.com']);
   });
 
   it('confirms in the themed dialog before revoking access', async () => {

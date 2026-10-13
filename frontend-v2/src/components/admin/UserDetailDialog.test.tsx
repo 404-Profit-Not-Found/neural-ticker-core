@@ -2,7 +2,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UserDetailDialog } from './UserDetailDialog';
 import { describe, it, expect, vi } from 'vitest';
-import type { AdminUser } from './UserAdminCard';
+import type { AdminUser } from './model';
 
 describe('UserDetailDialog', () => {
     const mockUser: AdminUser = {

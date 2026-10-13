@@ -1,166 +1,90 @@
-import { Badge } from '../ui/badge';
-import { UserTierBadge } from '../ui/user-tier-badge';
-import { Button } from '../ui/button';
 import { Check, X } from 'lucide-react';
+import { Button } from '../ui/button';
 import { TickerLogo } from '../dashboard/TickerLogo';
 import { formatDateTime } from '../../lib/datetime';
 import { cn } from '../../lib/utils';
-import { useState, useEffect } from 'react';
-import { AdminService } from '../../services/adminService';
-
-
-export interface ExtendedTickerRequest {
-    id: string;
-    symbol: string;
-    user_id: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
-    created_at: string;
-    user?: {
-        id: string;
-        email: string;
-        nickname?: string;
-        avatar_url?: string;
-        tier?: 'free' | 'pro' | 'whale';
-    };
-}
+import { ADMIN_CELL, RequestStatusStamp, UserAvatar } from './admin-ui';
+import type { ExtendedTickerRequest } from './model';
+import { useRequestTickerInfo } from './useRequestTickerInfo';
 
 interface TickerRequestRowProps {
     request: ExtendedTickerRequest;
     onApprove: (id: string, symbol: string) => void;
     onReject: (id: string, symbol: string) => void;
-    isFirst?: boolean;
-    isLast?: boolean;
 }
 
-export function TickerRequestRow({ request, onApprove, onReject, isFirst, isLast }: TickerRequestRowProps) {
+/** A ticker request as a table row — the desktop view of the Requests tab. */
+export function TickerRequestRow({ request, onApprove, onReject }: TickerRequestRowProps) {
+    const info = useRequestTickerInfo(request.symbol);
     const tier = request.user?.tier || 'free';
-    const [tickerInfo, setTickerInfo] = useState<{ name?: string, exchange?: string } | null>(null);
-
-    useEffect(() => {
-        const fetchInfo = async () => {
-            try {
-                // Try search to get name/exchange
-                const results = await AdminService.searchTickersAdmin(request.symbol);
-                const match = results.find(r => r.symbol === request.symbol);
-                if (match) {
-                    setTickerInfo({ name: match.name, exchange: match.exchange });
-                }
-            } catch {
-                // silent fail
-                console.error("Failed to fetch info for", request.symbol);
-            }
-        };
-        fetchInfo();
-    }, [request.symbol]);
-
-
-
-    const cellClass = (index: number, total: number) => cn(
-        "p-4 align-middle whitespace-nowrap bg-card transition-colors",
-        isFirst && "first:rounded-tl-lg first:rounded-bl-lg", // rounded corners for the row group
-        isLast && "last:rounded-tr-lg last:rounded-br-lg",
-        // Actually AnalyzerTableView appies it per row (first and last cell of the row)
-        // first:border-l first:rounded-l-lg last:border-r last:rounded-r-lg
-        index === 0 && "pl-6 rounded-l-lg",
-        index === total - 1 && "pr-6 rounded-r-lg"
-    );
+    const pending = request.status?.toUpperCase() === 'PENDING';
 
     return (
-        <tr className="group relative">
-            {/* Symbol & Logo */}
-            <td className={cellClass(0, 5)}>
-                <div className="flex items-center gap-4">
-                    <div className="relative w-10 h-10 overflow-hidden rounded-full bg-background/50">
-                        <TickerLogo symbol={request.symbol} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-lg font-bold font-mono tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            {request.symbol}
-                        </span>
-                        <div className="flex flex-col">
-                            {tickerInfo?.name ? (
-                                <span className="text-xs font-medium text-muted-foreground line-clamp-1 max-w-[200px]" title={tickerInfo.name}>
-                                    {tickerInfo.name}
-                                </span>
-                            ) : (
-                                <span className="text-xs text-muted-foreground">Request</span>
-                            )}
-                            {tickerInfo?.exchange && (
-                                <span className="text-[11px] text-muted-foreground uppercase">
-                                    {tickerInfo.exchange}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </td>
-
-            {/* Status */}
-            <td className={cellClass(1, 5)}>
-                {/* Same status stamps as the Users tab: tinted fills, one vocabulary. */}
-                <Badge
-                    variant={request.status === 'PENDING' ? 'waitlist' : request.status === 'APPROVED' ? 'active' : 'statusBanned'}
-                    className="h-5 px-1.5 text-[11px] uppercase"
-                >
-                    {request.status}
-                </Badge>
-            </td>
-
-            {/* Requestor */}
-            <td className={cellClass(2, 5)}>
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                        {request.user?.avatar_url ? (
-                            <img src={request.user.avatar_url} alt="User" className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-xs font-bold text-muted-foreground">
-                                {request.user?.nickname?.slice(0, 2).toUpperCase() || '??'}
-                            </span>
+        <tr>
+            <td className={cn(ADMIN_CELL, 'w-[45%] max-w-0')}>
+                <div className="flex min-w-0 items-center gap-3">
+                    <TickerLogo symbol={request.symbol} className="h-10 w-10 shrink-0" />
+                    <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground">{request.symbol}</div>
+                        {info?.name && (
+                            <div className="truncate text-xs text-muted-foreground" title={info.name}>
+                                {info.name}
+                                {info.exchange && <span className="num"> · {info.exchange}</span>}
+                            </div>
                         )}
                     </div>
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">
-                                {request.user?.nickname || 'Unknown user'}
-                            </span>
-                            {tier !== 'free' && (
-                                <UserTierBadge tier={tier} className="h-5 gap-0.5 px-1 text-[11px]" />
-                            )}
+                </div>
+            </td>
+
+            <td className={cn(ADMIN_CELL, 'whitespace-nowrap')}>
+                <RequestStatusStamp status={request.status} />
+            </td>
+
+            <td className={cn(ADMIN_CELL, 'w-[55%] max-w-0')}>
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <UserAvatar
+                        email={request.user?.email}
+                        nickname={request.user?.nickname}
+                        avatarUrl={request.user?.avatar_url}
+                        className="h-7 w-7 text-[10px]"
+                    />
+                    <div className="min-w-0">
+                        <div className="truncate text-[13px] font-medium text-foreground">
+                            {request.user?.nickname || 'Unknown user'}
+                            {tier !== 'free' && <span className="num text-[11px] font-semibold uppercase text-muted-foreground"> · {tier}</span>}
                         </div>
-                        <span className="text-xs text-muted-foreground">{request.user?.email}</span>
+                        {request.user?.email && <div className="truncate text-xs text-muted-foreground">{request.user.email}</div>}
                     </div>
                 </div>
             </td>
 
-            {/* Date */}
-            <td className={cellClass(3, 5)}>
-                <span className="num text-xs text-muted-foreground">{formatDateTime(request.created_at)}</span>
+            <td className={cn(ADMIN_CELL, 'num whitespace-nowrap text-xs text-muted-foreground')}>
+                {formatDateTime(request.created_at)}
             </td>
 
-            {/* Actions */}
-            <td className={cellClass(4, 5)}>
-                {request.status === 'PENDING' && (
-                    <div className="flex justify-end gap-2">
+            <td className={cn(ADMIN_CELL, 'whitespace-nowrap')}>
+                {pending && (
+                    <div className="flex justify-end gap-1.5">
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-9 gap-1.5 px-3 text-up hover:bg-up/10 hover:text-up"
+                            className="h-8 gap-1.5 px-2.5 text-xs text-up hover:bg-up/10 hover:text-up"
                             onClick={() => onApprove(request.id, request.symbol)}
                             title="Approve"
                             aria-label={`Approve ${request.symbol}`}
                         >
-                            <Check size={16} />
+                            <Check size={14} aria-hidden />
                             Approve
                         </Button>
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-9 gap-1.5 px-3 text-down hover:bg-down/10 hover:text-down"
+                            className="h-8 gap-1.5 px-2.5 text-xs text-down hover:bg-down/10 hover:text-down"
                             onClick={() => onReject(request.id, request.symbol)}
                             title="Reject"
                             aria-label={`Reject ${request.symbol}`}
                         >
-                            <X size={16} />
+                            <X size={14} aria-hidden />
                             Reject
                         </Button>
                     </div>

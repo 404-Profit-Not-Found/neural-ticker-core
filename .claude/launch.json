@@ -43,6 +43,21 @@
       "autoPort": false
     },
     {
+      "name": "frontend-v2-mock-5284",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "vite.mock.config.ts",
+        "--port",
+        "5284",
+        "--strictPort"
+      ],
+      "port": 5284,
+      "cwd": "frontend-v2",
+      "autoPort": false
+    },
+    {
       "name": "backend-v2",
       "runtimeExecutable": "node",
       "runtimeArgs": [

@@ -47,7 +47,7 @@ describe('AdminStatsBar', () => {
         expect(onFilterChange).toHaveBeenCalledWith('ACTIVE');
     });
 
-    it('shows active state correctly', () => {
+    it('marks the selected filter, and only that one', () => {
         render(
             <AdminStatsBar
                 stats={mockStats}
@@ -56,9 +56,22 @@ describe('AdminStatsBar', () => {
             />
         );
 
-        // Waitlist button should have active styling (we check class presence logic indirectly or just ensure it renders)
-        // Testing implementation details (classes) is brittle, checking if render succeeds is mostly enough here unless we compute styles.
-        // We can check if it's disabled? No, it's not disabled.
-        expect(screen.getByText('Waitlist')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Waitlist/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: /All/ })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('shows no counts before the list has loaded', () => {
+        render(
+            <AdminStatsBar
+                stats={{ total: 0, active: 0, waitlist: 0, banned: 0, pro: 0, whale: 0 }}
+                selectedFilter="ALL"
+                onFilterChange={vi.fn()}
+                loading
+            />
+        );
+
+        // A placeholder, never a zero that reads as "nobody".
+        expect(screen.queryByText('0')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Active/ })).toBeInTheDocument();
     });
 });
