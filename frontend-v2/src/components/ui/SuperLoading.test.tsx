@@ -6,7 +6,7 @@ describe('SuperLoading', () => {
     it('shows the brand mark and name, the way the boot splash does', () => {
         const { container } = render(<SuperLoading />);
         // One word plus ".com" — never the old "Neural Ticker".
-        expect(screen.getByText('NeuralTicker')).toBeInTheDocument();
+        expect(screen.getByText('NeuralTicker.com')).toBeInTheDocument();
         expect(screen.getByText('.com')).toBeInTheDocument();
         expect(screen.queryByText('Neural Ticker')).not.toBeInTheDocument();
         expect(container.querySelector('img')).toHaveAttribute('src', expect.stringContaining('favicon.svg'));

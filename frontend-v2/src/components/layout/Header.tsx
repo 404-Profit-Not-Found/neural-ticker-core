@@ -7,6 +7,7 @@ import { api, cn } from '../../lib/api';
 import { queryClient } from '../../lib/queryClient';
 import { useActiveResearchCount } from '../../hooks/useTicker';
 import { openCommandPalette } from '../../app/commandPalette';
+import { Brand } from '../common/Brand';
 import { SuperLoading } from '../ui/SuperLoading';
 import { useLocalAnalysisCount } from '../../store/analysisStore';
 import { preloadRoute } from '../../app/routes';
@@ -376,19 +377,13 @@ export function Header() {
             <Link
               to="/dashboard"
               aria-label="NeuralTicker — dashboard"
-              className="group flex min-h-11 flex-shrink-0 items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="group flex min-h-11 flex-shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <img
-                src={`${import.meta.env.BASE_URL}favicon.svg`}
-                alt=""
-                width={19}
-                height={24}
-                className="h-6 w-auto shrink-0"
+              {/* The suffix yields on the narrowest phones so four 44px actions still fit. */}
+              <Brand
+                className="text-xl text-foreground transition-opacity group-hover:opacity-80 sm:text-[1.375rem]"
+                suffixClassName="max-[379px]:hidden"
               />
-              <span aria-hidden className="text-base font-bold leading-none tracking-tight text-foreground transition-opacity group-hover:opacity-80 sm:text-lg">
-                {/* The suffix yields on the narrowest phones so four 44px actions still fit. */}
-                NeuralTicker<span className="text-muted-foreground max-[379px]:hidden">.com</span>
-              </span>
             </Link>
           </div>
 

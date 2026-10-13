@@ -1,3 +1,4 @@
+import { Brand } from '../components/common/Brand';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -29,18 +30,9 @@ export function Login() {
         <div className="flex min-h-dvh flex-col bg-background text-foreground">
             <main className="flex flex-1 items-center justify-center px-4 py-10">
                 <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
-                    {/* Brand lockup — the same mark and wordmark as the app header. */}
-                    <h1 className="flex items-center justify-center gap-3">
-                        <img
-                            src={`${import.meta.env.BASE_URL}favicon.svg`}
-                            alt=""
-                            width={30}
-                            height={38}
-                            className="h-9 w-auto shrink-0 sm:h-10"
-                        />
-                        <span className="text-[1.75rem] font-bold leading-none tracking-tight sm:text-3xl">
-                            NeuralTicker<span className="text-muted-foreground">.com</span>
-                        </span>
+                    {/* The same wordmark as the app header, larger. */}
+                    <h1 className="flex justify-center">
+                        <Brand className="text-[2rem] sm:text-4xl" />
                     </h1>
                     <p className="mt-3 text-center text-sm text-muted-foreground">
                         AI stock research, risk ratings and portfolio tracking.

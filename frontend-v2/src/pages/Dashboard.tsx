@@ -138,13 +138,14 @@ export function Dashboard() {
       <main className="container mx-auto max-w-[90rem] space-y-6 px-4 py-4 lg:space-y-8 lg:py-5 animate-in fade-in duration-300">
 
         {compact ? (
-          // Phone / tablet: one tonal block — the portfolio figure, then four
-          // counters in a row. The first list starts within the first screen.
-          <section aria-label="Overview" className="overflow-hidden rounded-lg bg-card">
+          // Phone / tablet: the portfolio figure in one tonal block, then four
+          // equal tiles that span the same width. The first list still starts
+          // within the first screen.
+          <section aria-label="Overview" className="space-y-2">
             <Link
               to="/portfolio"
               onTouchStart={() => preloadRoute('/portfolio')}
-              className="block px-4 pb-3 pt-4 transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="block rounded-lg bg-card px-4 pb-3.5 pt-4 transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="label-micro">Holdings</span>
@@ -168,26 +169,29 @@ export function Dashboard() {
               <p className="mt-1.5 h-4 text-xs text-muted-foreground">{portfolioLoading ? null : portfolioNote}</p>
             </Link>
 
-            {/* Four plain figures on the same surface — no tiles inside the block. */}
-            <ul className="grid grid-cols-4 px-1.5 pb-1.5">
+            {/* Four tiles of their own, edge to edge with the block above. */}
+            <ul className="grid grid-cols-4 gap-2">
               {[
-                { to: '/analyzer?filter=strong_buy', label: 'Strong buy', query: strongBuyQuery, tone: 'text-up' },
-                { to: '/analyzer?filter=sell', label: 'Sell', query: sellQuery, tone: 'text-down' },
-                { to: '/research?filter=recent', label: 'AI reports', query: recentResearchQuery, tone: 'text-ai' },
-                { to: '/analyzer', label: 'Tickers', query: tickersQuery, tone: 'text-foreground' },
+                { to: '/analyzer?filter=strong_buy', label: 'Strong buy', icon: Zap, query: strongBuyQuery, tone: 'text-up' },
+                { to: '/analyzer?filter=sell', label: 'Sell', icon: TrendingDown, query: sellQuery, tone: 'text-down' },
+                { to: '/research?filter=recent', label: 'AI reports', icon: Brain, query: recentResearchQuery, tone: 'text-ai' },
+                { to: '/analyzer', label: 'Tickers', icon: Activity, query: tickersQuery, tone: 'text-foreground' },
               ].map((item) => (
                 <li key={item.label} className="min-w-0">
                   <Link
                     to={item.to}
                     onTouchStart={() => preloadRoute(item.to)}
                     aria-busy={item.query.isPending || undefined}
-                    className="flex min-h-[3.5rem] flex-col justify-center gap-1.5 rounded-md px-2.5 py-2 transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="flex h-full min-h-[4.25rem] flex-col justify-between gap-2 rounded-lg bg-card px-3 py-2.5 transition-colors active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {item.query.isPending ? (
-                      <Skeleton className="h-[18px] w-8" />
-                    ) : (
-                      <span className={cn('num text-lg font-bold leading-none', item.tone)}>{count(item.query.data)}</span>
-                    )}
+                    <span className="flex items-center justify-between gap-1">
+                      {item.query.isPending ? (
+                        <Skeleton className="h-5 w-8" />
+                      ) : (
+                        <span className={cn('num text-xl font-bold leading-none', item.tone)}>{count(item.query.data)}</span>
+                      )}
+                      <item.icon size={14} className={cn('opacity-70', item.tone === 'text-foreground' ? 'text-muted-foreground' : item.tone)} aria-hidden />
+                    </span>
                     <span className="truncate text-[11px] leading-none text-muted-foreground">{item.label}</span>
                   </Link>
                 </li>

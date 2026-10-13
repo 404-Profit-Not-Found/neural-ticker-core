@@ -3,6 +3,7 @@ import { testTypeOrmConfig } from './database/typeorm.test.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static'; // Added
+import { STATIC_CLIENT_EXCLUDE } from './utils/static-client.util';
 import { ScheduleModule } from '@nestjs/schedule'; // Added
 import { join } from 'path'; // Added
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // Added
@@ -60,6 +61,7 @@ const frontendRoot = serveLegacyFrontend
     // The web client (see `frontendRoot` above).
     ServeStaticModule.forRoot({
       rootPath: frontendRoot,
+      exclude: STATIC_CLIENT_EXCLUDE,
       serveStaticOptions: {
         // Vite emits content-hashed files under /assets — safe to cache
         // forever. Everything else (index.html, sw.js, the manifest) must

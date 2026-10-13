@@ -1,3 +1,4 @@
+import { Brand } from '../components/common/Brand';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { startGoogleLogin } from '../lib/base';
 import { Button } from '../components/ui/button';
@@ -40,12 +41,9 @@ export function AccessDenied() {
                 <Link
                     to="/login"
                     aria-label="NeuralTicker — sign in"
-                    className="flex min-h-11 items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="flex min-h-11 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                    <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={19} height={24} className="h-6 w-auto shrink-0" />
-                    <span aria-hidden className="text-lg font-bold leading-none tracking-tight">
-                        NeuralTicker<span className="text-muted-foreground">.com</span>
-                    </span>
+                    <Brand className="text-xl sm:text-[1.375rem]" />
                 </Link>
             </header>
 

@@ -1,14 +1,17 @@
 // Session handling for the mock.
 //
 // Mirrors src/modules/auth/strategies/jwt.strategy.ts: the JWT travels in an
-// HttpOnly `authentication` cookie (or an Authorization: Bearer header), and
+// HttpOnly cookie (or an Authorization: Bearer header), and
 // `validate()` re-loads the user on every request — a deleted user is a 401,
 // a `revoked` user is a 401 with its own message.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { appendCookie, parseCookies, unauthenticated, unauthorizedMsg } from './core.ts';
 import type { MockState, User } from './state.ts';
 
-export const AUTH_COOKIE = 'authentication';
+// Not the real name on purpose. Cookies are shared by every port on
+// `localhost`, so a mock that wrote `authentication` would overwrite (or clear)
+// the session of a real backend open in the same browser and sign the user out.
+export const AUTH_COOKIE = 'mock_authentication';
 export const SCENARIO_COOKIE = 'mock_scenario';
 
 /** The mock "JWT". Not signed — it only needs to round-trip a user id. */
