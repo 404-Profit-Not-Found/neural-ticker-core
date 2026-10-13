@@ -62,6 +62,8 @@ export interface ResearchItem {
     id: string;
     created_at: string;
     status: 'completed' | 'pending' | 'failed' | 'processing';
+    /** Why a failed run failed, as the API reports it. */
+    error?: string | null;
     question?: string;
     title?: string; // Explicitly adding title
     content?: string;

@@ -9,6 +9,7 @@ import { PageFallback } from './PageFallback';
 import { StatusBar } from './StatusBar';
 import { TickerTape } from './TickerTape';
 import { recordRecentTicker } from '../../app/commandPalette';
+import { pageKey } from '../../app/pageKey';
 
 /** Pages about the account or the app itself, not the market: no live strip. */
 const NO_TAPE = /^\/(profile|admin)(\/|$)/;
@@ -51,8 +52,9 @@ export function AppShell() {
         tabIndex={-1}
         className="outline-none pb-[var(--shell-bottom)]"
       >
-        {/* Keyed by path so a crashed page recovers on the next navigation. */}
-        <ErrorBoundary key={location.pathname}>
+        {/* Keyed by page so a crashed page recovers on the next navigation;
+            the tabs of one ticker are one page and do not remount it. */}
+        <ErrorBoundary key={pageKey(location.pathname)}>
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>

@@ -283,6 +283,18 @@ export function AdminConsole() {
     };
 
     const handleUpdateRole = async (userId: string, role: string) => {
+        // A change of privileges is never one tap away.
+        const who = identities.find((u) => u.id === userId)?.email ?? 'this user';
+        const makingAdmin = role === 'admin';
+        const confirmed = await confirm({
+            title: makingAdmin ? `Make ${who} an admin?` : `Remove the admin role from ${who}?`,
+            description: makingAdmin
+                ? 'Admins can manage users, credits, tickers and comments.'
+                : 'They keep their account and lose access to the admin console.',
+            confirmLabel: makingAdmin ? 'Make admin' : 'Remove admin role',
+            destructive: !makingAdmin,
+        });
+        if (!confirmed) return;
         try {
             await AdminService.updateRole(userId, role);
             setIdentities(prev => prev.map(u => u.id === userId ? { ...u, role } : u));

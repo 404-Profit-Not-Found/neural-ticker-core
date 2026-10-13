@@ -74,6 +74,19 @@ export function CreateAlertDialog({ symbol, currentPrice, nativeCurrency = 'USD'
       setError(isPercentType ? 'Enter a percentage greater than 0.' : 'Enter a target price greater than 0.');
       return;
     }
+    // The field starts at the current price as a reference. An alert at (or on
+    // the wrong side of) that price would fire the moment it is saved.
+    if (!isPercentType && currentPrice > 0) {
+      const now = formatNative(currentPrice, nativeCurrency);
+      if (alertType === 'price_above' && value <= currentPrice) {
+        setError(`${symbol} is already at ${now}. Enter a higher price.`);
+        return;
+      }
+      if (alertType === 'price_below' && value >= currentPrice) {
+        setError(`${symbol} is already at ${now}. Enter a lower price.`);
+        return;
+      }
+    }
 
     try {
       await createAlert.mutateAsync({

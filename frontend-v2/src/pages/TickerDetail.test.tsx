@@ -156,7 +156,7 @@ describe('TickerDetail', () => {
     // Click Research tab
     fireEvent.click(screen.getByText('AI Research'));
     // TickerDetail component uses navigate to change tab, and then location changes
-    expect(mockNavigate).toHaveBeenCalledWith('/ticker/AAPL/research');
+    expect(mockNavigate).toHaveBeenCalledWith('/ticker/AAPL/research', { replace: true });
   });
 
   it('renders 404 state when no ticker found', () => {

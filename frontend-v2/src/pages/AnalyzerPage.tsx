@@ -18,6 +18,7 @@ export function AnalyzerPage() {
     const sectorParam = searchParams.getAll('sector');
     const upsideParam = searchParams.get('upside');
     const regionParam = searchParams.getAll('region');
+    const overallScoreParam = searchParams.get('overallScore');
     const filterParam = searchParams.get('filter');
 
     const initialFilters: AnalyzerFilters = {
@@ -25,7 +26,7 @@ export function AnalyzerPage() {
       aiRating: aiRatingParam.length > 0 ? aiRatingParam : [],
       sector: sectorParam.length > 0 ? sectorParam : [],
       upside: upsideParam || null,
-      overallScore: null,
+      overallScore: overallScoreParam || null,
       region: regionParam.length > 0 ? regionParam : [],
     };
 
@@ -78,6 +79,7 @@ export function AnalyzerPage() {
     filters.sector?.forEach((s) => params.append('sector', s));
     filters.region?.forEach((r) => params.append('region', r));
     if (filters.upside) params.append('upside', filters.upside);
+    if (filters.overallScore) params.append('overallScore', filters.overallScore);
 
     // View
     params.set('view', viewMode);

@@ -63,7 +63,7 @@ describe('ResearchPage', () => {
 
       const alert = await screen.findByRole('alert');
       expect(within(alert).getByText('This research run failed')).toBeInTheDocument();
-      expect(within(alert).getByText(/temporarily overloaded/i)).toBeInTheDocument();
+      expect(within(alert).getByText(/temporarily unavailable/i)).toBeInTheDocument();
 
       const details = screen.getByText('Technical details').closest('details');
       expect(details).not.toBeNull();

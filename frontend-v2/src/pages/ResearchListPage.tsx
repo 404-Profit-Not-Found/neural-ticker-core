@@ -1,3 +1,4 @@
+import { failureReason } from '../lib/research-failure';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -248,6 +249,9 @@ function ReportRow({ note, isAdmin, onDelete, deleting }: {
         </Link>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
           {isFailed && <Badge variant="sell">Failed</Badge>}
+          {isFailed && failureReason(note.error) && (
+            <span className="text-down">{failureReason(note.error)}</span>
+          )}
           {isPending && (
             <Badge variant="outline" className="bg-signal/15 text-signal">
               {note.status === 'pending' ? 'Queued' : 'Running'}

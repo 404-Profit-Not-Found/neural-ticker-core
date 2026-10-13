@@ -134,13 +134,14 @@ export function TickerCard({
                 <TickerLogo url={logoUrl} symbol={symbol} className="h-11 w-11 shrink-0" />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-1">
+                        {/* Never squeezed: a ticker that reads "C…" is not a ticker. */}
+                        <div className="flex shrink-0 items-center gap-1">
                             {/* The symbol is the card's link; its hit area is the whole card. */}
                             <Link
                                 to={to}
                                 onMouseEnter={() => preloadRoute(to)}
                                 onFocus={() => preloadRoute(to)}
-                                className="truncate text-lg font-bold leading-none tracking-tight text-foreground outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                                className="whitespace-nowrap text-lg font-bold leading-none tracking-tight text-foreground outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-ring"
                             >
                                 {symbol}
                             </Link>
@@ -159,6 +160,7 @@ export function TickerCard({
                             </button>
                         </div>
                         <VerdictBadge
+                            compact
                             risk={risk}
                             upside={upside}
                             downside={downside}
