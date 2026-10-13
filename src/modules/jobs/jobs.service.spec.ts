@@ -46,16 +46,25 @@ describe('JobsService', () => {
     failStuckTickets: jest.fn(),
     createResearchTicket: jest.fn(),
     processTicket: jest.fn(),
+    failPendingTicket: jest.fn().mockResolvedValue(undefined),
     getOrGenerateDailyDigest: jest.fn(),
     reprocessFinancials: jest.fn(),
     getLastResearchedAtBySymbol: jest.fn().mockResolvedValue(new Map()),
   };
 
+  const mockScannerLockQuery = jest.fn().mockResolvedValue([]);
   const mockRequestQueueRepo = {
     find: jest.fn().mockResolvedValue([]),
     save: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    // The scanner claims its batch inside manager.transaction under an
+    // advisory lock; run the callback inline with a stub transaction manager.
+    manager: {
+      transaction: jest.fn((cb: (mgr: any) => Promise<unknown>) =>
+        cb({ query: mockScannerLockQuery }),
+      ),
+    },
   };
 
   const mockMarketStatusService = {
@@ -535,17 +544,72 @@ describe('JobsService', () => {
       });
       mockResearchService.processTicket.mockResolvedValue(undefined);
 
+      mockResearchService.createResearchTicket
+        .mockResolvedValueOnce({ id: 'note-1' })
+        .mockResolvedValueOnce({ id: 'note-2' });
+
       const result = await service.runRiskRewardScanner();
 
-      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(1);
-      expect(mockResearchService.createResearchTicket).toHaveBeenCalledWith(
-        null,
-        ['AAPL'],
-        expect.any(String),
-        'gemini',
-        'cron',
+      // Both due tickers are claimed up front (under the lock), but only the
+      // first is processed; the second is released rather than left PENDING.
+      expect(mockResearchService.createResearchTicket).toHaveBeenCalledTimes(2);
+      expect(mockResearchService.processTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.processTicket).toHaveBeenCalledWith('note-1');
+      expect(mockResearchService.failPendingTicket).toHaveBeenCalledTimes(1);
+      expect(mockResearchService.failPendingTicket).toHaveBeenCalledWith(
+        'note-2',
+        expect.stringContaining('budget'),
       );
       expect(result).toMatchObject({ processed: 1, due: 2 });
+
+      sleepSpy.mockRestore();
+    });
+
+    // Audit H9: overlapping runs used to pick the same due tickers because
+    // neither had written a note yet when the other read the throttle.
+    it('selects and claims its batch under the scanner advisory lock', async () => {
+      const sleepSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((callback: any) => {
+          callback();
+          return {} as NodeJS.Timeout;
+        });
+
+      mockLlmBudgetService.getRemaining.mockResolvedValue(450);
+      mockLlmBudgetService.hasBudget.mockResolvedValue(true);
+      mockTickersService.getAllTickers.mockResolvedValue([
+        { id: '1', symbol: 'AAPL' },
+      ]);
+      mockRiskRewardService.getLastAnalysisAtByTickerId.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.getLastResearchedAtBySymbol.mockResolvedValue(
+        new Map(),
+      );
+      mockResearchService.createResearchTicket.mockResolvedValue({
+        id: 'note-1',
+      });
+      mockResearchService.processTicket.mockResolvedValue(undefined);
+
+      await service.runRiskRewardScanner();
+
+      expect(mockRequestQueueRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(mockScannerLockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('pg_advisory_xact_lock'),
+        ['risk-reward-scanner'],
+      );
+      // Lock first, then the throttle reads, then the claim — all before any
+      // slow processing starts.
+      const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+      expect(order(mockScannerLockQuery)).toBeLessThan(
+        order(mockResearchService.getLastResearchedAtBySymbol),
+      );
+      expect(
+        order(mockResearchService.getLastResearchedAtBySymbol),
+      ).toBeLessThan(order(mockResearchService.createResearchTicket));
+      expect(order(mockResearchService.createResearchTicket)).toBeLessThan(
+        order(mockResearchService.processTicket),
+      );
 
       sleepSpy.mockRestore();
     });

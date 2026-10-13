@@ -12,6 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, LessThan, Not, MoreThanOrEqual, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  EnrichmentStatus,
   ResearchNote,
   LlmProvider,
   ResearchStatus,
@@ -97,6 +98,18 @@ export class ResearchService implements OnModuleInit {
       user_id: userId || undefined, // TypeORM expects undefined for nullable columns in create() sometimes if strict
     });
     return this.noteRepo.save(note);
+  }
+
+  /**
+   * Fails a ticket that was created but will not be processed (e.g. the scanner
+   * claimed it and then ran out of budget), so it doesn't sit PENDING. No-op
+   * unless the ticket is still PENDING.
+   */
+  async failPendingTicket(id: string, reason: string): Promise<void> {
+    await this.noteRepo.update(
+      { id, status: ResearchStatus.PENDING },
+      { status: ResearchStatus.FAILED, error: reason },
+    );
   }
 
   async createManualNote(
@@ -474,16 +487,24 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       // However, parallelizing these saves real-world seconds.
       this.logger.log(`Starting parallel enrichment for ticket ${id}...`);
 
+      // Outcome of each enrichment step, persisted on the note (audit H4). The
+      // note is already COMPLETED and every step below swallows its own errors,
+      // so without this a note whose risk analysis or financials silently
+      // failed is indistinguishable from a fully enriched one.
+      const enrichment: EnrichmentStatus = {};
+
       const enrichmentTasks = [
         // A. Title Generation (Fast)
         this.generateTitle(note.question, result.answerMarkdown, note.tickers)
           .then(async (title) => {
             await this.noteRepo.update(id, { title });
             this.logger.log(`Title generated for ticket ${id}: ${title}`);
+            enrichment.title = 'ok';
           })
-          .catch((err) =>
-            this.logger.error(`Title generation failed for ticket ${id}`, err),
-          ),
+          .catch((err) => {
+            enrichment.title = 'failed';
+            this.logger.error(`Title generation failed for ticket ${id}`, err);
+          }),
 
         // B. Quality Scoring (Fast)
         this.qualityScoringService
@@ -495,6 +516,7 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
               this.logger.warn(
                 `Quality scoring unavailable for ticket ${id}; left unscored: ${judgment.error}`,
               );
+              enrichment.quality = 'failed';
               return;
             }
             const groundingWithJudgment = {
@@ -509,28 +531,48 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
             this.logger.log(
               `Quality scored for ticket ${id}: ${judgment.score}`,
             );
+            enrichment.quality = 'ok';
           })
-          .catch((err) =>
-            this.logger.error(`Quality scoring failed for ticket ${id}`, err),
-          ),
+          .catch((err) => {
+            enrichment.quality = 'failed';
+            this.logger.error(`Quality scoring failed for ticket ${id}`, err);
+          }),
 
         // C. Risk Verification (Medium)
+        // evaluateFromResearch swallows extraction errors and resolves null,
+        // and deliberately skips anything but a single-ticker note — so null
+        // means "failed" only when an analysis was actually expected.
         this.riskRewardService
           .evaluateFromResearch(note)
-          .catch((err) =>
-            this.logger.error(`Risk verification failed for ticket ${id}`, err),
-          ),
+          .then((analysis) => {
+            enrichment.risk_analysis = analysis
+              ? 'ok'
+              : note.tickers.length === 1
+                ? 'failed'
+                : 'skipped';
+          })
+          .catch((err) => {
+            enrichment.risk_analysis = 'failed';
+            this.logger.error(`Risk verification failed for ticket ${id}`, err);
+          }),
 
         // D. Financial Extraction (Slowest)
-        this.extractFinancialsFromResearch(
-          note.tickers,
-          result.answerMarkdown,
-        ).catch((err) =>
-          this.logger.error(
-            `Financial extraction failed for ticket ${id}`,
-            err,
-          ),
-        ),
+        // Also swallows per-ticker errors; nothing extracted at all is the
+        // "no fundamentals" gap this status exists to expose.
+        this.extractFinancialsFromResearch(note.tickers, result.answerMarkdown)
+          .then((extracted) => {
+            enrichment.financials =
+              extracted.description || extracted.financials || extracted.ratings
+                ? 'ok'
+                : 'failed';
+          })
+          .catch((err) => {
+            enrichment.financials = 'failed';
+            this.logger.error(
+              `Financial extraction failed for ticket ${id}`,
+              err,
+            );
+          }),
       ];
 
       // Since each task now has its own catch block, Promise.all will only reject
@@ -538,7 +580,26 @@ You MUST include a "Risk/Reward Profile" section at the end of your report with 
       // This ensures a failure in Title Gen doesn't mark the whole research as FAILED.
       await Promise.all(enrichmentTasks);
 
-      this.logger.log(`Enrichment complete for ticket ${id}.`);
+      // Best-effort: recording the outcome must never flip a COMPLETED note to
+      // FAILED via the outer catch.
+      try {
+        await this.noteRepo.update(id, { enrichment_status: enrichment });
+      } catch (err) {
+        this.logger.error(
+          `Failed to persist enrichment status for ticket ${id}`,
+          err,
+        );
+      }
+
+      const failedSteps = Object.entries(enrichment)
+        .filter(([, status]) => status === 'failed')
+        .map(([step]) => step);
+      this.logger.log(
+        `Enrichment complete for ticket ${id}.` +
+          (failedSteps.length
+            ? ` Failed steps: ${failedSteps.join(', ')}.`
+            : ''),
+      );
     } catch (e) {
       this.logger.error(`Ticket ${id} failed`, e);
       note.status = ResearchStatus.FAILED;
