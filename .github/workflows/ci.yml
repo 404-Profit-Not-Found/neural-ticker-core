@@ -150,3 +150,27 @@ jobs:
     - name: Build Frontend
       run: npm run build
       working-directory: ./frontend
+
+  # The web client served at / (frontend-v2). Its own job, so a failure is
+  # visible on its own line and never masks the previous client's checks.
+  frontend-v2:
+    needs: secrets-scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend-v2
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js 22.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22.x
+        cache: 'npm'
+        cache-dependency-path: frontend-v2/package-lock.json
+    - run: npm ci
+    - name: Lint
+      run: npm run lint
+    - name: Unit Tests
+      run: npm test
+    - name: Typecheck + Build
+      run: npm run build

@@ -21,9 +21,18 @@ profile.cov
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# env file
+# env files — never commit a real one; .env.example is the template
 .env
+.env.*
+!.env.example
 .env.yaml
+
+# credentials and key material
+*.pem
+*.key
+*.p12
+service-account*.json
+gcp-sa-key.json
 # firebase-config.json
 # firebase-client-config.json
 # Editor/IDE
