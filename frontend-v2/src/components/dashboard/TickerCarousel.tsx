@@ -21,6 +21,52 @@ interface TickerCarouselProps {
  *    screen, one tap from the detail page).
  *  - From `lg`: the full analysis cards in a grid.
  */
+/** The analysis card's own shape, so nothing jumps when the real cards arrive. */
+function TickerCardSkeleton() {
+    return (
+        <div aria-hidden className="flex h-[300px] flex-col justify-between gap-4 rounded-md bg-card p-4">
+            {/* Identity: logo, symbol + rating, name, sector */}
+            <div className="flex items-start gap-3">
+                <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-6 w-24" />
+                    </div>
+                    <Skeleton className="h-3.5 w-40 max-w-full" />
+                    <Skeleton className="h-3 w-28 max-w-full" />
+                </div>
+            </div>
+            {/* Price and trend */}
+            <div className="flex items-end justify-between gap-3">
+                <div className="space-y-2">
+                    <Skeleton className="h-7 w-28" />
+                    <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-10 w-28" />
+            </div>
+            {/* 52-week range */}
+            <div className="space-y-2">
+                <Skeleton className="h-1.5 w-full rounded-full" />
+                <div className="flex justify-between">
+                    <Skeleton className="h-3 w-12" />
+                    <Skeleton className="h-3 w-14" />
+                    <Skeleton className="h-3 w-12" />
+                </div>
+            </div>
+            {/* Upside · Downside · Risk · R/R */}
+            <div className="grid grid-cols-4 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                        <Skeleton className="h-2.5 w-12 max-w-full" />
+                        <Skeleton className="h-4 w-14 max-w-full" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function TickerCarousel({ data, isLoading, error, onRetry }: TickerCarouselProps) {
     const { data: marketStatusRaw } = useAllMarketsStatus();
     const compact = useCompactLayout();
@@ -31,7 +77,7 @@ export function TickerCarousel({ data, isLoading, error, onRetry }: TickerCarous
         ) : (
             <div role="status" aria-label="Loading opportunities" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-[300px] bg-card" />
+                    <TickerCardSkeleton key={i} />
                 ))}
             </div>
         );

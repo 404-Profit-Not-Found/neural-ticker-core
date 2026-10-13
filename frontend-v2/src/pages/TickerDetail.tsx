@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../lib/api-error';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowUp, BellPlus, Eye, RefreshCw, Share2, Star } from 'lucide-react';
@@ -29,6 +30,7 @@ import { TickerFinancials } from '../components/ticker/TickerFinancials';
 import { TickerDiscussion } from '../components/ticker/TickerDiscussion';
 import { PriceChart } from '../components/ticker/PriceChart';
 import { TickerLogo } from '../components/dashboard/TickerLogo';
+import { forgetMissingLogo } from '../lib/missing-logos';
 import { FiftyTwoWeekRange } from '../components/dashboard/FiftyTwoWeekRange';
 import { StocktwitsAnalysis } from '../components/stocktwits/StocktwitsAnalysis';
 import { SharePopover } from '../components/common/SharePopover';
@@ -125,10 +127,11 @@ export function TickerDetail() {
             // Invalidate query to refetch ticker details and update logo
             queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
             setIsLogoUploadOpen(false);
+            forgetMissingLogo(symbol);
             toast.success('Logo updated');
         } catch (err) {
             console.error('Failed to update logo', err);
-            toast.error('Failed to update logo (Admin only)');
+            toast.error(apiErrorMessage(err, 'Failed to update logo'));
         }
     };
     const expectedTopResearchIdRef = useRef<string | undefined>(undefined);
@@ -316,6 +319,8 @@ export function TickerDetail() {
             await api.post(`/research/sync/${symbol}`);
             queryClient.invalidateQueries({ queryKey: tickerKeys.details(symbol) });
             queryClient.invalidateQueries({ queryKey: tickerKeys.research(symbol) });
+            // A refresh can change nothing on screen: say that it ran.
+            toast.success(`${symbol} refreshed`);
         } catch (err) {
             console.error('Sync failed', err);
             toast.error('Could not refresh this ticker');
@@ -501,9 +506,9 @@ export function TickerDetail() {
                     value={currentTab}
                     onValueChange={(value) => {
                         if (value === 'overview') {
-                            navigate(`/ticker/${symbol}`);
+                            navigate(`/ticker/${symbol}`, { replace: true });
                         } else {
-                            navigate(`/ticker/${symbol}/${value}`);
+                            navigate(`/ticker/${symbol}/${value}`, { replace: true });
                         }
                     }}
                     className="mt-5 w-full md:mt-7"
@@ -566,10 +571,16 @@ export function TickerDetail() {
                                 toggleLikeMutation.mutate({ commentId, symbol });
                             }
                         }}
-                        onDeleteComment={(commentId) => {
-                            if (symbol) {
-                                deleteCommentMutation.mutate({ commentId, symbol });
-                            }
+                        onDeleteComment={async (commentId) => {
+                            if (!symbol) return;
+                            // One tap must not remove someone's words.
+                            const confirmed = await confirm({
+                                title: 'Delete this comment?',
+                                description: 'It is removed for everyone and cannot be restored.',
+                                confirmLabel: 'Delete',
+                                destructive: true,
+                            });
+                            if (confirmed) deleteCommentMutation.mutate({ commentId, symbol });
                         }}
                         mentionedUsers={mentionedUsers}
                     />

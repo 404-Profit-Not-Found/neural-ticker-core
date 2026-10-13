@@ -252,6 +252,18 @@ export function AdminConsole() {
     };
 
     const handleUpdateRole = async (userId: string, role: string) => {
+        // A change of privileges is never one tap away.
+        const who = identities.find((u) => u.id === userId)?.email ?? 'this user';
+        const makingAdmin = role === 'admin';
+        const confirmed = await confirm({
+            title: makingAdmin ? `Make ${who} an admin?` : `Remove the admin role from ${who}?`,
+            description: makingAdmin
+                ? 'Admins can manage users, credits, tickers and comments.'
+                : 'They keep their account and lose access to the admin console.',
+            confirmLabel: makingAdmin ? 'Make admin' : 'Remove admin role',
+            destructive: !makingAdmin,
+        });
+        if (!confirmed) return;
         try {
             await AdminService.updateRole(userId, role);
             setIdentities(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
@@ -396,9 +408,11 @@ export function AdminConsole() {
             const aVal = sortValue(a);
             const bVal = sortValue(b);
 
-            // An invited address has no balance yet. Comparing against nothing
-            // gave no order at all; missing values go last, either direction.
-            if (aVal == null || bVal == null) return aVal == null ? (bVal == null ? 0 : 1) : -1;
+            // No value (never signed in, no balance yet) goes last either way,
+            // instead of landing wherever the comparison happens to leave it.
+            const aMissing = aVal === null || aVal === undefined || aVal === '';
+            const bMissing = bVal === null || bVal === undefined || bVal === '';
+            if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1;
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -510,7 +524,7 @@ export function AdminConsole() {
                             ) : compact ? (
                                 <AdminRowsSkeleton rows={8} label="Loading users" />
                             ) : (
-                                <AdminTableSkeleton rows={8} columns={5} label="Loading users" />
+                                <AdminTableSkeleton rows={8} columns={6} label="Loading users" />
                             )
                         ) : paginatedData.length === 0 ? (
                             <EmptyState

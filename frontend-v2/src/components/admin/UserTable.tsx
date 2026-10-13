@@ -1,7 +1,7 @@
 import { Ban, Check, CheckCircle, Gift, MoreHorizontal, Sparkles } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { formatDateTime } from '../../lib/datetime';
+import { formatDateTime, formatTimeAgo } from '../../lib/datetime';
 import { cn } from '../../lib/utils';
 import { ADMIN_CELL, ADMIN_CELL_HOVER, ADMIN_TABLE, SortTh, Th, UserAvatar, UserStatusStamp, UserTierStamps } from './admin-ui';
 import { userName, type AdminUser, type SortDirection } from './model';
@@ -44,6 +44,7 @@ export function UserTable({ users, sort, onSort, onOpen, onUpdateTier, onGiftCre
                         <SortTh label="Status" sorted={sorted('status')} onSort={() => onSort('status')} />
                         <SortTh label="Credits" sorted={sorted('credits_balance')} onSort={() => onSort('credits_balance')} />
                         <SortTh label="Joined" sorted={sorted('created_at')} onSort={() => onSort('created_at')} />
+                        <SortTh label="Last login" sorted={sorted('last_login')} onSort={() => onSort('last_login')} />
                         <Th className="text-right">
                             <span className="sr-only">Actions</span>
                         </Th>
@@ -83,6 +84,16 @@ export function UserTable({ users, sort, onSort, onOpen, onUpdateTier, onGiftCre
                             </td>
                             <td className={cn(ADMIN_CELL, ADMIN_CELL_HOVER, 'num whitespace-nowrap text-xs text-muted-foreground')}>
                                 {formatDateTime(user.created_at || user.invited_at)}
+                            </td>
+                            {/* How long ago, not a date: "214d ago" is the answer being looked for. */}
+                            <td className={cn(ADMIN_CELL, ADMIN_CELL_HOVER, 'num whitespace-nowrap text-xs')}>
+                                {user.last_login ? (
+                                    <time dateTime={user.last_login} title={formatDateTime(user.last_login)} className="text-foreground/90">
+                                        {formatTimeAgo(user.last_login)}
+                                    </time>
+                                ) : (
+                                    <span className="text-muted-foreground">Never</span>
+                                )}
                             </td>
                             <td className={cn(ADMIN_CELL, ADMIN_CELL_HOVER, 'whitespace-nowrap')}>
                                 <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>

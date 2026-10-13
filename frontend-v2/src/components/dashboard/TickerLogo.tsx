@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { cn } from '../../lib/api';
 import { useTickerLogo } from '../../hooks/useTicker';
+import { isLogoMissing, markLogoMissing } from '../../lib/missing-logos';
 
 /** Letters shown when there is no logo: the root symbol, at most four characters. */
 function fallbackLabel(symbol?: string): string {
@@ -10,7 +11,6 @@ function fallbackLabel(symbol?: string): string {
     return root.slice(0, 4).toUpperCase();
 }
 
-// Memoize because base64 image rendering is heavy
 interface TickerLogoProps {
     url?: string;
     symbol: string;
@@ -19,9 +19,11 @@ interface TickerLogoProps {
     noLogo?: boolean;
 }
 
+// Memoize because base64 image rendering is heavy
 export const TickerLogo = memo(({ url, symbol, className, noLogo }: TickerLogoProps) => {
     const { data: logoSrc, isLoading, isError: hookError } = useTickerLogo(symbol);
-    const [imgError, setImgError] = useState(false);
+    const [failedSymbol, setFailedSymbol] = useState<string | null>(null);
+    const imgError = failedSymbol === symbol || isLogoMissing(symbol);
 
     // Fallback logic
     const showPlaceholder = noLogo || hookError || imgError || (!isLoading && !logoSrc && !url);
@@ -53,7 +55,10 @@ export const TickerLogo = memo(({ url, symbol, className, noLogo }: TickerLogoPr
                 <img
                     src={logoSrc}
                     alt=""
-                    onError={() => setImgError(true)}
+                    onError={() => {
+                        markLogoMissing(symbol);
+                        setFailedSymbol(symbol);
+                    }}
                     className="h-full w-full rounded-full object-contain"
                 />
             </div>

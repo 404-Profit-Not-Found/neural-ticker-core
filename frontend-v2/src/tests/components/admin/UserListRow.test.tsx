@@ -38,5 +38,12 @@ describe('UserListRow', () => {
         render(<UserListRow user={{ email: 'new@example.com', tier: 'free', role: 'user', status: 'INVITED' }} onOpen={vi.fn()} />);
         expect(screen.getByText('INVITED')).toBeInTheDocument();
         expect(screen.queryByText(/credits/)).not.toBeInTheDocument();
+        expect(screen.getByText('never signed in')).toBeInTheDocument();
+    });
+
+    it('says how long ago the user was last seen', () => {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 60_000).toISOString();
+        render(<UserListRow user={{ ...mockUser, last_login: threeDaysAgo }} onOpen={vi.fn()} />);
+        expect(screen.getByText('seen 3d ago')).toBeInTheDocument();
     });
 });

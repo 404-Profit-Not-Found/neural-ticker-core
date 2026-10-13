@@ -355,10 +355,11 @@
   to { transform: translateX(-50%); }
 }
 
-/* Skeletons shimmer in visible steps — a loading state with terminal manners. */
-@keyframes skeleton-steps {
-  from { background-position: 150% 0; }
-  to { background-position: -50% 0; }
+/* Skeletons: one soft highlight gliding across. Animated with a transform so
+   it stays smooth (compositor-only) however many placeholders are on screen. */
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 /* RGB Theme Specifics */

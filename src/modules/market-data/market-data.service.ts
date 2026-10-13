@@ -2187,8 +2187,12 @@ export class MarketDataService {
     // / score" with exactly the tickers that have none.
     qb.orderBy(sortField, sortDirection, 'NULLS LAST');
 
-    // Add secondary sort for stability (pages must not shuffle between requests)
-    qb.addOrderBy('ticker.symbol', 'ASC');
+    // Add secondary sort for stability (pages must not shuffle between requests).
+    // Not when the symbol IS the sort: TypeORM keys ORDER BY by expression, so
+    // adding it again would replace the requested direction with ASC.
+    if (sortField !== 'ticker.symbol') {
+      qb.addOrderBy('ticker.symbol', 'ASC');
+    }
 
     // Performance Optimization: Use window function instead of separate getCount() query
     // This calculates total count in the same query, avoiding a second expensive full table scan

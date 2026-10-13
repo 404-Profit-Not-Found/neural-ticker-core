@@ -201,6 +201,8 @@ export function PortfolioStats({
   const periodGain = series?.periodGain ?? 0;
   const periodGainPct = series?.periodGainPct ?? 0;
   const isPeriodProfit = periodGain >= 0;
+  // A fraction of a cent is "no change", not "−$0.00 (-0.00%)".
+  const isPeriodFlat = Math.abs(periodGain) < 0.005;
 
   const historyNotes: string[] = [];
   if (history.status === 'ready') {
@@ -353,12 +355,12 @@ export function PortfolioStats({
                 <div
                   className={cn(
                     "num flex flex-wrap items-center gap-x-1.5 text-xs font-semibold",
-                    isPeriodProfit ? "text-up" : "text-down"
+                    isPeriodFlat ? "text-muted-foreground" : isPeriodProfit ? "text-up" : "text-down"
                   )}
                   title="Change in holdings value over this period, excluding money added or withdrawn"
                 >
-                  {isPeriodProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                  {isPeriodProfit ? '+' : '−'}{formatCurrency(Math.abs(periodGain))} ({periodGainPct >= 0 ? '+' : ''}{periodGainPct.toFixed(2)}%) <span className="ml-1 font-sans font-medium text-muted-foreground">{range}</span>
+                  {isPeriodFlat ? null : isPeriodProfit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  {isPeriodFlat ? '' : isPeriodProfit ? '+' : '−'}{formatCurrency(Math.abs(periodGain))} ({isPeriodFlat ? '' : periodGainPct >= 0 ? '+' : '−'}{Math.abs(isPeriodFlat ? 0 : periodGainPct).toFixed(2)}%) <span className="ml-1 font-sans font-medium text-muted-foreground">{range}</span>
                 </div>
               ) : null}
             </div>

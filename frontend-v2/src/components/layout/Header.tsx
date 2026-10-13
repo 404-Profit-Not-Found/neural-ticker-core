@@ -295,7 +295,11 @@ export function Header() {
 
   // Warm the menu chunk when the browser is idle, so the first open is instant.
   useEffect(() => {
-    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
+    // With a deadline: a browser that never reports itself idle (a stream,
+    // an animation) must not leave the first open waiting for the network.
+    const idle = window.requestIdleCallback
+      ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 2000 })
+      : (cb: () => void) => window.setTimeout(cb, 1500);
     const cancel = window.cancelIdleCallback ?? window.clearTimeout;
     const id = idle(preloadMenus);
     return () => cancel(id);

@@ -533,6 +533,56 @@ export class TickersService {
     return false;
   }
 
+  /** Largest logo we fetch and store. */
+  private static readonly MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+  /**
+   * Fetches a logo and returns it, or throws. The caller has already checked
+   * the URL with isSafeRemoteImageUrl; maxRedirects stays 0 so that check
+   * cannot be bypassed by a redirect to a private address.
+   */
+  private async fetchLogo(
+    url: string,
+  ): Promise<{ buffer: Buffer; mimeType: string }> {
+    const response = await firstValueFrom(
+      this.httpService.get(url, {
+        responseType: 'arraybuffer',
+        maxRedirects: 0,
+        // Some image hosts reject a blank/default library User-Agent with
+        // HTTP 403 — notably Wikimedia/Wikipedia, a common source of company
+        // logos ("Please set a user-agent..."). Send a descriptive UA so the
+        // fetch is accepted.
+        headers: {
+          'User-Agent':
+            'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
+        },
+        timeout: 10000,
+        maxContentLength: TickersService.MAX_LOGO_BYTES,
+      }),
+    );
+
+    const buffer = Buffer.from(response.data);
+    // axios types header values as a broad union; content-type is a string.
+    const contentType: unknown = response.headers['content-type'];
+    const declared = (typeof contentType === 'string' ? contentType : '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    // A page that answers 200 with HTML (a login wall, an error page) is not
+    // a logo. A missing header is given the benefit of the doubt, as before.
+    if (declared && !declared.startsWith('image/')) {
+      throw new Error(`the link returned ${declared}, not an image`);
+    }
+    if (buffer.length === 0) {
+      throw new Error('the link returned an empty response');
+    }
+    return { buffer, mimeType: declared || 'image/png' };
+  }
+
+  /**
+   * Background download: used when a ticker is created or backfilled. Never
+   * throws — a missing logo must not fail the flow that asked for it.
+   */
   async downloadAndSaveLogo(symbolId: string, url: string) {
     if (!url) return;
     if (!TickersService.isSafeRemoteImageUrl(url)) {
@@ -545,27 +595,7 @@ export class TickersService {
       this.logger.debug(
         `Downloading logo for ticker ID ${symbolId} from ${url}`,
       );
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          responseType: 'arraybuffer',
-          maxRedirects: 0,
-          // Some image hosts reject a blank/default library User-Agent with
-          // HTTP 403 — notably Wikimedia/Wikipedia, a common source of company
-          // logos ("Please set a user-agent..."). Send a descriptive UA so the
-          // fetch is accepted. maxRedirects stays 0 so the SSRF host check
-          // above can't be bypassed via a redirect to a private address.
-          headers: {
-            'User-Agent':
-              'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
-          },
-          timeout: 10000,
-        }),
-      );
-
-      const buffer = Buffer.from(response.data);
-      // axios now types header values as a broad union; content-type is a string.
-      const mimeType =
-        (response.headers['content-type'] as string) || 'image/png';
+      const { buffer, mimeType } = await this.fetchLogo(url);
 
       const logo = this.logoRepo.create({
         symbol_id: symbolId,
@@ -594,8 +624,13 @@ export class TickersService {
     return this.logoRepo.findOne({ where: { symbol_id: ticker.id } });
   }
 
+  /**
+   * How many tickers a user can see. Hidden (shadow-banned) tickers are left
+   * out, like in every list — otherwise the dashboard counts one more ticker
+   * than the Tickers page shows.
+   */
   async getCount(): Promise<number> {
-    return this.tickerRepo.count();
+    return this.tickerRepo.count({ where: { is_hidden: false } });
   }
 
   async getAllTickers(): Promise<Partial<TickerEntity>[]> {
@@ -961,6 +996,12 @@ export class TickersService {
     return this.tickerRepo.save(ticker);
   }
 
+  /**
+   * Admin: set a ticker's logo from a URL. The image is fetched before
+   * anything is saved, so success means the logo is really stored — a link
+   * that cannot be used is a 400 with the reason, not a silent no-op.
+   * An empty URL clears `logo_url`.
+   */
   async updateLogo(symbol: string, logoUrl: string): Promise<TickerEntity> {
     const ticker = await this.tickerRepo.findOne({
       where: { symbol: symbol.toUpperCase() },
@@ -969,19 +1010,32 @@ export class TickersService {
       throw new NotFoundException(`Ticker ${symbol} not found`);
     }
 
-    ticker.logo_url = logoUrl;
-    const saved = await this.tickerRepo.save(ticker);
-
-    // Trigger download in background
-    if (logoUrl) {
-      this.downloadAndSaveLogo(saved.id, logoUrl).catch((err) =>
-        this.logger.error(
-          `Failed to download logo for ${saved.symbol}: ${getErrorMessage(err)}`,
-        ),
+    const url = typeof logoUrl === 'string' ? logoUrl.trim() : '';
+    if (url) {
+      if (!TickersService.isSafeRemoteImageUrl(url)) {
+        throw new BadRequestException(
+          'Enter a public https:// link to an image.',
+        );
+      }
+      let logo: { buffer: Buffer; mimeType: string };
+      try {
+        logo = await this.fetchLogo(url);
+      } catch (err) {
+        throw new BadRequestException(
+          `Could not use that link as a logo: ${getErrorMessage(err)}.`,
+        );
+      }
+      await this.logoRepo.save(
+        this.logoRepo.create({
+          symbol_id: ticker.id,
+          image_data: logo.buffer,
+          mime_type: logo.mimeType,
+        }),
       );
     }
 
-    return saved;
+    ticker.logo_url = url;
+    return this.tickerRepo.save(ticker);
   }
 
   async getHiddenTickers(): Promise<Partial<TickerEntity>[]> {

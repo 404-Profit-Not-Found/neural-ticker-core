@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiErrorMessage } from '../../lib/api-error';
 import { appPath } from '../../lib/base';
+import { forgetMissingLogo } from '../../lib/missing-logos';
 import { AdminService } from '../../services/adminService';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
@@ -89,6 +91,7 @@ export function LogoManager() {
         setUpdatingSymbol(symbol);
         try {
             await AdminService.updateTickerLogo(symbol, url);
+            forgetMissingLogo(symbol);
             toast.success(`Logo updated for ${symbol}`);
             setSavedLogos(prev => ({ ...prev, [symbol]: url }));
             setLogoInputs(prev => {
@@ -103,7 +106,7 @@ export function LogoManager() {
             }
         } catch (error) {
             console.error('Failed to update logo:', error);
-            toast.error('Failed to update logo');
+            toast.error(apiErrorMessage(error, 'Failed to update logo'));
         } finally {
             setUpdatingSymbol(null);
         }

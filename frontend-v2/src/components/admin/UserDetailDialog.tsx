@@ -11,7 +11,7 @@ import { UserStatusBadge } from '../ui/user-status-badge';
 import { Gift, Ban, CheckCircle, RotateCcw, Shield, ShieldOff, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { SegmentedControl } from '../ui/segmented';
-import { formatDateTime } from '../../lib/datetime';
+import { formatDateTime, formatTimeAgo } from '../../lib/datetime';
 import { cn } from '../../lib/utils';
 import { UserAvatar } from './admin-ui';
 import { isAdminUser, userName, type AdminUser } from './model';
@@ -96,12 +96,18 @@ export function UserDetailDialog({
                             <dd className="num mt-1 text-[13px] text-foreground">{formatDateTime(user.created_at || user.invited_at)}</dd>
                         </div>
                         <div className="min-w-0">
+                            <dt className="label-micro">Last login</dt>
+                            <dd className="num mt-1 text-[13px] text-foreground" title={user.last_login ? formatDateTime(user.last_login) : undefined}>
+                                {user.last_login ? formatTimeAgo(user.last_login) : 'Never'}
+                            </dd>
+                        </div>
+                        <div className="min-w-0">
                             <dt className="label-micro">Credits</dt>
                             <dd className="num mt-1 text-[13px] text-foreground">
                                 {user.credits_balance != null ? user.credits_balance.toLocaleString() : <span className="text-muted-foreground">—</span>}
                             </dd>
                         </div>
-                        <div className="col-span-2 min-w-0">
+                        <div className="min-w-0">
                             <dt className="label-micro">User ID</dt>
                             <dd className="mt-1">
                                 {user.id ? (

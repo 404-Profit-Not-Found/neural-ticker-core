@@ -173,6 +173,17 @@ describe('TickersService', () => {
     });
   });
 
+  describe('getCount', () => {
+    it('counts only the tickers a user can see (hidden ones are left out)', async () => {
+      mockTickerRepo.count.mockResolvedValue(43);
+
+      await expect(service.getCount()).resolves.toBe(43);
+      expect(mockTickerRepo.count).toHaveBeenCalledWith({
+        where: { is_hidden: false },
+      });
+    });
+  });
+
   describe('awaitEnsureTicker', () => {
     it('should be an alias for ensureTicker', async () => {
       const mockTicker = { symbol: 'AAPL' };
@@ -781,10 +792,25 @@ describe('TickersService', () => {
               'neural-ticker-logo-fetcher/1.0 (+https://neuralticker.com)',
           },
           timeout: 10000,
+          maxContentLength: 2 * 1024 * 1024,
         },
       );
       expect(mockLogoRepo.create).toHaveBeenCalled();
       expect(mockLogoRepo.save).toHaveBeenCalled();
+    });
+
+    it('does not store a page that is not an image', async () => {
+      mockLogoRepo.save.mockClear();
+      mockHttpService.get.mockReturnValue(
+        of({
+          data: Buffer.from('<html>sign in</html>'),
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        }),
+      );
+
+      await service.downloadAndSaveLogo('ticker-1', 'https://logo.com/login');
+
+      expect(mockLogoRepo.save).not.toHaveBeenCalled();
     });
 
     it('should handle download failure gracefully', async () => {
@@ -813,6 +839,81 @@ describe('TickersService', () => {
     it('should return early if no URL provided', async () => {
       await service.downloadAndSaveLogo('ticker-1', '');
       expect(mockHttpService.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateLogo (admin)', () => {
+    const ticker = { id: 'ticker-1', symbol: 'AAPL', logo_url: null };
+
+    beforeEach(() => {
+      mockHttpService.get.mockReset();
+      mockLogoRepo.save.mockReset();
+      mockLogoRepo.save.mockResolvedValue({});
+      mockTickerRepo.findOne.mockResolvedValue({ ...ticker });
+      mockTickerRepo.save.mockImplementation((t: any) => Promise.resolve(t));
+    });
+
+    it('stores the image first and only then reports success', async () => {
+      mockHttpService.get.mockReturnValue(
+        of({
+          data: Buffer.from('png-bytes'),
+          headers: { 'content-type': 'image/png' },
+        }),
+      );
+
+      const saved = await service.updateLogo(
+        'aapl',
+        ' https://logo.com/a.png ',
+      );
+
+      expect(mockLogoRepo.save).toHaveBeenCalledTimes(1);
+      expect(saved.logo_url).toBe('https://logo.com/a.png');
+    });
+
+    it.each([
+      ['not a url'],
+      ['http://logo.com/a.png'],
+      ['https://localhost/a.png'],
+      ['https://169.254.169.254/latest/meta-data/'],
+    ])('rejects %s without fetching or saving anything', async (url) => {
+      await expect(service.updateLogo('AAPL', url)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockHttpService.get).not.toHaveBeenCalled();
+      expect(mockLogoRepo.save).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a link that cannot be downloaded, and saves nothing', async () => {
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('Request failed with status code 404')),
+      );
+
+      await expect(
+        service.updateLogo('AAPL', 'https://logo.com/missing.png'),
+      ).rejects.toThrow(/Could not use that link as a logo/);
+      expect(mockLogoRepo.save).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a link that returns a web page instead of an image', async () => {
+      mockHttpService.get.mockReturnValue(
+        of({
+          data: Buffer.from('<html></html>'),
+          headers: { 'content-type': 'text/html' },
+        }),
+      );
+
+      await expect(
+        service.updateLogo('AAPL', 'https://logo.com/page'),
+      ).rejects.toThrow(/not an image/);
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('clears the URL when given an empty value', async () => {
+      const saved = await service.updateLogo('AAPL', '');
+      expect(mockHttpService.get).not.toHaveBeenCalled();
+      expect(saved.logo_url).toBe('');
     });
   });
 

@@ -14,9 +14,22 @@ import { cn } from '../../lib/utils';
 
 /**
  * Box of a row — shared with its skeleton, so content never jumps when it
- * replaces the placeholder. 76px tall: 10 + 18 + 16 + 4 + 18 + 10.
+ * replaces the placeholder. 80px tall: 11 + 18 + 16 + 6 + 18 + 11.
  */
-const ROW_BOX = 'flex h-[4.75rem] items-center gap-2.5 px-3.5';
+const ROW_BOX = 'flex h-20 items-center gap-2.5 px-3.5';
+
+/**
+ * Fixed tracks. Every row is built from the same columns at the same
+ * positions, whatever it holds — a list of rows has to read as a table:
+ *
+ *   - the price column and the sparkline slot never grow with their content,
+ *     so the sparklines line up under each other;
+ *   - the rating stamp has a slot of its own at the start of the third line,
+ *     so the upside always starts at the same place and the risk always ends
+ *     at the right edge.
+ */
+const PRICE_COL = 'w-[5.75rem]';
+const STAMP_SLOT = 'w-[5.5rem]';
 
 export interface TickerListRowProps {
     symbol: string;
@@ -27,7 +40,7 @@ export interface TickerListRowProps {
     change: number;
     currency?: string;
     sparkline?: number[];
-    /** Pre-computed rating stamp shown next to the symbol. */
+    /** Pre-computed rating stamp; it leads the third line. */
     rating?: { label: string; variant: BadgeProps['variant'] } | null;
     /** One short line under the name (e.g. upside and risk). */
     meta?: ReactNode;
@@ -44,9 +57,12 @@ export interface TickerListRowProps {
  * of tickers on a phone (see DESIGN.md §6 "Rows, not cards"). The row is one
  * tonal surface with no outline; the whole of it is a single link.
  *
- *   [logo]  SYMBOL [RATING]               ~~~      $172.30
- *           Company name                           +5.87%
- *           meta line (full width)
+ *   [logo]  SYMBOL                        ~~~      $172.30
+ *           Company name                            +5.87%
+ *           [RATING]   +44.0% upside        Risk ▮▮▮▮▯ 8
+ *
+ * One layout for every ticker: nothing moves to another line because a
+ * symbol is long or a price has a currency code in front of it.
  */
 export function TickerListRow({
     symbol,
@@ -66,17 +82,12 @@ export function TickerListRow({
     // Exactly zero is neutral — never dressed up as a gain.
     const flat = Math.abs(change) < 0.005;
     const up = change > 0;
-    const stamp = rating ? (
-        <Badge variant={rating.variant} className="h-[18px] shrink-0 px-1.5 text-[10px]">
-            {rating.label}
-        </Badge>
-    ) : null;
-    // The stamp sits beside the symbol when both fit the name column (about
-    // 136px on a 390px phone); otherwise it leads the meta line. Never
-    // squeezed, never over the sparkline.
-    const stampInMeta = !!rating && symbol.length * 10 + rating.label.length * 7 + 20 > 136;
     // A row with its own control (edit mode) gives the sparkline's room to it.
     const showSparkline = !action && !!sparkline && sparkline.length > 1;
+    // Six-figure prices are shortened, and a long figure ("SEK 1,281.40") is
+    // set smaller, so the column keeps its width.
+    const priceText = price <= 0 ? '—' : price >= 100_000 ? formatPrice(price, currency, { compact: true }) : formatNative(price, currency);
+    const longPrice = priceText.length > 9;
 
     return (
         <div className={cn('flex items-stretch overflow-hidden rounded-lg bg-card', className)}>
@@ -91,24 +102,20 @@ export function TickerListRow({
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2.5">
                         <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                                {/* A symbol is an identifier: it never truncates. */}
-                                <span className="shrink-0 text-[15px] font-semibold leading-tight text-foreground">{symbol}</span>
-                                {!stampInMeta && stamp}
-                            </span>
+                            {/* A symbol is an identifier: it never truncates. */}
+                            <span className="block whitespace-nowrap text-[15px] font-semibold leading-tight text-foreground">{symbol}</span>
                             <span className="block truncate text-[13px] leading-tight text-muted-foreground">{name}</span>
                         </span>
 
                         {showSparkline && (
-                            <span className="hidden shrink-0 min-[380px]:block">
+                            <span className="hidden w-12 shrink-0 min-[380px]:block">
                                 <Sparkline data={sparkline!} width={48} height={28} label="14-day trend" />
                             </span>
                         )}
 
-                        <span className="flex min-w-[4.75rem] shrink-0 flex-col items-end gap-1">
-                            <span className="num text-[15px] font-semibold leading-none text-foreground">
-                                {/* Six-figure prices are shortened so the column stays aligned. */}
-                                {price <= 0 ? '—' : price >= 100_000 ? formatPrice(price, currency, { compact: true }) : formatNative(price, currency)}
+                        <span className={cn(PRICE_COL, 'flex shrink-0 flex-col items-end gap-1')}>
+                            <span className={cn('num whitespace-nowrap font-semibold leading-none text-foreground', longPrice ? 'text-[13px]' : 'text-[15px]')}>
+                                {priceText}
                             </span>
                             <span
                                 className={cn(
@@ -122,11 +129,18 @@ export function TickerListRow({
                         </span>
                     </span>
 
-                    {/* Full width, so it never wraps around the sparkline and price. */}
-                    {/* A fixed-height line: every row is the same height, stamp or not. */}
-                    {(meta || (stampInMeta && stamp)) && (
-                        <span className="mt-1 flex h-[18px] items-center gap-3 whitespace-nowrap text-xs leading-none text-muted-foreground">
-                            {stampInMeta && stamp}
+                    {/* Third line, full width and of fixed height: rating in its
+                        slot, then what `meta` brings (upside, and risk at the
+                        right edge). */}
+                    {(meta || rating) && (
+                        <span className="mt-1.5 flex h-[18px] items-center gap-2 overflow-hidden whitespace-nowrap text-xs leading-none text-muted-foreground [container-type:inline-size]">
+                            {rating && (
+                                <span className={cn(STAMP_SLOT, 'flex shrink-0')}>
+                                    <Badge variant={rating.variant} className="h-[18px] px-1.5 text-[10px]">
+                                        {rating.label}
+                                    </Badge>
+                                </span>
+                            )}
                             {meta}
                         </span>
                     )}
@@ -148,12 +162,18 @@ export function TickerRowMeta({ item }: { item: TickerData }) {
             {hasUpside && (
                 <span className={cn('num font-medium', upside > 0 ? 'text-up' : upside < 0 ? 'text-down' : 'text-muted-foreground')}>
                     {upside > 0 ? '+' : upside < 0 ? '−' : ''}
-                    {Math.abs(upside).toFixed(1)}% upside
+                    {Math.abs(upside).toFixed(1)}%
+                    {/* The words yield to the figures as the line gets shorter
+                        (a narrow phone, or a row that also holds a control):
+                        "Risk" first, then "upside". Sign and colour stay. */}
+                    <span className="[@container(max-width:15.6rem)]:sr-only"> upside</span>
                 </span>
             )}
             {hasRisk && (
-                <span className="inline-flex items-center gap-1.5">
-                    Risk <RiskBar value={item.riskScore} segments={5} size="sm" />
+                // Always at the right edge, under the price.
+                <span className="ml-auto inline-flex items-center gap-1.5">
+                    <span className="[@container(max-width:17.45rem)]:sr-only">Risk</span>
+                    <RiskBar value={item.riskScore} segments={5} size="sm" />
                 </span>
             )}
         </>
@@ -200,14 +220,23 @@ export function TickerRowListSkeleton({ rows = 6, label = 'Loading tickers' }: {
         <div role="status" aria-label={label} className="space-y-1.5">
             {Array.from({ length: rows }).map((_, i) => (
                 <div key={i} className={cn(ROW_BOX, 'rounded-lg bg-card')}>
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                        <Skeleton className="h-3.5 w-24" />
-                        <Skeleton className="h-3 w-36" />
-                    </div>
-                    <div className="space-y-2">
-                        <Skeleton className="ml-auto h-3.5 w-16" />
-                        <Skeleton className="ml-auto h-3 w-12" />
+                    <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2.5">
+                            <div className="flex-1 space-y-1.5">
+                                <Skeleton className="h-3.5 w-16" />
+                                <Skeleton className="h-3 w-32 max-w-full" />
+                            </div>
+                            <div className={cn(PRICE_COL, 'shrink-0 space-y-1.5')}>
+                                <Skeleton className="ml-auto h-3.5 w-16" />
+                                <Skeleton className="ml-auto h-3 w-12" />
+                            </div>
+                        </div>
+                        <div className="mt-1.5 flex h-[18px] items-center gap-2">
+                            <Skeleton className={cn(STAMP_SLOT, 'h-[18px]')} />
+                            <Skeleton className="h-3 w-20" />
+                            <Skeleton className="ml-auto h-3 w-14" />
+                        </div>
                     </div>
                 </div>
             ))}

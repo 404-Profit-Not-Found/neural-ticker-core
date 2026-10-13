@@ -20,7 +20,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
 import { PageFallback } from './components/layout/PageFallback';
 import { ThemeController } from './app/ThemeController';
-import { Pages, preloadCommonRoutes } from './app/routes';
+import { Pages, preloadRoutes } from './app/routes';
 import { BASE } from './lib/base';
 
 // Scroll handling for a single-page app:
@@ -93,7 +93,7 @@ function ProtectedLayout() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (user) preloadCommonRoutes();
+    if (user) preloadRoutes();
   }, [user]);
 
   if (loading) {
@@ -154,7 +154,11 @@ function OAuthCallback() {
 
 function App() {
   return (
-    <BrowserRouter basename={BASE || undefined}>
+    // No transitions for navigation: wrapped in one, React keeps the page you
+    // are leaving on screen until the next one is ready, and a tap looks as if
+    // it did nothing. A tap must change the screen at once — to the page, or
+    // to its loading state.
+    <BrowserRouter basename={BASE || undefined} unstable_useTransitions={false}>
       <ScrollManager />
       <AuthProvider>
         <LanguageProvider>

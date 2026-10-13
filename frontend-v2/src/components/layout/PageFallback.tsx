@@ -1,34 +1,27 @@
-import { Skeleton } from '../ui/skeleton';
-import { cn } from '../../lib/utils';
+import { useEffect, useState } from 'react';
+import { SuperLoading } from '../ui/SuperLoading';
+
+/** A prefetched route chunk resolves within a few frames: show nothing for that long. */
+const SHOW_AFTER_MS = 180;
 
 /**
- * Shown while a route chunk is loading. Deliberately generic and quiet: the
- * shell (header, tab bar) stays painted, so this only has to hold the page's
- * footprint for the few frames a prefetched chunk needs to resolve.
+ * Shown while a route chunk is loading. Most navigations never see it — the
+ * chunk is prefetched on intent and resolves at once — so it stays empty for
+ * a moment rather than flashing. When loading really takes time, it is the
+ * loading screen (wordmark, candles), not a grid of grey blocks that looks
+ * like no page in particular.
  */
 export function PageFallback({ fullScreen = false }: { fullScreen?: boolean }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-label="Loading page"
-      className={cn(
-        'container max-w-[90rem] mx-auto px-4 py-6 md:py-8',
-        fullScreen && 'min-h-dvh',
-      )}
-    >
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-56" />
-          <Skeleton className="h-4 w-80 max-w-full" />
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <Skeleton className="h-72" />
-      </div>
-    </div>
-  );
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShow(true), SHOW_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (!show) {
+    // Holds the page's footprint so the shell does not jump.
+    return <div role="status" aria-live="polite" aria-label="Loading page" className={fullScreen ? 'min-h-dvh' : 'min-h-page'} />;
+  }
+  return <SuperLoading text="Loading" fullScreen={fullScreen} />;
 }

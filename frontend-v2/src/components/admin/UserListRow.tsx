@@ -1,3 +1,4 @@
+import { formatDateTime, formatTimeAgo } from '../../lib/datetime';
 import { AdminRow, UserAvatar, UserStatusStamp, UserTierStamps } from './admin-ui';
 import { userName, type AdminUser } from './model';
 
@@ -11,7 +12,8 @@ interface UserListRowProps {
  * A user as one compact row — the phone view of the Users tab.
  *
  *   (NO)  noname [PRO]                     ACTIVE
- *         noname@example.com           10 credits
+ *         noname@example.com
+ *         10 credits · seen 3d ago
  */
 export function UserListRow({ user, onOpen }: UserListRowProps) {
     return (
@@ -21,17 +23,23 @@ export function UserListRow({ user, onOpen }: UserListRowProps) {
             title={userName(user)}
             stamps={<UserTierStamps user={user} />}
             subtitle={user.email}
-            trailing={
+            meta={
                 <>
-                    <UserStatusStamp user={user} />
                     {/* An invited address has no balance yet: nothing to print, not a zero. */}
                     {user.credits_balance != null && (
-                        <span className="num text-xs leading-none text-muted-foreground">
-                            <span>{user.credits_balance.toLocaleString()}</span> credits
-                        </span>
+                        <>
+                            <span className="num">
+                                <span>{user.credits_balance.toLocaleString()}</span> credits
+                            </span>
+                            <span aria-hidden>·</span>
+                        </>
                     )}
+                    <span className="num" title={user.last_login ? formatDateTime(user.last_login) : undefined}>
+                        {user.last_login ? `seen ${formatTimeAgo(user.last_login)}` : 'never signed in'}
+                    </span>
                 </>
             }
+            trailing={<UserStatusStamp user={user} />}
         />
     );
 }

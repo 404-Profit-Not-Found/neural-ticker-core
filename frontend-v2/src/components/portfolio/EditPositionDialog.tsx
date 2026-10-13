@@ -209,7 +209,7 @@ export function EditPositionDialog({ open, onOpenChange, position, onSuccess }: 
         // Same themed confirmation as deleting from the positions list.
         const confirmed = await confirm({
             title: `Delete ${position.symbol} position?`,
-            description: 'This can’t be undone.',
+            description: 'The holding is removed without crediting its value to your cash — to close it for cash, sell it instead. This can’t be undone.',
             confirmLabel: 'Delete position',
             destructive: true,
         });
