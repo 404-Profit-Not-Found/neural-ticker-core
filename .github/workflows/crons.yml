@@ -5,22 +5,27 @@ permissions:
 
 on:
   schedule:
-    # Daily at Midnight UTC (Watchers Sync, Moderation, Research cleanup)
-    - cron: '0 0 * * *'
-    # Hourly (Candle Sync batch, Risk/Reward Scanner, Posts Sync, Cleanup)
-    - cron: '0 * * * *'
+    # Minutes are deliberately kept off :00. GitHub delays and drops scheduled
+    # runs under load, and the start of every hour is its documented peak.
+    # Each job below matches its trigger by comparing github.event.schedule to
+    # the exact string here — change a value in both places or the job never runs.
+    #
+    # Daily at 00:17 UTC (Watchers Sync, Moderation, Research cleanup)
+    - cron: '17 0 * * *'
+    # Hourly at :07 (Candle Sync batch, Posts Sync, Cleanup, Risk/Reward Scanner)
+    - cron: '7 * * * *'
     # Every 5 mins during market hours (6 AM - 9 PM UTC, Mon-Fri)
     # Used by: snapshot-sync (price tick) + market-hours-refresh (top picks, portfolios)
-    - cron: '*/5 6-21 * * 1-5'
+    - cron: '3-58/5 6-21 * * 1-5'
     # Every 5 minutes (24/7) - daily digest, queue processor
-    - cron: '*/5 * * * *'
+    - cron: '1-56/5 * * * *'
   workflow_dispatch:
 
 jobs:
   daily-jobs:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '17 0 * * *' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Daily Watchers Sync
         run: |
@@ -40,7 +45,7 @@ jobs:
   hourly-jobs:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '7 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
       # Daily (1d) candle sync, split into a small stale-first batch per hour so
       # each run stays well under the Cloud Run 5-min request timeout. Full
@@ -49,18 +54,6 @@ jobs:
       - name: Trigger Candle Sync (hourly stale-first batch)
         run: |
           curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/sync-daily-candles" \
-            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type:application/json"
-
-      # Queues research for the most-stale tickers (never-analysed first, then
-      # oldest), rotating through the whole universe on a ~weekly cadence. Hard
-      # daily free-LLM budget caps total calls so it never hits the billed key.
-      # Endpoint returns 202 immediately and runs the scan in the background.
-      # This is the ONLY scanner trigger — hourly + a tiny batch keeps it gentle
-      # (it used to also fire every 5 min, which front-loaded the daily budget).
-      - name: Trigger Risk/Reward Scanner (stale-first rotation, budget-gated)
-        run: |
-          curl --fail-with-body --show-error -sS -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
             -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
             -H "Content-Type:application/json"
 
@@ -76,11 +69,27 @@ jobs:
             -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
             -H "Content-Type:application/json"
 
+      # Researches the most-stale tickers (never-analysed first, then oldest),
+      # rotating through the whole universe on a ~weekly cadence. Hard daily
+      # free-LLM budget caps total calls so it never hits the billed key.
+      # The endpoint runs the scan INSIDE the request and answers when the batch
+      # is done (a few minutes): Cloud Run only gives the service CPU while a
+      # request is in flight, so a scan left running in the background was
+      # starved and its research ended up without a risk analysis.
+      # This is the ONLY scanner trigger — hourly + a tiny batch keeps it gentle
+      # (it used to also fire every 5 min, which front-loaded the daily budget).
+      # Kept last so a failed scan can't skip the other hourly steps.
+      - name: Run Risk/Reward Scanner (stale-first rotation, budget-gated)
+        run: |
+          curl --fail-with-body --show-error -sS --max-time 290 -X POST "${{ vars.CLOUD_RUN_URL }}/api/v1/jobs/run-risk-reward-scanner" \
+            -H "X-Cron-Secret:${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type:application/json"
+
   # Light snapshot sync every 5 mins during market hours (Mon-Fri, 6 AM - 9 PM UTC)
   snapshot-sync:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '*/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '3-58/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Snapshot Sync
         run: |
@@ -92,7 +101,7 @@ jobs:
   market-hours-refresh:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '*/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '3-58/5 6-21 * * 1-5' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Top Picks Refresh
         run: |
@@ -110,7 +119,7 @@ jobs:
   frequent-jobs:
     runs-on: ubuntu-latest
     environment: prod
-    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '1-56/5 * * * *' || github.event_name == 'workflow_dispatch'
     steps:
       # NOTE: the Risk/Reward Scanner intentionally does NOT run here. It runs
       # ONLY hourly (see hourly-jobs). Running it every 5 min front-loaded the
