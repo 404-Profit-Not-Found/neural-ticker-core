@@ -36,8 +36,9 @@ const logoUrl = z
  *    filter (`TickersService.searchTickersAdmin`).
  *  - `set_ticker_logo` mirrors the per-row "New Logo URL" + Save, i.e. the
  *    admin `PATCH /api/tickers/:symbol` route (`TickersService.updateLogo`):
- *    it stores `logo_url` and downloads + caches the image in the background,
- *    which is then served at `GET /api/tickers/:symbol/logo`.
+ *    it downloads and caches the image first — failing with the reason if
+ *    the link cannot be used — and then stores `logo_url`. The image is served
+ *    at `GET /api/tickers/:symbol/logo`.
  */
 @Injectable()
 export class LogoTools {

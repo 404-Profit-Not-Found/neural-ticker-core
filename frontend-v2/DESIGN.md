@@ -94,7 +94,8 @@ at least 14px and form fields 16px (prevents iOS zoom).
 | Headline figure | `StatPill` (`components/dashboard/StatPill.tsx`) |
 | Nothing to show | `EmptyState` — `ui/empty-state.tsx` |
 | Failed to load | `LoadError` (same file): names what failed, keeps context, offers a retry |
-| Loading | `Skeleton` shaped like the content it replaces (never a lone spinner for a whole page) |
+| Loading (part of a page) | `Skeleton` shaped like the content it replaces — smooth sweep, never a spinner |
+| Loading (no page yet: boot, sign-in/out, a slow route, opening a ticker) | `SuperLoading` — the loading screen with the wordmark and the candlestick chart; its styles live in `index.html` so the boot splash and the app draw the same thing |
 | Confirm / ask for one value | `useConfirm()` / `usePrompt()` — `ui/confirm.tsx` (never `window.confirm/alert/prompt`) |
 | Feedback after an action | `toast` from `sonner` |
 | Modal | `Dialog` — `ui/dialog.tsx` (focus trap, Escape, scroll lock built in) |

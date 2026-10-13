@@ -1,3 +1,5 @@
+import { apiErrorMessage } from '../../lib/api-error';
+import { forgetMissingLogo } from '../../lib/missing-logos';
 import { useState, useEffect } from 'react';
 import { appPath } from '../../lib/base';
 import { AdminService } from '../../services/adminService';
@@ -57,6 +59,7 @@ export function LogoManager() {
         setUpdatingSymbol(symbol);
         try {
             await AdminService.updateTickerLogo(symbol, url);
+            forgetMissingLogo(symbol);
             toast.success(`Logo updated for ${symbol}`);
             // Optimistically remove if filtering by missing
             if (showMissingLogos) {
@@ -64,7 +67,7 @@ export function LogoManager() {
             }
         } catch (error) {
             console.error('Failed to update logo:', error);
-            toast.error('Failed to update logo');
+            toast.error(apiErrorMessage(error, 'Failed to update logo'));
         } finally {
             setUpdatingSymbol(null);
         }

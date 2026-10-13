@@ -1,8 +1,9 @@
 import { cn } from "../../lib/api"
 
 /**
- * Loading placeholder. The highlight sweeps across in visible steps rather
- * than a smooth gradient — the terminal's way of saying "working".
+ * Loading placeholder: a quiet tonal block with one soft highlight gliding
+ * across it. The highlight is a pseudo-element moved with a transform, so it
+ * is smooth and cheap however many placeholders are on screen.
  * Honours prefers-reduced-motion (falls back to a static block).
  */
 function Skeleton({
@@ -12,8 +13,10 @@ function Skeleton({
   return (
     <div
       className={cn(
-        "rounded-md bg-muted bg-[length:200%_100%] bg-no-repeat motion-safe:animate-[skeleton-steps_1.4s_steps(12,end)_infinite]",
-        "bg-[linear-gradient(90deg,transparent_0%,rgb(var(--foreground)/0.07)_45%,rgb(var(--foreground)/0.12)_50%,rgb(var(--foreground)/0.07)_55%,transparent_100%)]",
+        "relative isolate overflow-hidden rounded-md bg-muted/80",
+        "after:absolute after:inset-0 after:-translate-x-full after:content-['']",
+        "after:bg-[linear-gradient(90deg,transparent,rgb(var(--foreground)/0.07)_50%,transparent)]",
+        "motion-safe:after:animate-[skeleton-sweep_1.6s_ease-in-out_infinite]",
         className,
       )}
       {...props}

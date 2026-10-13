@@ -1,3 +1,4 @@
+import { failureReason } from '../../lib/research-failure';
 import { useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Brain, Check, ChevronRight, Pencil, RefreshCw, Trash2, Upload, X } from 'lucide-react';
@@ -172,6 +173,9 @@ export function ResearchFeed({ research, onTrigger, isAnalyzing, onDelete, defau
 
                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                                         {isFailed && <Badge variant="sell">Failed</Badge>}
+                                        {isFailed && failureReason(item.error) && (
+                                            <span className="text-down">{failureReason(item.error)}</span>
+                                        )}
                                         {isPending && <Badge variant="outline" className="bg-signal/15 text-signal">Running</Badge>}
                                         <time dateTime={isoDateTime(stamp)} title={formatDateTime(stamp)} className="num whitespace-nowrap">
                                             {formatRelative(stamp)}

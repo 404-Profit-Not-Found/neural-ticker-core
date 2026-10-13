@@ -44,6 +44,15 @@ export function recentTickers(): string[] {
   }
 }
 
+/** Sign-out: the next person on this browser must not see what was viewed. */
+export function clearRecentTickers(): void {
+  try {
+    localStorage.removeItem(RECENT_KEY);
+  } catch {
+    // Storage unavailable: nothing was kept either.
+  }
+}
+
 export function recordRecentTicker(symbol: string): void {
   const sym = symbol.toUpperCase();
   if (!SYMBOL_RE.test(sym)) return;

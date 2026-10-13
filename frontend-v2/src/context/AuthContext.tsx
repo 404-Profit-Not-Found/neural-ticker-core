@@ -1,3 +1,4 @@
+import { clearRecentTickers } from '../app/commandPalette';
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { httpClient } from '../lib/api';
 import { queryClient, persister, claimCacheFor } from '../lib/queryClient';
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await persister.removeClient(); // Clear IndexedDB
             queryClient.clear();            // Clear in-memory cache
             await claimCacheFor(null);      // Forget who owned it
+            clearRecentTickers();           // "Recently viewed" is per person too
         } catch (e) {
             console.error('Failed to clear local cache:', e);
         }

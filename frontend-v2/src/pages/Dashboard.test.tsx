@@ -57,8 +57,8 @@ import '@testing-library/jest-dom';
 
 // Mock Components
 vi.mock('../components/dashboard/TickerCarousel', () => ({
-    TickerCarousel: ({ data }: { data: unknown[] }) => (
-        <div data-testid="watchlist-grid">
+    TickerCarousel: ({ data, isLoading }: { data: unknown[]; isLoading?: boolean }) => (
+        <div data-testid="watchlist-grid" data-loading={isLoading ? 'yes' : 'no'}>
             Grid Items: {data.length}
         </div>
     )
@@ -185,6 +185,22 @@ describe('Dashboard', () => {
         expect((await screen.findAllByText('5')).length).toBeGreaterThan(0); // Strong Buy count
         expect(await screen.findByText('3')).toBeTruthy(); // Sell count
         expect(await screen.findByText('50')).toBeTruthy(); // AI Reports (24h)
+    });
+
+    it('treats the previous strategy\'s rows as loading, not as this strategy\'s answer', async () => {
+        // What the query returns right after YOLO → Shorts: still the old rows.
+        (useStockAnalyzer as Mock).mockReturnValue({
+            data: { items: [] },
+            isLoading: false,
+            isPlaceholderData: true,
+        });
+        renderDashboard();
+        expect(await screen.findByTestId('watchlist-grid')).toHaveAttribute('data-loading', 'yes');
+    });
+
+    it('stops loading once the strategy has its own rows', async () => {
+        renderDashboard();
+        expect(await screen.findByTestId('watchlist-grid')).toHaveAttribute('data-loading', 'no');
     });
 
     it('shows placeholders until the stats load', () => {

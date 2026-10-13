@@ -1,3 +1,4 @@
+import { describeFailure } from '../lib/research-failure';
 import { useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -47,21 +48,6 @@ interface ResearchNote {
 }
 
 const TAB = 'max-lg:min-h-11 gap-2';
-
-/** What went wrong, in words a reader can act on. The raw text stays available. */
-function describeFailure(error?: string): string {
-    const text = (error || '').toLowerCase();
-    if (/overload|unavailable|\b503\b|\b529\b/.test(text)) {
-        return 'The AI model was temporarily overloaded, so this note was not written. Running it again in a few minutes usually works.';
-    }
-    if (/rate limit|quota|\b429\b/.test(text)) {
-        return 'The AI provider turned the request down because of a usage limit. Try again later.';
-    }
-    if (/timeout|timed out|deadline/.test(text)) {
-        return 'The AI model took too long to answer and the run was stopped. Try again, or pick a faster model.';
-    }
-    return 'Something went wrong while this note was being written, so there is nothing to show.';
-}
 
 function hostname(url?: string): string {
     if (!url) return '';

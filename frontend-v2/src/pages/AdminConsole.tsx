@@ -49,7 +49,7 @@ import { EmptyState } from '../components/ui/empty-state';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useCompactLayout } from '../hooks/useMediaQuery';
-import { formatDateTime } from '../lib/datetime';
+import { formatDateTime, formatTimeAgo } from '../lib/datetime';
 
 /**
  * The one account allowed to revoke another admin's access.
@@ -283,6 +283,18 @@ export function AdminConsole() {
     };
 
     const handleUpdateRole = async (userId: string, role: string) => {
+        // A change of privileges is never one tap away.
+        const who = identities.find((u) => u.id === userId)?.email ?? 'this user';
+        const makingAdmin = role === 'admin';
+        const confirmed = await confirm({
+            title: makingAdmin ? `Make ${who} an admin?` : `Remove the admin role from ${who}?`,
+            description: makingAdmin
+                ? 'Admins can manage users, credits, tickers and comments.'
+                : 'They keep their account and lose access to the admin console.',
+            confirmLabel: makingAdmin ? 'Make admin' : 'Remove admin role',
+            destructive: !makingAdmin,
+        });
+        if (!confirmed) return;
         try {
             await AdminService.updateRole(userId, role);
             setIdentities(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
@@ -421,6 +433,12 @@ export function AdminConsole() {
             const aVal = (a as any)[sortConfig.key];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const bVal = (b as any)[sortConfig.key];
+
+            // No value (never signed in, no balance yet) goes last either way,
+            // instead of landing wherever the comparison happens to leave it.
+            const aMissing = aVal === null || aVal === undefined || aVal === '';
+            const bMissing = bVal === null || bVal === undefined || bVal === '';
+            if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1;
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -786,6 +804,9 @@ export function AdminConsole() {
                                                                         <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('created_at')}>
                                                                             <div className="flex items-center gap-1">Joined {renderSortIcon('created_at')}</div>
                                                                         </TableHead>
+                                                                        <TableHead className="cursor-pointer text-muted-foreground font-medium" onClick={() => handleSort('last_login')}>
+                                                                            <div className="flex items-center gap-1">Last login {renderSortIcon('last_login')}</div>
+                                                                        </TableHead>
                                                                         <TableHead className="text-right text-muted-foreground font-medium pr-6">Actions</TableHead>
                                                                     </TableRow>
                                                                 </TableHeader>
@@ -824,6 +845,15 @@ export function AdminConsole() {
                                                                             </TableCell>
                                                                             <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                                                                                 {formatDateTime(user.created_at || user.invited_at)}
+                                                                            </TableCell>
+                                                                            <TableCell className="font-mono text-xs whitespace-nowrap">
+                                                                                {user.last_login ? (
+                                                                                    <time dateTime={user.last_login} title={formatDateTime(user.last_login)} className="text-foreground/90">
+                                                                                        {formatTimeAgo(user.last_login)}
+                                                                                    </time>
+                                                                                ) : (
+                                                                                    <span className="text-muted-foreground">Never</span>
+                                                                                )}
                                                                             </TableCell>
                                                                             <TableCell className="text-right pr-6 rounded-r-lg py-3">
                                                                                 <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>

@@ -106,6 +106,11 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loa
     // added as the width allows, so it never needs a sideways scroll. The
     // fallbacks keep the full table in unit tests (no matchMedia there).
     const wide = useMediaQuery('(min-width: 1280px)', true);
+    // The trend column and the "Buy" / "Sell" words need about 1,390px of
+    // page: measured, the full table is 1,360px wide. Below that they would
+    // push the table past its container and the sticky Actions column would
+    // sit on top of the AI rating.
+    const roomy = useMediaQuery('(min-width: 1440px)', true);
     const extraWide = useMediaQuery('(min-width: 1536px)', true);
     const { displayCurrency, formatNative } = useCurrency();
     const columnHelper = createColumnHelper<Position>();
@@ -175,10 +180,10 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loa
                                     </div>
                                 )}
                             </div>
-                            <span className="max-w-[110px] truncate text-xs text-muted-foreground xl:max-w-[180px]">
+                            <span className="max-w-[100px] truncate text-xs text-muted-foreground xl:max-w-[180px]">
                                 {ticker?.name || 'Unknown'}
                             </span>
-                            <span className="max-w-[110px] truncate text-[11px] text-muted-foreground xl:max-w-[180px]">
+                            <span className="max-w-[100px] truncate text-[11px] text-muted-foreground xl:max-w-[180px]">
                                 {ticker?.industry || ticker?.sector || fundamentals?.sector || 'Unknown Sector'}
                             </span>
                         </div>
@@ -362,7 +367,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loa
                                 aria-label={`Buy more ${row.symbol}`}
                             >
                                 <ShoppingCart size={14} />
-                                {wide && 'Buy'}
+                                {roomy && 'Buy'}
                             </button>
                         )}
                         {onSell && (
@@ -374,7 +379,7 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loa
                                 aria-label={`Sell ${row.symbol}`}
                             >
                                 <Banknote size={14} />
-                                {wide && 'Sell'}
+                                {roomy && 'Sell'}
                             </button>
                         )}
                         {onEdit && (
@@ -403,10 +408,10 @@ export function PortfolioTable({ positions, onDelete, onEdit, onSell, onBuy, loa
         })
     ];
 
-    // Trend from 1280px, the 52-week track from 1536px (see the hook above).
+    // Trend from 1440px, the 52-week track from 1536px (see the hooks above).
     const visibleColumns = columns.filter((column) => {
         const id = (column as { id?: string; accessorKey?: string }).id ?? (column as { accessorKey?: string }).accessorKey;
-        if (id === 'sparkline') return wide;
+        if (id === 'sparkline') return roomy;
         if (id === '52wk') return extraWide;
         return true;
     });
