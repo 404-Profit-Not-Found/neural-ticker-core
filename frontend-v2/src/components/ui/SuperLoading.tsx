@@ -1,3 +1,4 @@
+import { Brand } from '../common/Brand';
 import { cn } from '../../lib/utils';
 
 interface SuperLoadingProps {
@@ -31,12 +32,7 @@ export function SuperLoading({ text, symbol, className, fullScreen = false }: Su
             )}
             style={{ backgroundColor: 'var(--boot-bg)', color: 'var(--boot-text)' }}
         >
-            <div className="flex items-center gap-3 text-[28px] font-bold leading-none tracking-[-0.02em]">
-                <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[34px] w-auto shrink-0" />
-                <span>
-                    NeuralTicker<span style={{ color: 'var(--boot-muted)' }}>.com</span>
-                </span>
-            </div>
+            <Brand className="text-[28px] tracking-[-0.02em]" suffixStyle={{ color: 'var(--boot-muted)' }} />
             <div className="h-0.5 w-[168px] overflow-hidden rounded-[2px] bg-[rgb(128_128_128/0.22)]">
                 <div
                     className="h-full w-[30%] motion-safe:animate-progress-bar motion-reduce:w-full motion-reduce:opacity-50"

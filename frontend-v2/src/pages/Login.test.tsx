@@ -20,7 +20,7 @@ describe('Login Page', () => {
 
         // Check for the main title
         // Brand lockup: logo + "NeuralTicker.com", as in the app header.
-        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('NeuralTicker.com');
+        expect(screen.getByRole('heading', { level: 1, name: 'NeuralTicker.com' })).toBeInTheDocument();
 
         // Check for the Google Sign in button text
         expect(screen.getByText('Sign in with Google')).toBeInTheDocument();

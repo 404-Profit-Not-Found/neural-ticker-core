@@ -57,18 +57,21 @@
 
     .boot-brand {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      align-items: baseline;
       font-size: 28px;
       font-weight: 700;
       line-height: 1;
       letter-spacing: -0.02em;
     }
 
+    /* The mark is the first letter of the wordmark — same figures as
+       src/components/common/Brand.tsx. */
     .boot-brand svg {
-      height: 34px;
+      height: 0.76em;
       width: auto;
       flex: none;
+      margin-right: 0.05em;
+      transform: translateY(0.02em);
     }
 
     .boot-brand span span,
@@ -137,7 +140,7 @@
           <rect x="0" y="0" width="100" height="512" rx="50" fill="#6d28d9" />
           <line x1="50" y1="50" x2="350" y2="462" stroke="url(#boot-n)" stroke-width="100" stroke-linecap="round" />
         </svg>
-        <span>NeuralTicker<span>.com</span></span>
+        <span aria-hidden="true">euralTicker<span>.com</span></span>
       </div>
       <div class="boot-bar"><div></div></div>
       <p class="boot-status">Loading</p>
