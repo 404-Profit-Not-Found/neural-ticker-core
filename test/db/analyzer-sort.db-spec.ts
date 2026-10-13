@@ -112,6 +112,12 @@ describeDb('analyzer sort order (real PostgreSQL)', () => {
     expect(seen).toEqual(['AAA', 'BBB', 'CCC', 'NADA', 'NOAI', 'ZNEW']);
   });
 
+  it('sorts by symbol in both directions (the tie-break must not undo DESC)', async () => {
+    const asc = await order('symbol', 'ASC');
+    expect(asc).toEqual(['AAA', 'BBB', 'CCC', 'NADA', 'NOAI', 'ZNEW']);
+    expect(await order('symbol', 'DESC')).toEqual([...asc].reverse());
+  });
+
   it('the same request twice returns the same order', async () => {
     const first = await order('ai_rating', 'DESC');
     expect(await order('ai_rating', 'DESC')).toEqual(first);
