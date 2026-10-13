@@ -326,7 +326,9 @@ describe('ResearchController', () => {
       mockResearchService.updateTitle.mockResolvedValue(note);
       const req = { user: { id: 'user1' } };
 
-      const result = await controller.updateTitle(req, '1', 'New Title');
+      const result = await controller.updateTitle(req, '1', {
+        title: 'New Title',
+      });
 
       expect(result).toEqual(note);
       expect(mockResearchService.updateTitle).toHaveBeenCalledWith(
@@ -342,9 +344,9 @@ describe('ResearchController', () => {
       );
       const req = { user: { id: 'user1' } };
 
-      await expect(controller.updateTitle(req, '999', 'Title')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        controller.updateTitle(req, '999', { title: 'Title' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException for unauthorized access', async () => {
@@ -353,9 +355,9 @@ describe('ResearchController', () => {
       );
       const req = { user: { id: 'user1' } };
 
-      await expect(controller.updateTitle(req, '1', 'Title')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        controller.updateTitle(req, '1', { title: 'Title' }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

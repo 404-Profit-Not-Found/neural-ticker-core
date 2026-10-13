@@ -45,14 +45,26 @@ import {
   ArrayNotEmpty,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { NumericIdPipe } from '../../common/pipes/numeric-id.pipe';
+import { TICKER_SYMBOL_REGEX } from '../tickers/utils/ticker-symbol.util';
 
-// Ticker symbols are uppercase alphanumerics plus dot/hyphen (e.g. BRK.B,
-// RDS-A), max 10 chars. Mirrors ticker-requests.service.ts. Symbols that pass
-// this format check are still validated against the ticker universe in the
-// service layer before being used as DB upsert keys.
-const TICKER_SYMBOL_REGEX = /^[A-Z0-9.-]{1,10}$/;
+// Symbols that pass the TICKER_SYMBOL_REGEX format check are still validated
+// against the ticker universe in the service layer before being used as DB
+// upsert keys.
 const MAX_TICKERS_PER_REQUEST = 10;
 const MAX_QUESTION_LENGTH = 2000;
+const MAX_TITLE_LENGTH = 200;
+// An uploaded note is a whole research report (and is fed to the LLM judge),
+// so the cap is generous but finite.
+const MAX_NOTE_CONTENT_LENGTH = 100000;
+
+// Uploads have always been normalized (trim + upper-case) by the service, so
+// "aapl" stays acceptable: normalize first, then check the symbol format.
+const normalizeTickers = ({ value }: { value: unknown }) =>
+  Array.isArray(value)
+    ? value.map((t) => (typeof t === 'string' ? t.trim().toUpperCase() : t))
+    : value;
 
 // ... DTO stays same ...
 export class AskResearchDto {
@@ -132,17 +144,24 @@ export class AskResearchDto {
   apiKey?: string;
 }
 
-class UploadResearchDto {
+export class UploadResearchDto {
   @ApiProperty({
     example: ['AAPL'],
     description: 'Tickers related to this note',
   })
+  @Transform(normalizeTickers)
   @IsArray()
+  @ArrayMaxSize(MAX_TICKERS_PER_REQUEST)
   @IsString({ each: true })
+  @Matches(TICKER_SYMBOL_REGEX, {
+    each: true,
+    message: 'Each ticker must be 1-10 chars of A-Z, 0-9, dot or hyphen.',
+  })
   tickers: string[];
 
   @ApiProperty({ example: 'My Thesis', description: 'Title of the research' })
   @IsString()
+  @MaxLength(MAX_TITLE_LENGTH)
   title: string;
 
   @ApiProperty({
@@ -150,10 +169,12 @@ class UploadResearchDto {
     description: 'Markdown content',
   })
   @IsString()
+  @MaxLength(MAX_NOTE_CONTENT_LENGTH)
   content: string;
 
   @ApiProperty({ required: false, default: 'completed' })
   @IsString()
+  @MaxLength(20)
   @IsOptional()
   status?: string;
 
@@ -163,17 +184,24 @@ class UploadResearchDto {
     description: 'Model used for generation',
   })
   @IsString()
+  @MaxLength(100)
   @IsOptional()
   model?: string;
 }
 
-class ContributeDto {
+export class ContributeDto {
   @ApiProperty({
     example: ['AAPL'],
     description: 'Tickers related to this note',
   })
+  @Transform(normalizeTickers)
   @IsArray()
+  @ArrayMaxSize(MAX_TICKERS_PER_REQUEST)
   @IsString({ each: true })
+  @Matches(TICKER_SYMBOL_REGEX, {
+    each: true,
+    message: 'Each ticker must be 1-10 chars of A-Z, 0-9, dot or hyphen.',
+  })
   tickers: string[];
 
   @ApiProperty({
@@ -181,7 +209,17 @@ class ContributeDto {
     description: 'Markdown content of the research',
   })
   @IsString()
+  @MaxLength(MAX_NOTE_CONTENT_LENGTH)
   content: string;
+}
+
+export class UpdateTitleDto {
+  @ApiProperty({ example: 'NVDA: Data-Center Demand Still Accelerating' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Matches(/\S/, { message: 'title must not be empty' })
+  @MaxLength(MAX_TITLE_LENGTH)
+  title: string;
 }
 
 export class StreamResearchDto {
@@ -431,7 +469,10 @@ export class ResearchController {
   })
   @ApiResponse({ status: 404, description: 'Ticket not found. Invalid ID.' })
   @Get(':id')
-  async getResearch(@Request() req: any, @Param('id') id: string) {
+  async getResearch(
+    @Request() req: any,
+    @Param('id', NumericIdPipe) id: string,
+  ) {
     const note = await this.researchService.getResearchNote(id);
     if (!note) {
       throw new NotFoundException(`Research note ${id} not found`);
@@ -450,7 +491,7 @@ export class ResearchController {
   @ApiResponse({ status: 200, description: 'Ticket deleted successfully.' })
   @ApiResponse({ status: 404, description: 'Ticket not found.' })
   @Delete(':id')
-  async delete(@Request() req: any, @Param('id') id: string) {
+  async delete(@Request() req: any, @Param('id', NumericIdPipe) id: string) {
     const userId = req.user.id;
     // Optional: Check if exists first or just delete
     // Service now handles permission checking
@@ -464,12 +505,12 @@ export class ResearchController {
   @Post(':id/title') // Using POST or PATCH
   async updateTitle(
     @Request() req: any,
-    @Param('id') id: string,
-    @Body('title') title: string,
+    @Param('id', NumericIdPipe) id: string,
+    @Body() dto: UpdateTitleDto,
   ) {
     const userId = req.user.id;
     try {
-      return await this.researchService.updateTitle(id, userId, title);
+      return await this.researchService.updateTitle(id, userId, dto.title);
     } catch (e) {
       if (e.message === 'Research note not found')
         throw new NotFoundException(e.message);
@@ -571,7 +612,10 @@ export class ResearchController {
     description: 'Returns the signed URL',
   })
   @Get(':id/share-link')
-  async getShareLink(@Request() req: any, @Param('id') id: string) {
+  async getShareLink(
+    @Request() req: any,
+    @Param('id', NumericIdPipe) id: string,
+  ) {
     const note = await this.researchService.getResearchNote(id);
     if (!note) throw new NotFoundException('Research note not found');
 

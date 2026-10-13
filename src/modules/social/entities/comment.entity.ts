@@ -7,11 +7,14 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '../../users/entities/user.entity';
 
 @Entity('comments')
+@Index('idx_comments_parent_id', ['parent_id'])
+@Index('idx_comments_moderation_status', ['moderation_status'])
 export class Comment {
   @ApiProperty({ example: '1', description: 'Unique ID' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -42,7 +45,10 @@ export class Comment {
     onDelete: 'CASCADE',
     nullable: true,
   })
-  @JoinColumn({ name: 'parent_id' })
+  @JoinColumn({
+    name: 'parent_id',
+    foreignKeyConstraintName: 'comments_parent_id_fkey',
+  })
   parent: Comment | null;
 
   @OneToMany(() => Comment, (comment) => comment.parent)

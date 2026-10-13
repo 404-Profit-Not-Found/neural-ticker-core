@@ -1,4 +1,4 @@
-# --- Stage 1: Build Frontend ---
+# --- Stage 1: Build the previous web client (kept as a rollback: FRONTEND_LEGACY=true) ---
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 # Copy frontend package files
@@ -9,6 +9,14 @@ RUN npm ci
 # Copy frontend source
 COPY frontend/ .
 # Build frontend
+RUN npm run build
+
+# --- Stage 1b: Build the web client served at / (frontend-v2) ---
+FROM node:22-alpine AS frontend-v2-builder
+WORKDIR /app/frontend-v2
+COPY frontend-v2/package*.json ./
+RUN npm ci
+COPY frontend-v2/ .
 RUN npm run build
 
 # --- Stage 2: Build Backend ---
@@ -44,8 +52,11 @@ RUN npm ci --only=production
 # Copy built backend assets
 COPY --from=backend-builder /app/dist ./dist
 
-# Copy built frontend assets to the "client" folder expected by ServeStaticModule
+# Previous client: served instead of the default only when FRONTEND_LEGACY=true
 COPY --from=frontend-builder /app/client ./client
+
+# Default client: app.module.ts serves <dist>/../frontend-v2/dist at /
+COPY --from=frontend-v2-builder /app/frontend-v2/dist ./frontend-v2/dist
 
 # Create a non-root user for security (optional but recommended for Cloud Run)
 # Alpine images usually have 'node' user

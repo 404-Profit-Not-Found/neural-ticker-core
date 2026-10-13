@@ -1,3 +1,11 @@
+/**
+ * The default "Flash Lite" model: the user-facing `low` research tier AND the
+ * background tiers (extraction, cron, summary, recommendation, scoring, comment
+ * moderation). ONE literal — everything that needs this default reads it from
+ * here, so the next model change is a one-line edit.
+ */
+export const GEMINI_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite';
+
 export default () => {
   return {
     env: process.env.APP_ENV || 'local',
@@ -53,8 +61,9 @@ export default () => {
         // On a 429 it falls back to the other free models; the legacy 2.5
         // models are no longer in the fallback chain. The high-volume
         // background tiers (extraction/cron/summary/recommendation/scoring)
-        // deliberately stay on the cheaper gemini-3.1-flash-lite.
-        low: process.env.GEMINI_MODEL_LOW || 'gemini-3.5-flash-lite',
+        // now run on the SAME model — so they also share its free quota at
+        // Google with interactive "Flash Lite" research.
+        low: process.env.GEMINI_MODEL_LOW || GEMINI_FLASH_LITE_MODEL,
         // 'medium' = the balanced "flash" tier. gemini-3.8-flash has no
         // '-preview' suffix, so it runs on the primary (free) key.
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3.8-flash',
@@ -62,16 +71,17 @@ export default () => {
         // (secondary) key, so it MUST keep the gated '-preview' suffix.
         deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3.1-pro-preview',
         extraction:
-          process.env.GEMINI_MODEL_EXTRACTION || 'gemini-3.1-flash-lite',
+          process.env.GEMINI_MODEL_EXTRACTION || GEMINI_FLASH_LITE_MODEL,
         // Local text tasks (summarize / score / recommend over text already in
-        // the prompt — no web search). Hardcoded to flash-lite (not env-tunable)
-        // on purpose: on the paid (Tier 2) key Gemma has the lowest TPM of any
-        // model (16K) and a small context, so big notes 429'd it; flash-lite
-        // gives 10M TPM, a 1M context, and is cheap. Change the literal below to
-        // switch back to a gemma-* id.
-        summary: 'gemini-3.1-flash-lite',
-        recommendation: 'gemini-3.1-flash-lite',
-        scoring: 'gemini-3.1-flash-lite',
+        // the prompt — no web search; comment moderation uses the `scoring`
+        // tier too). Flash Lite, and not env-tunable, on purpose: on the paid
+        // (Tier 2) key Gemma has the lowest TPM of any model (16K) and a small
+        // context, so big notes 429'd it; flash-lite gives 10M TPM, a 1M
+        // context, and is cheap. Change GEMINI_FLASH_LITE_MODEL above (or the
+        // entries below, to split a tier off) to move them.
+        summary: GEMINI_FLASH_LITE_MODEL,
+        recommendation: GEMINI_FLASH_LITE_MODEL,
+        scoring: GEMINI_FLASH_LITE_MODEL,
       },
     },
     llm: {
@@ -80,6 +90,23 @@ export default () => {
       // own and never escalates to the billed secondary key. DB-backed counter
       // (llm_daily_usage) survives Cloud Run instance restarts.
       dailyFreeLimit: parseInt(process.env.LLM_DAILY_FREE_LIMIT || '450', 10),
+    },
+    userSecrets: {
+      // Keys for encrypting per-user secrets at rest (a user's personal Gemini
+      // API key): "k2:<base64 32 bytes>,k1:<base64 32 bytes>" — first = active,
+      // the rest decrypt only. Unset = stored unencrypted, as before. Parsed
+      // and validated by SecretBox when the application starts.
+      keys: process.env.USER_SECRETS_KEYS,
+    },
+    tickers: {
+      // New tickers one non-admin user may make the platform start tracking
+      // per 24 hours (each one costs provider calls + a research run). Admins
+      // are exempt; tickers already tracked are never affected. 0 = non-admins
+      // can only use the ticker-request flow.
+      createDailyLimit: parseInt(
+        process.env.TICKER_CREATE_DAILY_LIMIT || '10',
+        10,
+      ),
     },
     riskReward: {
       enabled: process.env.RRSCORE_ENABLED !== 'false',

@@ -52,6 +52,23 @@ describe('QualityScoringService', () => {
     }
   });
 
+  it('passes freeOnly on to the LLM only when asked to', async () => {
+    (llmService.generateResearch as jest.Mock).mockResolvedValue({
+      answerMarkdown: '{"score": 50, "rarity": "Uncommon", "details": {}}',
+    });
+
+    await service.score('content', { freeOnly: true });
+    expect(
+      (llmService.generateResearch as jest.Mock).mock.calls[0][0],
+    ).toMatchObject({ quality: 'scoring', freeOnly: true });
+
+    (llmService.generateResearch as jest.Mock).mockClear();
+    await service.score('content');
+    expect(
+      (llmService.generateResearch as jest.Mock).mock.calls[0][0],
+    ).not.toHaveProperty('freeOnly');
+  });
+
   it('should handle Epic rarity', async () => {
     const mockReponse = {
       answerMarkdown: JSON.stringify({

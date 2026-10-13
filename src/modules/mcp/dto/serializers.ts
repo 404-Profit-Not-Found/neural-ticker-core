@@ -131,7 +131,8 @@ export function serializePendingOrder(o: any): Record<string, unknown> | null {
     currency: o.currency,
     status: o.status,
     region: o.region,
-    requested_price: o.requested_price == null ? null : Number(o.requested_price),
+    requested_price:
+      o.requested_price == null ? null : Number(o.requested_price),
     fees: Number(o.fees),
     note: o.note,
     attempts: o.attempts,
@@ -188,7 +189,8 @@ export function serializeWatchlistItem(it: any): Record<string, unknown> {
 export function serializeTickerRequest(r: any): Record<string, unknown> | null {
   if (!r) return null;
   const out: Record<string, unknown> = {
-    id: String(r.id),
+    // No id / user_id when the pending request belongs to someone else.
+    id: r.id != null ? String(r.id) : undefined,
     symbol: r.symbol,
     status: r.status,
     user_id: r.user_id,

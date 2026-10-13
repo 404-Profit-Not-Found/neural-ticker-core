@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import { showBanner } from './utils/banner.util';
 import { json, urlencoded } from 'express';
 import helmet from 'helmet';
+import { legacyV2RedirectTarget } from './utils/legacy-v2-redirect.util';
 
 async function bootstrap() {
   console.log('--- BOOTSTRAP STARTING ---');
@@ -54,6 +55,21 @@ async function bootstrap() {
   );
 
   app.use(cookieParser());
+
+  // The web client used to be served under /v2/ while it was opt-in; it is
+  // now the default at /. Send old links to the same page there (always a
+  // same-origin path — see legacyV2RedirectTarget).
+  app.use(
+    '/v2',
+    (
+      req: { method: string; url?: string },
+      res: { redirect: (status: number, url: string) => void },
+      next: () => void,
+    ) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      res.redirect(302, legacyV2RedirectTarget(req.url));
+    },
+  );
   console.log('--- NEST APP CREATED ---');
 
   // Disable ETags to ensure 200 OK with data (fix for 304 empty body filtering issue)

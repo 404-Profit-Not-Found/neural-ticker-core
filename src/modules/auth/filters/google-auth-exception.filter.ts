@@ -1,6 +1,6 @@
 import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 
 @Catch()
 export class GoogleAuthExceptionFilter implements ExceptionFilter {
@@ -17,6 +17,7 @@ export class GoogleAuthExceptionFilter implements ExceptionFilter {
       exception instanceof Error ? exception.message : String(exception);
     this.logger.error(`Google Auth Failed: ${errorMessage}`);
 
+    // The web client lives at the origin root (see app.module.ts).
     const frontendUrl =
       this.configService.get<string>('frontendUrl') || 'http://localhost:5173';
 

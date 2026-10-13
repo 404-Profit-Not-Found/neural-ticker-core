@@ -7,7 +7,6 @@ import {
   Param,
   UseGuards,
   Req,
-  UnauthorizedException,
   BadRequestException,
   Patch,
 } from '@nestjs/common';
@@ -20,8 +19,13 @@ import { ResearchService } from '../research/research.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { User } from './entities/user.entity';
+import { AccountUser, toAccountUser } from './public-user';
 import { AllowedUser } from './entities/allowed-user.entity';
+import {
+  AddToUserlistDto,
+  GiftCreditsDto,
+  UpdateUserTierDto,
+} from './dto/admin.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -39,7 +43,7 @@ export class AdminController {
 
   @Get('users')
   @ApiOperation({ summary: 'List all registered users' })
-  async getUsers(): Promise<User[]> {
+  async getUsers(): Promise<AccountUser[]> {
     return this.usersService.findAll();
   }
 
@@ -59,8 +63,10 @@ export class AdminController {
 
   @Post('userlist')
   @ApiOperation({ summary: 'Add email to userlist' })
-  async addToUserlist(@Body() body: { email: string; addedBy?: string }) {
-    if (!body.email) throw new UnauthorizedException('Email required');
+  async addToUserlist(@Body() body: AddToUserlistDto) {
+    // The DTO requires a well-formed email (400). This used to answer a
+    // missing email with a 401, which the clients treat as an expired session.
+    if (!body.email) throw new BadRequestException('Email required');
     return this.usersService.allowEmail(body.email, body.addedBy || 'admin');
   }
 
@@ -93,10 +99,10 @@ export class AdminController {
   }
 
   @Patch('users/:id/tier')
-  @ApiOperation({ summary: 'Update user tier (free/pro)' })
+  @ApiOperation({ summary: 'Update user tier (free/pro/whale)' })
   async updateUserTier(
     @Param('id') id: string,
-    @Body() body: { tier: 'free' | 'pro' },
+    @Body() body: UpdateUserTierDto,
   ) {
     // We should implement updateTier in UsersService or just save it here
     // For simplicity, reusing UsersService update or direct repo approach if exposed
@@ -108,15 +114,24 @@ export class AdminController {
 
   @Post('users/:id/credits')
   @ApiOperation({ summary: 'Gift credits to user' })
-  async giftCredits(
-    @Param('id') id: string,
-    @Body() body: { amount: number; reason?: string },
-  ) {
-    return this.creditService.addCredits(
-      id,
-      body.amount,
-      (body.reason as any) || 'admin_gift',
-      { gifted_by: 'admin' },
+  async giftCredits(@Param('id') id: string, @Body() body: GiftCreditsDto) {
+    // The ledger reason is ALWAYS 'admin_gift'. The body's `reason` is the
+    // admin's free-text note (the console sends "Admin Gift") and goes into
+    // the metadata: letting it name the reason would let a gift be booked as
+    // e.g. 'manual_contribution' and count against the user's daily
+    // contribution cap.
+    const metadata: Record<string, any> = { gifted_by: 'admin' };
+    if (body.reason) metadata.note = body.reason;
+
+    // The credit service hands back the full row; an admin still never gets
+    // another user's secret preference values.
+    return toAccountUser(
+      await this.creditService.addCredits(
+        id,
+        body.amount,
+        'admin_gift',
+        metadata,
+      ),
     );
   }
 

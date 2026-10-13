@@ -1,27 +1,150 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07090f" />
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#08080a" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="description" content="NeuralTicker — AI-powered stock research, risk analysis and portfolio tracking." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Neural Ticker v2" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <link rel="manifest" href="/v2/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="/v2/icon-192.png" />
-  <link rel="icon" href="/v2/favicon.png" />
-  <title>NEURAL//TICKER — Pixel Terminal (v2)</title>
+  <meta name="apple-mobile-web-app-title" content="NeuralTicker" />
+  <title>NeuralTicker</title>
+  <script>
+    // Apply the saved theme's canvas before first paint (prevents a flash).
+    (function () {
+      var theme = 'dark';
+      try { theme = localStorage.getItem('theme-preference') || 'dark'; } catch (e) { /* private mode */ }
+      var vars = {
+        dark: ['#08080a', '#f4f4f5', '#a1a1aa', '#a78bfa'],
+        rgb: ['#08080a', '#f4f4f5', '#a1a1aa', '#a78bfa'],
+        light: ['#f0f1f4', '#09090b', '#5f5f69', '#6d28d9'],
+        gray: ['#e4e4e7', '#18181b', '#52525b', '#6d28d9']
+      }[theme] || ['#08080a', '#f4f4f5', '#a1a1aa', '#a78bfa'];
+      var root = document.documentElement;
+      root.style.setProperty('--boot-bg', vars[0]);
+      root.style.setProperty('--boot-text', vars[1]);
+      root.style.setProperty('--boot-muted', vars[2]);
+      root.style.setProperty('--boot-accent', vars[3]);
+    })();
+  </script>
+  <style>
+    body {
+      margin: 0;
+      background-color: var(--boot-bg, #08080a);
+      font-family: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
 
-  <!-- Pixel fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-    rel="stylesheet">
+    /* Boot splash: the mark, the name, one thin progress line. The React
+       loader (SuperLoading) draws the same thing, so the hand-off is invisible. */
+    .boot {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      background-color: var(--boot-bg, #08080a);
+      color: var(--boot-text, #f4f4f5);
+    }
+
+    .boot-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .boot-brand svg {
+      height: 34px;
+      width: auto;
+      flex: none;
+    }
+
+    .boot-brand span span,
+    .boot-status,
+    .boot-version {
+      color: var(--boot-muted, #a1a1aa);
+    }
+
+    .boot-bar {
+      width: 168px;
+      height: 2px;
+      overflow: hidden;
+      border-radius: 2px;
+      background: rgba(128, 128, 128, 0.22);
+    }
+
+    .boot-bar div {
+      width: 30%;
+      height: 100%;
+      background: var(--boot-accent, #a78bfa);
+      animation: bootProgress 1.6s linear infinite;
+    }
+
+    .boot-status,
+    .boot-version {
+      margin: 0;
+      font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .boot-version {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    @keyframes bootProgress {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(334%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot-bar div { animation: none; width: 100%; opacity: 0.5; }
+    }
+  </style>
 </head>
+
 <body>
-  <div id="app"></div>
+  <div id="root">
+    <div class="boot" role="status" aria-label="Loading NeuralTicker">
+      <div class="boot-brand">
+        <svg viewBox="0 0 400 512" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="boot-n" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7c3aed" />
+              <stop offset="100%" stop-color="#4f46e5" />
+            </linearGradient>
+          </defs>
+          <rect x="300" y="0" width="100" height="512" rx="50" fill="#4338ca" />
+          <rect x="0" y="0" width="100" height="512" rx="50" fill="#6d28d9" />
+          <line x1="50" y1="50" x2="350" y2="462" stroke="url(#boot-n)" stroke-width="100" stroke-linecap="round" />
+        </svg>
+        <span>NeuralTicker<span>.com</span></span>
+      </div>
+      <div class="boot-bar"><div></div></div>
+      <p class="boot-status">Loading</p>
+      <span class="boot-version">v%APP_VERSION%</span>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
+
 </html>

@@ -71,6 +71,16 @@ class EnvironmentVariables {
   @IsOptional()
   RRSCORE_PROVIDER: string;
 
+  // Format and key sizes are validated by SecretBox when the app starts.
+  @IsString()
+  @IsOptional()
+  USER_SECRETS_KEYS: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  TICKER_CREATE_DAILY_LIMIT: number;
+
   @IsNumber()
   @IsOptional()
   HTTP_READ_TIMEOUT_SEC: number;

@@ -8,6 +8,23 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { TickerRequestEntity } from './entities/ticker-request.entity';
 import { TickersService } from '../tickers/tickers.service';
+import {
+  ADMIN_USER_SUMMARY_FIELDS,
+  toAdminUserSummary,
+  userColumns,
+} from '../users/public-user';
+
+/**
+ * What a requester gets back: their own request row — or, when the symbol is
+ * already pending for someone else, just its state.
+ */
+export type TickerRequestReceipt = Pick<
+  TickerRequestEntity,
+  'symbol' | 'status'
+> &
+  Partial<
+    Pick<TickerRequestEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  >;
 
 @Injectable()
 export class TickerRequestsService {
@@ -21,7 +38,10 @@ export class TickerRequestsService {
 
   static readonly DAILY_REQUEST_LIMIT = 20;
 
-  async createRequest(userId: string, symbol: string) {
+  async createRequest(
+    userId: string,
+    symbol: string,
+  ): Promise<TickerRequestReceipt> {
     const startSymbol = (symbol || '').trim().toUpperCase();
     if (!/^[A-Z0-9.-]{1,10}$/.test(startSymbol)) {
       throw new BadRequestException('Invalid ticker symbol format');
@@ -67,7 +87,13 @@ export class TickerRequestsService {
 
         if (existingRequest) {
           this.logger.log(`Pending request already exists for ${startSymbol}`);
-          return existingRequest;
+          // The pending row may be ANOTHER user's: the caller learns that the
+          // symbol is already requested, not who asked (id, user_id, dates).
+          const receipt: TickerRequestReceipt =
+            existingRequest.user_id === userId
+              ? existingRequest
+              : { symbol: startSymbol, status: 'PENDING' };
+          return receipt;
         }
 
         // 3. Create request
@@ -110,11 +136,22 @@ export class TickerRequestsService {
     }
   }
 
+  /**
+   * ADMIN-ONLY listing. Each request carries a summary of its requester
+   * (public view + email/full name) — never the `users` row, whose
+   * `preferences` can hold the requester's API key.
+   */
   async getRequests() {
-    return this.requestRepo.find({
-      order: { created_at: 'DESC' },
-      relations: ['user'],
-    });
+    const requests = await this.requestRepo
+      .createQueryBuilder('request')
+      .leftJoin('request.user', 'user')
+      .addSelect(userColumns('user', ADMIN_USER_SUMMARY_FIELDS))
+      .orderBy('request.created_at', 'DESC')
+      .getMany();
+    return requests.map((request) => ({
+      ...request,
+      user: toAdminUserSummary(request.user),
+    }));
   }
 
   /**

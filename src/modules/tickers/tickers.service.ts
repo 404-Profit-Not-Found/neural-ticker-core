@@ -2,25 +2,59 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  BadRequestException,
   HttpException,
   Inject,
   forwardRef,
   HttpStatus,
 } from '@nestjs/common';
 import { getErrorMessage } from '../../utils/error.util';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { EntityManager, Repository, ILike, In, MoreThanOrEqual } from 'typeorm';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity'; // Added
 import { PriceOhlcv } from '../market-data/entities/price-ohlcv.entity';
-import { inferCurrencyFromExchange } from './utils/exchange-currency.util';
+import {
+  inferCurrencyFromExchange,
+  isUsStyleSymbol,
+} from './utils/exchange-currency.util';
+import {
+  TICKER_SYMBOL_REGEX,
+  normalizeTickerSymbol,
+} from './utils/ticker-symbol.util';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { JobsService } from '../jobs/jobs.service'; // Added
 import { RequestType } from '../jobs/entities/request-queue.entity'; // Added
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import {
+  RequestActor,
+  currentActor,
+} from '../../common/request-actor/request-actor';
+
+/**
+ * 429 for a non-admin user who has created their daily allowance of NEW
+ * tickers. A class of its own so callers can tell it from a provider rate
+ * limit, which is also a 429 but transient.
+ */
+export class TickerCreationCapException extends HttpException {
+  constructor(limit: number) {
+    super(
+      {
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        error: 'Too Many Requests',
+        message:
+          `You have reached the limit of ${limit} new tickers per day. ` +
+          'Tickers already on the platform are not affected. To get another ' +
+          'one added, submit a ticker request instead.',
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+}
 
 @Injectable()
 export class TickersService {
@@ -41,6 +75,7 @@ export class TickersService {
     @Inject(forwardRef(() => JobsService))
     private readonly jobsService: JobsService,
     private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getTicker(symbol: string, isAdmin = false): Promise<TickerEntity> {
@@ -50,6 +85,124 @@ export class TickersService {
       throw new NotFoundException(`Ticker ${symbol} not found`);
     }
     return ticker;
+  }
+
+  /**
+   * Gate for the PUBLIC ticker reads (the composite / snapshot / news /
+   * history / profile routes and the anonymous MCP market-data tools). Call it
+   * before anything else in the handler.
+   *
+   * Those reads resolve their symbol through ensureTicker(), which — for a
+   * symbol we do not track yet — asks the data providers, INSERTS the ticker
+   * and starts its initialisation (history sync + an LLM research run). That
+   * is fine for a signed-in user discovering a ticker; an anonymous caller
+   * must never be able to trigger it.
+   *
+   *  1. not a plausible symbol at all (empty, or longer than 32 characters)
+   *                                  → 400, without a lookup
+   *  2. a ticker we already track    → allowed for everyone, WHATEVER its
+   *                                    symbol looks like: the format rule
+   *                                    below must never lock an existing
+   *                                    listing out (`RELIANCE.NS` is 11
+   *                                    characters, indices start with `^`)
+   *  3. untracked + malformed        → 400: the strict pattern guards
+   *                                    creation and provider calls
+   *  4. untracked + anonymous        → 404, whether or not a provider knows
+   *                                    the symbol
+   *  5. untracked + signed-in        → passes (creation works as before)
+   */
+  async assertPublicReadAllowed(
+    symbol: string,
+    isSignedIn: boolean,
+  ): Promise<void> {
+    const normalized = normalizeTickerSymbol(symbol);
+    if (!TickersService.isLookupCandidate(normalized)) {
+      throw new BadRequestException('Invalid ticker symbol format');
+    }
+
+    const tracked = await this.tickerRepo.count({
+      where: { symbol: normalized },
+    });
+    const refusal = TickersService.publicReadRefusal(
+      normalized,
+      tracked > 0,
+      isSignedIn,
+    );
+    if (refusal) throw refusal;
+  }
+
+  /**
+   * The same gate for a LIST of symbols, with one lookup: which of them may be
+   * read, and — per refused symbol — why not. Never throws.
+   */
+  async partitionPublicRead(
+    symbols: string[],
+    isSignedIn: boolean,
+  ): Promise<{
+    readable: string[];
+    refused: { symbol: string; error: string }[];
+  }> {
+    const normalized = [
+      ...new Set((symbols || []).map((s) => normalizeTickerSymbol(s))),
+    ].filter(Boolean);
+    const candidates = normalized.filter((s) =>
+      TickersService.isLookupCandidate(s),
+    );
+
+    const trackedRows = candidates.length
+      ? await this.tickerRepo.find({
+          where: { symbol: In(candidates) },
+          select: ['symbol'],
+        })
+      : [];
+    const tracked = new Set(trackedRows.map((t) => t.symbol));
+
+    const readable: string[] = [];
+    const refused: { symbol: string; error: string }[] = [];
+    for (const symbol of normalized) {
+      const refusal = TickersService.isLookupCandidate(symbol)
+        ? TickersService.publicReadRefusal(
+            symbol,
+            tracked.has(symbol),
+            isSignedIn,
+          )
+        : new BadRequestException('Invalid ticker symbol format');
+      if (refusal) refused.push({ symbol, error: refusal.message });
+      else readable.push(symbol);
+    }
+    return { readable, refused };
+  }
+
+  /**
+   * Short enough to be a symbol, and free of control characters — worth a
+   * (parameterised) lookup. A NUL byte in particular cannot be sent to
+   * PostgreSQL as text at all: the query fails ("invalid byte sequence") and
+   * the public route answered 500 instead of 400.
+   */
+  private static isLookupCandidate(normalized: string): boolean {
+    return (
+      normalized.length >= 1 &&
+      normalized.length <= 32 &&
+      // eslint-disable-next-line no-control-regex
+      !/[\u0000-\u001f\u007f]/.test(normalized)
+    );
+  }
+
+  /** Steps 2-5 of the gate: why this read is refused, or null. */
+  private static publicReadRefusal(
+    normalized: string,
+    isTracked: boolean,
+    isSignedIn: boolean,
+  ): HttpException | null {
+    if (isTracked) return null;
+    if (!TICKER_SYMBOL_REGEX.test(normalized)) {
+      return new BadRequestException('Invalid ticker symbol format');
+    }
+    // Same body as the 404 for a ticker that is hidden.
+    if (!isSignedIn) {
+      return new NotFoundException(`Ticker ${normalized} not found`);
+    }
+    return null;
   }
 
   async findOneBySymbol(symbol: string): Promise<TickerEntity | null> {
@@ -80,6 +233,12 @@ export class TickersService {
       }
       return existing;
     }
+
+    // From here on this call CREATES a ticker. A non-admin user may only do
+    // that a limited number of times a day; refuse before spending a provider
+    // call on it. (Checked again, under a lock, at the insert below.)
+    const creator = currentActor();
+    await this.assertCreationAllowed(creator);
 
     let profile;
     let source = 'finnhub';
@@ -144,6 +303,11 @@ export class TickersService {
             );
             await this.jobsService.queueRequest(RequestType.ADD_TICKER, {
               symbol: upperSymbol,
+              // The worker creates the ticker on this user's behalf, so the
+              // retry still counts against their daily cap.
+              ...(TickersService.isCapped(creator)
+                ? { requested_by: creator.userId }
+                : {}),
             });
             throw new HttpException(
               { message: 'Ticker addition queued', status: 'QUEUED' },
@@ -195,7 +359,20 @@ export class TickersService {
       finnhub_raw: source === 'finnhub' ? profile : { yahoo_fallback: profile },
     });
 
-    const savedTicker = await this.tickerRepo.save(newTicker);
+    newTicker.created_by_user_id = creator?.userId ?? null;
+
+    const inserted = await this.insertNewTicker(newTicker, creator);
+    // Read the row back the way every later call sees it: the creator column
+    // is `select: false` and must not ride along in an API response.
+    const savedTicker = await this.tickerRepo.findOneOrFail({
+      where: { symbol: upperSymbol },
+    });
+    if (!inserted) {
+      // Another request created the same symbol while we were asking the
+      // providers. That request owns the initialisation — starting it here too
+      // would research the ticker twice.
+      return savedTicker;
+    }
 
     // Initial background sync: Download logo, Fetch Snapshot, History and Research
     void this.jobsService.initializeTicker(savedTicker.symbol);
@@ -211,6 +388,85 @@ export class TickersService {
     }
 
     return savedTicker;
+  }
+
+  // --- Per-user daily cap on NEW tickers ---------------------------------
+
+  /** New tickers a non-admin user may create per 24 hours (admins: no cap). */
+  static readonly DEFAULT_CREATE_DAILY_LIMIT = 10;
+
+  getCreateDailyLimit(): number {
+    const configured = Number(
+      this.configService.get('tickers.createDailyLimit'),
+    );
+    return Number.isInteger(configured) && configured >= 0
+      ? configured
+      : TickersService.DEFAULT_CREATE_DAILY_LIMIT;
+  }
+
+  /** The cap applies to an identified, non-admin user — not to system jobs. */
+  private static isCapped(actor: RequestActor | null): actor is RequestActor {
+    return !!actor && actor.role !== 'admin';
+  }
+
+  /** Tickers this user created in the last 24 hours. */
+  private countRecentlyCreatedBy(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<number> {
+    return manager.count(TickerEntity, {
+      where: {
+        created_by_user_id: userId,
+        created_at: MoreThanOrEqual(new Date(Date.now() - 24 * 60 * 60 * 1000)),
+      },
+    });
+  }
+
+  private async assertCreationAllowed(
+    actor: RequestActor | null,
+  ): Promise<void> {
+    if (!TickersService.isCapped(actor)) return;
+    const limit = this.getCreateDailyLimit();
+    const used = await this.countRecentlyCreatedBy(
+      this.tickerRepo.manager,
+      actor.userId,
+    );
+    if (used >= limit) throw new TickerCreationCapException(limit);
+  }
+
+  /**
+   * Inserts the new ticker. Returns false when the symbol was created by a
+   * concurrent request in the meantime (unique `symbol`).
+   *
+   * For a capped user the count and the insert happen in one transaction under
+   * an advisory lock keyed by the user, so parallel requests for different
+   * symbols cannot all pass the check and overshoot the cap.
+   */
+  private async insertNewTicker(
+    ticker: TickerEntity,
+    actor: RequestActor | null,
+  ): Promise<boolean> {
+    try {
+      await this.tickerRepo.manager.transaction(async (manager) => {
+        if (TickersService.isCapped(actor)) {
+          await manager.query(
+            'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+            [`ticker-create:${actor.userId}`],
+          );
+          const limit = this.getCreateDailyLimit();
+          const used = await this.countRecentlyCreatedBy(manager, actor.userId);
+          if (used >= limit) throw new TickerCreationCapException(limit);
+        }
+        await manager.save(ticker);
+      });
+      return true;
+    } catch (error) {
+      // 23505 = unique_violation: lost the race for this symbol.
+      if (error?.code === '23505' || error?.driverError?.code === '23505') {
+        return false;
+      }
+      throw error;
+    }
   }
 
   private async checkAndDownloadLogo(ticker: TickerEntity) {
@@ -529,9 +785,10 @@ export class TickersService {
           finnhubResult.value.result.forEach((item: any) => {
             if (!item.symbol) return;
             const sym = item.symbol.toUpperCase();
-            // Filter out dots if needed, but keeping them allows more matches.
-            // Just filter duplicates.
-            if (!existingSymbols.has(sym) && !sym.includes('.')) {
+            // Finnhub results are kept for US-style symbols only (exchange-
+            // suffixed ones come from Yahoo below) — which includes US share
+            // classes such as BRK.B. Just filter duplicates.
+            if (!existingSymbols.has(sym) && isUsStyleSymbol(sym)) {
               existingSymbols.add(sym); // Add to set so Yahoo doesn't duplicate it
               externalResults.push({
                 symbol: item.symbol,
@@ -870,7 +1127,7 @@ export class TickersService {
 
         // US-listed stocks (no exchange suffix like .DE, .PA, .L) always trade in USD,
         // even if Yahoo reports the company's home currency (e.g. DKK for NVO ADR).
-        if (currency && !ticker.symbol.includes('.') && currency !== 'USD') {
+        if (currency && isUsStyleSymbol(ticker.symbol) && currency !== 'USD') {
           this.logger.debug(
             `Overriding reported currency ${currency} -> USD for US-listed ${ticker.symbol}`,
           );

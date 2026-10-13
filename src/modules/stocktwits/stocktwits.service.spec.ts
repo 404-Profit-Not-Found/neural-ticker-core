@@ -1,3 +1,4 @@
+import { LlmUnavailableException } from '../llm/llm-unavailable.exception';
 import { Test, TestingModule } from '@nestjs/testing';
 import { StockTwitsService } from './stocktwits.service';
 import { HttpService } from '@nestjs/axios';
@@ -63,6 +64,7 @@ describe('StockTwitsService', () => {
 
   const mockCreditService = {
     deductCredits: jest.fn().mockResolvedValue({ success: true }),
+    refundCredits: jest.fn().mockResolvedValue(10),
     getModelCost: jest.fn().mockReturnValue(10),
   };
 
@@ -98,6 +100,78 @@ describe('StockTwitsService', () => {
   });
 
   describe('analyzeComments', () => {
+    // The analysis is paid for before the LLM is called.
+    describe('when the LLM cannot answer', () => {
+      const arrange = () => {
+        jest.spyOn(service, 'fetchAndStorePosts').mockResolvedValue(undefined);
+        mockRepo.find.mockResolvedValue(
+          Array(10).fill({
+            username: 'user1',
+            likes_count: 5,
+            body: 'Bullish on earnings!',
+            created_at: new Date(),
+          }),
+        );
+        mockTickersService.findOneBySymbol.mockResolvedValue({
+          id: 'ticker-123',
+          symbol: 'AAPL',
+        });
+        mockCreditService.deductCredits.mockClear();
+        mockCreditService.refundCredits.mockClear();
+        mockLlmService.generateResearch.mockReset();
+      };
+
+      it('LLM unavailable → no pointless retry, the credits are refunded, the caller gets the 503', async () => {
+        arrange();
+        const unavailable = new LlmUnavailableException('quota_exhausted');
+        mockLlmService.generateResearch.mockRejectedValue(unavailable);
+
+        await expect(service.analyzeComments('AAPL', 'user-1')).rejects.toBe(
+          unavailable,
+        );
+
+        expect(mockLlmService.generateResearch).toHaveBeenCalledTimes(1);
+        expect(mockCreditService.deductCredits).toHaveBeenCalledTimes(1);
+        expect(mockCreditService.refundCredits).toHaveBeenCalledTimes(1);
+        expect(mockCreditService.refundCredits).toHaveBeenCalledWith(
+          'user-1',
+          { amount: 10 },
+          {
+            spend_reason: 'social_analysis_spend',
+            symbol: 'AAPL',
+            cause: 'LLM_UNAVAILABLE',
+          },
+        );
+      });
+
+      it('an anonymous / system run was never charged: nothing to refund', async () => {
+        arrange();
+        mockLlmService.generateResearch.mockRejectedValue(
+          new LlmUnavailableException('not_configured'),
+        );
+
+        await expect(service.analyzeComments('AAPL')).rejects.toBeInstanceOf(
+          LlmUnavailableException,
+        );
+
+        expect(mockCreditService.deductCredits).not.toHaveBeenCalled();
+        expect(mockCreditService.refundCredits).not.toHaveBeenCalled();
+      });
+
+      it('any other failure keeps the retry and is rethrown unchanged, with no refund', async () => {
+        arrange();
+        const bug = new TypeError('boom');
+        mockLlmService.generateResearch.mockRejectedValue(bug);
+
+        await expect(service.analyzeComments('AAPL', 'user-1')).rejects.toBe(
+          bug,
+        );
+
+        expect(mockLlmService.generateResearch).toHaveBeenCalledTimes(2);
+        expect(mockCreditService.refundCredits).not.toHaveBeenCalled();
+      });
+    });
+
     it('should return null if not enough posts', async () => {
       mockRepo.find.mockResolvedValue([]); // Empty posts
       const result = await service.analyzeComments('AAPL');

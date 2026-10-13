@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { asLlmUnavailable } from './llm-unavailable.exception';
 import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { ResearchPrompt, ResearchResult, QualityTier } from './llm.types';
@@ -7,13 +8,44 @@ import { jsonToToon } from 'toon-parser';
 
 @Injectable()
 export class LlmService {
+  private readonly logger = new Logger(LlmService.name);
+
   constructor(
     private readonly openAiProvider: OpenAiProvider,
     private readonly geminiProvider: GeminiProvider,
   ) {}
 
+  /**
+   * Every LLM call in the app goes through here. A failure that means "no LLM
+   * answer can be had right now" — no key, quota used up, provider down — is
+   * turned into LlmUnavailableException (a stable 503 `LLM_UNAVAILABLE`, with
+   * none of the provider's error text); anything else is rethrown untouched.
+   */
   async generateResearch(prompt: ResearchPrompt): Promise<ResearchResult> {
+    try {
+      return await this.dispatch(prompt);
+    } catch (error) {
+      const unavailable = asLlmUnavailable(error);
+      if (!unavailable) throw error;
+      // The provider has already logged its own detail; here only the verdict.
+      this.logger.warn(
+        `LLM unavailable (${unavailable.reason}) — provider ${prompt.provider || 'openai'}, tier ${prompt.quality ?? 'default'}`,
+      );
+      throw unavailable;
+    }
+  }
+
+  private async dispatch(prompt: ResearchPrompt): Promise<ResearchResult> {
     const provider = prompt.provider || 'openai';
+
+    // "Free-only" means no billed spend at all. Gemini honours it by staying
+    // on the free key; OpenAI has no free tier, so a free-only call must not
+    // reach it (or the ensemble, which includes it).
+    if (prompt.freeOnly === true && provider !== 'gemini') {
+      throw new BadRequestException(
+        `A free-only LLM call cannot use the billed provider "${provider}"`,
+      );
+    }
 
     // Optimize context tokens using Toon Parser
     const optimizedPrompt = { ...prompt };
@@ -69,6 +101,13 @@ export class LlmService {
         }
 
         if (answerParts.length === 0) {
+          // Both failed. If either did because the LLM is unavailable, say
+          // that; otherwise it is a failure of ours.
+          for (const res of [openaiRes, geminiRes]) {
+            const unavailable =
+              res.status === 'rejected' ? asLlmUnavailable(res.reason) : null;
+            if (unavailable) throw unavailable;
+          }
           throw new Error('All ensemble providers failed');
         }
 

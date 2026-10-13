@@ -20,6 +20,9 @@ export type AlertType =
 
 @Entity('price_alerts')
 @Index('idx_price_alerts_user', ['user_id'])
+@Index('idx_price_alerts_active', ['enabled', 'symbol'], {
+  where: '(enabled = true)',
+})
 export class PriceAlert {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -28,14 +31,20 @@ export class PriceAlert {
   user_id: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'price_alerts_user_id_fkey',
+  })
   user: User;
 
   @Column({ type: 'bigint' })
   ticker_id: string;
 
   @ManyToOne(() => TickerEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'ticker_id' })
+  @JoinColumn({
+    name: 'ticker_id',
+    foreignKeyConstraintName: 'price_alerts_ticker_id_fkey',
+  })
   ticker: TickerEntity;
 
   @Column({ type: 'varchar', length: 20 })
@@ -61,18 +70,19 @@ export class PriceAlert {
   })
   reference_price: number;
 
-  @Column({ default: true })
+  // These four are nullable in the database (created with a DEFAULT only).
+  @Column({ default: true, nullable: true })
   enabled: boolean;
 
   @Column({ type: 'timestamptz', nullable: true })
   triggered_at: Date;
 
-  @Column({ type: 'int', default: 60 })
+  @Column({ type: 'int', default: 60, nullable: true })
   cooldown_minutes: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', nullable: true })
   created_at: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'timestamptz', nullable: true })
   updated_at: Date;
 }

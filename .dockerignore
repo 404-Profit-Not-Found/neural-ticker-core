@@ -4,7 +4,15 @@ dist
 .git
 .github
 .env
+.env.*
+*.pem
+*.key
+*.p12
+service-account*.json
+gcp-sa-key.json
 .DS_Store
 frontend/node_modules
 frontend/dist
 client
+frontend-v2/node_modules
+frontend-v2/dist

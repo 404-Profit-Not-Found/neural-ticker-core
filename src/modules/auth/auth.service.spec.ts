@@ -150,21 +150,42 @@ describe('AuthService', () => {
   });
 
   describe('loginWithFirebase', () => {
-    it('should login with valid firebase token', async () => {
-      const decoded = {
-        email: 'test@example.com',
-        uid: 'firebase-uid',
-        name: 'Test User',
-        picture: 'http://avatar.url',
-      };
-      const user = { id: '1', email: 'test@example.com' };
-      mockFirebaseService.verifyIdToken.mockResolvedValue(decoded);
-      mockUsersService.createOrUpdateGoogleUser.mockResolvedValue(user);
+    const decoded = {
+      email: 'test@example.com',
+      email_verified: true,
+      uid: 'firebase-uid',
+      name: 'Test User',
+      picture: 'http://avatar.url',
+    };
+    const activeUser = { id: '1', email: 'test@example.com', role: 'user' };
 
+    const rejection = async (): Promise<UnauthorizedException> =>
+      service.loginWithFirebase('valid-token').catch((e) => e);
+
+    beforeEach(() => {
+      mockFirebaseService.verifyIdToken.mockResolvedValue(decoded);
+      mockUsersService.isEmailAllowed.mockResolvedValue(true);
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.createOrUpdateGoogleUser.mockResolvedValue(activeUser);
+    });
+
+    it('should login with valid firebase token', async () => {
       const result = await service.loginWithFirebase('valid-token');
 
-      expect(result).toEqual(user);
+      expect(result).toEqual(activeUser);
       expect(firebaseService.verifyIdToken).toHaveBeenCalledWith('valid-token');
+      expect(usersService.isEmailAllowed).toHaveBeenCalledWith(
+        'test@example.com',
+      );
+      expect(usersService.createOrUpdateGoogleUser).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        googleId: 'firebase-uid',
+        fullName: 'Test User',
+        avatarUrl: 'http://avatar.url',
+      });
+      expect(mockAuthLogRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: '1', provider: 'firebase' }),
+      );
     });
 
     it('should throw UnauthorizedException for invalid token', async () => {
@@ -172,9 +193,11 @@ describe('AuthService', () => {
         new Error('Invalid token'),
       );
 
-      await expect(service.loginWithFirebase('invalid-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      const error = await rejection();
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect(error.message).toBe('Invalid Firebase Token: Invalid token');
+      expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException if no email in token', async () => {
@@ -183,6 +206,113 @@ describe('AuthService', () => {
       await expect(service.loginWithFirebase('valid-token')).rejects.toThrow(
         UnauthorizedException,
       );
+      expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['false', false],
+      ['missing', undefined],
+      ['a truthy non-boolean', 'true'],
+    ])(
+      'rejects a token whose email_verified is %s and never links or creates an account',
+      async (_label, emailVerified) => {
+        mockFirebaseService.verifyIdToken.mockResolvedValue({
+          ...decoded,
+          // An address nobody proved they own — e.g. a default admin's.
+          email: 'branislavlang@gmail.com',
+          email_verified: emailVerified,
+        });
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(UnauthorizedException);
+        expect(error.message).toBe('Firebase account email is not verified.');
+        // Nothing about the address is even looked up.
+        expect(usersService.isEmailAllowed).not.toHaveBeenCalled();
+        expect(usersService.findByEmail).not.toHaveBeenCalled();
+        expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
+        expect(mockAuthLogRepo.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('enforces the invite list like the Google path (was: any Firebase user got in)', async () => {
+      mockUsersService.isEmailAllowed.mockResolvedValue(false);
+
+      const error = await rejection();
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      // Same message as validateOAuthLogin.
+      expect(error.message).toBe(
+        'Access Denied: You are not on the invite list.',
+      );
+      expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
+      expect(mockAuthLogRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('blocks a banned account with the Google-path message', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+        role: 'revoked',
+      });
+
+      const error = await rejection();
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect(error.message).toBe('Your account has been suspended.');
+      expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['not invited', false],
+      ['already on the invite list but not approved yet', true],
+    ])(
+      'gives a waitlisted account no session (%s)',
+      async (_label, isAllowed) => {
+        mockUsersService.isEmailAllowed.mockResolvedValue(isAllowed);
+        mockUsersService.findByEmail.mockResolvedValue({
+          id: '1',
+          email: 'test@example.com',
+          role: 'waitlist',
+        });
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(UnauthorizedException);
+        expect(error.message).toBe(
+          'Access pending: your account is on the waitlist.',
+        );
+        expect(usersService.createOrUpdateGoogleUser).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['revoked', 'waitlist'])(
+      're-checks the role of the account actually resolved (case-insensitive match → %s)',
+      async (role) => {
+        // findByEmail is an exact match and misses "Test@Example.com";
+        // createOrUpdateGoogleUser matches it case-insensitively.
+        mockUsersService.createOrUpdateGoogleUser.mockResolvedValue({
+          id: '1',
+          email: 'Test@Example.com',
+          role,
+        });
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(UnauthorizedException);
+        expect(mockAuthLogRepo.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not disguise a server-side failure as an invalid token', async () => {
+      mockUsersService.createOrUpdateGoogleUser.mockRejectedValue(
+        new Error('connection terminated'),
+      );
+
+      const error = await rejection();
+
+      expect(error).not.toBeInstanceOf(UnauthorizedException);
+      expect(error.message).toBe('connection terminated');
     });
   });
 

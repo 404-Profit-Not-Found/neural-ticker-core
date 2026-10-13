@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { TickersService } from './tickers.service';
+import { ConfigService } from '@nestjs/config';
+import { TickerCreationCapException, TickersService } from './tickers.service';
+import { runWithActor } from '../../common/request-actor/request-actor';
 import { TickerEntity } from './entities/ticker.entity';
 import { TickerLogoEntity } from './entities/ticker-logo.entity';
 import { TickerRequestEntity } from '../ticker-requests/entities/ticker-request.entity';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { JobsService } from '../jobs/jobs.service';
@@ -37,14 +39,28 @@ describe('TickersService', () => {
     getRawOne: jest.fn().mockResolvedValue(null),
   };
 
-  const mockTickerRepo = {
+  // The insert of a new ticker runs in manager.transaction (count + insert
+  // under an advisory lock for a capped user); run the callback inline.
+  const mockManager: any = {
+    query: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
+    save: jest.fn((ticker: any) => mockTickerRepo.save(ticker)),
+    transaction: jest.fn((cb: (manager: any) => Promise<unknown>) =>
+      cb(mockManager),
+    ),
+  };
+  const mockTickerRepo: any = {
     findOne: jest.fn(),
+    // The row as it is read back after the insert (no creator column).
+    findOneOrFail: jest.fn(),
     create: jest.fn().mockImplementation((dto) => dto),
     save: jest.fn(),
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
     find: jest.fn(),
     count: jest.fn(),
+    manager: mockManager,
   };
+  const mockConfig: Record<string, unknown> = {};
 
   const mockLogoRepo = {
     findOne: jest.fn(),
@@ -122,11 +138,17 @@ describe('TickersService', () => {
           provide: getRepositoryToken(TickerRequestEntity),
           useValue: mockRequestRepo,
         },
+        {
+          provide: ConfigService,
+          useValue: { get: (key: string) => mockConfig[key] },
+        },
       ],
     }).compile();
 
     service = module.get<TickersService>(TickersService);
     jest.clearAllMocks();
+    for (const key of Object.keys(mockConfig)) delete mockConfig[key];
+    mockManager.count.mockResolvedValue(0);
   });
 
   it('should be defined', () => {
@@ -156,6 +178,266 @@ describe('TickersService', () => {
       const mockTicker = { symbol: 'AAPL' };
       mockTickerRepo.findOne.mockResolvedValue(mockTicker);
       expect(await service.awaitEnsureTicker('AAPL')).toEqual(mockTicker);
+    });
+  });
+
+  describe('assertPublicReadAllowed (gate for the public reads)', () => {
+    const noSideEffects = () => {
+      expect(mockFinnhubService.getCompanyProfile).not.toHaveBeenCalled();
+      expect(mockYahooService.getSummary).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+      expect(mockJobsService.queueRequest).not.toHaveBeenCalled();
+    };
+
+    // The universe: what `count({ where: { symbol } })` finds.
+    const track = (...symbols: string[]) =>
+      mockTickerRepo.count.mockImplementation(({ where }: any) =>
+        Promise.resolve(symbols.includes(where.symbol) ? 1 : 0),
+      );
+
+    it.each([
+      ['empty', ''],
+      ['whitespace', '   '],
+      ['33 characters', 'A'.repeat(33)],
+      ['a 5000-character string', 'A'.repeat(5000)],
+      ['a non-string', undefined as any],
+    ])(
+      'answers something that cannot be a symbol (%s) with 400 for everyone, WITHOUT a lookup',
+      async (_label, symbol) => {
+        for (const isSignedIn of [false, true]) {
+          await expect(
+            service.assertPublicReadAllowed(symbol, isSignedIn),
+          ).rejects.toThrow(BadRequestException);
+        }
+        expect(mockTickerRepo.count).not.toHaveBeenCalled();
+        expect(mockTickerRepo.findOne).not.toHaveBeenCalled();
+        noSideEffects();
+      },
+    );
+
+    // The strict pattern must never lock an existing listing out.
+    it.each([
+      ['an 11-character symbol', 'RELIANCE.NS'],
+      ['a symbol containing ^', '^GSPC'],
+      ['a symbol containing =', 'EURUSD=X'],
+      ['a symbol containing &', 'M&M.NS'],
+      ['a 32-character symbol', 'A'.repeat(32)],
+    ])(
+      'serves a TRACKED ticker with %s to an anonymous and to a signed-in caller',
+      async (_label, symbol) => {
+        track(symbol);
+
+        await expect(
+          service.assertPublicReadAllowed(symbol, false),
+        ).resolves.toBeUndefined();
+        await expect(
+          service.assertPublicReadAllowed(symbol.toLowerCase(), true),
+        ).resolves.toBeUndefined();
+
+        expect(mockTickerRepo.count).toHaveBeenCalledWith({
+          where: { symbol },
+        });
+        noSideEffects();
+      },
+    );
+
+    it.each([
+      ['longer than 10 characters', 'RELIANCE.NS'],
+      ['a space inside', 'AA PL'],
+      ['a slash', 'AAPL/../x'],
+      ['an index caret', '^GSPC'],
+      ['SQL', "AAPL'--"],
+    ])(
+      'answers an UNTRACKED malformed symbol (%s) with 400 for everyone — the pattern guards creation and provider calls',
+      async (_label, symbol) => {
+        track('AAPL');
+
+        for (const isSignedIn of [false, true]) {
+          await expect(
+            service.assertPublicReadAllowed(symbol, isSignedIn),
+          ).rejects.toThrow(BadRequestException);
+        }
+        // Looked up (as a bound parameter), found nothing, then refused.
+        expect(mockTickerRepo.count).toHaveBeenCalledTimes(2);
+        noSideEffects();
+      },
+    );
+
+    it('answers an ANONYMOUS caller with 404 for a well-formed symbol we do not track — without asking any provider', async () => {
+      track('AAPL');
+
+      const error = await service
+        .assertPublicReadAllowed('NVDA', false)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.getStatus()).toBe(404);
+      // The same body a hidden ticker gets from getTicker() — nothing about
+      // whether a data provider knows the symbol.
+      expect(error.message).toBe('Ticker NVDA not found');
+      expect(mockTickerRepo.count).toHaveBeenCalledWith({
+        where: { symbol: 'NVDA' },
+      });
+      noSideEffects();
+    });
+
+    it('gives the identical 404 whether or not the symbol exists upstream', async () => {
+      track();
+      // Provider mocks are irrelevant: they are never consulted.
+      mockFinnhubService.getCompanyProfile.mockResolvedValue({ name: 'Real' });
+
+      const real = await service
+        .assertPublicReadAllowed('NVDA', false)
+        .catch((e) => e);
+      const bogus = await service
+        .assertPublicReadAllowed('ZZZZZZ', false)
+        .catch((e) => e);
+
+      expect(real.getStatus()).toBe(bogus.getStatus());
+      expect(real.getResponse()).toEqual({
+        ...bogus.getResponse(),
+        message: 'Ticker NVDA not found',
+      });
+      noSideEffects();
+    });
+
+    it('lets an anonymous caller read a ticker we already track (case and whitespace insensitive)', async () => {
+      track('AAPL');
+
+      await expect(
+        service.assertPublicReadAllowed(' aapl ', false),
+      ).resolves.toBeUndefined();
+
+      expect(mockTickerRepo.count).toHaveBeenCalledWith({
+        where: { symbol: 'AAPL' },
+      });
+      noSideEffects();
+    });
+
+    it.each(['NVDA', 'BRK.B', 'VOLV-B.ST', '7203.T', 'brk.b'])(
+      'lets a SIGNED-IN caller through for the untracked, well-formed %s (creation keeps working downstream)',
+      async (symbol) => {
+        track('AAPL');
+
+        await expect(
+          service.assertPublicReadAllowed(symbol, true),
+        ).resolves.toBeUndefined();
+        noSideEffects();
+      },
+    );
+  });
+
+  // Found on a real PostgreSQL (test/db/public-gate.db-spec.ts): a NUL byte
+  // cannot be sent as text, so the lookup itself failed and the route said 500.
+  describe('the public-read gate and control characters', () => {
+    it.each([
+      ['a NUL byte', 'NUL\u0000X'],
+      ['only a NUL byte', '\u0000'],
+      ['a tab inside', 'AA\tPL'],
+      ['a newline inside', 'AA\nPL'],
+      ['DEL', 'AAPL\u007f'],
+    ])(
+      '%s is a 400 without any lookup, for anonymous and signed-in callers',
+      async (_label, symbol) => {
+        mockTickerRepo.count.mockClear();
+        for (const signedIn of [false, true]) {
+          await expect(
+            service.assertPublicReadAllowed(symbol, signedIn),
+          ).rejects.toThrow(BadRequestException);
+        }
+        expect(mockTickerRepo.count).not.toHaveBeenCalled();
+      },
+    );
+
+    it('in a list it is refused per symbol and never reaches the query', async () => {
+      mockTickerRepo.find.mockResolvedValue([{ symbol: 'AAPL' }]);
+
+      const result = await service.partitionPublicRead(
+        ['AAPL', 'BAD\u0000'],
+        false,
+      );
+
+      expect(result.readable).toEqual(['AAPL']);
+      expect(result.refused).toEqual([
+        { symbol: 'BAD\u0000', error: 'Invalid ticker symbol format' },
+      ]);
+      const [options] = mockTickerRepo.find.mock.calls[0];
+      expect(options.where.symbol.value).toEqual(['AAPL']);
+    });
+  });
+
+  describe('partitionPublicRead (the gate for a list of symbols)', () => {
+    const trackRows = (...symbols: string[]) =>
+      mockTickerRepo.find.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          symbols
+            .filter((s) => where.symbol.value.includes(s))
+            .map((symbol) => ({ symbol })),
+        ),
+      );
+
+    it('splits an anonymous request with ONE lookup: tracked symbols are readable, the rest get a per-symbol reason', async () => {
+      trackRows('AAPL', 'RELIANCE.NS', '^GSPC');
+
+      const result = await service.partitionPublicRead(
+        [
+          'aapl',
+          'NVDA', // well-formed, untracked
+          'RELIANCE.NS', // tracked although it breaks the pattern
+          '^GSPC',
+          'AA PL', // untracked + malformed
+          'A'.repeat(40), // never looked up
+          'AAPL', // duplicate
+          '',
+        ],
+        false,
+      );
+
+      expect(result.readable).toEqual(['AAPL', 'RELIANCE.NS', '^GSPC']);
+      expect(result.refused).toEqual([
+        { symbol: 'NVDA', error: 'Ticker NVDA not found' },
+        { symbol: 'AA PL', error: 'Invalid ticker symbol format' },
+        { symbol: 'A'.repeat(40), error: 'Invalid ticker symbol format' },
+      ]);
+      expect(mockTickerRepo.find).toHaveBeenCalledTimes(1);
+      const { where, select } = mockTickerRepo.find.mock.calls[0][0];
+      expect(select).toEqual(['symbol']);
+      // The over-long string is not part of the query.
+      expect(where.symbol.value).toEqual([
+        'AAPL',
+        'NVDA',
+        'RELIANCE.NS',
+        '^GSPC',
+        'AA PL',
+      ]);
+      expect(mockFinnhubService.getCompanyProfile).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+    });
+
+    it('lets a signed-in caller keep untracked well-formed symbols', async () => {
+      trackRows('AAPL');
+
+      const result = await service.partitionPublicRead(
+        ['AAPL', 'NVDA', 'AA PL'],
+        true,
+      );
+
+      expect(result.readable).toEqual(['AAPL', 'NVDA']);
+      expect(result.refused).toEqual([
+        { symbol: 'AA PL', error: 'Invalid ticker symbol format' },
+      ]);
+    });
+
+    it('does not query for an empty list', async () => {
+      mockTickerRepo.find.mockClear();
+
+      expect(await service.partitionPublicRead([], false)).toEqual({
+        readable: [],
+        refused: [],
+      });
+      expect(mockTickerRepo.find).not.toHaveBeenCalled();
     });
   });
 
@@ -191,6 +473,7 @@ describe('TickersService', () => {
       const newTicker = { id: '1', symbol: 'AAPL', ...mockProfile };
       mockTickerRepo.create.mockReturnValue(newTicker);
       mockTickerRepo.save.mockResolvedValue(newTicker);
+      mockTickerRepo.findOneOrFail.mockResolvedValue(newTicker);
 
       const result = await service.ensureTicker('AAPL');
       expect(result).toEqual(newTicker);
@@ -232,6 +515,245 @@ describe('TickersService', () => {
       await expect(service.ensureTicker('TEST')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  // A new ticker costs provider calls and a research run. A non-admin user
+  // may cause only a limited number per day; the limit lives in ensureTicker,
+  // the one place every creation path ends in. Against a real database (the
+  // lock, the count, parallel requests): test/db/ticker-creation.db-spec.ts.
+  describe('ensureTicker — per-user daily cap on NEW tickers', () => {
+    const user = { userId: 'user-1', role: 'user' };
+    const admin = { userId: 'admin-1', role: 'admin' };
+    const asActor = <T>(actor: any, fn: () => Promise<T>) =>
+      runWithActor(actor, fn);
+
+    const untrackedButKnownToProviders = (symbol = 'NVDA') => {
+      const row = { id: '7', symbol, name: 'NVIDIA Corp' };
+      mockTickerRepo.findOne.mockResolvedValue(null);
+      mockFinnhubService.getCompanyProfile.mockResolvedValue({
+        name: 'NVIDIA Corp',
+        exchange: 'NASDAQ',
+        currency: 'USD',
+      });
+      mockTickerRepo.create.mockImplementation((dto: any) => ({ ...dto }));
+      mockTickerRepo.save.mockImplementation((t: any) =>
+        Promise.resolve({ id: '7', ...t }),
+      );
+      mockTickerRepo.findOneOrFail.mockResolvedValue(row);
+      return row;
+    };
+
+    const expectNothingCreated = () => {
+      expect(mockFinnhubService.getCompanyProfile).not.toHaveBeenCalled();
+      expect(mockYahooService.getSummary).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+      expect(mockJobsService.queueRequest).not.toHaveBeenCalled();
+    };
+
+    it('under the limit: creates the ticker, records the creator, and returns the row WITHOUT the creator', async () => {
+      const row = untrackedButKnownToProviders();
+      mockManager.count.mockResolvedValue(9);
+
+      const result = await asActor(user, () => service.ensureTicker('nvda'));
+
+      expect(mockTickerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbol: 'NVDA',
+          created_by_user_id: 'user-1',
+        }),
+      );
+      expect(result).toBe(row);
+      expect(result).not.toHaveProperty('created_by_user_id');
+      expect(mockJobsService.initializeTicker).toHaveBeenCalledTimes(1);
+      expect(mockJobsService.initializeTicker).toHaveBeenCalledWith('NVDA');
+    });
+
+    it('counts what THIS user created in the last 24 hours', async () => {
+      untrackedButKnownToProviders();
+      const before = Date.now();
+
+      await asActor(user, () => service.ensureTicker('NVDA'));
+
+      const [entity, options] = mockManager.count.mock.calls[0];
+      expect(entity).toBe(TickerEntity);
+      expect(options.where.created_by_user_id).toBe('user-1');
+      const since: Date = options.where.created_at.value;
+      expect(before - since.getTime()).toBeGreaterThanOrEqual(
+        24 * 60 * 60 * 1000 - 5,
+      );
+      expect(before - since.getTime()).toBeLessThan(24 * 60 * 60 * 1000 + 5000);
+    });
+
+    it('at the limit: 429 before a single provider call, with a message that points to the request flow', async () => {
+      untrackedButKnownToProviders();
+      mockManager.count.mockResolvedValue(10);
+
+      const error = await asActor(user, () =>
+        service.ensureTicker('NVDA'),
+      ).catch((e) => e);
+
+      expect(error).toBeInstanceOf(TickerCreationCapException);
+      expect(error.getStatus()).toBe(429);
+      expect(error.getResponse()).toEqual({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message:
+          'You have reached the limit of 10 new tickers per day. Tickers ' +
+          'already on the platform are not affected. To get another one ' +
+          'added, submit a ticker request instead.',
+      });
+      expectNothingCreated();
+    });
+
+    it('checks again under a per-user advisory lock at the insert, so parallel requests cannot overshoot', async () => {
+      untrackedButKnownToProviders();
+      // The cheap pre-check still sees 9; by the time this request holds the
+      // lock, a parallel one has created the 10th.
+      mockManager.count.mockResolvedValueOnce(9).mockResolvedValueOnce(10);
+
+      await expect(
+        asActor(user, () => service.ensureTicker('NVDA')),
+      ).rejects.toBeInstanceOf(TickerCreationCapException);
+
+      expect(mockManager.query).toHaveBeenCalledWith(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        ['ticker-create:user-1'],
+      );
+      // lock first, then the count, inside the same transaction
+      expect(mockManager.query.mock.invocationCallOrder[0]).toBeLessThan(
+        mockManager.count.mock.invocationCallOrder[1],
+      );
+      expect(mockTickerRepo.save).not.toHaveBeenCalled();
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+    });
+
+    it('a ticker that is already tracked is never affected, however many the user has created', async () => {
+      const tracked = { id: '1', symbol: 'AAPL' };
+      mockTickerRepo.findOne.mockResolvedValue(tracked);
+      mockManager.count.mockResolvedValue(999);
+
+      await expect(
+        asActor(user, () => service.ensureTicker('AAPL')),
+      ).resolves.toBe(tracked);
+
+      expect(mockManager.count).not.toHaveBeenCalled();
+      expect(mockManager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('admins are exempt (and still recorded as the creator)', async () => {
+      untrackedButKnownToProviders();
+      mockManager.count.mockResolvedValue(999);
+
+      await asActor(admin, () => service.ensureTicker('NVDA'));
+
+      expect(mockManager.count).not.toHaveBeenCalled();
+      expect(mockManager.query).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ created_by_user_id: 'admin-1' }),
+      );
+    });
+
+    it('system work (no user: crons, approvals queue) is not capped and records no creator', async () => {
+      untrackedButKnownToProviders();
+      mockManager.count.mockResolvedValue(999);
+
+      await service.ensureTicker('NVDA');
+
+      expect(mockManager.count).not.toHaveBeenCalled();
+      expect(mockTickerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ created_by_user_id: null }),
+      );
+    });
+
+    it.each([
+      ['TICKER_CREATE_DAILY_LIMIT=2', 2, 2, true],
+      ['TICKER_CREATE_DAILY_LIMIT=2, one used', 2, 1, false],
+      ['TICKER_CREATE_DAILY_LIMIT=0 (requests only)', 0, 0, true],
+      ['unset → default 10', undefined, 9, false],
+      ['not a number → default 10', NaN, 10, true],
+      ['negative → default 10', -3, 9, false],
+    ])('%s', async (_l, configured, used, refused) => {
+      untrackedButKnownToProviders();
+      mockConfig['tickers.createDailyLimit'] = configured;
+      mockManager.count.mockResolvedValue(used);
+
+      const outcome = asActor(user, () => service.ensureTicker('NVDA'));
+
+      if (refused) {
+        await expect(outcome).rejects.toBeInstanceOf(
+          TickerCreationCapException,
+        );
+      } else {
+        await expect(outcome).resolves.toBeDefined();
+      }
+    });
+
+    it('two requests for the same new symbol: the one that loses the insert returns the row and does NOT initialise it again', async () => {
+      const row = untrackedButKnownToProviders();
+      // unique_violation on tickers.symbol, as TypeORM surfaces it
+      mockTickerRepo.save.mockRejectedValue(
+        Object.assign(new Error('duplicate key value'), {
+          driverError: { code: '23505' },
+        }),
+      );
+
+      const result = await asActor(user, () => service.ensureTicker('NVDA'));
+
+      expect(result).toBe(row);
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+    });
+
+    it('any other insert failure still surfaces', async () => {
+      untrackedButKnownToProviders();
+      mockTickerRepo.save.mockRejectedValue(new Error('connection lost'));
+
+      await expect(
+        asActor(user, () => service.ensureTicker('NVDA')),
+      ).rejects.toThrow('connection lost');
+      expect(mockJobsService.initializeTicker).not.toHaveBeenCalled();
+    });
+
+    describe('when the providers are rate limited and the add is queued', () => {
+      const rateLimited = () => {
+        mockTickerRepo.findOne.mockResolvedValue(null);
+        mockFinnhubService.getCompanyProfile.mockRejectedValue(
+          new Error('boom'),
+        );
+        mockYahooService.getSummary.mockRejectedValue(
+          new Error('Too Many Requests'),
+        );
+      };
+
+      it('the queued request carries the capped user, so the retry still counts against them', async () => {
+        rateLimited();
+
+        await expect(
+          asActor(user, () => service.ensureTicker('NVDA')),
+        ).rejects.toMatchObject({ status: 202 });
+
+        expect(mockJobsService.queueRequest).toHaveBeenCalledWith(
+          'ADD_TICKER',
+          { symbol: 'NVDA', requested_by: 'user-1' },
+        );
+      });
+
+      it.each([
+        ['an admin', admin],
+        ['a system job', null],
+      ])('for %s it carries no user', async (_l, actor) => {
+        rateLimited();
+
+        await expect(
+          asActor(actor, () => service.ensureTicker('NVDA')),
+        ).rejects.toMatchObject({ status: 202 });
+
+        expect(mockJobsService.queueRequest).toHaveBeenCalledWith(
+          'ADD_TICKER',
+          { symbol: 'NVDA' },
+        );
+      });
     });
   });
 
@@ -512,6 +1034,28 @@ describe('TickersService', () => {
       expect(finnhubResult).toBeDefined();
       expect(yahooResult).toBeDefined();
       expect(finnhubResult?.is_locally_tracked).toBe(false);
+    });
+
+    it('keeps US share classes (BRK.B) from Finnhub and still leaves exchange-suffixed symbols to Yahoo', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+      mockRequestRepo.find.mockResolvedValue([]);
+
+      mockFinnhubService.searchSymbols.mockResolvedValue({
+        result: [
+          { symbol: 'BRK.B', description: 'BERKSHIRE HATHAWAY INC-CL B' },
+          { symbol: 'BRK.A', description: 'BERKSHIRE HATHAWAY INC-CL A' },
+          { symbol: 'BRK.DE', description: 'Berkshire (Xetra listing)' },
+          { symbol: 'BRKB.JK', description: 'Unknown venue' },
+        ],
+      });
+      mockYahooService.search.mockResolvedValue({ quotes: [] });
+
+      const result = await service.searchTickers('BRK', true);
+      const symbols = result.map((r) => r.symbol);
+
+      expect(symbols).toEqual(expect.arrayContaining(['BRK.B', 'BRK.A']));
+      expect(symbols).not.toContain('BRK.DE');
+      expect(symbols).not.toContain('BRKB.JK');
     });
 
     it('should handle external API failures gracefully', async () => {

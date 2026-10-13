@@ -6,6 +6,7 @@ import { MarketStatusService } from '../../market-data/market-status.service';
 import { TickersService } from '../../tickers/tickers.service';
 import { CurrencyService } from '../../currency/currency.service';
 import { toolJson } from '../dto/serializers';
+import { getMcpUser } from '../auth/mcp-user.util';
 
 const symbol = z
   .string()
@@ -23,6 +24,15 @@ const dateStr = z
 /**
  * Anonymous market-data, search and currency tools. No authentication
  * required — these expose public market information.
+ *
+ * "Public" means READING what the platform already tracks. The snapshot,
+ * history and news reads resolve their symbol through
+ * TickersService.ensureTicker(), which for an untracked symbol asks the data
+ * providers, inserts the ticker and starts its initialisation (history sync +
+ * an LLM research run). An anonymous caller must never trigger that, so those
+ * tools pass through the same gate as the public HTTP routes
+ * (TickersService.assertPublicReadAllowed): anonymous + untracked symbol is a
+ * "not found" tool error. A caller with a valid token is not gated.
  */
 @Injectable()
 export class MarketDataTools {
@@ -33,15 +43,24 @@ export class MarketDataTools {
     private readonly currency: CurrencyService,
   ) {}
 
+  /** Throws the tool's "not found" error for an anonymous caller asking for a
+   *  symbol we do not track. A signed-in caller is not gated. */
+  private async gateAnonymousRead(symbol: string, req: any): Promise<void> {
+    if (getMcpUser(req)) return;
+    await this.tickers.assertPublicReadAllowed(symbol, false);
+  }
+
   @Tool({
     name: 'get_ticker_snapshot',
     description:
       'Get a full market snapshot for one symbol: latest price, day change, ' +
       'company profile, key fundamentals and metrics. Use this for a complete ' +
-      'point-in-time view of a single ticker.',
+      'point-in-time view of a single ticker. Without authentication only ' +
+      'tickers already tracked on the platform are available.',
     parameters: z.object({ symbol }),
   })
-  async getTickerSnapshot(args: { symbol: string }) {
+  async getTickerSnapshot(args: { symbol: string }, _ctx: unknown, req: any) {
+    await this.gateAnonymousRead(args.symbol, req);
     return toolJson(await this.marketData.getSnapshot(args.symbol));
   }
 
@@ -49,7 +68,9 @@ export class MarketDataTools {
     name: 'get_ticker_snapshots',
     description:
       'Get market snapshots for up to 100 symbols at once. Returns an array of ' +
-      'snapshots. Prefer this over many single calls when comparing tickers.',
+      'snapshots. Prefer this over many single calls when comparing tickers. ' +
+      'Without authentication only tickers already tracked on the platform ' +
+      'are returned; the others come back as { symbol, error } entries.',
     parameters: z.object({
       symbols: z
         .array(symbol)
@@ -58,8 +79,26 @@ export class MarketDataTools {
         .describe('List of ticker symbols (max 100).'),
     }),
   })
-  async getTickerSnapshots(args: { symbols: string[] }) {
-    return toolJson(await this.marketData.getSnapshots(args.symbols));
+  async getTickerSnapshots(
+    args: { symbols: string[] },
+    _ctx: unknown,
+    req: any,
+  ) {
+    if (getMcpUser(req)) {
+      return toolJson(await this.marketData.getSnapshots(args.symbols));
+    }
+
+    // Anonymous: serve the tracked symbols, and answer the rest with the same
+    // per-symbol { symbol, error } entry a failed snapshot produces — without
+    // ever handing them to the snapshot path (which would create them).
+    const { readable, refused } = await this.tickers.partitionPublicRead(
+      args.symbols,
+      false,
+    );
+    const served = readable.length
+      ? await this.marketData.getSnapshots(readable)
+      : [];
+    return toolJson([...served, ...refused]);
   }
 
   @Tool({
@@ -78,12 +117,17 @@ export class MarketDataTools {
       to: dateStr.describe('Range end, YYYY-MM-DD.'),
     }),
   })
-  async getTickerHistory(args: {
-    symbol: string;
-    interval: string;
-    from: string;
-    to: string;
-  }) {
+  async getTickerHistory(
+    args: {
+      symbol: string;
+      interval: string;
+      from: string;
+      to: string;
+    },
+    _ctx: unknown,
+    req: any,
+  ) {
+    await this.gateAnonymousRead(args.symbol, req);
     return toolJson(
       await this.marketData.getHistory(
         args.symbol,
@@ -143,7 +187,12 @@ export class MarketDataTools {
       to: dateStr.optional().describe('Optional end date, YYYY-MM-DD.'),
     }),
   })
-  async getCompanyNews(args: { symbol: string; from?: string; to?: string }) {
+  async getCompanyNews(
+    args: { symbol: string; from?: string; to?: string },
+    _ctx: unknown,
+    req: any,
+  ) {
+    await this.gateAnonymousRead(args.symbol, req);
     return toolJson(
       await this.marketData.getCompanyNews(args.symbol, args.from, args.to),
     );

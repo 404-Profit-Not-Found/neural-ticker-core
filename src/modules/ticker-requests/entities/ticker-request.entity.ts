@@ -6,11 +6,15 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '../../users/entities/user.entity';
 
+// Index / constraint names and the ON DELETE rule are those of the database
+// as the migrations build it (CreateTickerRequests).
 @Entity('ticker_requests')
+@Index('IDX_ticker_requests_symbol_status', ['symbol', 'status'])
 export class TickerRequestEntity {
   @ApiProperty({
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -38,8 +42,11 @@ export class TickerRequestEntity {
   @Column({ type: 'uuid' })
   user_id: string;
 
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'FK_ticker_requests_user',
+  })
   user: User;
 
   @ApiProperty()

@@ -1,0 +1,166 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+    useTickerDetails,
+    useTickerNews,
+    useTickerLogo,
+    useTickerResearch,
+    useTickerRisk,
+    useTickerSocial,
+    usePostComment,
+    useTriggerResearch,
+    useDeleteResearch,
+    useUpdateResearchTitle
+} from './useTicker';
+import { api } from '../lib/api';
+
+// Mock API
+vi.mock('../lib/api', () => ({
+    api: {
+        get: vi.fn(),
+        post: vi.fn(),
+        delete: vi.fn()
+    },
+
+}));
+
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: false,
+        },
+    },
+});
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
+
+describe('useTicker Hooks', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        queryClient.clear();
+    });
+
+    describe('useTickerDetails', () => {
+        it('fetches composite details and watchers', async () => {
+            (api.get as Mock)
+                .mockResolvedValueOnce({ data: { symbol: 'AAPL', price: 150 } }) // composite
+                .mockResolvedValueOnce({ data: { watchers: 42 } }); // watchers
+
+            const { result } = renderHook(() => useTickerDetails('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual({
+                symbol: 'AAPL',
+                price: 150,
+                watchers: 42
+            });
+            expect(api.get).toHaveBeenCalledWith('/tickers/AAPL/composite');
+            expect(api.get).toHaveBeenCalledWith('/social/stats/AAPL/watchers');
+        });
+
+        it('handles missing symbol', async () => {
+            const { result } = renderHook(() => useTickerDetails(''), { wrapper });
+            expect(result.current.data).toBeUndefined();
+            expect(result.current.isLoading).toBe(false); // Should be disabled
+        });
+    });
+
+    describe('useTickerNews', () => {
+        it('fetches news properly', async () => {
+            const mockNews = [{ id: 1, headline: 'Apple is King' }];
+            (api.get as Mock).mockResolvedValueOnce({ data: mockNews });
+
+            const { result } = renderHook(() => useTickerNews('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(result.current.data).toEqual(mockNews);
+            expect(api.get).toHaveBeenCalledWith('/tickers/AAPL/news');
+        });
+    });
+
+    describe('useTickerLogo', () => {
+        it('returns correct logo url path', () => {
+            const { result } = renderHook(() => useTickerLogo('AAPL'));
+            expect(result.current.data).toBe('/api/v1/tickers/AAPL/logo');
+            expect(result.current.isLoading).toBe(false);
+            expect(result.current.isError).toBe(false);
+        });
+
+        it('returns null if no symbol', () => {
+            const { result } = renderHook(() => useTickerLogo(''));
+            expect(result.current.data).toBeNull();
+            expect(result.current.isError).toBe(true);
+        });
+    });
+
+    describe('useTickerOthers', () => {
+        it('fetches risk data', async () => {
+            (api.get as Mock).mockResolvedValueOnce({ data: { score: 5 } });
+            const { result } = renderHook(() => useTickerRisk('AAPL'), { wrapper });
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(result.current.data).toEqual({ score: 5 });
+        });
+
+        it('fetches social data', async () => {
+            (api.get as Mock).mockResolvedValueOnce({ data: [{ id: 1 }] });
+            const { result } = renderHook(() => useTickerSocial('AAPL'), { wrapper });
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(result.current.data).toEqual({ comments: [{ id: 1 }], mentionedUsers: {} });
+        });
+    });
+
+    describe('useTickerMutations', () => {
+        it('posts a comment', async () => {
+            (api.post as Mock).mockResolvedValueOnce({});
+            const { result } = renderHook(() => usePostComment(), { wrapper });
+
+            result.current.mutate({ symbol: 'AAPL', content: 'Hello' });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(api.post).toHaveBeenCalledWith('/social/comments/AAPL', { content: 'Hello' });
+        });
+
+        it('triggers research', async () => {
+            (api.post as Mock).mockResolvedValueOnce({ data: { id: 'job-1' } });
+            const { result } = renderHook(() => useTriggerResearch(), { wrapper });
+
+            result.current.mutate({ symbol: 'AAPL', provider: 'gemini' });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(api.post).toHaveBeenCalledWith('/research/ask', expect.anything());
+        });
+
+        it('deletes research', async () => {
+            (api.delete as Mock).mockResolvedValueOnce({});
+            const { result } = renderHook(() => useDeleteResearch(), { wrapper });
+            result.current.mutate('r1');
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(api.delete).toHaveBeenCalledWith('/research/r1');
+        });
+
+        it('updates research title', async () => {
+            (api.post as Mock).mockResolvedValueOnce({});
+            const { result } = renderHook(() => useUpdateResearchTitle(), { wrapper });
+            result.current.mutate({ id: 'r1', title: 'New Title' });
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(api.post).toHaveBeenCalledWith('/research/r1/title', { title: 'New Title' });
+        });
+    });
+
+    describe('useTickerResearch', () => {
+        it('fetches research with params', async () => {
+            const mockResearch = { data: [{ id: 'r1' }] };
+            (api.get as Mock).mockResolvedValueOnce({ data: mockResearch });
+
+            const { result } = renderHook(() => useTickerResearch('AAPL'), { wrapper });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+            expect(result.current.data).toEqual([{ id: 'r1' }]);
+            expect(api.get).toHaveBeenCalledWith('/research', { params: { limit: 50, ticker: 'AAPL' } });
+        });
+    });
+});

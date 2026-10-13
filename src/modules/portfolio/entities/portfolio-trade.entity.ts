@@ -23,8 +23,13 @@ import { PortfolioPosition } from './portfolio-position.entity';
  * unique index on (user_id, external_id) lets `record_trade` be retried safely.
  */
 @Entity('portfolio_trades')
-@Index(['user_id', 'symbol'])
-@Index(['user_id', 'trade_date'])
+@Index('IDX_portfolio_trades_user_symbol', ['user_id', 'symbol'])
+@Index('IDX_portfolio_trades_user_date', ['user_id', 'trade_date'])
+// One source trade per user (MCP imports); app-originated trades (NULL) exempt.
+@Index('UQ_portfolio_trades_user_external', ['user_id', 'external_id'], {
+  unique: true,
+  where: '(external_id IS NOT NULL)',
+})
 export class PortfolioTrade {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,7 +38,10 @@ export class PortfolioTrade {
   user_id: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'portfolio_trades_user_id_fkey',
+  })
   user: User;
 
   // The lot this trade affected. Kept nullable + ON DELETE SET NULL so the
@@ -42,7 +50,10 @@ export class PortfolioTrade {
   position_id: string | null;
 
   @ManyToOne(() => PortfolioPosition, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'position_id' })
+  @JoinColumn({
+    name: 'position_id',
+    foreignKeyConstraintName: 'portfolio_trades_position_id_fkey',
+  })
   position: PortfolioPosition | null;
 
   @Column()
@@ -92,9 +103,9 @@ export class PortfolioTrade {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updated_at: Date;
 }

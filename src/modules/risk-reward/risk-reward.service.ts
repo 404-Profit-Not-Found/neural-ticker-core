@@ -314,6 +314,13 @@ export class RiskRewardService {
     };
   }
 
+  /** Gate for the public read route — see TickersService. getLatestScore()
+   *  and getScoreHistory() resolve the symbol through the creating snapshot
+   *  path, so an anonymous caller must pass this first. */
+  assertPublicReadAllowed(symbol: string, isSignedIn: boolean): Promise<void> {
+    return this.marketDataService.assertPublicReadAllowed(symbol, isSignedIn);
+  }
+
   async getLatestScore(symbol: string) {
     const snapshot = await this.marketDataService.getSnapshot(symbol);
     return this.getLatestAnalysis(snapshot.ticker.id);
@@ -460,7 +467,10 @@ export class RiskRewardService {
   }
 
   // Called by ResearchService after a Deep Research Note is generated
-  async evaluateFromResearch(note: any): Promise<RiskAnalysis | null> {
+  async evaluateFromResearch(
+    note: any,
+    options: { freeOnly?: boolean } = {},
+  ): Promise<RiskAnalysis | null> {
     if (!note || !note.answer_markdown) return null;
 
     // We assume the note contains multiple tickers or one. The schema suggests analysis per ticker.
@@ -496,6 +506,7 @@ export class RiskRewardService {
           tickerSymbol,
           note.answer_markdown,
           note.id,
+          options.freeOnly === true,
         );
         if (analysis) results.push(analysis);
       } catch (e) {
@@ -512,6 +523,7 @@ export class RiskRewardService {
     symbol: string,
     text: string,
     noteId: string,
+    freeOnly = false,
   ): Promise<RiskAnalysis> {
     const snapshot = await this.marketDataService.getSnapshot(symbol);
     const context = {
@@ -648,6 +660,7 @@ export class RiskRewardService {
       numericContext: context,
       provider: this.configService.get<any>('riskReward.provider', 'gemini'),
       quality: 'medium' as QualityTier,
+      ...(freeOnly ? { freeOnly: true } : {}),
     };
 
     // this.logger.log(`[${symbol}] Numeric Context: ${JSON.stringify(context)}`);

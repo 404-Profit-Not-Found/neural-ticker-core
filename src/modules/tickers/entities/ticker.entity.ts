@@ -4,11 +4,15 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ColumnNumericTransformer } from '../../../common/transformers/column-numeric.transformer';
 
 @Entity('tickers')
+@Index('idx_tickers_created_by_user', ['created_by_user_id', 'created_at'], {
+  where: '"created_by_user_id" IS NOT NULL',
+})
 export class TickerEntity {
   @ApiProperty({ example: '1', description: 'Unique ID' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -161,6 +165,15 @@ export class TickerEntity {
   })
   @Column({ type: 'timestamptz', nullable: true })
   last_news_update: Date;
+
+  /**
+   * The user whose request made the platform start tracking this ticker
+   * (NULL: created by a system job, or before this was recorded). Counted by
+   * the per-user daily creation cap in TickersService.ensureTicker.
+   * `select: false` — a ticker row is served publicly, its creator is not.
+   */
+  @Column({ type: 'uuid', nullable: true, select: false })
+  created_by_user_id: string | null;
 
   @ApiProperty()
   @CreateDateColumn({ type: 'timestamptz' })

@@ -20,7 +20,9 @@ import { User } from '../../users/entities/user.entity';
  * with no backfill needed.
  */
 @Entity('portfolio_cash_balances')
-@Index(['user_id', 'currency'], { unique: true })
+@Index('UQ_portfolio_cash_user_currency', ['user_id', 'currency'], {
+  unique: true,
+})
 export class PortfolioCashBalance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -29,7 +31,10 @@ export class PortfolioCashBalance {
   user_id: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'portfolio_cash_balances_user_id_fkey',
+  })
   user: User;
 
   @Column({ length: 3 })
@@ -38,9 +43,9 @@ export class PortfolioCashBalance {
   @Column('decimal', { precision: 20, scale: 2, default: 0 })
   amount: number;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   created_at: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updated_at: Date;
 }

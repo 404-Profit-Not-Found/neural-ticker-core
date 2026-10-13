@@ -1,4 +1,8 @@
-import { inferCurrencyFromExchange } from './exchange-currency.util';
+import {
+  getExchangeSuffix,
+  inferCurrencyFromExchange,
+  isUsStyleSymbol,
+} from './exchange-currency.util';
 
 describe('inferCurrencyFromExchange', () => {
   describe('symbol-suffix rules', () => {
@@ -103,5 +107,73 @@ describe('inferCurrencyFromExchange', () => {
       expect(inferCurrencyFromExchange('', '')).toBeNull();
       expect(inferCurrencyFromExchange(undefined, undefined)).toBeNull();
     });
+  });
+});
+
+describe('getExchangeSuffix', () => {
+  it.each([
+    ['SAP.DE', 'DE'],
+    ['ASML.AS', 'AS'],
+    ['7203.T', 'T'],
+    ['BARC.L', 'L'],
+    // Hyphen = share class, dot = venue: the suffix is after the LAST dot.
+    ['VOLV-B.ST', 'ST'],
+    ['sap.de', 'DE'],
+    [' SAP.DE ', 'DE'],
+  ])('returns the venue suffix of %s', (symbol, suffix) => {
+    expect(getExchangeSuffix(symbol)).toBe(suffix);
+  });
+
+  it.each([
+    'AAPL',
+    'COIN', // contains "CO"
+    'SMCI', // contains "MC" / "MI"
+    'BRK.A', // US share class — a dot, but not a venue
+    'BRK.B',
+    'RDS-A',
+    '',
+  ])('returns null for %s (no exchange suffix)', (symbol) => {
+    expect(getExchangeSuffix(symbol)).toBeNull();
+  });
+
+  it('returns null for null / undefined', () => {
+    expect(getExchangeSuffix(null)).toBeNull();
+    expect(getExchangeSuffix(undefined)).toBeNull();
+  });
+});
+
+describe('isUsStyleSymbol', () => {
+  it.each([
+    'AAPL',
+    'COIN',
+    'RDS-A', // hyphenated share class, no dot
+    'BRK.A', // dot + one letter that is not a venue = US share class
+    'BRK.B',
+    'BF.B',
+    'brk.b',
+    ' BRK.B ',
+  ])('is true for %s', (symbol) => {
+    expect(isUsStyleSymbol(symbol)).toBe(true);
+  });
+
+  it.each([
+    'SAP.DE',
+    'ASML.AS',
+    'VOLV-B.ST',
+    'BARC.L', // one letter, but London IS a venue
+    'BMW.F', // Frankfurt
+    '7203.T', // Tokyo
+    'SHOP.TO',
+    'ABC.V', // TSX Venture
+    'BBCA.JK', // a venue we do not know is still an exchange suffix
+    'XYZ.WS',
+  ])('is false for %s', (symbol) => {
+    expect(isUsStyleSymbol(symbol)).toBe(false);
+  });
+
+  it('treats empty input as "no suffix"', () => {
+    expect(isUsStyleSymbol('')).toBe(true);
+    expect(isUsStyleSymbol(null)).toBe(true);
+    expect(isUsStyleSymbol(undefined)).toBe(true);
   });
 });

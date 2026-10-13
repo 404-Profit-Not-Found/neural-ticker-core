@@ -32,6 +32,17 @@
       "cwd": "frontend-v2"
     },
     {
+      "name": "frontend-v2-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:mock"
+      ],
+      "port": 5274,
+      "cwd": "frontend-v2",
+      "autoPort": false
+    },
+    {
       "name": "backend-v2",
       "runtimeExecutable": "node",
       "runtimeArgs": [

@@ -1,10 +1,21 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, ArrayContains, Brackets } from 'typeorm';
+import {
+  Repository,
+  Between,
+  ArrayContains,
+  Brackets,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
 import { TickersService } from '../tickers/tickers.service';
+import {
+  ONE_LETTER_VENUE_SUFFIXES,
+  isUsStyleSymbol,
+  usStyleSymbolSql,
+} from '../tickers/utils/exchange-currency.util';
 import { FinnhubService } from '../finnhub/finnhub.service';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { PortfolioService } from '../portfolio/portfolio.service';
@@ -21,9 +32,16 @@ import { Comment } from '../social/entities/comment.entity';
 import { CompanyNews } from './entities/company-news.entity';
 import { TickerEntity as Ticker } from '../tickers/entities/ticker.entity';
 import { getErrorMessage } from '../../utils/error.util';
-import { calculateAiRating, VerdictInput } from '../../lib/verdict.util';
+import {
+  AiRating,
+  VERDICT_SQL,
+  ratingFields,
+  ratingFilterValue,
+  toScenarioPrice,
+} from '../../lib/ticker-verdict';
 import { GetAnalyzerTickersOptions } from './interfaces/get-analyzer-tickers-options.interface';
 import { NumberUtil } from '../../utils/number.util';
+import { inProcessJobsEnabled } from '../../common/background-jobs';
 
 @Injectable()
 export class MarketDataService {
@@ -58,11 +76,31 @@ export class MarketDataService {
     private readonly priceAlertsService: PriceAlertsService,
   ) {}
 
+  /**
+   * A ticker's CURRENT PRICE is the `close` of its newest DAILY candle, and
+   * its PREVIOUS CLOSE that candle's `prevClose` (the live quote keeps today's
+   * daily candle up to date). `price_ohlcv` also holds the intraday candles
+   * the 1D / 1W / 1M charts cache (5m, 15m, … — stamped during the day, so
+   * later than the day's daily candle, and without a `prevClose`); a "latest
+   * row of any timeframe" lookup returned one of those as the price, with a
+   * day change of 0 %, for every ticker whose intraday chart had been opened.
+   * Every latest-price lookup therefore names the daily timeframe.
+   */
+  static readonly DAILY_TIMEFRAME = '1d';
+
+  /** Join condition: `price` = the ticker's newest daily candle. */
+  static readonly LATEST_DAILY_PRICE_JOIN =
+    "price.symbol_id = ticker.id AND price.timeframe = '1d' AND price.ts = " +
+    "(SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id AND timeframe = '1d')";
+
   private snapshotRequests = new Map<string, Promise<any>>();
   private historyRequests = new Map<string, Promise<any>>();
 
   // In-app crons only run in development - GitHub Actions handles production crons
-  private readonly isDevMode = process.env.NODE_ENV !== 'production';
+  // (and not at all with BACKGROUND_JOBS=off — see inProcessJobsEnabled).
+  private get isDevMode(): boolean {
+    return inProcessJobsEnabled();
+  }
 
   // Cron Job: Refresh active portfolio symbols every 30 seconds
   @Cron('*/30 * * * * *')
@@ -177,6 +215,11 @@ export class MarketDataService {
     }
   }
 
+  /** Gate for the public read routes — see TickersService. */
+  assertPublicReadAllowed(symbol: string, isSignedIn: boolean): Promise<void> {
+    return this.tickersService.assertPublicReadAllowed(symbol, isSignedIn);
+  }
+
   async getSnapshot(symbol: string) {
     const key = symbol.toUpperCase();
     const existing = this.snapshotRequests.get(key);
@@ -263,9 +306,12 @@ export class MarketDataService {
       24,
     );
 
-    // Fetch latest candle from DB
+    // Fetch the latest DAILY candle from DB — see LATEST_DAILY_PRICE_JOIN.
     let latestCandle = await this.ohlcvRepo.findOne({
-      where: { symbol_id: tickerEntity.id },
+      where: {
+        symbol_id: tickerEntity.id,
+        timeframe: MarketDataService.DAILY_TIMEFRAME,
+      },
       order: { ts: 'DESC' },
     });
 
@@ -293,8 +339,10 @@ export class MarketDataService {
       options.updateIfStale !== false
     ) {
       // Check if this is a non-US stock (has exchange suffix like .DE, .L, .PA)
-      // Finnhub free tier doesn't support non-US stocks, skip directly to Yahoo
-      const isNonUSStock = symbol.includes('.');
+      // Finnhub free tier doesn't support non-US stocks, skip directly to Yahoo.
+      // (Not `symbol.includes('.')`: US share classes — BRK.A, BRK.B — carry a
+      // dot too and ARE on Finnhub.)
+      const isNonUSStock = !isUsStyleSymbol(symbol);
 
       if (isNonUSStock) {
         this.logger.log(
@@ -586,6 +634,12 @@ export class MarketDataService {
       }
     }
 
+    // The consensus as STORED — what the analyzer's SQL reads. The AI rating
+    // below is computed from it, so that a ticker is rated the same here as in
+    // the analyzer; the fallback that follows only fills the value returned
+    // for display and is never saved.
+    const storedConsensus = fundamentals?.consensus_rating ?? null;
+
     // Fallback: If consensus_rating is missing in fundamentals but we have analyst ratings, derive it.
     if (fundamentals && !fundamentals.consensus_rating) {
       const recentRatings = await this.analystRatingRepo.find({
@@ -698,12 +752,39 @@ export class MarketDataService {
       cleanSparkline.push(latestCandle.close);
     }
 
+    const scenarioTargets = aiAnalysis
+      ? MarketDataService.scenarioTargets({
+          bear: MarketDataService.scenarioPriceMid(aiAnalysis, 'bear'),
+          base: MarketDataService.scenarioPriceMid(aiAnalysis, 'base'),
+        })
+      : { bear_price: null, base_price: null };
+
     return {
       ticker: tickerEntity,
       latestPrice: latestCandle,
       quote: detailedQuote, // Exposed for frontend (d, dp)
       fundamentals,
-      aiAnalysis,
+      // Same `base_price` / `bear_price` as the analyzer returns for this
+      // ticker, taken from the scenarios already loaded with the analysis (no
+      // extra query): the clients derive upside, downside and the AI rating
+      // from them, so a watchlist (snapshots) and the tickers page (analyzer)
+      // must get the same two numbers.
+      aiAnalysis: aiAnalysis
+        ? {
+            ...aiAnalysis,
+            ...scenarioTargets,
+            // The server's rating (same derivation as the analyzer's SQL).
+            ...ratingFields({
+              close: latestCandle?.close,
+              analysis: { ...aiAnalysis, ...scenarioTargets },
+              fundamentals: fundamentals
+                ? { ...fundamentals, consensus_rating: storedConsensus }
+                : null,
+              news_sentiment: tickerEntity.news_sentiment,
+              news_impact_score: tickerEntity.news_impact_score,
+            }),
+          }
+        : null,
       source,
       news: aiAnalysis
         ? {
@@ -721,6 +802,31 @@ export class MarketDataService {
       },
       sparkline: cleanSparkline,
     };
+  }
+
+  /**
+   * `bear_price` / `base_price` of an AI analysis: the `price_mid` of its
+   * 'bear' and 'base' scenarios as numbers, or null when that scenario does
+   * not exist. The ONE definition for every endpoint that returns `aiAnalysis`
+   * — the analyzer reads the two values through its SQL joins, the snapshots
+   * from the analysis' loaded scenarios; both convert them here.
+   */
+  private static scenarioTargets(raw: { bear: unknown; base: unknown }): {
+    bear_price: number | null;
+    base_price: number | null;
+  } {
+    return {
+      bear_price: toScenarioPrice(raw.bear),
+      base_price: toScenarioPrice(raw.base),
+    };
+  }
+
+  /** `price_mid` of the analysis' scenario of the given type, if loaded. */
+  private static scenarioPriceMid(
+    analysis: { scenarios?: { scenario_type: string; price_mid: unknown }[] },
+    type: 'base' | 'bear',
+  ): unknown {
+    return analysis.scenarios?.find((s) => s.scenario_type === type)?.price_mid;
   }
 
   static readonly MAX_SNAPSHOT_SYMBOLS = 100;
@@ -1310,7 +1416,7 @@ export class MarketDataService {
 
     // Fetch from API
     let news;
-    const isNonUSStock = symbol.includes('.');
+    const isNonUSStock = !isUsStyleSymbol(symbol);
 
     if (isNonUSStock) {
       this.logger.log(
@@ -1690,56 +1796,51 @@ export class MarketDataService {
   }
 
   /**
-   * Get count of tickers where the weighted verdict algorithm returns "Strong Buy".
-   * Uses the same logic as the frontend VerdictBadge.
+   * Tickers the AI rates "Strong Buy" — exactly the list the analyzer returns
+   * for `aiRating=Strong Buy` (the dashboard tile links there), because both
+   * use the same SQL rating over the same joins.
    */
   async getStrongBuyCount(): Promise<{ count: number; symbols: string[] }> {
-    const tickers = await this.getTickersWithRiskData();
-    // Include Strong Buy, No Brainer (Legendary), and Speculative Buy
-    const strongBuys = tickers.filter((t) =>
-      ['strongBuy', 'legendary', 'speculativeBuy'].includes(t.verdict.variant),
-    );
-    return {
-      count: strongBuys.length,
-      symbols: strongBuys.map((t) => t.symbol),
-    };
+    const symbols = await this.symbolsRated('Strong Buy');
+    return { count: symbols.length, symbols };
   }
 
-  /**
-   * Get count of tickers where the weighted verdict algorithm returns "Sell".
-   * Uses the same logic as the frontend VerdictBadge.
-   */
+  /** Tickers the AI rates "Sell" — the analyzer's `aiRating=Sell` list. */
   async getSellCount(): Promise<{ count: number; symbols: string[] }> {
-    const tickers = await this.getTickersWithRiskData();
-    const sells = tickers.filter((t) => t.verdict.variant === 'sell');
-    return { count: sells.length, symbols: sells.map((t) => t.symbol) };
+    const symbols = await this.symbolsRated('Sell');
+    return { count: symbols.length, symbols };
   }
 
   /**
-   * Internal helper: Fetch all tickers with risk data and compute their verdict using live calculations.
-   * Uses the same dynamic price calculation as the Analyzer filter.
+   * Visible tickers with the given AI rating, by symbol. A ticker without an
+   * analysis has no rating and is never returned.
    */
-  private async getTickersWithRiskData() {
+  private async symbolsRated(rating: AiRating): Promise<string[]> {
     const qb = this.tickerRepo.createQueryBuilder('ticker');
+    MarketDataService.joinVerdictInputs(qb);
+    const rows: { symbol: string }[] = await qb
+      .select('ticker.symbol', 'symbol')
+      .where('ticker.is_hidden = :hidden', { hidden: false })
+      .andWhere(`${VERDICT_SQL.rating} = :rating`, { rating })
+      .orderBy('ticker.symbol', 'ASC')
+      .getRawMany();
+    return rows.map((row) => row.symbol);
+  }
 
-    // Join Latest Risk
+  /**
+   * The joins VERDICT_SQL reads from, under the aliases it expects: the
+   * ticker's fundamentals, its latest price, its latest risk analysis and that
+   * analysis' base / bear scenarios. (The analyzer makes the same joins,
+   * mapped onto the entity.)
+   */
+  private static joinVerdictInputs(qb: SelectQueryBuilder<Ticker>): void {
+    qb.leftJoin(Fundamentals, 'fund', 'fund.symbol_id = ticker.id');
+    qb.leftJoin(PriceOhlcv, 'price', MarketDataService.LATEST_DAILY_PRICE_JOIN);
     qb.leftJoin(
       RiskAnalysis,
       'risk',
       'risk.ticker_id = ticker.id AND risk.created_at = (SELECT MAX(created_at) FROM risk_analyses WHERE ticker_id = ticker.id)',
     );
-
-    // Join Fundamentals
-    qb.leftJoin(Fundamentals, 'fund', 'fund.symbol_id = ticker.id');
-
-    // Join Latest Price
-    qb.leftJoin(
-      PriceOhlcv,
-      'price',
-      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
-    );
-
-    // Join Base and Bear Scenarios
     qb.leftJoin(
       RiskScenario,
       'base_scenario',
@@ -1750,58 +1851,6 @@ export class MarketDataService {
       'bear_scenario',
       "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'",
     );
-
-    qb.where('ticker.is_hidden = :hidden', { hidden: false });
-
-    // Select fields with dynamic calculations
-    qb.select([
-      'ticker.symbol',
-      'risk.financial_risk',
-      'risk.overall_score',
-      'fund.consensus_rating',
-      'fund.pe_ttm',
-      'price.close',
-      'base_scenario.price_mid',
-      'bear_scenario.price_mid',
-    ]);
-
-    const rawResults = await qb.getRawMany();
-
-    return rawResults.map((row) => {
-      const currentPrice = parseFloat(row.price_close) || 0;
-      const baseTarget = parseFloat(row.base_scenario_price_mid) || null;
-      const bearTarget = parseFloat(row.bear_scenario_price_mid) || null;
-      const financialRisk = parseFloat(row.risk_financial_risk) || 5;
-
-      // Dynamic upside calculation
-      let upside = 0;
-      if (currentPrice > 0 && baseTarget && baseTarget > 0) {
-        upside = ((baseTarget - currentPrice) / currentPrice) * 100;
-      }
-
-      // Dynamic downside calculation
-      let downside = 0;
-      if (currentPrice > 0 && bearTarget && bearTarget > 0) {
-        downside = ((bearTarget - currentPrice) / currentPrice) * 100;
-      } else if (financialRisk >= 8) {
-        downside = -100;
-      } else {
-        downside = -(financialRisk * 5);
-      }
-
-      const input: VerdictInput = {
-        risk: financialRisk,
-        upside: upside,
-        downside: downside,
-        consensus: row.fund_consensus_rating || undefined,
-        overallScore: parseFloat(row.risk_overall_score) || null,
-        peRatio: parseFloat(row.fund_pe_ttm) || null,
-      };
-      return {
-        symbol: row.ticker_symbol,
-        verdict: calculateAiRating(input),
-      };
-    });
   }
 
   /**
@@ -1832,13 +1881,16 @@ export class MarketDataService {
       'ticker.latestPrice',
       PriceOhlcv,
       'price',
-      'price.symbol_id = ticker.id AND price.ts = (SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id)',
+      MarketDataService.LATEST_DAILY_PRICE_JOIN,
     );
 
     // Calculate Price Change %
     // (close - prevClose) / prevClose * 100. Handle division by zero.
+    // NULL (not 0) when the ticker has no price row at all, so that sorting by
+    // change puts those rows last instead of in the middle of the real values.
     qb.addSelect(
       `CASE 
+        WHEN price.close IS NULL THEN NULL
         WHEN price.prevClose IS NOT NULL AND price.prevClose != 0 
         THEN ((price.close - price.prevClose) / price.prevClose) * 100 
         ELSE 0 
@@ -1866,101 +1918,20 @@ export class MarketDataService {
       "bear_scenario.analysis_id = risk.id AND bear_scenario.scenario_type = 'bear'",
     );
 
-    const upsideExpr = `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100`;
-    const downsideExpr = `CASE 
-      WHEN bear_scenario.price_mid IS NOT NULL AND price.close > 0 
-      THEN ((bear_scenario.price_mid - price.close) / price.close) * 100
-      WHEN risk.financial_risk >= 8 THEN -100
-      ELSE -(risk.financial_risk * 5)
-    END`;
-
-    // -------------------------------------------------------------------------
-    // VERDICT SCORING SQL (Backend Mirror of verdict.util.ts)
-    // -------------------------------------------------------------------------
-    const verdictScoreSql = `(
-        50
-        -- 1. Upside Impact (Max 0+, Capped at 100, * 0.4)
-        + (GREATEST(0, LEAST(100, COALESCE(${upsideExpr}, 0))) * 0.4)
-        
-        -- 2. Downside Impact (Abs, Cap 40, * 0.8) -> Subtract
-        - (LEAST(40, ABS(COALESCE(${downsideExpr}, 0)) * 0.8))
-        
-        -- 3. Risk Penalty / Bonus
-        + CASE 
-            WHEN risk.financial_risk >= 8 THEN -20 
-            WHEN risk.financial_risk >= 6 THEN -10 
-            WHEN risk.financial_risk <= 3 THEN 5 
-            ELSE 0 
-          END
-        
-      -- 3.5 ATH Penalty (Progressive)
-      + CASE
-          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.98) THEN -20
-          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.90) THEN -10
-          WHEN fund.fifty_two_week_high > 0 AND price.close >= (fund.fifty_two_week_high * 0.80) THEN -5
-          ELSE 0
-        END
-
-      -- 3.6 Low Reward (Buy the Dip) - With Falling Knife Check
-      + CASE
-          WHEN fund.fifty_two_week_low > 0 AND price.close <= (fund.fifty_two_week_low * 1.25) THEN
-            CASE
-               -- Falling Knife Exception: Sell Consensus AND Downside ~ -100%
-               WHEN (fund.consensus_rating ILIKE '%Sell%') AND (${downsideExpr} <= -99) THEN 0
-               -- Tiers
-               WHEN price.close <= (fund.fifty_two_week_low * 1.05) THEN 10
-               WHEN price.close <= (fund.fifty_two_week_low * 1.25) THEN 5
-               ELSE 0
-            END
-          ELSE 0
-        END
-
-      -- 3.7 No Revenue Penalty
-      + CASE
-          WHEN fund.revenue_ttm IS NULL OR fund.revenue_ttm <= 0 THEN -5
-          ELSE 0
-        END
-
-        -- 4. Neural Score Bonus (Weight Increased)
-        + CASE 
-            WHEN "risk"."overall_score" >= 8 THEN 20
-            WHEN "risk"."overall_score" >= 6 THEN 10
-            WHEN "risk"."overall_score" <= 4 THEN -10
-            ELSE 0 
-          END
-        
-        -- 5. Analyst Consensus
-        + CASE 
-            WHEN fund.consensus_rating ILIKE '%Strong Buy%' THEN 10 
-            WHEN fund.consensus_rating ILIKE '%Buy%' THEN 5 
-            WHEN fund.consensus_rating ILIKE '%Sell%' THEN -10 
-            ELSE 0 
-          END
-          
-        -- 6. PE Ratio Impact - Only reward value, don't punish growth/pre-revenue
-        + CASE 
-            WHEN fund.pe_ttm IS NULL OR fund.pe_ttm <= 0 THEN 0
-            WHEN fund.pe_ttm <= 10 THEN 20           -- Exceptional Value
-            WHEN fund.pe_ttm <= 15 THEN 15           -- Great Value
-            WHEN fund.pe_ttm <= 25 THEN 5            -- Fair Value
-            ELSE 0 
-          END
-
-        -- 7. Smart News Integration (High Impact Only)
-        + CASE
-            WHEN ticker.news_impact_score >= 8 AND UPPER(ticker.news_sentiment) = 'BULLISH' THEN 15
-            WHEN ticker.news_impact_score >= 8 AND UPPER(ticker.news_sentiment) = 'BEARISH' THEN -15
-            WHEN ticker.news_impact_score >= 5 AND UPPER(ticker.news_sentiment) = 'BULLISH' THEN 5
-            WHEN ticker.news_impact_score >= 5 AND UPPER(ticker.news_sentiment) = 'BEARISH' THEN -5
-            ELSE 0
-          END
-      )`;
+    // Upside, downside, verdict score and rating: the SQL twin of the clients'
+    // rating maths (src/lib/ticker-verdict.ts). One definition for the values
+    // this query filters, sorts and returns.
+    const upsideExpr = VERDICT_SQL.upside;
+    const downsideExpr = VERDICT_SQL.downside;
 
     qb.addSelect('base_scenario.price_mid', 'base_price');
     qb.addSelect('bear_scenario.price_mid', 'bear_price');
     qb.addSelect(upsideExpr, 'dynamic_upside');
     qb.addSelect(downsideExpr, 'dynamic_downside');
-    qb.addSelect(verdictScoreSql, 'ai_verdict_score');
+    // NULL without an analysis: a ticker that has never been analysed has no
+    // rating — it sorts last and no rating filter matches it.
+    qb.addSelect(VERDICT_SQL.score, 'ai_verdict_score');
+    qb.addSelect(VERDICT_SQL.rating, 'ai_rating');
 
     // Analyst Count Subquery
     qb.addSelect((subQuery) => {
@@ -2081,7 +2052,12 @@ export class MarketDataService {
             } else if (r === 'US') {
               regionBracket.orWhere(
                 new Brackets((us: any) => {
-                  us.where(`ticker.symbol NOT LIKE '%.%'`).andWhere(
+                  // The SQL twin of isUsStyleSymbol: bare symbols AND US
+                  // share classes (BRK.B) — a plain "no dot" test left the
+                  // latter in neither region.
+                  us.where(usStyleSymbolSql('ticker.symbol'), {
+                    oneLetterVenues: ONE_LETTER_VENUE_SUFFIXES,
+                  }).andWhere(
                     `UPPER(ticker.exchange) NOT IN (:...usExcludedExchanges)`,
                     { usExcludedExchanges: EU_EXCHANGE_CODES },
                   );
@@ -2120,10 +2096,7 @@ export class MarketDataService {
       if (match) {
         const val = parseInt(match[0], 10);
         // Use the same dynamic expression we defined for selects
-        qb.andWhere(
-          `((base_scenario.price_mid - price.close) / NULLIF(price.close, 0)) * 100 > :upsideVal`,
-          { upsideVal: val },
-        );
+        qb.andWhere(`${upsideExpr} > :upsideVal`, { upsideVal: val });
       }
     }
 
@@ -2152,36 +2125,26 @@ export class MarketDataService {
       qb.andWhere('fund.pe_ttm > 0');
     }
 
-    // 3. AI Rating Filter (Standardized Weighted Verdict)
-    // Synchronized with frontend rating-utils.ts
-    // Score Tiers: >= 80 Strong Buy, >= 65 Buy, >= 45 Hold, < 45 Sell
+    // 3. AI Rating Filter. Each ticker has exactly one rating — the one its
+    // badge shows — and a filter value selects exactly the tickers with that
+    // rating ("Strong Buy" does not also return "No Brainer" or "Speculative
+    // Buy"; a ticker without an analysis has no rating and matches nothing).
     if (options.aiRating && options.aiRating.length > 0) {
-      qb.andWhere(
-        new Brackets((sub: any) => {
-          options.aiRating?.forEach((rating: any) => {
-            if (rating === 'Legendary' || rating === 'No Brainer') {
-              sub.orWhere(`${verdictScoreSql} > 105`);
-            } else if (rating === 'Strong Buy') {
-              sub.orWhere(`${verdictScoreSql} >= 80`);
-            } else if (rating === 'Buy') {
-              sub.orWhere(
-                `${verdictScoreSql} >= 65 AND ${verdictScoreSql} < 80`,
-              );
-            } else if (rating === 'Hold') {
-              sub.orWhere(
-                `${verdictScoreSql} >= 45 AND ${verdictScoreSql} < 65`,
-              );
-            } else if (rating === 'Sell') {
-              sub.orWhere(`${verdictScoreSql} < 45`);
-            } else if (rating === 'Speculative Buy') {
-              // Speculative Buy override logic
-              sub.orWhere(
-                `risk.financial_risk >= 8 AND (risk.overall_score >= 7.5 OR ${upsideExpr} >= 100)`,
-              );
-            }
-          });
-        }),
-      );
+      const ratings = [
+        ...new Set(
+          options.aiRating
+            .map((value) => ratingFilterValue(String(value)))
+            .filter((rating): rating is AiRating => rating !== null),
+        ),
+      ];
+      if (ratings.length > 0) {
+        qb.andWhere(`${VERDICT_SQL.rating} IN (:...aiRatings)`, {
+          aiRatings: ratings,
+        });
+      } else {
+        // Only unknown values were asked for: nothing has such a rating.
+        qb.andWhere('1 = 0');
+      }
     }
 
     // Sort Mapping.
@@ -2218,9 +2181,13 @@ export class MarketDataService {
     // the ORDER BY direction, so never pass the raw user value through.
     const sortDirection: 'ASC' | 'DESC' =
       String(sortDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    qb.orderBy(sortField, sortDirection);
+    // NULLS LAST in BOTH directions: a ticker without the value (not analysed
+    // yet, no fundamentals, no price) always goes to the end. Postgres' default
+    // puts NULLs first on DESC, which filled the top of "highest upside / risk
+    // / score" with exactly the tickers that have none.
+    qb.orderBy(sortField, sortDirection, 'NULLS LAST');
 
-    // Add secondary sort for stability
+    // Add secondary sort for stability (pages must not shuffle between requests)
     qb.addOrderBy('ticker.symbol', 'ASC');
 
     // Performance Optimization: Use window function instead of separate getCount() query
@@ -2310,12 +2277,18 @@ export class MarketDataService {
             aiAnalysis: t.latestRisk
               ? {
                   ...t.latestRisk,
-                  bear_price: rawData?.bear_price
-                    ? parseFloat(rawData.bear_price)
-                    : null,
-                  base_price: rawData?.base_price
-                    ? parseFloat(rawData.base_price)
-                    : null,
+                  ...MarketDataService.scenarioTargets({
+                    bear: rawData?.bear_price,
+                    base: rawData?.base_price,
+                  }),
+                  // The server's rating, as computed by this query — the same
+                  // values it filtered and sorted by.
+                  rating: rawData?.ai_rating ?? null,
+                  rating_score:
+                    rawData?.ai_verdict_score === null ||
+                    rawData?.ai_verdict_score === undefined
+                      ? null
+                      : Number(rawData.ai_verdict_score),
                 }
               : null,
             counts: {
@@ -2620,7 +2593,7 @@ export class MarketDataService {
     // For US-listed stocks (no exchange suffix like .DE, .PA, .L),
     // the trading currency is always USD regardless of what Yahoo/Finnhub
     // reports as the company's home currency (e.g. DKK for Novo Nordisk ADR).
-    const isUSListed = !ticker.symbol.includes('.');
+    const isUSListed = isUsStyleSymbol(ticker.symbol);
     if (isUSListed && normalized !== 'USD') {
       this.logger.debug(
         `Overriding reported currency ${normalized} -> USD for US-listed ${ticker.symbol}`,

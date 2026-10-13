@@ -43,7 +43,22 @@ describe('SocialController', () => {
       const result = await controller.getComments('AAPL');
 
       expect(result).toEqual(mockComments);
-      expect(mockSocialService.getComments).toHaveBeenCalledWith('AAPL');
+      // No signed-in caller: an anonymous viewer.
+      expect(mockSocialService.getComments).toHaveBeenCalledWith('AAPL', null);
+    });
+
+    it('tells the service who is asking when the caller is signed in', async () => {
+      mockSocialService.getComments.mockResolvedValue({ comments: [] });
+
+      await controller.getComments('AAPL', {
+        user: { id: 'user123', role: 'admin', email: 'private@example.com' },
+      });
+
+      // Only what the visibility rules need — not the user row.
+      expect(mockSocialService.getComments).toHaveBeenCalledWith('AAPL', {
+        id: 'user123',
+        role: 'admin',
+      });
     });
   });
 
@@ -53,7 +68,9 @@ describe('SocialController', () => {
       mockSocialService.postComment.mockResolvedValue(mockComment);
       const req = { user: { id: 'user123' } };
 
-      const result = await controller.postComment(req, 'AAPL', 'Great stock!');
+      const result = await controller.postComment(req, 'AAPL', {
+        content: 'Great stock!',
+      });
 
       expect(result).toEqual(mockComment);
       expect(mockSocialService.postComment).toHaveBeenCalledWith(
@@ -69,7 +86,10 @@ describe('SocialController', () => {
       mockSocialService.postComment.mockResolvedValue(mockReply);
       const req = { user: { id: 'user123' } };
 
-      const result = await controller.postComment(req, 'AAPL', 'I agree!', '1');
+      const result = await controller.postComment(req, 'AAPL', {
+        content: 'I agree!',
+        parent_id: '1',
+      });
 
       expect(result).toEqual(mockReply);
       expect(mockSocialService.postComment).toHaveBeenCalledWith(

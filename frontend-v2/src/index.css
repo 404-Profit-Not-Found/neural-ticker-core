@@ -1,0 +1,735 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Default (Dark). Structure comes from three tones, not from strokes:
+       canvas → surface (card) → raised/inset (muted) → selected (raised). */
+    --background: 8 8 10;
+    /* #08080a */
+    --foreground: 244 244 245;
+    /* #f4f4f5 */
+    --card: 24 24 30;
+    /* #18181e — the weakest step carries the layout, so it gets room */
+    --card-foreground: 244 244 245;
+    --popover: 33 33 41;
+    /* #212129 — floats above everything, so it is the lightest surface */
+    --popover-foreground: 244 244 245;
+    --primary: 37 99 235;
+    /* Blue 600 — fills: buttons */
+    --link: 96 165 250;
+    /* Blue 400 — the same blue as text: 7:1 on a surface */
+    --primary-foreground: 250 250 250;
+    --secondary: 38 38 47;
+    /* #26262f */
+    --secondary-foreground: 244 244 245;
+    --muted: 38 38 47;
+    --muted-foreground: 161 161 170;
+    /* Zinc 400 — 8:1 on the canvas, 6.7:1 on a surface */
+    --accent: 38 38 47;
+    --accent-foreground: 244 244 245;
+    --raised: 56 56 68;
+    /* #383844 */
+    --destructive: 185 28 28;
+    /* Red 700 — white text on it is 6.5:1 */
+    --destructive-foreground: 250 250 250;
+    /* Strokes are off (see tailwind.config.js); `hairline` is the one
+       sanctioned rule colour. */
+    --stroke: 0;
+    --border: 48 48 58;
+    --input: 48 48 58;
+    --hairline: 44 44 54;
+    --ring: 245 158 11;
+    /* Signal: where you are — active nav, selected toggles, focus, LEDs */
+    --signal: 245 158 11;
+    /* Amber 500 */
+    --signal-foreground: 24 16 0;
+    /* Market direction */
+    --up: 52 211 153;
+    /* Emerald 400 */
+    --down: 251 113 133;
+    /* Rose 400 — losses read as clearly as gains (6.6:1 on a surface) */
+    /* AI-generated things: research, digest, analysis */
+    --ai: 167 139 250;
+    /* Violet 400 */
+    --radius: 6px;
+    color-scheme: dark;
+  }
+
+  [data-theme='light'] {
+    --background: 240 241 244;
+    /* Cool light gray, so white surfaces read without an outline */
+    --foreground: 9 9 11;
+    --card: 255 255 255;
+    --card-foreground: 9 9 11;
+    --popover: 255 255 255;
+    --popover-foreground: 9 9 11;
+    --primary: 37 99 235;
+    --link: 29 78 216;
+    /* Blue 700 as text */
+    --primary-foreground: 255 255 255;
+    --secondary: 229 231 236;
+    --secondary-foreground: 24 24 27;
+    --muted: 229 231 236;
+    --muted-foreground: 95 95 105;
+    /* 5.4:1 on the canvas, 6.2:1 on a surface */
+    --accent: 229 231 236;
+    --accent-foreground: 24 24 27;
+    --raised: 255 255 255;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 228 228 231;
+    --input: 228 228 231;
+    --hairline: 222 224 230;
+    --ring: 146 64 14;
+    --signal: 146 64 14;
+    /* Amber 800 — 5.4:1 on its own tint */
+    --signal-foreground: 255 255 255;
+    --up: 4 120 87;
+    /* Emerald 700 */
+    --down: 190 18 60;
+    /* Rose 700 */
+    --ai: 109 40 217;
+    /* Violet 700 */
+    color-scheme: light;
+  }
+
+  [data-theme='gray'] {
+    --background: 228 228 231;
+    /* Zinc 200 */
+    --foreground: 24 24 27;
+    /* Zinc 900 */
+    --card: 244 244 245;
+    /* Zinc 100 */
+    --card-foreground: 24 24 27;
+    --popover: 250 250 250;
+    /* Zinc 50 */
+    --popover-foreground: 24 24 27;
+    --primary: 37 99 235;
+    --link: 29 78 216;
+    /* Blue 700 as text */
+    --primary-foreground: 255 255 255;
+    --secondary: 212 212 216;
+    /* Zinc 300 */
+    --secondary-foreground: 24 24 27;
+    --muted: 212 212 216;
+    /* Zinc 300 */
+    --muted-foreground: 82 82 91;
+    /* Zinc 600 */
+    --accent: 212 212 216;
+    --accent-foreground: 24 24 27;
+    --raised: 250 250 250;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 161 161 170;
+    --input: 161 161 170;
+    --hairline: 200 200 206;
+    --ring: 124 45 18;
+    --signal: 124 45 18;
+    /* Orange 900 — the gray canvas needs the darker step */
+    --signal-foreground: 255 255 255;
+    --up: 4 120 87;
+    --down: 190 18 60;
+    --ai: 109 40 217;
+    color-scheme: light;
+  }
+}
+
+@layer base {
+  * {
+    /* A bare `border` draws nothing: structure comes from tone and spacing. */
+    border-color: transparent;
+  }
+
+  /* Icons keep their size in a crowded flex row instead of collapsing. */
+  .lucide {
+    flex-shrink: 0;
+  }
+
+  :root {
+    /* Shell chrome heights, shared by layout utilities (`min-h-page`). */
+    --header-h: 3.5rem;
+    --tabbar-h: calc(3.75rem + env(safe-area-inset-bottom));
+    --statusbar-h: 0px;
+    /* Space taken at the bottom of the viewport by fixed shell chrome. */
+    --shell-bottom: calc(var(--tabbar-h) + var(--statusbar-h));
+    --page-min-h: calc(100dvh - var(--header-h) - var(--shell-bottom));
+  }
+
+  /* Matches the shell: tab bar below `lg`, status line from `lg` up. */
+  @media (min-width: 1024px) {
+    :root {
+      --tabbar-h: 0px;
+      --statusbar-h: 1.75rem;
+    }
+  }
+
+  html {
+    /* Reserve the scrollbar's space so pages of different heights don't
+       shift sideways when navigating between them. */
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-[color:rgb(var(--background))] text-[color:rgb(var(--foreground))] font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Prices, quantities and percentages line up in columns and don't jitter
+     as they update. */
+  .font-mono,
+  .tabular-nums,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One consistent keyboard focus indicator; mouse/touch focus stays quiet. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* iOS zooms the page when focusing a field whose text is under 16px, and a
+     36px field is a poor touch target. */
+  @media (max-width: 767px) and (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select {
+      min-height: 2.75rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Design language
+   v1's information design with a terminal's discipline: tonal surfaces, a
+   live ticker tape, a status line, mono numerals and small uppercase mono
+   labels. No outlines and no divider lines — tone and spacing do that work.
+   The character comes from structure, never from a novelty typeface.
+   Rules of thumb (see DESIGN.md):
+     · Inter for anything a person reads as a sentence or a name
+     · JetBrains Mono for every number (.num) and for short uppercase data
+       labels (.label-micro, .panel-title, stamps)
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+  /* Small uppercase data label: column heads, field captions, units. */
+  .label-micro {
+    font-family: theme('fontFamily.mono');
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--muted-foreground));
+  }
+
+  /* Every number: aligned digits, no jitter when values tick. */
+  .num {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Panel = one tonal surface with an optional title row. No outline. */
+  .panel {
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+  }
+
+  /* The title row and the body are one block: no rule, no doubled padding. */
+  .panel-head + .panel-body {
+    padding-top: 0.25rem;
+  }
+
+  .panel-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-family: theme('fontFamily.mono');
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgb(var(--foreground) / 0.92);
+  }
+
+  /* Square status light. Colour via --led (defaults to the signal colour). */
+  .led {
+    --led: var(--signal);
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    background: rgb(var(--led));
+    box-shadow: 0 0 0 2px rgb(var(--led) / 0.16), 0 0 8px rgb(var(--led) / 0.55);
+  }
+  .led-up { --led: var(--up); }
+  .led-down { --led: var(--down); }
+  .led-info { --led: 59 130 246; }
+  .led-ai { --led: 168 85 247; }
+  .led-off {
+    background: rgb(var(--muted-foreground) / 0.45);
+    box-shadow: none;
+  }
+  .led-pulse { animation: led-pulse 1.6s steps(2, jump-none) infinite; }
+
+  /* Stamp: a filled tag — uppercase, mono. */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    height: 1.375rem;
+    padding: 0 0.4375rem;
+    border-radius: 4px;
+    background: rgb(var(--muted));
+    font-family: theme('fontFamily.mono');
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Keyboard hint. */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3125rem;
+    border-radius: 4px;
+    background: rgb(var(--muted));
+    font-family: theme('fontFamily.mono');
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    color: rgb(var(--muted-foreground));
+  }
+
+  /* Former dashed rule between groups; now just the gap it used to mark. */
+  .px-rule {
+    height: 1px;
+  }
+}
+
+@keyframes led-pulse {
+  50% { opacity: 0.35; }
+}
+
+/* Ticker tape: two copies of the strip slide left by exactly one copy. */
+@keyframes tape-scroll {
+  to { transform: translateX(-50%); }
+}
+
+/* Skeletons shimmer in visible steps — a loading state with terminal manners. */
+@keyframes skeleton-steps {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+/* RGB Theme Specifics */
+[data-theme='rgb'] {
+  /* Using dark mode base */
+}
+
+/* RGB animated border - uses a pseudo-element behind the card */
+[data-theme='rgb'] .rgb-border {
+  position: relative;
+  z-index: 0;
+  border: none !important;
+  overflow: visible !important;
+}
+
+[data-theme='rgb'] .rgb-border::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(45deg,
+      #ff0000,
+      #ff8800,
+      #ffff00,
+      #00ff00,
+      #00ffff,
+      #0066ff,
+      #8800ff,
+      #ff0088,
+      #ff0000);
+  background-size: 400% 400%;
+  animation: rgb-border-rotate 15s linear infinite;
+  pointer-events: none;
+}
+
+[data-theme='rgb'] .rgb-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgb(var(--card));
+  pointer-events: none;
+}
+
+[data-theme='rgb'] .rgb-text {
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #ef4444);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rgb-text-flow 60s linear infinite;
+  background-size: 200% auto;
+}
+
+.style-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.style-kpi .style-hero-grid {
+  display: none;
+}
+
+.style-hero .style-hero-grid {
+  opacity: 0.85;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.style-hero .style-hero-blob {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(var(--primary), 0.12), transparent 28%),
+    radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.10), transparent 24%);
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+
+[data-theme='light'] .style-hero,
+[data-theme='gray'] .style-hero {
+  background: rgb(var(--card));
+  border-color: rgb(228 228 231 / 0.8);
+}
+
+[data-theme='light'] .style-hero .style-hero-grid,
+[data-theme='gray'] .style-hero .style-hero-grid {
+  opacity: 0.6;
+  background-image:
+    linear-gradient(rgba(120, 120, 150, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 120, 150, 0.22) 1px, transparent 1px);
+}
+
+[data-theme='rgb'] .style-hero .style-hero-grid {
+  opacity: 0.9;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+}
+
+/* Light-only badge contrast helpers */
+[data-theme='light'] .badge-light-strong,
+[data-theme='gray'] .badge-light-strong {
+  color: #0f172a !important;
+  background-color: #bbf7d0 !important;
+  /* green-100 */
+}
+
+[data-theme='light'] .badge-light-buy,
+[data-theme='gray'] .badge-light-buy {
+  color: #0f172a !important;
+  background-color: #c8f8e2 !important;
+  /* custom soft emerald */
+}
+
+[data-theme='light'] .badge-light-hold,
+[data-theme='gray'] .badge-light-hold {
+  color: #0f172a !important;
+  background-color: #fef08a !important;
+  /* yellow-200 */
+}
+
+[data-theme='light'] .badge-light-purple,
+[data-theme='gray'] .badge-light-purple {
+  color: #0f172a !important;
+  background-color: #e9d5ff !important;
+  /* purple-200 */
+}
+
+[data-theme='light'] .badge-light-sell,
+[data-theme='gray'] .badge-light-sell {
+  color: #0f172a !important;
+  background-color: #fecdd3 !important;
+  /* rose-200 */
+}
+
+[data-theme='rgb'] .style-hero {
+  border: none;
+}
+
+[data-theme='rgb'] .style-hero .style-hero-blob {
+  opacity: 0.5;
+}
+
+[data-theme='rgb'] .style-hero .style-hero-grid {
+  opacity: 0.25;
+}
+
+@keyframes rgb-border-rotate {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes rgb-text-flow {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Watchlist Tile RGB Hover Effect */
+[data-theme='rgb'] .watchlist-tile {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme='rgb'] .watchlist-tile:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+  z-index: 10;
+}
+
+[data-theme='rgb'] .watchlist-tile:hover::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  z-index: -2;
+  border-radius: inherit;
+  background: linear-gradient(45deg,
+      #ff0000,
+      #ff8800,
+      #ffff00,
+      #00ff00,
+      #00ffff,
+      #0066ff,
+      #8800ff,
+      #ff0088,
+      #ff0000);
+  background-size: 400% 400%;
+  animation: rgb-border-rotate 8s linear infinite;
+  pointer-events: none;
+}
+
+[data-theme='rgb'] .watchlist-tile:hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgb(var(--card));
+  pointer-events: none;
+}
+
+/* RGB Bottom Border (Header) - Keep sticky by removing relative position */
+[data-theme='rgb'] .rgb-border-b {
+  border-bottom-color: transparent !important;
+}
+
+[data-theme='rgb'] .rgb-border-b::after {
+  content: "";
+  position: absolute;
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 50;
+  background: linear-gradient(90deg,
+      #ff0000,
+      #ff8800,
+      #ffff00,
+      #00ff00,
+      #00ffff,
+      #0066ff,
+      #8800ff,
+      #ff0088,
+      #ff0000);
+  background-size: 200% auto;
+  animation: rgb-text-flow 15s linear infinite;
+  box-shadow: 0 1px 10px rgba(var(--primary), 0.5);
+}
+
+/* Ticker card: a tone-coloured glow on hover in the RGB theme. */
+[data-theme='rgb'] .ticker-card[data-tone='emerald']:hover {
+  box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+[data-theme='rgb'] .ticker-card[data-tone='yellow']:hover {
+  box-shadow: 0 0 15px -3px rgba(245, 158, 11, 0.4);
+}
+
+[data-theme='rgb'] .ticker-card[data-tone='red']:hover {
+  box-shadow: 0 0 15px -3px rgba(239, 68, 68, 0.4);
+}
+
+[data-theme='rgb'] .ticker-card[data-tone='primary']:hover {
+  box-shadow: 0 0 15px -3px rgba(59, 130, 246, 0.4);
+}
+
+/* Admin Console & General Table Enhancements */
+.admin-table-row {
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.admin-table-row:hover {
+  background-color: rgb(var(--muted) / 0.15) !important;
+}
+
+[data-theme='gray'] .admin-table-row:hover {
+  background-color: #ffffff !important;
+}
+
+.admin-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(var(--primary) / 0.3), rgb(var(--accent) / 0.3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+  color: rgb(var(--primary));
+  flex-shrink: 0;
+}
+
+.admin-stats-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.3);
+}
+
+.admin-stats-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgb(var(--primary)), rgb(139 92 246));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.admin-stats-card:hover::before {
+  opacity: 1;
+}
+
+/* Tier selector dropdown */
+.tier-selector {
+  transition: all 0.2s ease;
+}
+
+.tier-selector:hover {
+  background-color: rgb(var(--muted) / 0.3);
+}
+
+/* Light theme admin overrides */
+[data-theme='light'] .admin-user-avatar,
+[data-theme='gray'] .admin-user-avatar {
+  background: linear-gradient(135deg, rgb(var(--primary) / 0.15), rgb(139 92 246 / 0.15));
+}
+
+[data-theme='light'] .admin-stats-card,
+[data-theme='gray'] .admin-stats-card {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+[data-theme='light'] .admin-stats-card:hover,
+[data-theme='gray'] .admin-stats-card:hover {
+  box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.15);
+}
+
+/* Full-screen loader progress line (SuperLoading). */
+@keyframes superProgressMove {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(334%); }
+}
+
+.animate-progress-bar {
+  animation: superProgressMove 1.6s linear infinite;
+}
+
+/* Neural Logo Specific Animations */
+@keyframes neural-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 0px rgba(124, 58, 237, 0)) hue-rotate(0deg);
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 15px rgba(124, 58, 237, 0.6)) hue-rotate(15deg);
+  }
+}
+
+.animate-neural-pulse {
+  animation: neural-pulse 3s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, filter;
+}

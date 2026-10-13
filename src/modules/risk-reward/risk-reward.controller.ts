@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -10,6 +10,7 @@ import {
 import { RiskRewardService } from './risk-reward.service';
 
 import { Public } from '../auth/public.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @ApiTags('Risk/Reward')
 @ApiBearerAuth()
@@ -63,9 +64,18 @@ export class RiskRewardController {
       },
     },
   })
+  // Public, but an anonymous caller can only read a ticker we already track
+  // (both reads resolve the symbol through the creating snapshot path): see
+  // TickersService.assertPublicReadAllowed.
   @Get()
   @Public()
-  getScore(@Param('symbol') symbol: string, @Query('history') history: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getScore(
+    @Param('symbol') symbol: string,
+    @Query('history') history: string,
+    @Req() req?: any,
+  ) {
+    await this.service.assertPublicReadAllowed(symbol, !!req?.user);
     if (history === 'true') {
       return this.service.getScoreHistory(symbol);
     }

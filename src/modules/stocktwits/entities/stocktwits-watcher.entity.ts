@@ -14,7 +14,7 @@ export class StockTwitsWatcher {
   id: string;
 
   @ApiProperty({ example: 'AAPL', description: 'Stock Symbol' })
-  @Index()
+  @Index('IDX_stocktwits_watchers_symbol')
   @Column()
   symbol: string;
 
@@ -26,7 +26,7 @@ export class StockTwitsWatcher {
     example: '2023-01-01T12:00:00Z',
     description: 'Record timestamp',
   })
-  @Index()
+  @Index('IDX_stocktwits_watchers_timestamp')
   @CreateDateColumn({ type: 'timestamptz' })
   timestamp: Date;
 }

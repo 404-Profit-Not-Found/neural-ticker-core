@@ -18,6 +18,7 @@ import { PriceAlertsService } from '../price-alerts/price-alerts.service';
 import { ConfigService } from '@nestjs/config';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
 import { MarketStatusService } from './market-status.service';
+import { VERDICT_SQL } from '../../lib/ticker-verdict';
 
 describe('MarketDataService', () => {
   let service: MarketDataService;
@@ -357,6 +358,62 @@ describe('MarketDataService', () => {
       expect(finnhubService.getQuote).toHaveBeenCalledWith('AAPL');
       expect(result.latestPrice!.close).toBe(155);
       expect(mockOhlcvRepo.save).toHaveBeenCalled();
+    });
+
+    describe('US vs non-US routing of a stale snapshot', () => {
+      const stale = () => {
+        const staleDate = new Date(Date.now() - 20 * 60 * 1000);
+        mockOhlcvRepo.findOne.mockResolvedValue({
+          close: 100,
+          ts: staleDate,
+          updated_at: staleDate,
+        } as unknown as PriceOhlcv);
+        mockFundamentalsRepo.findOne.mockResolvedValue({
+          updated_at: new Date(),
+        });
+        mockFinnhubService.getQuote.mockResolvedValue({
+          c: 155,
+          o: 154,
+          h: 156,
+          l: 153,
+          v: 1000,
+          t: Date.now() / 1000,
+        });
+        mockYahooService.getQuote.mockResolvedValue(null);
+        mockYahooService.getSummary.mockResolvedValue(null);
+      };
+
+      // A dot is not an exchange suffix when it marks a US share class.
+      it.each(['BRK.B', 'BRK.A', 'BF.B'])(
+        'treats the US share class %s as a US listing: Finnhub, not straight to Yahoo',
+        async (symbol) => {
+          mockTickersService.awaitEnsureTicker.mockResolvedValue({
+            id: 1,
+            symbol,
+          });
+          stale();
+
+          await service.getSnapshot(symbol);
+
+          expect(finnhubService.getQuote).toHaveBeenCalledWith(symbol);
+        },
+      );
+
+      it.each(['SAP.DE', '7203.T', 'VOLV-B.ST', 'BBCA.JK'])(
+        'still skips Finnhub for the exchange-suffixed %s',
+        async (symbol) => {
+          mockTickersService.awaitEnsureTicker.mockResolvedValue({
+            id: 1,
+            symbol,
+          });
+          stale();
+
+          await service.getSnapshot(symbol);
+
+          expect(finnhubService.getQuote).not.toHaveBeenCalled();
+          expect(mockYahooService.getQuote).toHaveBeenCalledWith(symbol);
+        },
+      );
     });
   });
 
@@ -897,7 +954,297 @@ describe('MarketDataService', () => {
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
         '"dynamic_upside"',
         'ASC',
+        'NULLS LAST',
       );
+    });
+
+    // "Current price" = the newest DAILY candle. price_ohlcv also caches the
+    // intraday bars of the 1D/1W/1M charts, which are newer than the day's
+    // daily candle and carry no prevClose. On PostgreSQL:
+    // test/db/latest-price.db-spec.ts.
+    describe('latest price = the daily candle', () => {
+      it('the analyzer joins the newest 1d candle, not the newest row of any timeframe', async () => {
+        const qb = {
+          leftJoin: jest.fn().mockReturnThis(),
+          leftJoinAndMapOne: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          addOrderBy: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawAndEntities: jest
+            .fn()
+            .mockResolvedValue({ entities: [], raw: [] }),
+        };
+        mockTickersService.getRepo.mockReturnValue({
+          createQueryBuilder: jest.fn(() => qb),
+        });
+
+        await service.getAnalyzerTickers({});
+
+        const priceJoin = qb.leftJoinAndMapOne.mock.calls.find(
+          (call) => call[2] === 'price',
+        );
+        expect(priceJoin[3]).toBe(MarketDataService.LATEST_DAILY_PRICE_JOIN);
+        expect(MarketDataService.LATEST_DAILY_PRICE_JOIN).toBe(
+          "price.symbol_id = ticker.id AND price.timeframe = '1d' AND price.ts = " +
+            "(SELECT MAX(ts) FROM price_ohlcv WHERE symbol_id = ticker.id AND timeframe = '1d')",
+        );
+      });
+
+      it('a snapshot reads the newest 1d candle', async () => {
+        mockTickersService.awaitEnsureTicker.mockResolvedValue({
+          id: 1,
+          symbol: 'AAPL',
+        });
+        mockOhlcvRepo.findOne.mockResolvedValue({
+          close: 100,
+          ts: new Date(),
+        } as unknown as PriceOhlcv);
+        mockOhlcvRepo.find.mockResolvedValue([]);
+        mockFundamentalsRepo.findOne.mockResolvedValue({
+          updated_at: new Date(),
+        });
+        mockRiskAnalysisRepo.findOne.mockResolvedValue(null);
+
+        await service.getSnapshots(['AAPL']);
+
+        expect(mockOhlcvRepo.findOne).toHaveBeenCalledWith({
+          where: { symbol_id: 1, timeframe: '1d' },
+          order: { ts: 'DESC' },
+        });
+      });
+    });
+
+    // The AI rating: one SQL definition (src/lib/ticker-verdict.ts) for the
+    // filter, the sort, the returned fields and the dashboard counts. That it
+    // equals the clients' maths is proven on PostgreSQL in
+    // test/db/ai-rating.db-spec.ts; here: how the service uses it.
+    describe('AI rating', () => {
+      const run = async (options: Record<string, unknown>, result?: any) => {
+        const qb = {
+          leftJoin: jest.fn().mockReturnThis(),
+          leftJoinAndMapOne: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          addOrderBy: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawAndEntities: jest
+            .fn()
+            .mockResolvedValue(result ?? { entities: [], raw: [] }),
+        };
+        mockTickersService.getRepo.mockReturnValue({
+          createQueryBuilder: jest.fn(() => qb),
+        });
+        const page = await service.getAnalyzerTickers(options as any);
+        return { qb, page };
+      };
+      const ratingWhere = (qb: any) =>
+        qb.andWhere.mock.calls.find(
+          ([sql]: [unknown]) =>
+            typeof sql === 'string' && sql.includes('IN (:...aiRatings)'),
+        );
+
+      it('filters by the rating expression, with the values as parameters', async () => {
+        const { qb } = await run({ aiRating: ['Strong Buy', 'Sell'] });
+
+        const [sql, params] = ratingWhere(qb);
+        expect(sql).toBe(`${VERDICT_SQL.rating} IN (:...aiRatings)`);
+        expect(params).toEqual({ aiRatings: ['Strong Buy', 'Sell'] });
+      });
+
+      it('"Legendary" selects "No Brainer"; duplicates collapse', async () => {
+        const { qb } = await run({
+          aiRating: ['Legendary', 'No Brainer', 'Buy'],
+        });
+        expect(ratingWhere(qb)[1]).toEqual({
+          aiRatings: ['No Brainer', 'Buy'],
+        });
+      });
+
+      it('drops unknown values; only unknown values select nothing', async () => {
+        const mixed = await run({ aiRating: ['???', 'Hold'] });
+        expect(ratingWhere(mixed.qb)[1]).toEqual({ aiRatings: ['Hold'] });
+
+        const none = await run({ aiRating: ["Sell' OR 1=1 --"] });
+        expect(ratingWhere(none.qb)).toBeUndefined();
+        expect(none.qb.andWhere).toHaveBeenCalledWith('1 = 0');
+      });
+
+      it('no rating filter → no rating condition', async () => {
+        const { qb } = await run({ aiRating: [] });
+        expect(ratingWhere(qb)).toBeUndefined();
+        expect(qb.andWhere).not.toHaveBeenCalledWith('1 = 0');
+      });
+
+      it('selects the score and the rating it filters by, and the upside / downside it sorts by', async () => {
+        const { qb } = await run({});
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          VERDICT_SQL.score,
+          'ai_verdict_score',
+        );
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          VERDICT_SQL.rating,
+          'ai_rating',
+        );
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          VERDICT_SQL.upside,
+          'dynamic_upside',
+        );
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          VERDICT_SQL.downside,
+          'dynamic_downside',
+        );
+      });
+
+      it('the upside filter uses the same upside expression', async () => {
+        const { qb } = await run({ upside: '> 20%' });
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          `${VERDICT_SQL.upside} > :upsideVal`,
+          { upsideVal: 20 },
+        );
+      });
+
+      it('returns aiAnalysis.rating and aiAnalysis.rating_score as the query computed them', async () => {
+        const { page } = await run(
+          {},
+          {
+            entities: [
+              { id: 1, symbol: 'AAPL', latestRisk: { financial_risk: 3 } },
+              { id: 2, symbol: 'NOAI', latestRisk: null },
+            ],
+            raw: [
+              {
+                ticker_id: 1,
+                total_count: '2',
+                ai_rating: 'Strong Buy',
+                ai_verdict_score: 82.5,
+              },
+              {
+                ticker_id: 2,
+                total_count: '2',
+                ai_rating: null,
+                ai_verdict_score: null,
+              },
+            ],
+          },
+        );
+
+        expect(page.items[0].aiAnalysis).toMatchObject({
+          rating: 'Strong Buy',
+          rating_score: 82.5,
+        });
+        // Not analysed: no analysis object at all, hence no rating.
+        expect(page.items[1].aiAnalysis).toBeNull();
+      });
+
+      describe.each([
+        ['getStrongBuyCount', 'Strong Buy'],
+        ['getSellCount', 'Sell'],
+      ] as const)('%s', (method, rating) => {
+        it(`counts the visible tickers rated exactly "${rating}" by the same SQL`, async () => {
+          const qb: any = {
+            leftJoin: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            getRawMany: jest
+              .fn()
+              .mockResolvedValue([{ symbol: 'AAPL' }, { symbol: 'MSFT' }]),
+          };
+          (mockTickerRepo.createQueryBuilder as jest.Mock).mockReturnValueOnce(
+            qb,
+          );
+
+          const result = await service[method]();
+
+          expect(result).toEqual({ count: 2, symbols: ['AAPL', 'MSFT'] });
+          expect(qb.where).toHaveBeenCalledWith('ticker.is_hidden = :hidden', {
+            hidden: false,
+          });
+          expect(qb.andWhere).toHaveBeenCalledWith(
+            `${VERDICT_SQL.rating} = :rating`,
+            { rating },
+          );
+          // fundamentals, latest price, latest analysis, base + bear scenario
+          expect(qb.leftJoin).toHaveBeenCalledTimes(5);
+        });
+      });
+    });
+
+    // Postgres puts NULLs FIRST on DESC by default, which filled the top of
+    // "highest upside / risk / score" with the tickers that have no analysis.
+    // Against a real database: test/db/analyzer-sort.db-spec.ts.
+    describe('sorting: rows without the value always go last', () => {
+      const run = async (options: Record<string, unknown>) => {
+        const qb = {
+          leftJoin: jest.fn().mockReturnThis(),
+          leftJoinAndMapOne: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          addOrderBy: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawAndEntities: jest
+            .fn()
+            .mockResolvedValue({ entities: [], raw: [] }),
+        };
+        mockTickersService.getRepo.mockReturnValue({
+          createQueryBuilder: jest.fn(() => qb),
+        });
+        await service.getAnalyzerTickers(options as any);
+        return qb;
+      };
+
+      it.each([
+        ['upside_percent', '"dynamic_upside"'],
+        ['downside_percent', '"dynamic_downside"'],
+        ['financial_risk', 'risk.financial_risk'],
+        ['overall_score', 'risk.overall_score'],
+        ['ai_rating', '"ai_verdict_score"'],
+        ['change', '"price_change_pct"'],
+        ['close', 'price.close'],
+        ['market_cap', 'fund.market_cap'],
+        ['pe_ttm', 'fund.pe_ttm'],
+        ['consensus', 'fund.consensus_rating'],
+        ['sector', 'ticker.sector'],
+      ])('%s: NULLS LAST in both directions', async (sortBy, column) => {
+        for (const sortDir of ['ASC', 'DESC'] as const) {
+          const qb = await run({ sortBy, sortDir });
+          expect(qb.orderBy).toHaveBeenCalledTimes(1);
+          expect(qb.orderBy).toHaveBeenCalledWith(
+            column,
+            sortDir,
+            'NULLS LAST',
+          );
+        }
+      });
+
+      it('keeps the secondary order by symbol, so pages do not shuffle', async () => {
+        const qb = await run({ sortBy: 'upside_percent', sortDir: 'DESC' });
+        expect(qb.addOrderBy).toHaveBeenCalledWith('ticker.symbol', 'ASC');
+      });
+
+      it('gives a ticker without an analysis no rating score, and one without a price no change', async () => {
+        const qb = await run({ sortBy: 'ai_rating' });
+        const selected = (alias: string): string =>
+          qb.addSelect.mock.calls.find((call) => call[1] === alias)?.[0];
+
+        expect(selected('ai_verdict_score')).toMatch(
+          /^\(CASE WHEN risk\.id IS NULL THEN NULL ELSE /,
+        );
+        expect(selected('price_change_pct')).toMatch(
+          /WHEN price\.close IS NULL THEN NULL/,
+        );
+      });
     });
   });
 
@@ -918,6 +1265,200 @@ describe('MarketDataService', () => {
 
       expect(results.length).toBe(6);
       expect((service as any).performGetSnapshot).toHaveBeenCalledTimes(6);
+    });
+
+    // The clients derive upside, downside and the AI rating from
+    // aiAnalysis.base_price / bear_price. The analyzer has always returned
+    // them; the snapshots did not, so a watchlist and the tickers page showed
+    // different figures for the same symbol.
+    describe('aiAnalysis.base_price / bear_price (parity with the analyzer)', () => {
+      const fresh = () => {
+        mockOhlcvRepo.findOne.mockResolvedValue({
+          close: 100,
+          ts: new Date(),
+          updated_at: new Date(),
+        } as unknown as PriceOhlcv);
+        mockOhlcvRepo.find.mockResolvedValue([]);
+        mockFundamentalsRepo.findOne.mockResolvedValue({
+          updated_at: new Date(),
+        });
+      };
+
+      // The latest analysis as the database stores it: numeric columns come
+      // back as strings.
+      const analysis = (scenarios: any[]) => ({
+        id: '77',
+        ticker_id: 1,
+        overall_score: 7,
+        financial_risk: 4,
+        sentiment: 'bullish',
+        created_at: new Date('2026-10-01T00:00:00Z'),
+        scenarios,
+      });
+      const scenario = (scenario_type: string, price_mid: any) => ({
+        id: scenario_type,
+        analysis_id: '77',
+        scenario_type,
+        price_mid,
+        price_low: '1.00',
+        price_high: '999.00',
+      });
+
+      // What the analyzer endpoint returns for the same ticker + analysis: its
+      // SQL joins the 'base' / 'bear' scenario of the latest analysis and
+      // selects their price_mid as base_price / bear_price.
+      const analyzerItem = async (risk: any) => {
+        const raw: any = { ticker_id: 1, total_count: '1' };
+        for (const type of ['base', 'bear']) {
+          const match = risk?.scenarios.find(
+            (s: any) => s.scenario_type === type,
+          );
+          raw[`${type}_price`] = match ? match.price_mid : null;
+        }
+        const latestRisk = risk ? { ...risk } : null;
+        if (latestRisk) delete latestRisk.scenarios; // joined without them
+        const qb = {
+          leftJoin: jest.fn().mockReturnThis(),
+          leftJoinAndMapOne: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          addOrderBy: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawAndEntities: jest.fn().mockResolvedValue({
+            entities: [
+              {
+                id: 1,
+                symbol: 'AAPL',
+                latestPrice: { close: 100 },
+                latestRisk,
+              },
+            ],
+            raw: [raw],
+          }),
+        };
+        mockTickersService.getRepo.mockReturnValue({
+          createQueryBuilder: jest.fn(() => qb),
+        });
+        const result = await service.getAnalyzerTickers({ symbols: ['AAPL'] });
+        // The scenario prices come from these two joins + selects.
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          'base_scenario.price_mid',
+          'base_price',
+        );
+        expect(qb.addSelect).toHaveBeenCalledWith(
+          'bear_scenario.price_mid',
+          'bear_price',
+        );
+        return result.items[0];
+      };
+
+      const snapshotItem = async (risk: any) => {
+        mockTickersService.awaitEnsureTicker.mockResolvedValue({
+          id: 1,
+          symbol: 'AAPL',
+        });
+        fresh();
+        mockRiskAnalysisRepo.findOne.mockResolvedValue(risk);
+        const [item] = await service.getSnapshots(['AAPL']);
+        return item;
+      };
+
+      it('the two endpoints agree for a ticker with scenarios', async () => {
+        const risk = () =>
+          analysis([
+            scenario('bull', '210.00'),
+            scenario('base', '140.50'),
+            scenario('bear', '80.25'),
+          ]);
+
+        const fromSnapshots = await snapshotItem(risk());
+        const fromAnalyzer = await analyzerItem(risk());
+
+        expect(fromSnapshots.aiAnalysis.base_price).toBe(140.5);
+        expect(fromSnapshots.aiAnalysis.bear_price).toBe(80.25);
+        // The server's rating rides along (price 100, base 140.5, bear 80.25,
+        // risk 4, neural 7, no revenue): 50 + 16.2 - 7.9 - 5 + 10.
+        expect(fromSnapshots.aiAnalysis.rating).toBe('Hold');
+        expect(fromSnapshots.aiAnalysis.rating_score).toBeCloseTo(63.3, 10);
+        expect({
+          base_price: fromSnapshots.aiAnalysis.base_price,
+          bear_price: fromSnapshots.aiAnalysis.bear_price,
+        }).toEqual({
+          base_price: fromAnalyzer.aiAnalysis.base_price,
+          bear_price: fromAnalyzer.aiAnalysis.bear_price,
+        });
+        // Everything the snapshot's aiAnalysis carried before is still there.
+        expect(fromSnapshots.aiAnalysis).toMatchObject({
+          id: '77',
+          overall_score: 7,
+          financial_risk: 4,
+        });
+        expect(fromSnapshots.aiAnalysis.scenarios).toHaveLength(3);
+      });
+
+      it('a ticker without an analysis has aiAnalysis null, exactly as before', async () => {
+        const fromSnapshots = await snapshotItem(null);
+        const fromAnalyzer = await analyzerItem(null);
+
+        expect(fromSnapshots.aiAnalysis).toBeNull();
+        expect(fromSnapshots.news).toBeNull();
+        expect(fromAnalyzer.aiAnalysis).toBeNull();
+      });
+
+      it('an analysis without a bear scenario returns bear_price: null', async () => {
+        const risk = () => analysis([scenario('base', '140.50')]);
+
+        const fromSnapshots = await snapshotItem(risk());
+        const fromAnalyzer = await analyzerItem(risk());
+
+        expect(fromSnapshots.aiAnalysis.base_price).toBe(140.5);
+        expect(fromSnapshots.aiAnalysis.bear_price).toBeNull();
+        expect(fromSnapshots.aiAnalysis).toHaveProperty('bear_price', null);
+        expect(fromAnalyzer.aiAnalysis.bear_price).toBeNull();
+        expect(fromAnalyzer.aiAnalysis.base_price).toBe(140.5);
+      });
+
+      it.each([
+        ['no scenarios at all', []],
+        ['scenarios that were not loaded', undefined],
+      ])('an analysis with %s returns both as null', async (_l, scenarios) => {
+        const fromSnapshots = await snapshotItem(analysis(scenarios as any));
+
+        expect(fromSnapshots.aiAnalysis.base_price).toBeNull();
+        expect(fromSnapshots.aiAnalysis.bear_price).toBeNull();
+      });
+
+      it('agrees on the edge values too: a $0 bear target stays 0, a missing or unparsable price is null', async () => {
+        const risk = () =>
+          analysis([scenario('base', 'n/a'), scenario('bear', '0.00')]);
+
+        const fromSnapshots = await snapshotItem(risk());
+        const fromAnalyzer = await analyzerItem(risk());
+
+        expect(fromSnapshots.aiAnalysis.bear_price).toBe(0);
+        expect(fromSnapshots.aiAnalysis.base_price).toBeNull();
+        // JSON-identical on both endpoints.
+        const targets = (item: any) =>
+          JSON.stringify({
+            base_price: item.aiAnalysis.base_price,
+            bear_price: item.aiAnalysis.bear_price,
+          });
+        expect(targets(fromSnapshots)).toBe(targets(fromAnalyzer));
+      });
+
+      it('adds no query: one analysis lookup per symbol, scenarios included, as before', async () => {
+        await snapshotItem(analysis([scenario('base', '140.50')]));
+
+        expect(mockRiskAnalysisRepo.findOne).toHaveBeenCalledTimes(1);
+        expect(mockRiskAnalysisRepo.findOne).toHaveBeenCalledWith({
+          where: { ticker_id: 1 },
+          order: { created_at: 'DESC' },
+          relations: ['scenarios'],
+        });
+      });
     });
   });
 

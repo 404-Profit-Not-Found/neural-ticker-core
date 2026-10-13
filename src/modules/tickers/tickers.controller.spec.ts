@@ -10,6 +10,7 @@ describe('TickersController', () => {
     ensureTicker: jest.fn(),
     getLogo: jest.fn(),
     getTicker: jest.fn(),
+    assertPublicReadAllowed: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {

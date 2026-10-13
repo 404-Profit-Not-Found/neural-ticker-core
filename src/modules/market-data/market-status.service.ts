@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { YahooFinanceService } from '../yahoo-finance/yahoo-finance.service';
+import { getExchangeSuffix } from '../tickers/utils/exchange-currency.util';
 
 export interface MarketStatusResult {
   isOpen: boolean;
@@ -22,10 +23,10 @@ export class MarketStatusService {
   private pendingRequests = new Map<string, Promise<MarketStatusResult>>();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  // Known EU exchange suffixes and codes
-  private readonly EU_EXCHANGES = [
-    'LSE',
-    'XETRA',
+  // EU venues, as the symbol's exchange suffix (SAP.DE → 'DE').
+  private readonly EU_SUFFIXES = new Set([
+    'DE',
+    'L',
     'PA',
     'AS',
     'MC',
@@ -37,39 +38,48 @@ export class MarketStatusService {
     'CO',
     'ST',
     'OL',
-    '.DE',
-    '.L',
-    '.PA',
-    '.AS',
-    '.MC',
-    '.MI',
-    '.SW',
-    '.VI',
-    '.BR',
-    '.HE',
-    '.CO',
-    '.ST',
-    '.OL',
-  ];
+  ]);
+
+  // EU venues, as a code in the `exchange` field.
+  private readonly EU_EXCHANGE_CODES = new Set([
+    'LSE',
+    'XETRA',
+    ...this.EU_SUFFIXES,
+  ]);
 
   constructor(private readonly yahooFinanceService: YahooFinanceService) {}
 
   /**
    * Determines the region (US/EU) based on symbol or exchange.
+   *
+   * Codes are matched as codes, never as substrings: two-letter venue codes
+   * occur inside ordinary symbols and exchange names (COIN and BRK.A contain
+   * 'CO' / 'BR', SMCI 'MC', NASDAQ 'AS', "STOCK EXCHANGE" 'ST'), which used to
+   * classify those US listings as EU.
    */
   public getRegion(symbol: string, exchange?: string): 'US' | 'EU' | 'OTHER' {
-    const upperSymbol = symbol.toUpperCase();
-    const upperExchange = (exchange || '').toUpperCase();
-
-    for (const eu of this.EU_EXCHANGES) {
-      if (upperSymbol.includes(eu) || upperExchange.includes(eu)) {
-        return 'EU';
-      }
+    // 1. The symbol's exchange suffix names the venue: SAP.DE and VOLV-B.ST
+    //    are EU, 7203.T is neither EU nor US.
+    const suffix = getExchangeSuffix(symbol);
+    if (suffix) {
+      return this.EU_SUFFIXES.has(suffix) ? 'EU' : 'OTHER';
     }
 
-    // Default to US for common US exchanges or no suffix
+    // 2. No known suffix: go by the exchange field.
+    const upperExchange = (exchange || '').toUpperCase();
+    const exchangeCodes = upperExchange.split(/[^A-Z0-9]+/);
+    if (exchangeCodes.some((code) => this.EU_EXCHANGE_CODES.has(code))) {
+      return 'EU';
+    }
+
+    // 3. Default to US: bare symbols (AAPL), US share classes — a dot and one
+    //    letter that is not a venue (BRK.A, BRK.B) — and common US exchanges.
+    //    A longer suffix we do not know is some other venue.
+    const hasUnknownVenueSuffix = /\.[A-Z0-9]{2,}$/i.test(
+      (symbol || '').trim(),
+    );
     if (
-      !symbol.includes('.') ||
+      !hasUnknownVenueSuffix ||
       upperExchange.includes('NASDAQ') ||
       upperExchange.includes('NYSE')
     ) {

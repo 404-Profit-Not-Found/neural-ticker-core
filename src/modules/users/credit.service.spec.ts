@@ -297,4 +297,128 @@ describe('CreditService', () => {
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
     });
   });
+  // Credits given back for a paid action that could not be delivered. The
+  // SQL (jsonb match, row lock, concurrency): test/db/credits.db-spec.ts.
+  describe('refundCredits', () => {
+    const setup = (opts: {
+      user: any;
+      spent?: any;
+      alreadyRefunded?: number;
+    }) => {
+      mockQueryRunner.manager.getRepository.mockImplementation((entity) => {
+        if (entity === User) return mockUserRepo;
+        if (entity === CreditTransaction) return mockTxRepo;
+        return null;
+      });
+      const userQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(opts.user),
+      };
+      mockUserRepo.createQueryBuilder.mockReturnValue(userQb);
+      const txQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(opts.spent ?? null),
+        getCount: jest.fn().mockResolvedValue(opts.alreadyRefunded ?? 0),
+      };
+      mockTxRepo.createQueryBuilder.mockReturnValue(txQb);
+      mockTxRepo.create.mockImplementation((tx) => tx);
+      return { userQb, txQb };
+    };
+    const match = {
+      spendMatch: {
+        reason: 'research_spend' as const,
+        metadataKey: 'research_id',
+        metadataValue: '77',
+      },
+    };
+
+    it('a known amount: adds it back under a row lock and records a "refund" transaction', async () => {
+      const user = { id: 'user-1', credits_balance: 4 };
+      const { userQb } = setup({ user });
+
+      const refunded = await service.refundCredits(
+        'user-1',
+        { amount: 2 },
+        { cause: 'LLM_UNAVAILABLE' },
+      );
+
+      expect(refunded).toBe(2);
+      expect(userQb.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(user.credits_balance).toBe(6);
+      expect(mockTxRepo.save).toHaveBeenCalledWith({
+        user_id: 'user-1',
+        amount: 2,
+        reason: 'refund',
+        metadata: { cause: 'LLM_UNAVAILABLE' },
+      });
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('matched to a spend: refunds exactly what that spend deducted and points at it', async () => {
+      const user = { id: 'user-1', credits_balance: 5 };
+      setup({ user, spent: { id: 901, amount: -5 } });
+
+      const refunded = await service.refundCredits('user-1', match, {
+        cause: 'LLM_UNAVAILABLE',
+      });
+
+      expect(refunded).toBe(5);
+      expect(user.credits_balance).toBe(10);
+      expect(mockTxRepo.save).toHaveBeenCalledWith({
+        user_id: 'user-1',
+        amount: 5,
+        reason: 'refund',
+        metadata: {
+          cause: 'LLM_UNAVAILABLE',
+          refund_of: '901',
+          spend_reason: 'research_spend',
+          research_id: '77',
+        },
+      });
+    });
+
+    it.each([
+      [
+        'there is no such spend (an admin or a system ticket was never charged)',
+        { spent: null },
+      ],
+      [
+        'that spend was already refunded',
+        { spent: { id: 901, amount: -5 }, alreadyRefunded: 1 },
+      ],
+    ])('refunds nothing when %s', async (_label, state) => {
+      const user = { id: 'user-1', credits_balance: 5 };
+      setup({ user, ...state });
+
+      expect(await service.refundCredits('user-1', match)).toBe(0);
+
+      expect(user.credits_balance).toBe(5);
+      expect(mockTxRepo.save).not.toHaveBeenCalled();
+      expect(mockUserRepo.save).not.toHaveBeenCalled();
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it.each([0, -3, NaN, Infinity])(
+      'refunds nothing for an amount of %s',
+      async (amount) => {
+        const user = { id: 'user-1', credits_balance: 5 };
+        setup({ user });
+
+        expect(await service.refundCredits('user-1', { amount })).toBe(0);
+        expect(user.credits_balance).toBe(5);
+        expect(mockTxRepo.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('an unknown user is not an error', async () => {
+      setup({ user: null });
+      expect(await service.refundCredits('ghost', { amount: 2 })).toBe(0);
+      expect(mockTxRepo.save).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,3 +1,4 @@
+import { GEMINI_FLASH_LITE_MODEL } from '../../config/configuration';
 import {
   Injectable,
   Logger,
@@ -6,7 +7,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Not, In, FindOptionsWhere } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { Comment } from './entities/comment.entity';
@@ -16,6 +17,16 @@ import { TickerEntity } from '../tickers/entities/ticker.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebPushService } from '../web-push/web-push.service';
 import { UsersService } from '../users/users.service';
+import { PublicUser } from '../users/public-user';
+
+/** Who is asking for a comment thread. `null` / undefined = anonymous. */
+export interface CommentViewer {
+  id: string;
+  role?: string;
+}
+
+// Comments moderation has taken down. Only their author and admins see them.
+const HIDDEN_MODERATION_STATUSES = ['flagged', 'rejected'];
 
 @Injectable()
 export class SocialService {
@@ -51,16 +62,94 @@ export class SocialService {
   }
 
   /**
-   * Get top-level comments for a symbol with replies and like counts.
+   * Public views of the given users, keyed by id. Comment authors and mention
+   * targets are other users (and the comment feed is a public endpoint), so
+   * this service never loads a `User` row or the `Comment.user` relation.
    */
-  async getComments(symbol: string, limit: number = 50) {
-    // Fetch top-level comments only (parent_id IS NULL)
+  private async publicUsersById(
+    ids: string[],
+  ): Promise<Map<string, PublicUser>> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const users = await this.usersService.findPublicByIds(unique);
+    return new Map(users.map((u) => [u.id, u]));
+  }
+
+  /** A taken-down comment is visible to its author and to admins only. */
+  private canSee(
+    comment: Pick<Comment, 'moderation_status' | 'user_id'>,
+    viewer?: CommentViewer | null,
+  ): boolean {
+    if (!HIDDEN_MODERATION_STATUSES.includes(comment.moderation_status)) {
+      return true;
+    }
+    return (
+      viewer?.role === 'admin' || (!!viewer && comment.user_id === viewer.id)
+    );
+  }
+
+  /**
+   * A comment as a client receives it: with its author's public view, and
+   * without the moderator's reason unless the viewer is an admin.
+   */
+  private toClientComment<T extends Partial<Comment>>(
+    comment: T,
+    user: PublicUser | null,
+    viewer?: CommentViewer | null,
+  ): Omit<T, 'user' | 'moderation_reason'> & {
+    user: PublicUser | null;
+    moderation_reason?: string | null;
+  } {
+    const view = { ...comment, user };
+    if (viewer?.role !== 'admin') {
+      delete view.moderation_reason;
+    }
+    return view;
+  }
+
+  /**
+   * Get top-level comments for a symbol with replies and like counts.
+   *
+   * The feed is public. `viewer` (when the caller is signed in) only widens
+   * it: an author also gets their own taken-down comments, an admin gets
+   * everything plus `moderation_reason`.
+   */
+  async getComments(
+    symbol: string,
+    viewer?: CommentViewer | null,
+    limit: number = 50,
+  ) {
+    const topLevel: FindOptionsWhere<Comment> = {
+      ticker_symbol: symbol,
+      parent_id: IsNull(),
+    };
+    const visible: FindOptionsWhere<Comment> = {
+      ...topLevel,
+      moderation_status: Not(In(HIDDEN_MODERATION_STATUSES)),
+    };
+    // Filtered in the query so taken-down comments do not use up the page.
+    const where: FindOptionsWhere<Comment> | FindOptionsWhere<Comment>[] =
+      viewer?.role === 'admin'
+        ? topLevel
+        : viewer
+          ? [visible, { ...topLevel, user_id: viewer.id }]
+          : visible;
+
+    // Fetch top-level comments only (parent_id IS NULL). Authors are attached
+    // below as their public view — the `user` relation is NOT loaded.
     const comments = await this.commentRepo.find({
-      where: { ticker_symbol: symbol, parent_id: IsNull() },
+      where,
       order: { created_at: 'DESC' },
       take: limit,
-      relations: ['user', 'replies', 'replies.user'],
+      relations: ['replies'],
     });
+
+    // Replies come with their parent: drop the taken-down ones here.
+    for (const comment of comments) {
+      comment.replies = (comment.replies || []).filter((reply) =>
+        this.canSee(reply, viewer),
+      );
+    }
 
     // Attach like counts via a single query
     if (comments.length > 0) {
@@ -98,28 +187,32 @@ export class SocialService {
       }
     }
 
-    // Resolve <@userId> mention tokens to current user data
-    const allContent = comments
-      .flatMap((c) => [c.content, ...(c.replies || []).map((r) => r.content)])
-      .join(' ');
-    const mentionedIds = this.extractMentionedUserIds(allContent);
-    const mentionedUsers: Record<
-      string,
-      { id: string; nickname: string; avatar_url: string | null; tier: string }
-    > = {};
-    if (mentionedIds.length > 0) {
-      const users = await this.usersService.findByIds(mentionedIds);
-      for (const u of users) {
-        mentionedUsers[u.id] = {
-          id: u.id,
-          nickname: u.nickname || u.email?.split('@')[0] || 'Unknown',
-          avatar_url: u.avatar_url,
-          tier: u.tier,
-        };
-      }
+    // Resolve authors and <@userId> mention tokens to current public user data
+    const thread = comments.flatMap((c) => [c, ...(c.replies || [])]);
+    const mentionedIds = this.extractMentionedUserIds(
+      thread.map((c) => c.content).join(' '),
+    );
+    const users = await this.publicUsersById([
+      ...thread.map((c) => c.user_id),
+      ...mentionedIds,
+    ]);
+
+    const mentionedUsers: Record<string, PublicUser> = {};
+    for (const id of mentionedIds) {
+      const user = users.get(id);
+      if (user) mentionedUsers[id] = user;
     }
 
-    return { comments, mentionedUsers };
+    const toClient = <T extends Partial<Comment>>(c: T) =>
+      this.toClientComment(c, users.get(c.user_id as string) ?? null, viewer);
+
+    return {
+      comments: comments.map((c) => ({
+        ...toClient(c),
+        replies: (c.replies || []).map(toClient),
+      })),
+      mentionedUsers,
+    };
   }
 
   /**
@@ -139,30 +232,39 @@ export class SocialService {
       throw new BadRequestException('Invalid content');
     }
 
+    // A reply belongs to its parent's thread: the parent must exist and be a
+    // comment on the same ticker (a foreign parent_id would otherwise attach
+    // this text to another ticker's discussion, or fail the FK with a 500).
+    let parent: Comment | null = null;
+    if (parentId) {
+      parent = await this.commentRepo.findOne({ where: { id: parentId } });
+      if (!parent) {
+        throw new NotFoundException('Parent comment not found');
+      }
+      if (parent.ticker_symbol.toUpperCase() !== symbol.toUpperCase()) {
+        throw new BadRequestException(
+          'A reply must be posted on the same ticker as its parent comment',
+        );
+      }
+    }
+
     const comment = this.commentRepo.create({
       user_id: userId,
-      ticker_symbol: symbol,
+      ticker_symbol: parent ? parent.ticker_symbol : symbol,
       content,
       parent_id: parentId || null,
     });
     const saved = await this.commentRepo.save(comment);
 
-    // Load user relation for response
-    const full = await this.commentRepo.findOne({
-      where: { id: saved.id },
-      relations: ['user'],
-    });
+    // The author's public view: for the response and the notification texts
+    // other users receive (never the email).
+    const author = (await this.publicUsersById([userId])).get(userId) ?? null;
+    const authorName = author?.nickname || 'Someone';
 
     // If this is a reply, notify the parent comment author
     if (parentId) {
-      const parent = await this.commentRepo.findOne({
-        where: { id: parentId },
-        relations: ['user'],
-      });
-
       if (parent && parent.user_id !== userId) {
-        const replierName =
-          full?.user?.nickname || full?.user?.email?.split('@')[0] || 'Someone';
+        const replierName = authorName;
 
         // In-app notification
         this.notificationsService
@@ -198,13 +300,10 @@ export class SocialService {
     // --- Mention notifications ---
     const mentionedUserIds = this.extractMentionedUserIds(content);
     if (mentionedUserIds.length > 0) {
-      const commenterName =
-        full?.user?.nickname || full?.user?.email?.split('@')[0] || 'Someone';
+      const commenterName = authorName;
 
       // Find parent author ID to avoid double-notifying them (already got reply notification)
-      const parentAuthorId = parentId
-        ? (await this.commentRepo.findOne({ where: { id: parentId } }))?.user_id
-        : null;
+      const parentAuthorId = parent ? parent.user_id : null;
 
       for (const mentionedId of mentionedUserIds) {
         // Skip self-mentions
@@ -239,7 +338,7 @@ export class SocialService {
       }
     }
 
-    return full || saved;
+    return this.toClientComment(saved, author, { id: userId });
   }
 
   /**
@@ -251,41 +350,41 @@ export class SocialService {
   ): Promise<{ liked: boolean; likeCount: number }> {
     const comment = await this.commentRepo.findOne({
       where: { id: commentId },
-      relations: ['user'],
     });
     if (!comment) {
       throw new NotFoundException('Comment not found');
     }
 
-    const existing = await this.likeRepo.findOne({
-      where: { comment_id: commentId, user_id: userId },
+    // Check-then-insert, serialized per (comment, user): two simultaneous
+    // requests (a double click) would otherwise both see "no like yet" and both
+    // insert — the second one hitting the unique index and failing with a 500.
+    // The advisory lock is released when the transaction ends.
+    const liked = await this.likeRepo.manager.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `comment-like:${commentId}:${userId}`,
+      ]);
+      const likes = tx.getRepository(CommentLike);
+      const existing = await likes.findOne({
+        where: { comment_id: commentId, user_id: userId },
+      });
+      if (existing) {
+        // Unlike
+        await likes.remove(existing);
+        return false;
+      }
+      // Like
+      await likes.save(
+        likes.create({ comment_id: commentId, user_id: userId }),
+      );
+      return true;
     });
 
-    let liked: boolean;
-    if (existing) {
-      // Unlike
-      await this.likeRepo.remove(existing);
-      liked = false;
-    } else {
-      // Like
-      const like = this.likeRepo.create({
-        comment_id: commentId,
-        user_id: userId,
-      });
-      await this.likeRepo.save(like);
-      liked = true;
-
+    if (liked) {
       // Notify comment owner (only on like, not unlike)
       if (comment.user_id !== userId) {
-        // We need the liker's name — query separately since we don't have it
-        const likerComment = await this.commentRepo.query(
-          `SELECT nickname, email FROM users WHERE id = $1`,
-          [userId],
-        );
-        const likerName =
-          likerComment?.[0]?.nickname ||
-          likerComment?.[0]?.email?.split('@')[0] ||
-          'Someone';
+        // We need the liker's name — their public one, never the email
+        const liker = (await this.publicUsersById([userId])).get(userId);
+        const likerName = liker?.nickname || 'Someone';
 
         this.notificationsService
           .create(
@@ -390,6 +489,9 @@ export class SocialService {
     }
 
     const genai = new GoogleGenAI({ apiKey });
+    const moderationModel =
+      this.configService.get<string>('gemini.models.scoring') ||
+      GEMINI_FLASH_LITE_MODEL;
 
     const SYSTEM_PROMPT =
       'You are a content moderator for a financial investment discussion platform. ' +
@@ -408,7 +510,8 @@ export class SocialService {
 
       try {
         const response = await genai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
+          // The configured local-text tier (Flash Lite): no second literal.
+          model: moderationModel,
           contents: [
             {
               role: 'user',

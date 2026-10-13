@@ -17,7 +17,10 @@ export class PortfolioAnalysis {
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({
+    name: 'userId',
+    foreignKeyConstraintName: 'FK_portfolio_analyses_user',
+  })
   user: User;
 
   @Column({ nullable: true })

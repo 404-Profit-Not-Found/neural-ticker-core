@@ -1,0 +1,343 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { apiErrorMessage } from '../lib/api-error';
+import { api } from '../lib/api';
+import { dashboardKeys } from './useDashboardData';
+
+// Keys
+export const tickerKeys = {
+    all: ['tickers'] as const,
+    details: (symbol: string) => [...tickerKeys.all, 'details', symbol] as const,
+    news: (symbol: string) => [...tickerKeys.all, 'news', symbol] as const,
+    risk: (symbol: string) => [...tickerKeys.all, 'risk', symbol] as const,
+    social: (symbol: string) => [...tickerKeys.all, 'social', symbol] as const,
+    research: (symbol: string) => [...tickerKeys.all, 'research', symbol] as const,
+    logo: (symbol: string) => [...tickerKeys.all, 'logo', symbol] as const,
+};
+
+// Simplified hook that just returns the DB endpoint URL
+export function useTickerLogo(symbol: string) {
+    // If no symbol, return null immediately
+    if (!symbol) return { data: null, isLoading: false, isError: true };
+
+    // We don't even need to fetch. The URL is deterministic.
+    // The TickersController serves cached logos from DB at this endpoint.
+    // We append a timestamp/version if we want to bust cache, but cache-control handles it.
+    // We just return the URL string. TickerLogo can use it directly in <img src="..." />
+    // However, to keep API compatible with existing consuming code that expects { data: string },
+    // we'll return a mock query object or just use a simple state.
+
+    // Actually, TickerLogo expects { data, isLoading, isError }.
+    // Let's just return a static object since we trust the endpoint exists (or 404s handled by img onError).
+    
+    // BUT checking for "isValid" might be useful.
+    // Let's make a HEAD request to check if it exists? 
+    // No, that's extra latency. Just assume it works and handling onError in UI is better.
+    
+    // Wait, TickerLogo logic is: if (!data) showPlaceholder.
+    // If we just return the string, it will always show the image tag.
+    // That's fine, the image tag onError can hide itself.
+    
+    return {
+        data: `/api/v1/tickers/${symbol}/logo`,
+        isLoading: false,
+        isError: false
+    };
+}
+
+export function useTickerDetails(symbol?: string) {
+    return useQuery({
+        queryKey: tickerKeys.details(symbol || ''),
+        queryFn: async () => {
+            if (!symbol) return null;
+            // Parallel fetch: Composite Data, Watcher Count
+            const [compositeRes, watchersRes] = await Promise.all([
+                api.get(`/tickers/${symbol}/composite`),
+                api.get(`/social/stats/${symbol}/watchers`).catch(() => ({ data: { watchers: 0 } }))
+            ]);
+            return {
+                ...compositeRes.data,
+                watchers: watchersRes.data.watchers
+            };
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 60, // 1 min stale
+    });
+}
+
+export function useTickerHistory(symbol: string, interval: string = '1d', days?: number) {
+    return useQuery({
+        queryKey: [...tickerKeys.all, 'history', symbol, interval, days],
+        queryFn: async () => {
+             if (!symbol) return [];
+             const res = await api.get(`/tickers/${symbol}/history`, {
+                 params: { interval, days }
+             });
+             return res.data || [];
+        },
+        enabled: !!symbol,
+        refetchInterval: () => {
+             // Don't auto-refresh if there's no data yet (or handle loading) or if error
+             
+             // Intraday Refresh Rates
+             if (['1m', '2m', '5m'].includes(interval)) return 5000; // 5s for high freq
+             if (['15m', '30m', '1h', '60m', '90m'].includes(interval)) return 30000; // 30s for mid freq
+             
+             return false; // Daily+ standard specific refresh or no auto refresh
+        },
+        staleTime: 0, // Always fetch fresh for intraday
+    });
+}
+
+export function useTickerNews(symbol?: string) {
+    return useQuery({
+        queryKey: tickerKeys.news(symbol || ''),
+        queryFn: async () => {
+            if (!symbol) return [];
+            const res = await api.get(`/tickers/${symbol}/news`);
+            return res.data || [];
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 60 * 5, // 5 min
+    });
+}
+
+export function useTickerRisk(symbol?: string) {
+    return useQuery({
+        queryKey: tickerKeys.risk(symbol || ''),
+        queryFn: async () => {
+            if (!symbol) return null;
+            const res = await api.get(`/tickers/${symbol}/risk-reward`);
+            return res.data;
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 60 * 5, // 5 min
+    });
+}
+
+export function useTickerSocial(symbol?: string) {
+    return useQuery({
+        queryKey: tickerKeys.social(symbol || ''),
+        queryFn: async () => {
+             if (!symbol) return { comments: [], mentionedUsers: {} };
+             const res = await api.get(`/social/comments/${symbol}`);
+             // Backend returns { comments, mentionedUsers }
+             const data = res.data;
+             if (Array.isArray(data)) {
+                 // Backward compat: old format was just an array
+                 return { comments: data, mentionedUsers: {} };
+             }
+             return { comments: data.comments || [], mentionedUsers: data.mentionedUsers || {} };
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 30, // 30s
+    });
+}
+
+export function usePostComment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ symbol, content, parentId }: { symbol: string; content: string; parentId?: string }) => {
+            await api.post(`/social/comments/${symbol}`, {
+                content,
+                ...(parentId ? { parent_id: parentId } : {}),
+            });
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+        },
+        // The server validates comments (length, reply target); say what it said.
+        onError: (error) => {
+            toast.error(apiErrorMessage(error, 'Your comment could not be posted. Please try again.'));
+        },
+    });
+}
+
+export function useToggleCommentLike() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ commentId }: { commentId: string; symbol: string }) => {
+            const res = await api.post(`/social/comments/${commentId}/like`);
+            return res.data as { liked: boolean; likeCount: number };
+        },
+        onMutate: async ({ commentId, symbol }) => {
+            // Cancel outgoing refetches so they don't overwrite our optimistic update
+            await queryClient.cancelQueries({ queryKey: tickerKeys.social(symbol) });
+            await queryClient.cancelQueries({ queryKey: ['social', 'my-likes', symbol] });
+
+            // Snapshot previous values for rollback
+            const prevSocial = queryClient.getQueryData(tickerKeys.social(symbol));
+            const prevLikes = queryClient.getQueryData<string[]>(['social', 'my-likes', symbol]);
+
+            // Optimistically toggle the liked IDs
+            const wasLiked = prevLikes?.includes(commentId) ?? false;
+            queryClient.setQueryData<string[]>(['social', 'my-likes', symbol], (old = []) =>
+                wasLiked ? old.filter((id) => id !== commentId) : [...old, commentId],
+            );
+
+            // Optimistically update like_count on the comment
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            queryClient.setQueryData(tickerKeys.social(symbol), (old: any) => {
+                if (!old) return old;
+                const delta = wasLiked ? -1 : 1;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const updateComments = (comments: any[]): any[] =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    comments.map((c: any) => ({
+                        ...c,
+                        like_count: c.id === commentId ? Math.max(0, (c.like_count || 0) + delta) : c.like_count,
+                        replies: c.replies ? updateComments(c.replies) : c.replies,
+                    }));
+                return { ...old, comments: updateComments(old.comments || []) };
+            });
+
+            return { prevSocial, prevLikes };
+        },
+        onError: (_err, variables, context) => {
+            // Rollback on error
+            if (context?.prevSocial) {
+                queryClient.setQueryData(tickerKeys.social(variables.symbol), context.prevSocial);
+            }
+            if (context?.prevLikes) {
+                queryClient.setQueryData(['social', 'my-likes', variables.symbol], context.prevLikes);
+            }
+        },
+        onSettled: (_, _err, variables) => {
+            // Refetch to ensure server state is in sync
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+            queryClient.invalidateQueries({ queryKey: ['social', 'my-likes', variables.symbol] });
+        },
+    });
+}
+
+export function useMyCommentLikes(symbol?: string) {
+    return useQuery({
+        queryKey: ['social', 'my-likes', symbol || ''],
+        queryFn: async () => {
+            if (!symbol) return [];
+            const res = await api.get(`/social/comments/${symbol}/my-likes`);
+            return (res.data?.liked_ids || []) as string[];
+        },
+        enabled: !!symbol,
+        staleTime: 1000 * 30,
+    });
+}
+
+export function useDeleteComment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ commentId }: { commentId: string; symbol: string }) => {
+            await api.delete(`/social/comments/${commentId}`);
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tickerKeys.social(variables.symbol) });
+        },
+    });
+}
+
+// Research is tricky because of polling. 
+// We can use useQuery for fetching completed research, and manual mutation for triggering.
+export function useTickerResearch(symbol?: string) {
+    return useQuery({
+        queryKey: tickerKeys.research(symbol || 'all'), // Changed to distinct key if symbol exists
+        queryFn: async () => {
+            // If no symbol, we might want to return empty or all, but here we expect usage context
+            // But API now supports filtering.
+            const params: Record<string, string | number> = { limit: 50 }; // Increased limit
+            if (symbol) {
+                params.ticker = symbol;
+            }
+            
+            const res = await api.get('/research', { params });
+            // API returns paginated structure { data: [], total, ... }
+            return res.data?.data || [];
+        },
+        enabled: !!symbol,
+        staleTime: 0, 
+        refetchInterval: (query) => {
+            const data = query.state.data as Array<{ status: string }> | undefined;
+            // If data is not yet available (initial load), we might want to poll briefly or wait.
+            // But if we have data, check statuses.
+            if (data?.some((item) => item.status === 'processing' || item.status === 'pending')) {
+                return 5000; // Poll every 5s if analysis is in progress
+            }
+            return false;
+        }
+    });
+}
+
+export function useTriggerResearch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ symbol, provider, quality, question }: { symbol: string; provider?: 'openai' | 'gemini' | 'ensemble'; quality?: 'low' | 'medium' | 'high' | 'deep'; question?: string }) => {
+            const res = await api.post('/research/ask', {
+                tickers: [symbol],
+                question: question || `Deep dive analysis into ${symbol}`,
+                quality: quality || 'deep',
+                provider: provider || 'gemini'
+            });
+            return res.data;
+        },
+        onSuccess: (_, variables) => {
+            // We might want to invalidate, but polling is usually manual or requires specialized logic.
+            // For now, simpler to just return the ticket ID.
+            queryClient.invalidateQueries({ queryKey: tickerKeys.research(variables.symbol) });
+            // FORCE UPDATE GLOBAL INDICATOR
+            queryClient.invalidateQueries({ queryKey: ['research', 'active-count'] });
+            // Dashboard "AI Reports (24h)" counts the new note from creation.
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.recentResearch });
+        }
+    });
+}
+
+export function useDeleteResearch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.delete(`/research/${id}`);
+        },
+        onSuccess: () => {
+            // Invalidate all research queries
+            queryClient.invalidateQueries({ queryKey: tickerKeys.all });
+            queryClient.invalidateQueries({ queryKey: dashboardKeys.recentResearch });
+        },
+    });
+}
+
+export function useUpdateResearchTitle() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, title }: { id: string; title: string }) => {
+            await api.post(`/research/${id}/title`, { title });
+        },
+        onSuccess: () => {
+             queryClient.invalidateQueries({ queryKey: tickerKeys.all });
+        }
+    });
+}
+
+
+
+export function useActiveResearchCount() {
+    return useQuery({
+        queryKey: ['research', 'active-count'],
+        queryFn: async () => {
+            // Fetch recent research to check status
+            // Ideally backend supports status filtering, but we can fetch recent 20 and check.
+            const res = await api.get('/research', { params: { limit: 20 } });
+            const items = (res.data?.data || []) as { status: string }[];
+            return items.filter(i => i.status !== 'completed' && i.status !== 'failed').length;
+        },
+        refetchInterval: (query) => {
+            const count = query.state.data as number | undefined;
+            if (count && count > 0) {
+                return 5000; // Poll every 5s if we have active items
+            }
+            return 60000; // Poll only once per minute if idle
+        },
+        staleTime: 0,
+    });
+}
+
+
+

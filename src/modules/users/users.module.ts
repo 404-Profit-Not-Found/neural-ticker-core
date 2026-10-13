@@ -9,6 +9,7 @@ import { AdminController } from './admin.controller';
 import { AuthModule } from '../auth/auth.module';
 import { NicknameGeneratorService } from './nickname-generator.service';
 import { CreditService } from './credit.service';
+import { SecretBox } from './secret-box.service';
 import { WatchlistModule } from '../watchlist/watchlist.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
 import { ResearchModule } from '../research/research.module';
@@ -22,7 +23,7 @@ import { ResearchModule } from '../research/research.module';
     forwardRef(() => ResearchModule),
   ],
   controllers: [UsersController, AdminController],
-  providers: [UsersService, NicknameGeneratorService, CreditService],
+  providers: [UsersService, NicknameGeneratorService, CreditService, SecretBox],
   exports: [UsersService, CreditService],
 })
 export class UsersModule {}

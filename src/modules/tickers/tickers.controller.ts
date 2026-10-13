@@ -26,6 +26,7 @@ import { TickerEntity } from './entities/ticker.entity';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Ticker')
@@ -171,6 +172,12 @@ export class TickersController {
     status: 202,
     description: 'Ticker addition queued due to rate limiting.',
   }) // Added
+  @ApiResponse({ status: 403, description: 'Admin only.' })
+  // Admin only: no first-party client calls this as a regular user — users
+  // discover tickers through the read routes (capped per day) or file a
+  // ticker request for an admin to approve.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post()
   ensureBody(@Body('symbol') symbol: string) {
     if (!symbol) return;
@@ -182,6 +189,9 @@ export class TickersController {
     status: 202,
     description: 'Ticker addition queued due to rate limiting.',
   }) // Added
+  @ApiResponse({ status: 403, description: 'Admin only.' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':symbol')
   ensure(@Param('symbol') symbol: string) {
     return this.tickersService.ensureTicker(symbol.trim());
@@ -280,8 +290,13 @@ export class TickersController {
   })
   @ApiResponse({ status: 404, description: 'Ticker not found.' })
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':symbol')
-  get(@Req() req: any, @Param('symbol') symbol: string) {
+  async get(@Req() req: any, @Param('symbol') symbol: string) {
+    // Public route: an anonymous caller can only read a ticker we already
+    // track (see TickersService.assertPublicReadAllowed).
+    await this.tickersService.assertPublicReadAllowed(symbol, !!req?.user);
+
     const isAdmin = req.user?.role === 'admin';
     return this.tickersService.getTicker(symbol.trim(), isAdmin);
   }

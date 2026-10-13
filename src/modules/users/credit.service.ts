@@ -259,6 +259,116 @@ export class CreditService {
   }
 
   /**
+   * Gives credits back for a paid action that could not be delivered (today:
+   * the LLM was unavailable). Recorded as its own `refund` transaction — the
+   * spend stays in the ledger — so the history shows both.
+   *
+   * With `spendMatch`, the refund is tied to ONE spend transaction of the
+   * user (matched on a metadata key, e.g. the research ticket it paid for):
+   * the amount is whatever that spend deducted, nothing is refunded when no
+   * such spend exists (admins and system work are never charged), and a
+   * second call for the same spend does nothing. Check and credit run in one
+   * transaction with the user row locked.
+   *
+   * Returns the amount given back (0 = nothing to refund).
+   */
+  async refundCredits(
+    userId: string,
+    spend:
+      | { amount: number }
+      | {
+          spendMatch: {
+            reason:
+              | 'research_spend'
+              | 'portfolio_analysis_spend'
+              | 'social_analysis_spend';
+            metadataKey: string;
+            metadataValue: string;
+          };
+        },
+    metadata: Record<string, any> = {},
+  ): Promise<number> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const userRepo = queryRunner.manager.getRepository(User);
+      const txRepo = queryRunner.manager.getRepository(CreditTransaction);
+
+      const user = await userRepo
+        .createQueryBuilder('user')
+        .setLock('pessimistic_write')
+        .where('user.id = :id', { id: userId })
+        .getOne();
+      if (!user) {
+        await queryRunner.rollbackTransaction();
+        return 0;
+      }
+
+      let amount: number;
+      const refundMeta: Record<string, any> = { ...metadata };
+      if ('spendMatch' in spend) {
+        const { reason, metadataKey, metadataValue } = spend.spendMatch;
+        const spent = await txRepo
+          .createQueryBuilder('t')
+          .where('t.user_id = :userId', { userId })
+          .andWhere('t.reason = :reason', { reason })
+          .andWhere('t.amount < 0')
+          .andWhere('t.metadata ->> :key = :value', {
+            key: metadataKey,
+            value: metadataValue,
+          })
+          .orderBy('t.created_at', 'DESC')
+          .getOne();
+        const alreadyRefunded = spent
+          ? await txRepo
+              .createQueryBuilder('t')
+              .where('t.user_id = :userId', { userId })
+              .andWhere('t.reason = :refund', { refund: 'refund' })
+              .andWhere(`t.metadata ->> 'refund_of' = :spendId`, {
+                spendId: String(spent.id),
+              })
+              .getCount()
+          : 0;
+        if (!spent || alreadyRefunded > 0) {
+          await queryRunner.rollbackTransaction();
+          return 0;
+        }
+        amount = -spent.amount;
+        refundMeta.refund_of = String(spent.id);
+        refundMeta.spend_reason = reason;
+        refundMeta[metadataKey] = metadataValue;
+      } else {
+        amount = spend.amount;
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        await queryRunner.rollbackTransaction();
+        return 0;
+      }
+
+      user.credits_balance += amount;
+      await userRepo.save(user);
+      await txRepo.save(
+        txRepo.create({
+          user_id: userId,
+          amount,
+          reason: 'refund',
+          metadata: refundMeta,
+        }),
+      );
+
+      await queryRunner.commitTransaction();
+      return amount;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    * Resets credits to the tier cap if current date > reset_date
    * Logic typically triggered by Cron or Login interceptor
    */

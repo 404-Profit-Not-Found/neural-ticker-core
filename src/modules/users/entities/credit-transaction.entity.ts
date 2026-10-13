@@ -34,6 +34,7 @@ export class CreditTransaction {
       'manual_contribution',
       'monthly_reset',
       'admin_gift',
+      'refund',
     ],
   })
   @Column({ type: 'text' })
@@ -43,7 +44,9 @@ export class CreditTransaction {
     | 'social_analysis_spend'
     | 'manual_contribution'
     | 'monthly_reset'
-    | 'admin_gift';
+    | 'admin_gift'
+    // Credits given back for a paid action that could not be delivered.
+    | 'refund';
 
   @ApiProperty({ example: { note_id: '...', score: 85 } })
   @Column({ type: 'jsonb', nullable: true })
