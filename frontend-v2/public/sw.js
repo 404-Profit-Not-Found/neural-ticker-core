@@ -2,13 +2,14 @@
  * NeuralTicker service worker (scope: the app base — the origin root).
  *
  * 1. Speed: content-hashed build assets are served cache-first, and the app
- *    shell (index.html) is kept as an offline fallback for navigations.
+ *    shell (index.html, plus the brand mark it renders) is kept as an offline
+ *    fallback.
  * 2. Web push: shows notifications and routes clicks back into the app.
  *
  * It never touches /api requests — data is always live and cookie-scoped —
  * and never caches anything outside its own scope.
  */
-const VERSION = 'nt-v2-2';
+const VERSION = 'nt-v2-3';
 const ASSET_CACHE = `${VERSION}-assets`;
 const SHELL_CACHE = `${VERSION}-shell`;
 
@@ -16,12 +17,21 @@ const SHELL_CACHE = `${VERSION}-shell`;
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const SHELL_URL = SCOPE_PATH; // index.html
 const ASSETS_PREFIX = `${SCOPE_PATH}assets/`;
+// The wordmark's "N" is this file (Brand.tsx), not a hashed asset. Without a
+// cached copy, a shell served offline — or while the server restarts — renders
+// "euralTicker.com" with a zero-width broken image.
+const BRAND_MARK_URL = `${SCOPE_PATH}favicon.svg`;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.add(new Request(SHELL_URL, { cache: 'reload' })))
+      .then((cache) =>
+        cache.addAll([
+          new Request(SHELL_URL, { cache: 'reload' }),
+          new Request(BRAND_MARK_URL, { cache: 'reload' }),
+        ]),
+      )
       .catch(() => undefined),
   );
   self.skipWaiting();
@@ -84,6 +94,23 @@ async function shellNetworkFirst(request) {
   }
 }
 
+// Files the shell itself renders: network first so a deploy is picked up,
+// the cached copy when the server is unreachable.
+async function shellFileNetworkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok && !isHtml(response)) {
+      const cache = await caches.open(SHELL_CACHE);
+      cache.put(request, response.clone()).catch(() => undefined);
+    }
+    return response;
+  } catch (err) {
+    const cached = await caches.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    throw err;
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
@@ -97,6 +124,10 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.startsWith(ASSETS_PREFIX)) {
     event.respondWith(assetFirst(request));
+    return;
+  }
+  if (url.pathname === BRAND_MARK_URL) {
+    event.respondWith(shellFileNetworkFirst(request));
     return;
   }
   if (request.mode === 'navigate') {
