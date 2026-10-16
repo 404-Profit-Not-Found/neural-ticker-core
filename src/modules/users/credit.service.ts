@@ -19,7 +19,8 @@ export class CreditService {
     const m = model.toLowerCase();
 
     // Exact mapping matches shown in UI image
-    if (m.includes('pro') || m.includes('gpt-5')) return 5;
+    if (m.includes('pro') || m.includes('argon') || m.includes('gpt-5'))
+      return 5;
     if (
       m === 'gemini-3-flash-preview' ||
       m === 'gemini-3-flash' ||

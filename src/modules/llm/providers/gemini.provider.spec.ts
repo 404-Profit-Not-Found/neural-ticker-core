@@ -104,7 +104,7 @@ describe('GeminiProvider', () => {
       expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'user-key' });
     });
 
-    it('should use gemini-3.1-pro-preview for "deep" quality', async () => {
+    it('should use gemini-4-argon for "deep" quality', async () => {
       mockGenerateContent.mockResolvedValue({
         text: 'Deep Response',
         candidates: [],
@@ -114,9 +114,11 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-3.1-pro-preview',
+          model: 'gemini-4-argon',
           config: expect.objectContaining({
             tools: expect.arrayContaining([{ googleSearch: {} }]),
+            // Argon takes thinking levels, not a token budget.
+            thinkingConfig: { includeThoughts: true },
           }),
         }),
       );
