@@ -81,7 +81,7 @@ describe('RunAnalysisDialog', () => {
   it('locks the deep model for free users and says why', () => {
     (useAuth as Mock).mockReturnValue({ user: { id: 'u1', tier: 'free', role: 'user' } });
     const { dialog } = openDialog();
-    const pro = within(dialog).getByRole('radio', { name: /Gemini 3\.1 Pro/ });
+    const pro = within(dialog).getByRole('radio', { name: /Gemini 4 Argon/ });
     expect(pro).toBeDisabled();
     expect(pro).toHaveTextContent('Available on the Pro plan.');
   });
@@ -89,7 +89,7 @@ describe('RunAnalysisDialog', () => {
   it('shows what each model costs', () => {
     const { dialog } = openDialog();
     expect(within(dialog).getByRole('radio', { name: /Gemini 3\.5 Flash Lite/ })).toHaveTextContent('1 credit');
-    expect(within(dialog).getByRole('radio', { name: /Gemini 3\.1 Pro/ })).toHaveTextContent('5 credits');
+    expect(within(dialog).getByRole('radio', { name: /Gemini 4 Argon/ })).toHaveTextContent('5 credits');
   });
 
   it('can be cancelled', () => {
