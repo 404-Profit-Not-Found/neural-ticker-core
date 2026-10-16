@@ -17,7 +17,7 @@ export class GeminiProvider implements ILlmProvider {
   private client: GoogleGenAI;
 
   private readonly defaultModels = {
-    deep: 'gemini-3.1-pro-preview',
+    deep: 'gemini-4-argon',
     medium: 'gemini-3.8-flash',
     low: GEMINI_FLASH_LITE_MODEL,
     extraction: GEMINI_FLASH_LITE_MODEL,
@@ -65,8 +65,10 @@ export class GeminiProvider implements ILlmProvider {
 
     const modelName = this.resolveModel(prompt.quality);
     const isGemma = this.gemmaModels.has(modelName);
+    const isArgon = modelName.startsWith('gemini-4-argon');
     const isThinkingModel =
-      !isGemma && (modelName.includes('thinking') || modelName.includes('pro'));
+      !isGemma &&
+      (isArgon || modelName.includes('thinking') || modelName.includes('pro'));
 
     // 1. Configure Tools (Google Search)
     // Extraction is a pure JSON-from-text task; grounding adds latency
@@ -86,10 +88,15 @@ export class GeminiProvider implements ILlmProvider {
 
     let thinkingConfig: ThinkingConfig | undefined;
     if (isThinkingModel) {
-      thinkingConfig = {
-        includeThoughts: true,
-        thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
-      };
+      // Argon takes thinking *levels* (low / medium / high — no `minimal`),
+      // not a token budget. Leave the level unset so it uses its default
+      // (medium); older Pro / thinking models keep their budgets.
+      thinkingConfig = isArgon
+        ? { includeThoughts: true }
+        : {
+            includeThoughts: true,
+            thinkingBudget: modelName.includes('pro') ? 4096 : 2048,
+          };
     }
 
     const systemInstruction = isExtraction
@@ -210,9 +217,13 @@ export class GeminiProvider implements ILlmProvider {
 
     const triedOnCurrentKey = new Set<string>();
 
-    // CRITICAL: gemini-3 preview models are gated behind the Secondary (Billed) Key for stability/quota
-    const isGatedPreviewModel =
-      currentModel.startsWith('gemini-3') && currentModel.endsWith('-preview');
+    // CRITICAL: models with no free tier are gated behind the Secondary (Billed)
+    // Key: the gemini-3 "-preview" models, and Gemini 4 Argon (GA, but paid-only
+    // — it has no "-preview" suffix, so it needs its own check).
+    const isBilledOnlyModel = (m: string) =>
+      (m.startsWith('gemini-3') && m.endsWith('-preview')) ||
+      m.startsWith('gemini-4-argon');
+    const isGatedPreviewModel = isBilledOnlyModel(currentModel);
     if (isGatedPreviewModel && freeOnly) {
       // A free-only call never uses the billed key — not even for a model that
       // only the billed key serves. It stays on the free key and fails there.
@@ -295,10 +306,7 @@ export class GeminiProvider implements ILlmProvider {
             (m) => !triedOnCurrentKey.has(m),
           );
           // Gating check for next model in chain
-          const isNextGated =
-            nextFreeModel &&
-            nextFreeModel.startsWith('gemini-3') &&
-            nextFreeModel.endsWith('-preview');
+          const isNextGated = nextFreeModel && isBilledOnlyModel(nextFreeModel);
 
           if (nextFreeModel && !hasSwitchedToSecondary && !isNextGated) {
             this.logger.warn(

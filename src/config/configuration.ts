@@ -67,9 +67,9 @@ export default () => {
         // 'medium' = the balanced "flash" tier. gemini-3.8-flash has no
         // '-preview' suffix, so it runs on the primary (free) key.
         medium: process.env.GEMINI_MODEL_MEDIUM || 'gemini-3.8-flash',
-        // 'deep' = the premium "pro" tier. Pro is only available on the billed
-        // (secondary) key, so it MUST keep the gated '-preview' suffix.
-        deep: process.env.GEMINI_MODEL_DEEP || 'gemini-3.1-pro-preview',
+        // 'deep' = the premium tier: Gemini 4 Argon. It has no free tier, so the
+        // provider always routes it to the billed (secondary) key.
+        deep: process.env.GEMINI_MODEL_DEEP || 'gemini-4-argon',
         extraction:
           process.env.GEMINI_MODEL_EXTRACTION || GEMINI_FLASH_LITE_MODEL,
         // Local text tasks (summarize / score / recommend over text already in

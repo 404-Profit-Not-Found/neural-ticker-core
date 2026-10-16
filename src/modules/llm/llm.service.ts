@@ -141,6 +141,7 @@ export class LlmService {
     )
       return { provider: 'gemini', quality: 'medium' };
     if (
+      k === 'gemini-4-argon' ||
       k === 'gemini-3-pro-preview' ||
       k === 'gemini-3-pro' ||
       k === 'gemini-3.1-pro-preview' ||

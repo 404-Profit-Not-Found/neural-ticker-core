@@ -45,8 +45,8 @@ export const MODEL_OPTIONS: ModelOption[] = [
     },
     */
     {
-        key: 'gemini-3.1-pro-preview',
-        label: 'Gemini 3.1 Pro',
+        key: 'gemini-4-argon',
+        label: 'Gemini 4 Argon',
         provider: 'gemini',
         quality: 'deep',
         speed: '≈18s',
