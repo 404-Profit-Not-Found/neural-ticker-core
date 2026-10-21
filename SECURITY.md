@@ -1,21 +1,38 @@
 # Security Policy
 
-## Supported Versions
+Neural-Ticker is a single-maintainer project. The code in this repository runs
+at <https://neuralticker.com>.
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+## Reporting a vulnerability
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+Please do **not** open a public issue for security problems. Email
+**branislavlang@gmail.com** with:
 
-## Reporting a Vulnerability
+- what you found and where (URL, endpoint, file and line),
+- how to reproduce it,
+- what impact you believe it has.
 
-Use this section to tell people how to report a vulnerability.
+You will get an acknowledgement within 72 hours and a status update when the
+issue is fixed or declined. Credit in the fix commit is given if you want it.
+There is no bug bounty.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-rejected, etc.
+## Scope
 
-If you find a security vulnerability, please send an email to branislavlang@gmail.com.
+- This repository (backend `src/`, web clients `frontend-v2/` and `frontend/`,
+  workflows in `.github/`).
+- The deployed service at neuralticker.com and its API under `/api`.
+
+Out of scope: third-party data providers and LLM APIs the service calls, and
+denial-of-service testing against the live service.
+
+## Supported versions
+
+Only the `main` branch is supported; it is deployed continuously. Older tags
+and branches receive no fixes.
+
+## Secrets
+
+No real secret belongs in this repository. Configuration comes from the
+environment (see `.env.example`); `.env` is git-ignored. If you find a secret in
+the git history, report it the same way as a vulnerability so it can be
+rotated.

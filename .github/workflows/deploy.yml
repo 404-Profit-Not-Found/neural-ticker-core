@@ -1,15 +1,26 @@
-name: Deploy to Cloud Run
+name: Deploy to Cloud Run (manual fallback)
+
+# Since 2026-10-21 the live deploy path is the Cloud Build trigger
+# `rmgpgab-neural-ticker-core-us-central1-404-Profit-Not-Found-ceo`: it builds the
+# Dockerfile on every push to `main` and runs `gcloud run services update --image`
+# as the Cloud Run runtime service account — no key stored anywhere.
+#
+# This workflow used to run on every push as well (two deploys per push), and its
+# `env_vars` passed the service-account JSON through `--set-env-vars`, which split
+# it on commas and left the private key readable in the service configuration
+# (see docs/PUBLIC_LAUNCH_ASSESSMENT_2026-10-21.md, P0-1). It is kept only as a
+# manual fallback for building and deploying one commit. Environment variables of
+# the service are managed on the service itself (scripts/launch/00-cloudrun-fix-env.sh)
+# and are NOT touched here. The old key was deleted; to use this workflow again,
+# create a fresh key and store it as GCP_SA_KEY, or set up Workload Identity Federation.
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 env:
-  PROJECT_ID: neuro-b7a51 # User's project ID
-  REGION: us-central1 # Common region, user can change if needed
-  REPO_NAME: neural-repo # Artifact Registry Repo Name (User needs to create this)
+  PROJECT_ID: neuro-b7a51
+  REGION: us-central1
+  REPO_NAME: neural-repo
   SERVICE_NAME: neural-ticker-core
   IMAGE_NAME: neural-ticker-core
 
@@ -24,13 +35,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Debug Secrets
-        run: |
-          echo "Is GCP_SA_KEY set? ${{ secrets.GCP_SA_KEY != '' }}"
-          echo "Is DATABASE_URL set? ${{ secrets.DATABASE_URL != '' }}"
-      # Verify we have the secrets needed
-      # Note: We are using a Service Account Key JSON for simplicity as user has one.
-      # Ideally we use Workload Identity Federation (WIF) but that requires more setup on GCP side.
+
       - name: 'Google Auth'
         id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -51,35 +56,14 @@ jobs:
           docker push $IMAGE_TAG
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
+      # No `env_vars` on purpose: the service keeps the environment it already has.
       - name: 'Deploy to Cloud Run'
+        id: deploy
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: ${{ env.IMAGE_TAG }}
-          # flags: '--allow-unauthenticated' # Moved to bottom combined with other flags
-          env_vars: |
-             NODE_ENV=production
-             RUN_MIGRATIONS=false
-             DATABASE_URL=${{ secrets.DATABASE_URL }}
-             FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
-             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-             GEMINI_API_KEY_SECONDARY=${{ secrets.GEMINI_API_KEY_SECONDARY }}
-             JWT_SECRET=${{ secrets.JWT_SECRET }}
-             FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
-             GCP_SA_KEY=${{ secrets.GCP_SA_KEY }}
-             CRON_SECRET=${{ secrets.CRON_SECRET }}
-             GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
-             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-             APP_ENV=${{ secrets.APP_ENV }}
-             APP_PORT=${{ secrets.APP_PORT }}
-             VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }}
-             VAPID_PRIVATE_KEY=${{ secrets.VAPID_PRIVATE_KEY }}
-             VAPID_EMAIL=${{ secrets.VAPID_EMAIL }}
-             RESEARCH_SHARE_SECRET=${{ secrets.RESEARCH_SHARE_SECRET }}
           timeout: '5m'
           flags: '--allow-unauthenticated --no-use-http2'
 

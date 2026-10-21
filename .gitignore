@@ -48,3 +48,9 @@ client/
 
 .gemini/
 .env
+
+# Local tooling and design scratch — never tracked (removed from the index on 2026-10-21,
+# see docs/PUBLIC_LAUNCH_ASSESSMENT_2026-10-21.md, P2)
+.tmp-design/
+.antigravitycli/
+.claude/settings.local.json
